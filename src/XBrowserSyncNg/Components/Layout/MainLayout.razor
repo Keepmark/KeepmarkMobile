@@ -7,6 +7,10 @@
 @implements IDisposable
 
 <div class="page">
+    @if (syncing)
+    {
+        <div class="xbs-toploader" role="progressbar" aria-label="Syncing"></div>
+    }
     <div class="sidebar">
         <NavMenu />
     </div>
@@ -40,11 +44,34 @@
 
 @code {
     private string lockError = string.Empty;
+    private bool syncing;
 
     protected override void OnInitialized()
     {
         LockState.Changed += OnLockChanged;
         Toast.Changed += OnToast;
+        _ = WatchSessionAsync();
+    }
+
+    private async Task WatchSessionAsync()
+    {
+        for (int i = 0; i < 200 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnEngineStatus;
+            syncing = Session.Engine.Status == Core.Sync.SyncStatus.Syncing;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void OnEngineStatus(Core.Sync.SyncStatus s)
+    {
+        syncing = s == Core.Sync.SyncStatus.Syncing;
+        InvokeAsync(StateHasChanged);
     }
 
     private void OnLockChanged() => InvokeAsync(StateHasChanged);
@@ -77,5 +104,9 @@
     {
         LockState.Changed -= OnLockChanged;
         Toast.Changed -= OnToast;
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnEngineStatus;
+        }
     }
 }

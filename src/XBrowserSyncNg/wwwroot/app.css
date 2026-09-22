@@ -434,3 +434,22 @@ h1:focus {
 
 .xbs-statusbar-sync { flex-shrink: 0; padding: 0 0.25rem; }
 .xbs-statusbar-ver { flex-shrink: 0; font-size: 0.65rem; opacity: 0.8; }
+
+/* Top indeterminate sync loader. */
+.xbs-toploader {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 1300;
+    background: linear-gradient(90deg, transparent, #1b6ec2, transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: xbs-load-slide 1.1s linear infinite;
+}
+
+@keyframes xbs-load-slide {
+    from { background-position: -40% 0; }
+    to { background-position: 140% 0; }
+}

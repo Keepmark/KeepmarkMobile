@@ -55,6 +55,23 @@ public sealed class XbsSession : IAsyncDisposable
         Engine = engine;
         Ready = true;
         StartPollTimer();
+
+        // Cold-start background sync (auto mode only, credentials present).
+        // The UI shows a top loader while Engine.Status == Syncing.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (await _creds.GetAsync().ConfigureAwait(false) is not null)
+                {
+                    await engine.ExecuteAutoSyncAsync().ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Warn("session", $"Cold-start sync failed: {ex.GetType().Name}");
+            }
+        });
     }
 
     public XSyncApiClient ApiFor(string serviceUrl)
