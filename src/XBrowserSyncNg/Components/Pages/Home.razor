@@ -72,11 +72,14 @@ else
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
 
-    <p class="text-muted mt-3"><small>Status: @engineStatus · Last sync: @(lastSync?.ToLocalTime().ToString("g") ?? "never")</small></p>
-    @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
-    {
-        <button class="btn btn-outline-primary btn-sm" @onclick="SyncNow">Sync now</button>
-    }
+    <div class="xbs-statusbar">
+        <span class="xbs-statusbar-main">● @engineStatus · Last sync: @(lastSync?.ToLocalTime().ToString("g") ?? "never")</span>
+        @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
+        {
+            <button class="btn btn-link btn-sm xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
+        }
+        <span class="xbs-statusbar-ver">v@(AppInfo.VersionString)</span>
+    </div>
 }
 
 <button class="btn btn-primary xbs-fab" @onclick="() => sheetFor = new SheetTarget(null, CurrentParent)" aria-label="Add">+</button>
