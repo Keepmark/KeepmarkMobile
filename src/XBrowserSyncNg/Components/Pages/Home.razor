@@ -39,7 +39,7 @@ else
         <p class="text-muted">@hits.Count result(s)</p>
         @foreach (var id in hitRows)
         {
-            <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRowId == id" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+            <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRows.Contains(id)" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
                          FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
     }
@@ -70,7 +70,7 @@ else
                     <div class="xbs-pinned-list">
                         @foreach (var r in pinnedRows)
                         {
-                            <BookmarkRow @key="@("p" + r.RowId)" Row="r" Pinned="true" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId"
+                            <BookmarkRow @key="@("p" + r.RowId)" Row="r" Pinned="true" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
                                              FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
@@ -79,13 +79,13 @@ else
         }
         @foreach (var r in rows)
         {
-            <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
+            <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
 
     <div class="xbs-statusbar">
-        <span class="xbs-statusbar-main">● @engineStatus · Last sync: @FormatLastSync(lastSync)</span>
+        <span class="xbs-statusbar-main">@if (engineStatus != Core.Sync.SyncStatus.Idle){<text>● @engineStatus · </text>}Last sync: @FormatLastSync(lastSync)</span>
         @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
         {
             <button class="btn btn-link btn-sm xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
@@ -94,11 +94,12 @@ else
     </div>
 }
 
-<button class="btn btn-primary xbs-fab" @onclick="() => sheetFor = new SheetTarget(null, CurrentParent)" aria-label="Add">+</button>
+<button class="btn btn-primary xbs-fab" @onclick="AddNew" aria-label="Add">+</button>
 
 @if (sheetFor is not null)
 {
     <BookmarkSheet Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
+                   PresetUrl="sheetFor.PresetUrl" PresetDesc="sheetFor.PresetDesc"
                    Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null" />
 }
 
@@ -163,7 +164,7 @@ else
     private ItemRow? menuFor;
     private bool pinnedOpen = true;
     private int? flashRowId;
-    private int? expandedRowId;
+    private readonly HashSet<int> expandedRows = new();
     private Dictionary<int, string> pinPaths = new();
     private string sortMode = "Default";
     private CancellationTokenSource? flashTimer;
@@ -172,7 +173,7 @@ else
 
     private int? CurrentParent => crumbs.Count == 0 ? null : crumbs.Peek().RowId;
 
-    private sealed record SheetTarget(ItemRow? Row, int? Parent);
+    private sealed record SheetTarget(ItemRow? Row, int? Parent, string? PresetUrl = null, string? PresetDesc = null);
 
     protected override async Task OnInitializedAsync()
     {
@@ -269,9 +270,8 @@ else
     [JSInvokable]
     public Task OnRowSwipeRight(int rowId)
     {
-        // Toggle: swiping the expanded row collapses it, swiping another
-        // row moves the expansion (a single row is ever expanded).
-        expandedRowId = expandedRowId == rowId ? null : rowId;
+        // Swipe right: expand details. Multiple rows stay expanded together.
+        expandedRows.Add(rowId);
         StateHasChanged();
         return Task.CompletedTask;
     }
@@ -279,9 +279,9 @@ else
     [JSInvokable]
     public Task OnRowSwipeLeft(int rowId)
     {
-        if (expandedRowId == rowId)
+        // Swipe left: collapse this row only.
+        if (expandedRows.Remove(rowId))
         {
-            expandedRowId = null;
             StateHasChanged();
         }
 
@@ -392,6 +392,31 @@ else
         await RefreshAsync();
     }
 
+    private void AddNew()
+    {
+        // Prefill from clipboard when it holds a URI: full URL in its field,
+        // description as host+path without scheme, query or fragment.
+        string? presetUrl = null;
+        string? presetDesc = null;
+        try
+        {
+            var clip = Clipboard.Default.GetTextAsync().GetAwaiter().GetResult();
+            if (Uri.TryCreate(clip?.Trim(), UriKind.Absolute, out var u) &&
+                (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps))
+            {
+                presetUrl = u.ToString();
+                var path = u.AbsolutePath == "/" ? string.Empty : u.AbsolutePath;
+                presetDesc = u.Host + path;
+            }
+        }
+        catch
+        {
+            // Clipboard unavailable: plain empty form.
+        }
+
+        sheetFor = new SheetTarget(null, CurrentParent, presetUrl, presetDesc);
+    }
+
     private async Task SaveSheet(BookmarkSheet.BookmarkEdit e)
     {
         if (Session.Engine is null) return;
@@ -452,7 +477,6 @@ else
     private async Task GoRoot()
     {
         ClearFlash();
-        expandedRowId = null;
         crumbs.Clear();
         query = string.Empty;
         isSearch = false;
@@ -462,7 +486,6 @@ else
     private async Task JumpTo(int rowId)
     {
         ClearFlash();
-        expandedRowId = null;
         while (crumbs.Count > 0 && crumbs.Peek().RowId != rowId)
         {
             crumbs.Pop();
@@ -480,7 +503,6 @@ else
 
         var chain = await Session.Store.GetAncestorChainAsync(row.RowId);
         ClearFlash();
-        expandedRowId = null;
         crumbs.Clear();
         foreach (var folder in chain)
         {

@@ -36,13 +36,15 @@
             }
             <div class="mb-3">
                 <label class="form-label">Folder</label>
-                <select class="form-select" @bind="parentRowId">
-                    <option value="">Top level</option>
-                    @foreach (var f in Folders)
-                    {
-                        <option value="@f.RowId">@f.Title</option>
-                    }
-                </select>
+                <button type="button" class="form-control text-start" @onclick="() => showTree = !showTree">
+                    @(SelectedFolderPath() ?? "⌂ Top level")
+                </button>
+                @if (showTree)
+                {
+                    <div class="xbs-tree-box">
+                        <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnFolderPicked" />
+                    </div>
+                }
             </div>
             @if (!string.IsNullOrEmpty(error))
             {
@@ -60,6 +62,8 @@
     [Parameter] public bool Visible { get; set; }
     [Parameter] public ItemRow? Existing { get; set; }
     [Parameter] public int? DefaultParent { get; set; }
+    [Parameter] public string? PresetUrl { get; set; }
+    [Parameter] public string? PresetDesc { get; set; }
     [Parameter] public List<ItemRow> Folders { get; set; } = [];
     [Parameter] public EventCallback<BookmarkEdit> OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
@@ -69,10 +73,44 @@
     private string description = string.Empty;
     private string tags = string.Empty;
     private bool NewIsFolder;
-    private string parentRowId = string.Empty;
+    private int? selectedFolder;
+    private bool showTree;
     private string error = string.Empty;
 
     private bool IsEdit => Existing is not null;
+
+    private string? SelectedFolderPath()
+    {
+        if (selectedFolder is null)
+        {
+            return null;
+        }
+
+        var byId = Folders.ToDictionary(f => f.RowId);
+        if (!byId.TryGetValue(selectedFolder.Value, out var cur))
+        {
+            return null;
+        }
+
+        var parts = new Stack<string>();
+        while (cur is not null)
+        {
+            if (cur.Title is not null)
+            {
+                parts.Push(cur.Title);
+            }
+
+            cur = cur.ParentRowId is not null && byId.TryGetValue(cur.ParentRowId.Value, out var p) ? p : null;
+        }
+
+        return "\U0001F4C1 " + string.Join(" / ", parts);
+    }
+
+    private void OnFolderPicked(int? rowId)
+    {
+        selectedFolder = rowId;
+        showTree = false;
+    }
     private bool EffectiveIsFolder => IsEdit ? Existing!.IsFolder : NewIsFolder;
 
     protected override void OnParametersSet()
@@ -83,19 +121,23 @@
         }
 
         error = string.Empty;
+        showTree = false;
         if (Existing is not null)
         {
             title = Existing.Title ?? string.Empty;
             url = Existing.Url ?? string.Empty;
             description = Existing.Description ?? string.Empty;
             tags = Existing.Tags?.Replace("\u001F", ", ") ?? string.Empty;
-            parentRowId = Existing.ParentRowId?.ToString() ?? string.Empty;
+            selectedFolder = Existing.ParentRowId;
         }
         else
         {
-            title = url = description = tags = string.Empty;
+            title = string.Empty;
+            url = PresetUrl ?? string.Empty;
+            description = PresetDesc ?? string.Empty;
+            tags = string.Empty;
             NewIsFolder = false;
-            parentRowId = DefaultParent?.ToString() ?? string.Empty;
+            selectedFolder = DefaultParent;
         }
     }
 
@@ -128,11 +170,10 @@
                 .Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        int? parent = string.IsNullOrEmpty(parentRowId) ? null : int.Parse(parentRowId);
         await OnSave.InvokeAsync(new BookmarkEdit(Existing?.RowId, title.Trim(),
             EffectiveIsFolder ? null : url.Trim(),
             EffectiveIsFolder ? null : description.Trim(),
-            EffectiveIsFolder ? null : tagList, EffectiveIsFolder, parent));
+            EffectiveIsFolder ? null : tagList, EffectiveIsFolder, selectedFolder));
     }
 
     public sealed record BookmarkEdit(

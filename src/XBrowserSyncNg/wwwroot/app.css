@@ -321,6 +321,10 @@ h1:focus {
 
 /* Breadcrumb bar: horizontally scrollable, 48px touch targets. */
 .xbs-crumbs {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 900;
+    background: var(--bs-body-bg, #fff);
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -534,3 +538,29 @@ h1:focus {
 
 .xbs-appbar img { width: 28px; height: 28px; }
 .xbs-appbar span { font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; }
+
+/* Folder tree picker inside the edit sheet. */
+.xbs-tree-box {
+    max-height: 40dvh;
+    overflow-y: auto;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.xbs-tree-node {
+    display: block;
+    width: 100%;
+    text-align: left;
+    min-height: 48px;
+    padding: 0.4rem 0.6rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+}
+
+.xbs-tree-node.selected {
+    background: rgba(27, 110, 194, 0.15);
+    font-weight: 700;
+}

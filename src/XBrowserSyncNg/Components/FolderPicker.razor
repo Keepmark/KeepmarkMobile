@@ -1,0 +1,49 @@
+@using XBrowserSyncNg.Core.Data
+
+<div class="xbs-tree">
+    <button type="button" class="xbs-tree-node @(Selected is null ? "selected" : string.Empty)" @onclick="() => Select(null)">
+        <span>⌂ Top level</span>
+    </button>
+    @foreach (var root in Roots)
+    {
+        <TreeNode Node="root" Level="0" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<ItemRow> Folders { get; set; } = [];
+    [Parameter] public int? Selected { get; set; }
+    [Parameter] public EventCallback<int?> SelectedChanged { get; set; }
+
+    private List<ItemRow> Roots = [];
+    private Dictionary<int, List<ItemRow>> ByParent = new();
+
+    protected override void OnParametersSet()
+    {
+        var ids = Folders.Select(f => f.RowId).ToHashSet();
+        Roots = Folders.Where(f => f.ParentRowId is null || !ids.Contains(f.ParentRowId.Value))
+            .OrderBy(f => f.SortOrder).ToList();
+        ByParent = Folders.Where(f => f.ParentRowId is not null)
+            .GroupBy(f => f.ParentRowId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.SortOrder).ToList());
+    }
+
+    private Task Select(int? rowId) => SelectedChanged.InvokeAsync(rowId);
+
+    private RenderFragment TreeNode(ItemRow Node, int Level) => __builder =>
+    {
+        <div style="margin-left: @(Level)rem">
+            <button type="button" class="xbs-tree-node @(Selected == Node.RowId ? "selected" : string.Empty)"
+                    @onclick="() => Select(Node.RowId)" @onclick:stopPropagation="true">
+                <span>📁 @(Node.Title ?? "Folder")</span>
+            </button>
+            @if (ByParent.TryGetValue(Node.RowId, out var kids))
+            {
+                @foreach (var k in kids)
+                {
+                    @TreeNode(k, Level + 1)
+                }
+            }
+        </div>
+    };
+}
