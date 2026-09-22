@@ -89,10 +89,13 @@ else
         <div class="xbs-sheet" @onclick:stopPropagation="true">
             <h4>@(menuFor.Title ?? menuFor.Url)</h4>
             <div class="d-grid gap-2">
-                @if (!menuFor.IsFolder) { <button class="btn btn-primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }">Open</button> }
+                @if (!menuFor.IsFolder)
+                {
+                    <button class="btn btn-primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }">Open</button>
+                    <button class="btn btn-secondary" @onclick="() => ShareRow(menuFor)">Share</button>
+                }
                 <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
-                <button class="btn btn-secondary" @onclick="() => ShareRow(menuFor)">Share</button>
-                <button class="btn btn-secondary" @onclick="() => TogglePin(menuFor)">Pin / unpin</button>
+                <button class="btn btn-secondary" @onclick="() => TogglePin(menuFor)">@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? "Unpin" : "Pin")</button>
                 <button class="btn btn-danger" @onclick="() => DeleteRow(menuFor)">Delete</button>
                 <button class="btn btn-link" @onclick="() => menuFor = null">Cancel</button>
             </div>
