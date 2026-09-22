@@ -208,11 +208,13 @@ else
             lastSync = Session.Engine.LastSyncAt;
             var parent = CurrentParent;
             rows = await Session.Store.GetChildrenAsync(parent);
+            // Display-only sort: stored SortOrder (and therefore the sync blob)
+            // is never touched — folders first, separators last.
             rows = sortMode switch
             {
-                "Asc" => rows.OrderBy(r => r.Url == Core.XbsConstants.SeparatorUrl)
+                "Asc" => rows.OrderBy(RankForSort)
                     .ThenBy(r => SortTitle(r), StringComparer.OrdinalIgnoreCase).ToList(),
-                "Desc" => rows.OrderBy(r => r.Url == Core.XbsConstants.SeparatorUrl)
+                "Desc" => rows.OrderBy(RankForSort)
                     .ThenByDescending(r => SortTitle(r), StringComparer.OrdinalIgnoreCase).ToList(),
                 _ => rows
             };
@@ -515,6 +517,10 @@ else
     }
 
     private static string SortTitle(Core.Data.ItemRow r) => r.Title ?? r.Url ?? string.Empty;
+
+    /// <summary>Display rank only: folders 0, bookmarks 1, separators 2. Never persisted.</summary>
+    private static int RankForSort(Core.Data.ItemRow r) =>
+        r.Url == Core.XbsConstants.SeparatorUrl ? 2 : r.IsFolder ? 0 : 1;
 
     private async Task SetSort(string mode)
     {
