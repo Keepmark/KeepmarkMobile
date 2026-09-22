@@ -54,7 +54,7 @@
 
         try
         {
-            await Session.Engine.ExecuteAutoSyncAsync();
+            await Session.Engine.ForceSyncAsync();
             await Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
                 ? $"Sync complete {DateTime.Now:HH:mm:ss}"
                 : $"Sync finished: {Session.Engine.Status}");

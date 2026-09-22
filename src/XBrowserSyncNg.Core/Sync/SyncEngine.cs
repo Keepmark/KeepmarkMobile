@@ -152,13 +152,19 @@ public sealed class SyncEngine(
     }
 
     /// <summary>Auto tick: pull if remote is newer, else push if local is dirty.</summary>
-    public async Task ExecuteAutoSyncAsync(CancellationToken ct = default)
+    public Task ExecuteAutoSyncAsync(CancellationToken ct = default)
     {
         if (Mode != SyncMode.Auto)
         {
-            return;
+            return Task.CompletedTask;
         }
 
+        return ForceSyncAsync(ct);
+    }
+
+    /// <summary>Manual "Sync now": same as the auto tick but runs in any mode.</summary>
+    public async Task ForceSyncAsync(CancellationToken ct = default)
+    {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {

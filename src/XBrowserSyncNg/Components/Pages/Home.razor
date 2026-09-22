@@ -34,7 +34,7 @@ else
         @foreach (var id in hitRows)
         {
             <BookmarkRow Row="byRow[id]" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
-                         FolderPath="@hitPaths.GetValueOrDefault(id)" OnAction="OnRowAction" />
+                         FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
     }
     else
@@ -44,22 +44,21 @@ else
             <h6 class="text-muted mt-1">Pinned</h6>
             @foreach (var r in pinnedRows)
             {
-                <BookmarkRow Row="r" Pinned="true" OnAction="OnRowAction" />
+                <BookmarkRow Row="r" Pinned="true" OnOpen="OpenRow" OnAction="OnRowAction" />
             }
             <h6 class="text-muted mt-2">All</h6>
         }
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="" @onclick="GoRoot" @onclick:preventDefault>Top</a></li>
-                @foreach (var c in crumbs)
-                {
-                    <li class="breadcrumb-item">@c.Title</li>
-                }
-            </ol>
-        </nav>
+        <div class="xbs-crumbs" role="navigation" aria-label="Folders">
+            <button class="xbs-crumb" @onclick="GoRoot" aria-label="Top level">⌂</button>
+            @foreach (var c in crumbs.Reverse())
+            {
+                <span class="xbs-crumb-sep">/</span>
+                <button class="xbs-crumb" @onclick="() => JumpTo(c.RowId)">@c.Title</button>
+            }
+        </div>
         @foreach (var r in rows)
         {
-            <BookmarkRow Row="r" Pinned="pinned.Contains(r.NodeId ?? -1)" OnAction="OnRowAction" />
+            <BookmarkRow Row="r" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
@@ -206,13 +205,6 @@ else
         }
     }
 
-    [JSInvokable]
-    public async Task OnRowSwipeRight(int rowId)
-    {
-        var row = await ResolveAsync(rowId);
-        if (row is not null) await TogglePin(row);
-    }
-
     private async Task<ItemRow?> ResolveAsync(int rowId)
     {
         if (byRow.TryGetValue(rowId, out var cached)) return cached;
@@ -346,7 +338,7 @@ else
 
         try
         {
-            await Session.Engine.ExecuteAutoSyncAsync();
+            await Session.Engine.ForceSyncAsync();
             await Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
                 ? $"Sync complete {DateTime.Now:HH:mm:ss}"
                 : $"Sync finished: {Session.Engine.Status}",
@@ -363,6 +355,18 @@ else
     private async Task GoRoot()
     {
         crumbs.Clear();
+        query = string.Empty;
+        isSearch = false;
+        await RefreshAsync();
+    }
+
+    private async Task JumpTo(int rowId)
+    {
+        while (crumbs.Count > 0 && crumbs.Peek().RowId != rowId)
+        {
+            crumbs.Pop();
+        }
+
         query = string.Empty;
         isSearch = false;
         await RefreshAsync();

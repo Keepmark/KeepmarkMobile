@@ -15,10 +15,9 @@
         <div class="top-row px-4">
             <span class="navbar-brand">XBrowserSyncNg</span>
             <span>
-                <button class="btn btn-sm btn-outline-primary me-2" @onclick="SyncNow" disabled="@syncing">
+                <button class="btn btn-sm btn-outline-primary" @onclick="SyncNow" disabled="@syncing" onmouseup="this.blur()">
                     @(syncing ? "Syncing…" : "Sync now")
                 </button>
-                <span class="badge @(badgeClass)">@badgeText</span>
             </span>
         </div>
 
@@ -51,8 +50,6 @@
 @code {
     private string lockError = string.Empty;
     private bool syncing;
-    private string badgeText = "…";
-    private string badgeClass = "bg-secondary";
 
     protected override void OnInitialized()
     {
@@ -71,27 +68,13 @@
         if (Session.Engine is not null)
         {
             Session.Engine.StatusChanged += OnEngineStatus;
-            UpdateBadge(Session.Engine.Status);
         }
     }
 
     private void OnEngineStatus(Core.Sync.SyncStatus s)
     {
         syncing = s == Core.Sync.SyncStatus.Syncing;
-        UpdateBadge(s);
         InvokeAsync(StateHasChanged);
-    }
-
-    private void UpdateBadge(Core.Sync.SyncStatus s)
-    {
-        badgeText = s.ToString();
-        badgeClass = s switch
-        {
-            Core.Sync.SyncStatus.Idle => "bg-success",
-            Core.Sync.SyncStatus.Syncing => "bg-info text-dark",
-            Core.Sync.SyncStatus.NoCredentials => "bg-secondary",
-            _ => "bg-warning text-dark"
-        };
     }
 
     private void OnLockChanged() => InvokeAsync(StateHasChanged);
@@ -107,7 +90,7 @@
         syncing = true;
         try
         {
-            await Session.Engine.ExecuteAutoSyncAsync();
+            await Session.Engine.ForceSyncAsync();
             var st = Session.Engine.Status;
             if (st == Core.Sync.SyncStatus.Idle)
             {
