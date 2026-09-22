@@ -52,7 +52,7 @@ else
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
             <div class="xbs-pinned-box">
-                <button class="xbs-pinned-head" @onclick="() => pinnedOpen = !pinnedOpen" aria-expanded="@pinnedOpen">
+                <button class="xbs-pinned-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen">
                     <span class="chev">@(pinnedOpen ? "▾" : "▸")</span>
                     <span>📌 Pinned (@pinnedRows.Count)</span>
                 </button>
@@ -81,7 +81,7 @@ else
     }
 
     <div class="xbs-statusbar">
-        <span class="xbs-statusbar-main">● @engineStatus · Last sync: @(lastSync?.ToLocalTime().ToString("g") ?? "never")</span>
+        <span class="xbs-statusbar-main">● @engineStatus · Last sync: @FormatLastSync(lastSync)</span>
         @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
         {
             <button class="btn btn-link btn-sm xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
@@ -184,6 +184,7 @@ else
         }
 
         pinned = Pins.Load();
+        pinnedOpen = Preferences.Get("pinned_open", true);
         sortMode = AppSettings.ListSort;
         await RefreshAsync();
         ready = true;
@@ -234,7 +235,23 @@ else
     private void OnStatus(Core.Sync.SyncStatus s)
     {
         engineStatus = s;
+        if (Session.Engine is not null)
+        {
+            lastSync = Session.Engine.LastSyncAt;
+        }
+
         InvokeAsync(StateHasChanged);
+    }
+
+    private static string FormatLastSync(DateTimeOffset? value)
+    {
+        if (value is null)
+        {
+            return "never";
+        }
+
+        var local = value.Value.ToLocalTime();
+        return local.Date == DateTime.Now.Date ? local.ToString("t") : local.ToString("g");
     }
 
     private void OnData() => InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); });
@@ -329,6 +346,7 @@ else
         if (row?.NodeId is null || Session.Engine is null) return;
         bool added = Pins.Toggle(row.NodeId.Value);
         pinned = Pins.Load();
+        pinnedOpen = Preferences.Get("pinned_open", true);
         sortMode = AppSettings.ListSort;
         await RefreshAsync();
         await Toast.ShowAsync(added ? "Pinned" : "Unpinned");
@@ -488,6 +506,12 @@ else
     {
         flashTimer?.Cancel();
         flashRowId = null;
+    }
+
+    private void TogglePinned()
+    {
+        pinnedOpen = !pinnedOpen;
+        Preferences.Set("pinned_open", pinnedOpen);
     }
 
     private static string SortTitle(Core.Data.ItemRow r) => r.Title ?? r.Url ?? string.Empty;
