@@ -1,0 +1,46 @@
+// Interop constants. Verified against api/ (v1.1.13) and app/ sources.
+// Do not change without checking server version routing (Accept-Version)
+// and the sync-version compatibility rule (remote version must be <= SyncClientVersion).
+namespace XBrowserSyncNg.Core;
+
+public static class XbsConstants
+{
+    public const string DefaultServiceUrl = "https://api.xbrowsersync.org";
+
+    /// <summary>Minimum API version this client supports (mirrors app Globals.MinApiVersion).</summary>
+    public const string MinApiVersion = "1.1.9";
+
+    /// <summary>API version sent in the Accept-Version header. Must satisfy the server's ^1.1.3 route.</summary>
+    public const string ApiVersion = "1.1.13";
+
+    /// <summary>
+    /// Sync format version advertised when creating/upgrading a sync.
+    /// Kept >= latest known client (1.8.0) so existing syncs are never rejected
+    /// by the "remote version must be <= app version" rule. Independent from the APK version.
+    /// </summary>
+    public const string SyncClientVersion = "1.8.0";
+
+    /// <summary>PBKDF2 iteration count used by the original JS client (crypto.service.ts).</summary>
+    public const int KeyDerivationIterations = 250_000;
+
+    /// <summary>AES-GCM nonce length in bytes (prepended to the ciphertext).</summary>
+    public const int GcmNonceLength = 16;
+
+    /// <summary>Maximum bookmark description length enforced by the original client.</summary>
+    public const int DescriptionMaxLength = 300;
+
+    /// <summary>Separator bookmark marker (bookmarks with this URL render as separators).</summary>
+    public const string SeparatorUrl = "xbs:separator";
+
+    /// <summary>Delimiter used in QR payloads joining sync fields.</summary>
+    public const string QrDelimiter = "|$$|";
+
+    /// <summary>Default auto-sync poll interval, mirrors the 15-minute background alarm.</summary>
+    public static readonly TimeSpan SyncPollInterval = TimeSpan.FromMinutes(15);
+
+    /// <summary>HTTP timeout for /info probes (mirrors checkServiceStatus 3000ms).</summary>
+    public static readonly TimeSpan ServiceProbeTimeout = TimeSpan.FromSeconds(3);
+
+    /// <summary>Default HTTP timeout for bookmark up/downloads (mirrors the 12s interceptor default).</summary>
+    public static readonly TimeSpan DefaultHttpTimeout = TimeSpan.FromSeconds(12);
+}

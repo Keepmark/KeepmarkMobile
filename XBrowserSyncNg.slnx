@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/XBrowserSyncNg.Core/XBrowserSyncNg.Core.csproj" />
+    <Project Path="src/XBrowserSyncNg/XBrowserSyncNg.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/XBrowserSyncNg.Core.Tests/XBrowserSyncNg.Core.Tests.csproj" />
+  </Folder>
+</Solution>
