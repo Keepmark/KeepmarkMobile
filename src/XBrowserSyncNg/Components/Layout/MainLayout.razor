@@ -3,6 +3,7 @@
 @inject XBrowserSyncNg.Services.AppLockState LockState
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
 @inject XBrowserSyncNg.Services.IAppLockService AppLock
+@inject XBrowserSyncNg.Services.ToastState Toast
 @implements IDisposable
 
 <div class="page">
@@ -14,10 +15,10 @@
         <div class="top-row px-4">
             <span class="navbar-brand">XBrowserSyncNg</span>
             <span>
-                <button class="btn btn-sm btn-outline-primary me-2" @onclick="SyncNow">Sync now</button>
-                <span class="badge @(Session.Engine?.Status == Core.Sync.SyncStatus.Idle ? "bg-success" : "bg-warning text-dark")">
-                    @(Session.Engine?.Status.ToString() ?? "…")
-                </span>
+                <button class="btn btn-sm btn-outline-primary me-2" @onclick="SyncNow" disabled="@syncing">
+                    @(syncing ? "Syncing…" : "Sync now")
+                </button>
+                <span class="badge @(badgeClass)">@badgeText</span>
             </span>
         </div>
 
@@ -26,6 +27,11 @@
         </article>
     </main>
 </div>
+
+@if (Toast.Message is not null)
+{
+    <div class="xbs-toast @(Toast.IsError ? "error" : string.Empty)">@Toast.Message</div>
+}
 
 @if (LockState.Locked)
 {
@@ -44,24 +50,89 @@
 
 @code {
     private string lockError = string.Empty;
+    private bool syncing;
+    private string badgeText = "…";
+    private string badgeClass = "bg-secondary";
 
-    protected override void OnInitialized() => LockState.Changed += OnLockChanged;
+    protected override void OnInitialized()
+    {
+        LockState.Changed += OnLockChanged;
+        Toast.Changed += OnToast;
+        _ = WatchSessionAsync();
+    }
+
+    private async Task WatchSessionAsync()
+    {
+        for (int i = 0; i < 200 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnEngineStatus;
+            UpdateBadge(Session.Engine.Status);
+        }
+    }
+
+    private void OnEngineStatus(Core.Sync.SyncStatus s)
+    {
+        syncing = s == Core.Sync.SyncStatus.Syncing;
+        UpdateBadge(s);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateBadge(Core.Sync.SyncStatus s)
+    {
+        badgeText = s.ToString();
+        badgeClass = s switch
+        {
+            Core.Sync.SyncStatus.Idle => "bg-success",
+            Core.Sync.SyncStatus.Syncing => "bg-info text-dark",
+            Core.Sync.SyncStatus.NoCredentials => "bg-secondary",
+            _ => "bg-warning text-dark"
+        };
+    }
 
     private void OnLockChanged() => InvokeAsync(StateHasChanged);
+    private void OnToast() => InvokeAsync(StateHasChanged);
 
     private async Task SyncNow()
     {
-        if (Session.Engine is not null)
+        if (Session.Engine is null || syncing)
         {
-            try
-            {
-                await Session.Engine.ExecuteAutoSyncAsync();
-            }
-            catch
-            {
-                // Status badge + log carry the outcome; never crash the shell.
-            }
+            return;
+        }
 
+        syncing = true;
+        try
+        {
+            await Session.Engine.ExecuteAutoSyncAsync();
+            var st = Session.Engine.Status;
+            if (st == Core.Sync.SyncStatus.Idle)
+            {
+                await Toast.ShowAsync($"Sync complete {DateTime.Now:HH:mm:ss}");
+            }
+            else if (st == Core.Sync.SyncStatus.Conflict)
+            {
+                await Toast.ShowAsync("Sync conflict: review in Explore", isError: true);
+            }
+            else if (st == Core.Sync.SyncStatus.NoCredentials)
+            {
+                await Toast.ShowAsync("No sync connected — open Connect", isError: true);
+            }
+            else
+            {
+                await Toast.ShowAsync($"Sync finished: {st}", isError: st != Core.Sync.SyncStatus.Offline);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Toast.ShowAsync(ex.Message, isError: true);
+        }
+        finally
+        {
+            syncing = false;
             StateHasChanged();
         }
     }
@@ -89,5 +160,13 @@
         }
     }
 
-    public void Dispose() => LockState.Changed -= OnLockChanged;
+    public void Dispose()
+    {
+        LockState.Changed -= OnLockChanged;
+        Toast.Changed -= OnToast;
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnEngineStatus;
+        }
+    }
 }

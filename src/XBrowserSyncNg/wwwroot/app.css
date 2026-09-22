@@ -261,6 +261,23 @@ h1:focus {
     padding: 0.6rem 0.8rem;
 }
 
+/* Global toast */
+.xbs-toast {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    bottom: max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem));
+    z-index: 1200;
+    text-align: center;
+    background: #212529;
+    color: #fff;
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    pointer-events: none;
+}
+
+.xbs-toast.error { background: #b32121; }
+
 /* Add button */
 .xbs-fab {
     position: fixed;

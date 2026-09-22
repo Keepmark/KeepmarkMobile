@@ -75,6 +75,7 @@ public sealed class SyncEngine(
             if (remote.LastUpdated == local)
             {
                 log.Info("sync", "Pull: already up to date");
+                LastSyncAt = DateTimeOffset.UtcNow;
                 SetStatus(SyncStatus.Idle);
                 return false;
             }
@@ -201,6 +202,8 @@ public sealed class SyncEngine(
             }
             else
             {
+                // Successful check, nothing to do: still stamp the check time.
+                LastSyncAt = DateTimeOffset.UtcNow;
                 SetStatus(SyncStatus.Idle);
             }
         }

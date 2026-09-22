@@ -1,4 +1,5 @@
 ﻿@inject XBrowserSyncNg.Services.XbsSession Session
+@inject XBrowserSyncNg.Services.ToastState Toast
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -46,15 +47,21 @@
 @code {
     private async Task SyncNow()
     {
-        if (Session.Engine is not null)
+        if (Session.Engine is null)
         {
-            try
-            {
-                await Session.Engine.ExecuteAutoSyncAsync();
-            }
-            catch
-            {
-            }
+            return;
+        }
+
+        try
+        {
+            await Session.Engine.ExecuteAutoSyncAsync();
+            await Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
+                ? $"Sync complete {DateTime.Now:HH:mm:ss}"
+                : $"Sync finished: {Session.Engine.Status}");
+        }
+        catch (Exception ex)
+        {
+            await Toast.ShowAsync(ex.Message, isError: true);
         }
     }
 }

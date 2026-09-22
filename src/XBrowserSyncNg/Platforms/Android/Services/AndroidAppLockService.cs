@@ -35,25 +35,48 @@ public sealed class AndroidAppLockService : global::XBrowserSyncNg.Services.IApp
 
             var executor = ContextCompat.GetMainExecutor(activity)!;
             var prompt = new BiometricPrompt(activity, executor, new AuthCallback(tcs));
-            var builder = new BiometricPrompt.PromptInfo.Builder()
-                .SetTitle(title)
-                .SetConfirmationRequired(true);
 
-            if (requireDeviceCredential)
+            bool deviceCredential;
+            int authenticators;
+            var mode = Preferences.Get("app_lock", "Off");
+            if (requireDeviceCredential || mode != "BiometricOnly")
             {
-                // PIN/pattern/password only — no biometric shortcut, no negative button allowed.
-                builder.SetAllowedAuthenticators(BiometricManager.Authenticators.DeviceCredential);
+                // PIN/pattern/password (alone or as biometric fallback).
+                // NOTE: with DEVICE_CREDENTIAL allowed, a custom negative button
+                // is forbidden and makes the builder throw — the system provides
+                // its own cancel/credential UI.
+                authenticators = requireDeviceCredential
+                    ? BiometricManager.Authenticators.DeviceCredential
+                    : BiometricManager.Authenticators.BiometricStrong | BiometricManager.Authenticators.DeviceCredential;
+                deviceCredential = true;
             }
             else
             {
-                var mode = Preferences.Get("app_lock", "Off");
-                builder.SetAllowedAuthenticators(mode == "BiometricOnly"
-                    ? BiometricManager.Authenticators.BiometricStrong
-                    : BiometricManager.Authenticators.BiometricStrong | BiometricManager.Authenticators.DeviceCredential);
+                authenticators = BiometricManager.Authenticators.BiometricStrong;
+                deviceCredential = false;
+            }
+
+            var builder = new BiometricPrompt.PromptInfo.Builder()
+                .SetTitle(title)
+                .SetAllowedAuthenticators(authenticators);
+            if (!deviceCredential)
+            {
                 builder.SetNegativeButtonText("Cancel");
             }
 
-            prompt.Authenticate(builder.Build());
+            var info = builder.Build();
+            activity.RunOnUiThread(() =>
+            {
+                try
+                {
+                    prompt.Authenticate(info);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Biometric authenticate failed: {ex}");
+                    tcs.TrySetResult(false);
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -69,8 +92,11 @@ public sealed class AndroidAppLockService : global::XBrowserSyncNg.Services.IApp
         public override void OnAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) =>
             tcs.TrySetResult(true);
 
-        public override void OnAuthenticationError(int errorCode, Java.Lang.ICharSequence errString) =>
+        public override void OnAuthenticationError(int errorCode, Java.Lang.ICharSequence errString)
+        {
+            System.Diagnostics.Debug.WriteLine($"Biometric error {errorCode}: {errString}");
             tcs.TrySetResult(false);
+        }
 
         public override void OnAuthenticationFailed() { }
     }

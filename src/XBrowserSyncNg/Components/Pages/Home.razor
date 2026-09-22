@@ -3,6 +3,7 @@
 @using XBrowserSyncNg.Core.Data
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.PinnedStore Pins
+@inject XBrowserSyncNg.Services.ToastState Toast
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -193,16 +194,6 @@ else
     // ---- JS gesture callbacks ----
 
     [JSInvokable] public async Task OnRowTap(int rowId) => await OpenRow(await ResolveAsync(rowId));
-    [JSInvokable]
-    public async Task OnRowDoubleTap(int rowId)
-    {
-        var row = await ResolveAsync(rowId);
-        if (row is not null && row.Url != Core.XbsConstants.SeparatorUrl)
-        {
-            sheetFor = new SheetTarget(row, null);
-            StateHasChanged();
-        }
-    }
 
     [JSInvokable]
     public async Task OnRowLongPress(int rowId)
@@ -348,12 +339,25 @@ else
 
     private async Task SyncNow()
     {
-        if (Session.Engine is not null)
+        if (Session.Engine is null)
         {
-            try { await Session.Engine.ExecuteAutoSyncAsync(); }
-            catch { }
-            await RefreshAsync();
+            return;
         }
+
+        try
+        {
+            await Session.Engine.ExecuteAutoSyncAsync();
+            await Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
+                ? $"Sync complete {DateTime.Now:HH:mm:ss}"
+                : $"Sync finished: {Session.Engine.Status}",
+                isError: Session.Engine.Status is not (Core.Sync.SyncStatus.Idle or Core.Sync.SyncStatus.Offline));
+        }
+        catch (Exception ex)
+        {
+            await Toast.ShowAsync(ex.Message, isError: true);
+        }
+
+        await RefreshAsync();
     }
 
     private async Task GoRoot()

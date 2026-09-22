@@ -10,13 +10,9 @@
 window.xbsGestures = (() => {
     let dotNet = null;
     let state = null;
-    let lastTap = { rowId: -1, time: 0 };
-    let pendingTapTimer = 0;
     let openRow = null;
 
     const LONG_PRESS_MS = 500;
-    const DOUBLE_TAP_MS = 280;
-    const TAP_DELAY_MS = 260;
     const SWIPE_OPEN_PX = 128;
     const SWIPE_TRIGGER_PX = 56;
     const MOVE_TOLERANCE_PX = 12;
@@ -65,7 +61,6 @@ window.xbsGestures = (() => {
         if (!state.swiping && Math.abs(dx) > MOVE_TOLERANCE_PX && Math.abs(dx) > Math.abs(dy) * 1.2) {
             state.swiping = true;
             clearTimeout(state.timer);
-            clearTimeout(pendingTapTimer);
         }
         if (state.swiping) {
             const clamped = Math.max(-160, Math.min(160, dx));
@@ -102,20 +97,9 @@ window.xbsGestures = (() => {
         }
         if (s.longFired || s.moved) return;
 
-        // Tap (delayed so a second tap can claim it as double-tap).
-        const now = Date.now();
-        if (id === lastTap.rowId && now - lastTap.time < DOUBLE_TAP_MS) {
-            clearTimeout(pendingTapTimer);
-            lastTap = { rowId: -1, time: 0 };
-            dotNet.invokeMethodAsync('OnRowDoubleTap', id);
-        } else {
-            lastTap = { rowId: id, time: now };
-            inner.classList.add('xbs-tapped');
-            pendingTapTimer = setTimeout(() => {
-                inner.classList.remove('xbs-tapped');
-                dotNet.invokeMethodAsync('OnRowTap', id);
-            }, TAP_DELAY_MS);
-        }
+        // Single tap, fired immediately: opens folders / links. No double-tap
+        // on rows (edit lives on the ⋮ button and long-press) so taps never misfire.
+        dotNet.invokeMethodAsync('OnRowTap', id);
     }
 
     function onCancel(e) {
