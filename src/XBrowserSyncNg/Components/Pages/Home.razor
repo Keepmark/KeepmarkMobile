@@ -3,6 +3,7 @@
 @using XBrowserSyncNg.Core.Data
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.PinnedStore Pins
+@inject XBrowserSyncNg.Services.XbsSettings AppSettings
 @inject XBrowserSyncNg.Services.ToastState Toast
 @inject IJSRuntime JS
 @implements IDisposable
@@ -34,7 +35,7 @@ else
         <p class="text-muted">@hits.Count result(s)</p>
         @foreach (var id in hitRows)
         {
-            <BookmarkRow Row="byRow[id]" Expanded="expandedRowId == id" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+            <BookmarkRow Row="byRow[id]" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
                          FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
     }
@@ -60,15 +61,20 @@ else
                     <div class="xbs-pinned-list">
                         @foreach (var r in pinnedRows)
                         {
-                            <BookmarkRow Row="r" Pinned="true" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
+                            <BookmarkRow Row="r" Pinned="true" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
                 }
             </div>
         }
+        <div class="xbs-sortbar" role="toolbar" aria-label="Sort">
+            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
+            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
+            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
+        </div>
         @foreach (var r in rows)
         {
-            <BookmarkRow Row="r" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
+            <BookmarkRow Row="r" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
@@ -96,6 +102,12 @@ else
     <div class="xbs-sheet-backdrop" @onclick="() => menuFor = null">
         <div class="xbs-sheet" @onclick:stopPropagation="true">
             <h4>@(menuFor.Title ?? menuFor.Url)</h4>
+            @if (!menuFor.IsFolder)
+            {
+                @if (!string.IsNullOrEmpty(menuFor.Url)) { <p class="text-break">@menuFor.Url</p> }
+                @if (!string.IsNullOrEmpty(menuFor.Description)) { <p>@menuFor.Description</p> }
+                @if (!string.IsNullOrEmpty(menuFor.Tags)) { <p class="text-muted">#@menuFor.Tags.Replace("", " #") </p> }
+            }
             <div class="d-grid gap-2">
                 @if (!menuFor.IsFolder)
                 {
@@ -143,7 +155,7 @@ else
     private ItemRow? menuFor;
     private bool pinnedOpen = true;
     private int? flashRowId;
-    private int? expandedRowId;
+    private string sortMode = "Default";
     private CancellationTokenSource? flashTimer;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
     private CancellationTokenSource? undoTimer;
@@ -166,6 +178,7 @@ else
         }
 
         pinned = Pins.Load();
+        sortMode = AppSettings.ListSort;
         await RefreshAsync();
         ready = true;
     }
@@ -188,6 +201,14 @@ else
             lastSync = Session.Engine.LastSyncAt;
             var parent = CurrentParent;
             rows = await Session.Store.GetChildrenAsync(parent);
+            rows = sortMode switch
+            {
+                "Asc" => rows.OrderBy(r => r.Url == Core.XbsConstants.SeparatorUrl)
+                    .ThenBy(r => SortTitle(r), StringComparer.OrdinalIgnoreCase).ToList(),
+                "Desc" => rows.OrderBy(r => r.Url == Core.XbsConstants.SeparatorUrl)
+                    .ThenByDescending(r => SortTitle(r), StringComparer.OrdinalIgnoreCase).ToList(),
+                _ => rows
+            };
             allFolders = await Session.Store.GetAllFoldersAsync();
             pinnedRows = await Session.Store.GetByNodeIdsAsync(pinned);
             byRow.Clear();
@@ -224,28 +245,6 @@ else
             menuFor = row;
             StateHasChanged();
         }
-    }
-
-    [JSInvokable]
-    public Task OnRowSwipeRight(int rowId)
-    {
-        // Swipe right: expand for full wrapped details (single expanded row).
-        expandedRowId = rowId;
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    [JSInvokable]
-    public Task OnRowSwipeLeft(int rowId)
-    {
-        // Swipe left: collapse.
-        if (expandedRowId == rowId)
-        {
-            expandedRowId = null;
-            StateHasChanged();
-        }
-
-        return Task.CompletedTask;
     }
 
     private async Task<ItemRow?> ResolveAsync(int rowId)
@@ -303,6 +302,7 @@ else
         if (row?.NodeId is null || Session.Engine is null) return;
         bool added = Pins.Toggle(row.NodeId.Value);
         pinned = Pins.Load();
+        sortMode = AppSettings.ListSort;
         await RefreshAsync();
         await Toast.ShowAsync(added ? "Pinned" : "Unpinned");
         StateHasChanged();
@@ -399,7 +399,6 @@ else
     private async Task GoRoot()
     {
         ClearFlash();
-        expandedRowId = null;
         crumbs.Clear();
         query = string.Empty;
         isSearch = false;
@@ -409,7 +408,6 @@ else
     private async Task JumpTo(int rowId)
     {
         ClearFlash();
-        expandedRowId = null;
         while (crumbs.Count > 0 && crumbs.Peek().RowId != rowId)
         {
             crumbs.Pop();
@@ -460,6 +458,15 @@ else
     {
         flashTimer?.Cancel();
         flashRowId = null;
+    }
+
+    private static string SortTitle(Core.Data.ItemRow r) => r.Title ?? r.Url ?? string.Empty;
+
+    private async Task SetSort(string mode)
+    {
+        sortMode = mode;
+        AppSettings.ListSort = mode;
+        await RefreshAsync();
     }
 
     private void OnSearchInput(ChangeEventArgs e)

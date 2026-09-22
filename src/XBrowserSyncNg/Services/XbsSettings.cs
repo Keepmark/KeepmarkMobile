@@ -52,4 +52,11 @@ public sealed class XbsSettings
         get => Preferences.Get(KOpenMode, "CustomTabs");
         set => Preferences.Set(KOpenMode, value);
     }
+
+    /// <summary>List order: Default (server order), Asc, Desc.</summary>
+    public string ListSort
+    {
+        get => Preferences.Get("list_sort", "Default");
+        set => Preferences.Set("list_sort", value);
+    }
 }

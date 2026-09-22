@@ -466,25 +466,25 @@ h1:focus {
 }
 .xbs-search-input { padding-left: 2.5rem; }
 
-/* Expanded row: full wrapped details. */
-.xbs-expanded .xbs-row-title,
-.xbs-expanded .xbs-row-sub,
-.xbs-expanded .xbs-row-path {
-    white-space: normal;
-    overflow-wrap: anywhere;
+/* Sort bar under the breadcrumb. */
+.xbs-sortbar {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding: 0.25rem 0 0.5rem;
 }
 
-.xbs-row-desc {
-    margin-top: 0.35rem;
-    font-size: 0.9rem;
-    white-space: normal;
-    overflow-wrap: anywhere;
+.xbs-sort {
+    min-width: 48px;
+    min-height: 44px;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg, #fff);
+    font-weight: 600;
 }
 
-.xbs-row-tags {
-    margin-top: 0.25rem;
-    font-size: 0.8rem;
-    color: #1b6ec2;
-    white-space: normal;
-    overflow-wrap: anywhere;
+.xbs-sort.active {
+    background: #1b6ec2;
+    border-color: #1b6ec2;
+    color: #fff;
 }

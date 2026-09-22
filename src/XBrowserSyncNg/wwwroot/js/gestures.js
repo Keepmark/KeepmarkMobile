@@ -6,11 +6,9 @@
 window.xbsGestures = (() => {
     let dotNet = null;
     let state = null;
-    let suppressUntil = 0;
 
     const LONG_PRESS_MS = 500;
     const MOVE_TOLERANCE_PX = 12;
-    const SWIPE_TRIGGER_PX = 60;
 
     function onDown(e) {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -30,31 +28,17 @@ window.xbsGestures = (() => {
 
     function onMove(e) {
         if (!state || e.pointerId !== state.pointerId) return;
-        const dx = e.clientX - state.x0;
-        const dy = e.clientY - state.y0;
-        if (!state.swiping && Math.abs(dx) > MOVE_TOLERANCE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
-            state.swiping = true;
+        if (Math.abs(e.clientX - state.x0) > MOVE_TOLERANCE_PX ||
+            Math.abs(e.clientY - state.y0) > MOVE_TOLERANCE_PX) {
             clearTimeout(state.timer);
-        }
-        if (state.swiping) {
-            state.dx = dx;
-            if (e.cancelable) e.preventDefault();
-        } else if (Math.abs(dy) > MOVE_TOLERANCE_PX || Math.abs(dx) > MOVE_TOLERANCE_PX) {
-            clearTimeout(state.timer);
-            state.moved = true;
+            state = null;
         }
     }
 
     function onUp(e) {
-        if (!state || e.pointerId !== state.pointerId) return;
-        const s = state;
-        state = null;
-        clearTimeout(s.timer);
-        if (s.swiping) {
-            const dx = s.dx || 0;
-            suppressUntil = Date.now() + 400; // a swipe must never trigger the row tap
-            if (dx >= SWIPE_TRIGGER_PX) dotNet.invokeMethodAsync('OnRowSwipeRight', s.id);
-            else if (dx <= -SWIPE_TRIGGER_PX) dotNet.invokeMethodAsync('OnRowSwipeLeft', s.id);
+        if (state && e.pointerId === state.pointerId) {
+            clearTimeout(state.timer);
+            state = null;
         }
     }
 
@@ -66,12 +50,6 @@ window.xbsGestures = (() => {
             document.addEventListener('pointermove', onMove, { passive: true });
             document.addEventListener('pointerup', onUp, { passive: true });
             document.addEventListener('pointercancel', onUp, { passive: true });
-            document.addEventListener('click', (e) => {
-                if (Date.now() < suppressUntil && e.target.closest && e.target.closest('.xbs-row')) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                }
-            }, true);
         },
         closeAll() { /* kept for Blazor callers; no snapped rows anymore */ },
         scrollToRow(rowId) {
