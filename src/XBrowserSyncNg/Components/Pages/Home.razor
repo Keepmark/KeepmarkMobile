@@ -49,17 +49,21 @@ else
         </div>
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
-            <button class="xbs-pinned-head" @onclick="() => pinnedOpen = !pinnedOpen" aria-expanded="@pinnedOpen">
-                <span class="chev">@(pinnedOpen ? "▾" : "▸")</span>
-                <span>📌 Pinned (@pinnedRows.Count)</span>
-            </button>
-            @if (pinnedOpen)
-            {
-                @foreach (var r in pinnedRows)
+            <div class="xbs-pinned-box">
+                <button class="xbs-pinned-head" @onclick="() => pinnedOpen = !pinnedOpen" aria-expanded="@pinnedOpen">
+                    <span class="chev">@(pinnedOpen ? "▾" : "▸")</span>
+                    <span>📌 Pinned (@pinnedRows.Count)</span>
+                </button>
+                @if (pinnedOpen)
                 {
-                    <BookmarkRow Row="r" Pinned="true" OnOpen="OpenRow" OnAction="OnRowAction" />
+                    <div class="xbs-pinned-list">
+                        @foreach (var r in pinnedRows)
+                        {
+                            <BookmarkRow Row="r" Pinned="true" OnOpen="OpenRow" OnAction="OnRowAction" />
+                        }
+                    </div>
                 }
-            }
+            </div>
         }
         @foreach (var r in rows)
         {
