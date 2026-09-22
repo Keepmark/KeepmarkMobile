@@ -34,7 +34,7 @@ else
         <p class="text-muted">@hits.Count result(s)</p>
         @foreach (var id in hitRows)
         {
-            <BookmarkRow Row="byRow[id]" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+            <BookmarkRow Row="byRow[id]" Expanded="expandedRowId == id" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
                          FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
     }
@@ -60,7 +60,7 @@ else
                     <div class="xbs-pinned-list">
                         @foreach (var r in pinnedRows)
                         {
-                            <BookmarkRow Row="r" Pinned="true" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
+                            <BookmarkRow Row="r" Pinned="true" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
                 }
@@ -68,7 +68,7 @@ else
         }
         @foreach (var r in rows)
         {
-            <BookmarkRow Row="r" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
+            <BookmarkRow Row="r" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
@@ -143,6 +143,7 @@ else
     private ItemRow? menuFor;
     private bool pinnedOpen = true;
     private int? flashRowId;
+    private int? expandedRowId;
     private CancellationTokenSource? flashTimer;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
     private CancellationTokenSource? undoTimer;
@@ -223,6 +224,28 @@ else
             menuFor = row;
             StateHasChanged();
         }
+    }
+
+    [JSInvokable]
+    public Task OnRowSwipeRight(int rowId)
+    {
+        // Swipe right: expand for full wrapped details (single expanded row).
+        expandedRowId = rowId;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnRowSwipeLeft(int rowId)
+    {
+        // Swipe left: collapse.
+        if (expandedRowId == rowId)
+        {
+            expandedRowId = null;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task<ItemRow?> ResolveAsync(int rowId)
@@ -376,6 +399,7 @@ else
     private async Task GoRoot()
     {
         ClearFlash();
+        expandedRowId = null;
         crumbs.Clear();
         query = string.Empty;
         isSearch = false;
@@ -385,6 +409,7 @@ else
     private async Task JumpTo(int rowId)
     {
         ClearFlash();
+        expandedRowId = null;
         while (crumbs.Count > 0 && crumbs.Peek().RowId != rowId)
         {
             crumbs.Pop();
