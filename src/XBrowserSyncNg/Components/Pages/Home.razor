@@ -117,7 +117,7 @@ else
                 }
                 <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
                 <button class="btn btn-secondary" @onclick="() => TogglePin(menuFor)">@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? "Unpin" : "Pin")</button>
-                @if (menuFor.ParentRowId != CurrentParent)
+                @if (isSearch || menuFor.ParentRowId != CurrentParent)
                 {
                     <button class="btn btn-secondary" @onclick="() => GoToLocation(menuFor)">Go to location</button>
                 }
