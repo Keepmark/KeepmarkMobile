@@ -19,7 +19,7 @@
     [Parameter] public EventCallback<(ItemRow Row, RowAction Action)> OnAction { get; set; }
 
     private string RibbonClass => Row.IsFolder ? "folder" : Row.Url == Core.XbsConstants.SeparatorUrl ? "sep" : "mark";
-    private string Title => Row.IsFolder ? Row.Title ?? "Folder" : Row.Title ?? Row.Url ?? "(no title)";
+    private string Title => Row.IsFolder ? "📁 " + (Row.Title ?? "Folder") : Row.Title ?? Row.Url ?? "(no title)";
     private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Row.Url ?? string.Empty;
 
     private Task OnMenu() => OnAction.InvokeAsync((Row, RowAction.Menu));
