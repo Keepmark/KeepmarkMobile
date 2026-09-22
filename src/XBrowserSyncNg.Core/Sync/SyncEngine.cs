@@ -221,6 +221,44 @@ public sealed class SyncEngine(
         }
     }
 
+    public async Task<int> AddBookmarkAsync(int? parentRowId, BookmarkNode node, CancellationToken ct = default)
+    {
+        await RequireCredsAsync().ConfigureAwait(false);
+        int rowId = await store.AddNodeAsync(parentRowId, node).ConfigureAwait(false);
+        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        return rowId;
+    }
+
+    public async Task UpdateBookmarkAsync(
+        int rowId, string? title, string? url, string? description, List<string>? tags, CancellationToken ct = default)
+    {
+        await RequireCredsAsync().ConfigureAwait(false);
+        await store.UpdateNodeAsync(rowId, title, url, description, tags).ConfigureAwait(false);
+        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<(int? ParentRowId, List<BookmarkNode> Subtree)> DeleteBookmarkAsync(int rowId, CancellationToken ct = default)
+    {
+        await RequireCredsAsync().ConfigureAwait(false);
+        var backup = await store.DeleteNodeAsync(rowId).ConfigureAwait(false);
+        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        return backup;
+    }
+
+    public async Task MoveBookmarkAsync(int rowId, int? newParentRowId, CancellationToken ct = default)
+    {
+        await RequireCredsAsync().ConfigureAwait(false);
+        await store.MoveNodeAsync(rowId, newParentRowId).ConfigureAwait(false);
+        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task RestoreBookmarkAsync(int? parentRowId, List<BookmarkNode> subtree, CancellationToken ct = default)
+    {
+        await RequireCredsAsync().ConfigureAwait(false);
+        await store.RestoreSubtreeAsync(parentRowId, subtree).ConfigureAwait(false);
+        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+    }
+
     /// <summary>
     /// Onboarding/server-switch reconciliation: how many items on each side?
     /// Downloads + decrypts the remote tree (password already in hand).

@@ -1,4 +1,12 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0" y="0" width="456" height="456" fill="#512BD4" />
+<!-- XBrowserSyncNg app icon: isometric cube (recalls the xBrowserSync logo)
+     with a bookmark tail, palette shifted to green-teal to mark the Ng fork.
+     Navy #0A323D / green #2E9E7B / teal #267D91 / ice #71D2E2 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <rect width="108" height="108" rx="24" fill="#0A323D"/>
+  <g>
+    <polygon points="54,26 82,42 54,58 26,42" fill="#71D2E2"/>
+    <polygon points="26,42 54,58 54,74 26,58" fill="#2E9E7B"/>
+    <polygon points="54,58 82,42 82,58 54,74" fill="#267D91"/>
+    <polygon points="47,70 61,70 61,90 54,85 47,90" fill="#71D2E2"/>
+  </g>
 </svg>

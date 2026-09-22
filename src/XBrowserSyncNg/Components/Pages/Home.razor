@@ -1,10 +1,12 @@
 ﻿@page "/"
+@using Microsoft.JSInterop
+@using XBrowserSyncNg.Core.Data
 @inject XBrowserSyncNg.Services.XbsSession Session
+@inject XBrowserSyncNg.Services.PinnedStore Pins
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Explore</PageTitle>
-
-<h1>Explore</h1>
 
 @if (!ready)
 {
@@ -28,21 +30,23 @@ else
     else if (isSearch)
     {
         <p class="text-muted">@hits.Count result(s)</p>
-        <ul class="list-group">
-            @foreach (var h in hits)
-            {
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <div>@(h.Title ?? h.Url)</div>
-                        @if (!string.IsNullOrEmpty(h.FolderPath)) { <small class="text-muted">@h.FolderPath</small> }
-                    </div>
-                    @if (!h.IsFolder) { <button class="btn btn-sm btn-primary" @onclick="() => OpenUrl(h.Url)">Open</button> }
-                </li>
-            }
-        </ul>
+        @foreach (var id in hitRows)
+        {
+            <BookmarkRow Row="byRow[id]" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+                         FolderPath="@hitPaths.GetValueOrDefault(id)" OnAction="OnRowAction" />
+        }
     }
     else
     {
+        @if (pinnedRows.Count > 0 && crumbs.Count == 0)
+        {
+            <h6 class="text-muted mt-1">Pinned</h6>
+            @foreach (var r in pinnedRows)
+            {
+                <BookmarkRow Row="r" Pinned="true" OnAction="OnRowAction" />
+            }
+            <h6 class="text-muted mt-2">All</h6>
+        }
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="" @onclick="GoRoot" @onclick:preventDefault>Top</a></li>
@@ -52,43 +56,80 @@ else
                 }
             </ol>
         </nav>
-        <ul class="list-group">
-            @foreach (var r in rows)
-            {
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        @if (r.IsFolder) { <strong>@r.Title</strong> }
-                        else { <div>@(r.Title ?? r.Url)</div> }
-                        @if (!string.IsNullOrEmpty(r.Url) && !r.IsFolder) { <small class="text-muted">@r.Url</small> }
-                    </div>
-                    @if (r.IsFolder)
-                    {
-                        <button class="btn btn-sm btn-secondary" @onclick="() => Drill(r)">Open</button>
-                    }
-                    else
-                    {
-                        <button class="btn btn-sm btn-primary" @onclick="() => OpenUrl(r.Url)">Open</button>
-                    }
-                </li>
-            }
-        </ul>
+        @foreach (var r in rows)
+        {
+            <BookmarkRow Row="r" Pinned="pinned.Contains(r.NodeId ?? -1)" OnAction="OnRowAction" />
+        }
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
 
     <p class="text-muted mt-3"><small>Status: @engineStatus · Last sync: @(lastSync?.ToString("u") ?? "never")</small></p>
+    @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
+    {
+        <button class="btn btn-outline-primary btn-sm" @onclick="SyncNow">Sync now</button>
+    }
+}
+
+<button class="btn btn-primary xbs-fab" @onclick="() => sheetFor = new SheetTarget(null, CurrentParent)" aria-label="Add">+</button>
+
+@if (sheetFor is not null)
+{
+    <BookmarkSheet Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
+                   Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null" />
+}
+
+@if (menuFor is not null)
+{
+    <div class="xbs-sheet-backdrop" @onclick="() => menuFor = null">
+        <div class="xbs-sheet" @onclick:stopPropagation="true">
+            <h4>@(menuFor.Title ?? menuFor.Url)</h4>
+            <div class="d-grid gap-2">
+                @if (!menuFor.IsFolder) { <button class="btn btn-primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }">Open</button> }
+                <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
+                <button class="btn btn-secondary" @onclick="() => ShareRow(menuFor)">Share</button>
+                <button class="btn btn-secondary" @onclick="() => TogglePin(menuFor)">Pin / unpin</button>
+                <button class="btn btn-danger" @onclick="() => DeleteRow(menuFor)">Delete</button>
+                <button class="btn btn-link" @onclick="() => menuFor = null">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (undo is not null)
+{
+    <div class="xbs-undo">
+        <span>Bookmark deleted.</span>
+        <button class="btn btn-sm btn-light" @onclick="UndoDelete">Undo</button>
+    </div>
 }
 
 @code {
     private bool ready;
     private Core.Sync.SyncStatus engineStatus;
     private DateTimeOffset? lastSync;
-    private List<Core.Data.ItemRow> rows = [];
-    private readonly Stack<Core.Data.ItemRow> crumbs = new();
+    private List<ItemRow> rows = [];
+    private List<ItemRow> pinnedRows = [];
+    private List<ItemRow> allFolders = [];
+    private HashSet<int> pinned = [];
+    private readonly Stack<ItemRow> crumbs = new();
+    private readonly Dictionary<int, ItemRow> byRow = new();
     private string query = string.Empty;
-    private List<Core.Data.SearchHit> hits = [];
+    private List<SearchHit> hits = [];
+    private List<int> hitRows = [];
+    private Dictionary<int, string> hitPaths = new();
     private bool isSearch;
     private bool searching;
     private CancellationTokenSource? debounce;
+    private DotNetObjectReference<Home>? dotNet;
+    private bool gesturesInit;
+    private SheetTarget? sheetFor;
+    private ItemRow? menuFor;
+    private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
+    private CancellationTokenSource? undoTimer;
+
+    private int? CurrentParent => crumbs.Count == 0 ? null : crumbs.Peek().RowId;
+
+    private sealed record SheetTarget(ItemRow? Row, int? Parent);
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,8 +144,19 @@ else
             Session.Engine.DataChanged += OnData;
         }
 
+        pinned = Pins.Load();
         await RefreshAsync();
         ready = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!gesturesInit && ready)
+        {
+            gesturesInit = true;
+            dotNet = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("xbsGestures.init", dotNet);
+        }
     }
 
     private async Task RefreshAsync()
@@ -113,8 +165,20 @@ else
         {
             engineStatus = Session.Engine.Status;
             lastSync = Session.Engine.LastSyncAt;
-            var parent = crumbs.Count == 0 ? (int?)null : crumbs.Peek().RowId;
+            var parent = CurrentParent;
             rows = await Session.Store.GetChildrenAsync(parent);
+            allFolders = await Session.Store.GetAllFoldersAsync();
+            pinnedRows = await Session.Store.GetByNodeIdsAsync(pinned);
+            byRow.Clear();
+            foreach (var r in rows.Concat(pinnedRows)) byRow[r.RowId] = r;
+            foreach (var h in hits)
+            {
+                var node = await Session.Store.GetNodeAsync(h.RowId);
+                if (node is not null) byRow[h.RowId] = node;
+            }
+
+            hitRows = hits.Where(h => byRow.ContainsKey(h.RowId)).Select(h => h.RowId).ToList();
+            hitPaths = hits.ToDictionary(h => h.RowId, h => h.FolderPath);
         }
     }
 
@@ -124,14 +188,172 @@ else
         InvokeAsync(StateHasChanged);
     }
 
-    private void OnData() => InvokeAsync(RefreshAsync);
+    private void OnData() => InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); });
 
-    private async Task Drill(Core.Data.ItemRow folder)
+    // ---- JS gesture callbacks ----
+
+    [JSInvokable] public async Task OnRowTap(int rowId) => await OpenRow(await ResolveAsync(rowId));
+    [JSInvokable]
+    public async Task OnRowDoubleTap(int rowId)
     {
-        crumbs.Push(folder);
-        query = string.Empty;
-        isSearch = false;
+        var row = await ResolveAsync(rowId);
+        if (row is not null && row.Url != Core.XbsConstants.SeparatorUrl)
+        {
+            sheetFor = new SheetTarget(row, null);
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnRowLongPress(int rowId)
+    {
+        var row = await ResolveAsync(rowId);
+        if (row is not null)
+        {
+            menuFor = row;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnRowSwipeRight(int rowId)
+    {
+        var row = await ResolveAsync(rowId);
+        if (row is not null) await TogglePin(row);
+    }
+
+    private async Task<ItemRow?> ResolveAsync(int rowId)
+    {
+        if (byRow.TryGetValue(rowId, out var cached)) return cached;
+        if (Session.Store is null) return null;
+        var node = await Session.Store.GetNodeAsync(rowId);
+        if (node is not null) byRow[rowId] = node;
+        return node;
+    }
+
+    // ---- Actions ----
+
+    private async Task OpenRow(ItemRow? row)
+    {
+        if (row is null) return;
+        if (row.IsFolder)
+        {
+            crumbs.Push(row);
+            query = string.Empty;
+            isSearch = false;
+            await RefreshAsync();
+        }
+        else if (!string.IsNullOrWhiteSpace(row.Url) && row.Url != Core.XbsConstants.SeparatorUrl)
+        {
+            try { await Launcher.OpenAsync(row.Url); } catch { }
+        }
+    }
+
+    private async Task OnRowAction((ItemRow Row, RowAction Action) a)
+    {
+        await JS.InvokeVoidAsync("xbsGestures.closeAll");
+        switch (a.Action)
+        {
+            case RowAction.Share: await ShareRow(a.Row); break;
+            case RowAction.Delete: await DeleteRow(a.Row); break;
+            case RowAction.Menu: menuFor = a.Row; break;
+        }
+    }
+
+    private async Task ShareRow(ItemRow? row)
+    {
+        menuFor = null;
+        if (row is null || row.IsFolder) return;
+        try
+        {
+            await Share.Default.RequestAsync(new ShareTextRequest($"{row.Title}\n{row.Url}", "Share bookmark"));
+        }
+        catch { }
+    }
+
+    private async Task TogglePin(ItemRow? row)
+    {
+        menuFor = null;
+        if (row?.NodeId is null || Session.Engine is null) return;
+        Pins.Toggle(row.NodeId.Value);
+        pinned = Pins.Load();
         await RefreshAsync();
+        StateHasChanged();
+    }
+
+    private async Task DeleteRow(ItemRow? row)
+    {
+        menuFor = null;
+        await JS.InvokeVoidAsync("xbsGestures.closeAll");
+        if (row is null || Session.Engine is null) return;
+        undoTimer?.Cancel();
+        undo = await Session.Engine.DeleteBookmarkAsync(row.RowId);
+        await RefreshAsync();
+        StateHasChanged();
+        undoTimer = new CancellationTokenSource();
+        var token = undoTimer.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(6000, token);
+                await InvokeAsync(() => { undo = null; StateHasChanged(); });
+            }
+            catch (TaskCanceledException) { }
+        });
+    }
+
+    private async Task UndoDelete()
+    {
+        if (undo is null || Session.Engine is null) return;
+        undoTimer?.Cancel();
+        await Session.Engine.RestoreBookmarkAsync(undo.Value.Parent, undo.Value.Subtree);
+        undo = null;
+        await RefreshAsync();
+    }
+
+    private async Task SaveSheet(BookmarkSheet.BookmarkEdit e)
+    {
+        if (Session.Engine is null) return;
+        if (e.RowId is null)
+        {
+            var node = new Core.Models.BookmarkNode
+            {
+                Title = e.Title, Url = e.Url, Description = e.Description, Tags = e.Tags,
+                Children = e.IsFolder ? [] : null
+            };
+            await Session.Engine.AddBookmarkAsync(e.ParentRowId, node);
+        }
+        else
+        {
+            await Session.Engine.UpdateBookmarkAsync(e.RowId.Value, e.Title, e.Url, e.Description, e.Tags);
+            var current = await Session.Store!.GetNodeAsync(e.RowId.Value);
+            if (current is not null && current.ParentRowId != e.ParentRowId)
+            {
+                try
+                {
+                    await Session.Engine.MoveBookmarkAsync(e.RowId.Value, e.ParentRowId);
+                }
+                catch (Exception ex)
+                {
+                    // Move refused (e.g. folder into itself): fields are already saved.
+                    System.Diagnostics.Debug.WriteLine($"Move skipped: {ex.Message}");
+                }
+            }
+        }
+
+        sheetFor = null;
+        await RefreshAsync();
+    }
+
+    private async Task SyncNow()
+    {
+        if (Session.Engine is not null)
+        {
+            try { await Session.Engine.ExecuteAutoSyncAsync(); }
+            catch { }
+            await RefreshAsync();
+        }
     }
 
     private async Task GoRoot()
@@ -161,12 +383,14 @@ else
                         isSearch = true;
                         StateHasChanged();
                         hits = await Session.Store.SearchAsync(query.Trim(), 50);
+                        await RefreshAsync();
                         searching = false;
                     }
                     else
                     {
                         isSearch = false;
                         hits = [];
+                        hitRows = [];
                     }
 
                     StateHasChanged();
@@ -176,23 +400,6 @@ else
             {
             }
         });
-    }
-
-    private async Task OpenUrl(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url) || url == Core.XbsConstants.SeparatorUrl)
-        {
-            return;
-        }
-
-        try
-        {
-            await Launcher.OpenAsync(url);
-        }
-        catch
-        {
-            // Launcher failures surface as toast in a later pass; never crash the list.
-        }
     }
 
     public void Dispose()
@@ -205,5 +412,8 @@ else
 
         debounce?.Cancel();
         debounce?.Dispose();
+        undoTimer?.Cancel();
+        undoTimer?.Dispose();
+        dotNet?.Dispose();
     }
 }

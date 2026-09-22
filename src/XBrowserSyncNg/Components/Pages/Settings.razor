@@ -1,6 +1,7 @@
 @page "/settings"
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
+@inject XBrowserSyncNg.Services.IAppLockService AppLock
 
 <PageTitle>Settings</PageTitle>
 
@@ -50,6 +51,20 @@
 {
     <span class="text-success ms-2">Saved.</span>
 }
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger mt-2">@error</div>
+}
+
+<h3 class="mt-4">Gestures</h3>
+<ul>
+    <li><strong>Tap</strong> a bookmark to open it, a folder to enter it.</li>
+    <li><strong>Swipe right</strong> to pin / unpin.</li>
+    <li><strong>Swipe left</strong> for Share and Delete.</li>
+    <li><strong>Double-tap</strong> to edit.</li>
+    <li><strong>Long-press</strong> for all actions.</li>
+    <li><strong>Pull down</strong> (coming soon) to refresh from the server.</li>
+</ul>
 
 @code {
     private Core.Sync.SyncMode mode;
@@ -57,6 +72,8 @@
     private Core.Logging.XbsLogLevel verbosity;
     private string appLock = "Off";
     private int lockTimeout;
+    private string error = string.Empty;
+    private bool saved;
 
     protected override void OnInitialized()
     {
@@ -67,8 +84,34 @@
         lockTimeout = AppSettings.LockTimeoutMinutes;
     }
 
-    private void Save()
+    private async Task Save()
     {
+        error = string.Empty;
+        saved = false;
+
+        // Enabling or disabling app lock always requires device-PIN confirmation.
+        if (appLock != AppSettings.AppLock)
+        {
+            bool confirmed = false;
+            try
+            {
+                confirmed = await AppLock.AuthenticateAsync(
+                    appLock == "Off" ? "Confirm disabling app lock" : "Confirm app lock activation",
+                    requireDeviceCredential: true);
+            }
+            catch
+            {
+                confirmed = false;
+            }
+
+            if (!confirmed)
+            {
+                appLock = AppSettings.AppLock;
+                error = "Not confirmed with the device PIN. App lock unchanged.";
+                return;
+            }
+        }
+
         AppSettings.Mode = mode;
         AppSettings.ServiceUrl = serviceUrl.Trim();
         AppSettings.Verbosity = verbosity;
@@ -77,6 +120,4 @@
         Session.NotifySettingsChanged();
         saved = true;
     }
-
-    private bool saved;
 }

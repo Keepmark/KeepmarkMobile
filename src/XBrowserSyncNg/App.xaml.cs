@@ -3,11 +3,15 @@
 public partial class App : Application
 {
     private readonly Services.XbsSession _session;
+    private readonly Services.XbsSettings _settings;
+    private readonly Services.AppLockState _lock;
 
-    public App(Services.XbsSession session)
+    public App(Services.XbsSession session, Services.XbsSettings settings, Services.AppLockState lockState)
     {
         InitializeComponent();
         _session = session;
+        _settings = settings;
+        _lock = lockState;
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
@@ -26,5 +30,7 @@ public partial class App : Application
         {
             System.Diagnostics.Debug.WriteLine($"Session init failed: {ex}");
         }
+
+        _lock.Initialize(_settings);
     }
 }

@@ -138,6 +138,45 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Crud_AddUpdateMoveDelete_RoundTrip()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+
+        // Add bookmark at top level.
+        int rowId = await _store.AddNodeAsync(null,
+            new BookmarkNode { Title = "New", Url = "https://new.example" });
+        var added = await _store.GetNodeAsync(rowId);
+        Assert.NotNull(added);
+        Assert.Equal("New", added.Title);
+        Assert.NotNull(added.NodeId);
+
+        // Update fields.
+        await _store.UpdateNodeAsync(rowId, "Renamed", "https://renamed.example", "desc", ["t1", "t2"]);
+        added = await _store.GetNodeAsync(rowId);
+        Assert.Equal("Renamed", added!.Title);
+        Assert.Equal("desc", added.Description);
+
+        // Move into folder 1.
+        var folder = (await _store.GetChildrenAsync(null)).Single(r => r.IsFolder);
+        await _store.MoveNodeAsync(rowId, folder.RowId);
+        added = await _store.GetNodeAsync(rowId);
+        Assert.Equal(folder.RowId, added!.ParentRowId);
+
+        // Moving a folder into its own subtree is refused.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _store.MoveNodeAsync(folder.RowId, rowId));
+
+        // Delete with undo backup, then restore.
+        int? nodeId = (await _store.GetNodeAsync(rowId))?.NodeId;
+        var (parent, subtree) = await _store.DeleteNodeAsync(rowId);
+        Assert.Null(await _store.GetNodeAsync(rowId));
+        Assert.Equal(folder.RowId, parent);
+        await _store.RestoreSubtreeAsync(parent, subtree);
+        var restored = await _store.GetByNodeIdsAsync([nodeId!.Value]);
+        Assert.Single(restored);
+        Assert.Equal("Renamed", restored[0].Title);
+    }
+
+    [Fact]
     public async Task WrongKey_FailsToOpen()
     {
         // NOTE: sqlite-net enables SQLite shared-cache by default, so a second

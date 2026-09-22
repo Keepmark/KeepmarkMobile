@@ -1,4 +1,6 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@inject XBrowserSyncNg.Services.XbsSession Session
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">XBrowserSyncNg</a>
     </div>
@@ -12,6 +14,11 @@
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Explore
             </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <button class="nav-link nav-sync-btn" @onclick="SyncNow">
+                <span aria-hidden="true" class="nav-sync-glyph">⟳</span> Sync now
+            </button>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="connect">
@@ -35,3 +42,19 @@
         </div>
     </nav>
 </div>
+
+@code {
+    private async Task SyncNow()
+    {
+        if (Session.Engine is not null)
+        {
+            try
+            {
+                await Session.Engine.ExecuteAutoSyncAsync();
+            }
+            catch
+            {
+            }
+        }
+    }
+}

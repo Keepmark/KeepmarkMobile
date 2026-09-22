@@ -1,0 +1,141 @@
+@using XBrowserSyncNg.Core.Data
+
+@if (Visible)
+{
+    <div class="xbs-sheet-backdrop" @onclick="OnCancel">
+        <div class="xbs-sheet" @onclick:stopPropagation="true">
+            <h3>@(IsEdit ? "Edit bookmark" : NewIsFolder ? "New folder" : "New bookmark")</h3>
+            @if (!IsEdit)
+            {
+                <div class="mb-2">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" @bind="NewIsFolder">
+                        <option value="false">Bookmark</option>
+                        <option value="true">Folder</option>
+                    </select>
+                </div>
+            }
+            <div class="mb-2">
+                <label class="form-label">Title</label>
+                <input class="form-control" @bind="title" />
+            </div>
+            @if (!EffectiveIsFolder)
+            {
+                <div class="mb-2">
+                    <label class="form-label">URL</label>
+                    <input class="form-control" @bind="url" inputmode="url" />
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" @bind="description" rows="2" maxlength="300"></textarea>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Tags (comma separated)</label>
+                    <input class="form-control" @bind="tags" />
+                </div>
+            }
+            <div class="mb-3">
+                <label class="form-label">Folder</label>
+                <select class="form-select" @bind="parentRowId">
+                    <option value="">Top level</option>
+                    @foreach (var f in Folders)
+                    {
+                        <option value="@f.RowId">@f.Title</option>
+                    }
+                </select>
+            </div>
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <div class="alert alert-danger">@error</div>
+            }
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary flex-fill" @onclick="Save">Save</button>
+                <button class="btn btn-secondary" @onclick="OnCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public ItemRow? Existing { get; set; }
+    [Parameter] public int? DefaultParent { get; set; }
+    [Parameter] public List<ItemRow> Folders { get; set; } = [];
+    [Parameter] public EventCallback<BookmarkEdit> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string title = string.Empty;
+    private string url = string.Empty;
+    private string description = string.Empty;
+    private string tags = string.Empty;
+    private bool NewIsFolder;
+    private string parentRowId = string.Empty;
+    private string error = string.Empty;
+
+    private bool IsEdit => Existing is not null;
+    private bool EffectiveIsFolder => IsEdit ? Existing!.IsFolder : NewIsFolder;
+
+    protected override void OnParametersSet()
+    {
+        if (!Visible)
+        {
+            return;
+        }
+
+        error = string.Empty;
+        if (Existing is not null)
+        {
+            title = Existing.Title ?? string.Empty;
+            url = Existing.Url ?? string.Empty;
+            description = Existing.Description ?? string.Empty;
+            tags = Existing.Tags?.Replace("\u001F", ", ") ?? string.Empty;
+            parentRowId = Existing.ParentRowId?.ToString() ?? string.Empty;
+        }
+        else
+        {
+            title = url = description = tags = string.Empty;
+            NewIsFolder = false;
+            parentRowId = DefaultParent?.ToString() ?? string.Empty;
+        }
+    }
+
+    private async Task Save()
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            error = "Title is required.";
+            return;
+        }
+
+        List<string>? tagList = null;
+        if (!EffectiveIsFolder)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                error = "URL is required.";
+                return;
+            }
+
+            if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var u) ||
+                (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps))
+            {
+                error = "URL must start with http:// or https://.";
+                return;
+            }
+
+            tagList = tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        int? parent = string.IsNullOrEmpty(parentRowId) ? null : int.Parse(parentRowId);
+        await OnSave.InvokeAsync(new BookmarkEdit(Existing?.RowId, title.Trim(),
+            EffectiveIsFolder ? null : url.Trim(),
+            EffectiveIsFolder ? null : description.Trim(),
+            EffectiveIsFolder ? null : tagList, EffectiveIsFolder, parent));
+    }
+
+    public sealed record BookmarkEdit(
+        int? RowId, string Title, string? Url, string? Description,
+        List<string>? Tags, bool IsFolder, int? ParentRowId);
+}

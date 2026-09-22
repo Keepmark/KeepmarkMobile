@@ -1,0 +1,30 @@
+@using XBrowserSyncNg.Core.Data
+
+<div class="xbs-row" data-rowid="@Row.RowId">
+    <div class="xbs-row-underlay">
+        <div class="xbs-under-left">@(Pinned ? "★ Unpin" : "☆ Pin")</div>
+        <div class="xbs-under-right">
+            <button @onclick="() => OnAction.InvokeAsync((Row, RowAction.Share))">Share</button>
+            <button class="danger" @onclick="() => OnAction.InvokeAsync((Row, RowAction.Delete))">Delete</button>
+        </div>
+    </div>
+    <div class="xbs-row-inner">
+        <div class="xbs-row-icon">@Icon</div>
+        <div class="xbs-row-text">
+            <div class="xbs-row-title">@Title</div>
+            <div class="xbs-row-sub">@Sub</div>
+        </div>
+        <button class="xbs-row-chev" @onclick="() => OnAction.InvokeAsync((Row, RowAction.Menu))" aria-label="Actions">⋮</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
+    [Parameter] public bool Pinned { get; set; }
+    [Parameter] public string? FolderPath { get; set; }
+    [Parameter] public EventCallback<(ItemRow Row, RowAction Action)> OnAction { get; set; }
+
+    private string Icon => Row.IsFolder ? "📁" : Row.Url == Core.XbsConstants.SeparatorUrl ? "➖" : "🔖";
+    private string Title => Row.IsFolder ? Row.Title ?? "Folder" : Row.Title ?? Row.Url ?? "(no title)";
+    private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Row.Url ?? string.Empty;
+}

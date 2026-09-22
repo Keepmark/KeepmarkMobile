@@ -20,7 +20,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<IXbsLocalizer, EnglishLocalizer>();
         builder.Services.AddSingleton<XbsSettings>();
         builder.Services.AddSingleton<SecureCredentialStore>();
+        builder.Services.AddSingleton<PinnedStore>();
+        builder.Services.AddSingleton<AppLockState>();
         builder.Services.AddSingleton<XbsSession>();
+#if ANDROID
+        builder.Services.AddSingleton<IAppLockService, Platforms.Android.Services.AndroidAppLockService>();
+#endif
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

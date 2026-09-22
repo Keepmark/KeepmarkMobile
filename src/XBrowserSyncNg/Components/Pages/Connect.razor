@@ -1,6 +1,7 @@
 @page "/connect"
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
+@inject XBrowserSyncNg.Services.SecureCredentialStore Creds
 
 <PageTitle>Connect</PageTitle>
 
@@ -10,8 +11,19 @@
 {
     <p><em>Starting…</em></p>
 }
+else if (linked && !showAdvanced)
+{
+    <div class="alert alert-success">
+        Linked to <strong>@linkedUrl</strong> (sync <code>@ShortId(linkedId)</code>).
+    </div>
+    <button class="btn btn-outline-secondary" @onclick="() => showAdvanced = true">Advanced: change service…</button>
+}
 else
 {
+    @if (linked)
+    {
+        <div class="alert alert-info">Currently linked to <strong>@linkedUrl</strong>. Changing the service below re-links the app (reconciliation applies).</div>
+    }
     <div class="mb-3">
         <label class="form-label">Service URL</label>
         <input class="form-control" @bind="serviceUrl" />
@@ -71,8 +83,28 @@ else
     private bool isError;
     private Core.Api.ServiceInfoResponse? serviceInfo;
     private Services.ReconcileInfo? reconcile;
+    private bool linked;
+    private string? linkedUrl;
+    private string? linkedId;
+    private bool showAdvanced;
 
     protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        var c = await Creds.GetAsync();
+        linked = c is not null;
+        linkedUrl = c?.ServiceUrl;
+        linkedId = c?.Id;
+    }
+
+    private static string ShortId(string? id) =>
+        id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
 
     private async Task CheckService()
     {
