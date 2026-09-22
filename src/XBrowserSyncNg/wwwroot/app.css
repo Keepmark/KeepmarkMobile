@@ -453,3 +453,15 @@ h1:focus {
     from { background-position: -40% 0; }
     to { background-position: 140% 0; }
 }
+
+/* Search bar with lens. */
+.xbs-search { position: relative; }
+.xbs-search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    opacity: 0.7;
+}
+.xbs-search-input { padding-left: 2.5rem; }

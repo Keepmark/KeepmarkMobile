@@ -19,8 +19,9 @@ else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
 }
 else
 {
-    <div class="mb-2">
-        <input class="form-control" placeholder="Search bookmarks (min 2 chars)…"
+    <div class="mb-2 xbs-search">
+        <span class="xbs-search-icon" aria-hidden="true">🔍</span>
+        <input class="form-control xbs-search-input" placeholder="Search bookmarks (min 2 chars)…"
                @oninput="OnSearchInput" value="@query" />
     </div>
 
