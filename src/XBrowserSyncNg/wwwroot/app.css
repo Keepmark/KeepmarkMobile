@@ -225,6 +225,15 @@ h1:focus {
     text-overflow: ellipsis;
 }
 
+.xbs-row-path {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color, #6c757d);
+    opacity: 0.85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .xbs-row-chev {
     display: flex;
     align-items: center;
