@@ -1,7 +1,7 @@
 @using XBrowserSyncNg.Core.Data
 
 <div class="xbs-row" data-rowid="@Row.RowId" @onclick="() => OnOpen.InvokeAsync(Row)">
-    <div class="xbs-row-inner">
+    <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty)">
         <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
         <div class="xbs-row-text">
             <div class="xbs-row-title">@Title @if (Pinned) { <span class="xbs-pin" title="Pinned">★</span> }</div>
@@ -14,6 +14,7 @@
 @code {
     [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
     [Parameter] public bool Pinned { get; set; }
+    [Parameter] public bool Flash { get; set; }
     [Parameter] public string? FolderPath { get; set; }
     [Parameter] public EventCallback<ItemRow> OnOpen { get; set; }
     [Parameter] public EventCallback<(ItemRow Row, RowAction Action)> OnAction { get; set; }

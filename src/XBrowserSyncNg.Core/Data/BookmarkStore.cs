@@ -232,6 +232,28 @@ public sealed class BookmarkStore : IAsyncDisposable
     public async Task<ItemRow?> GetNodeAsync(int rowId) =>
         await Db.FindAsync<ItemRow>(rowId).ConfigureAwait(false);
 
+    /// <summary>Folder chain from top level down to the node's parent (for "go to location").</summary>
+    public async Task<List<ItemRow>> GetAncestorChainAsync(int rowId)
+    {
+        var db = Db;
+        var chain = new List<ItemRow>();
+        var node = await db.FindAsync<ItemRow>(rowId).ConfigureAwait(false);
+        var parent = node?.ParentRowId;
+        while (parent is not null)
+        {
+            var folder = await db.FindAsync<ItemRow>(parent.Value).ConfigureAwait(false);
+            if (folder is null)
+            {
+                break;
+            }
+
+            chain.Insert(0, folder);
+            parent = folder.ParentRowId;
+        }
+
+        return chain;
+    }
+
     public async Task<List<ItemRow>> GetByNodeIdsAsync(IEnumerable<int> nodeIds)
     {
         var ids = nodeIds.Distinct().ToList();

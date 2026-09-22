@@ -262,6 +262,14 @@ h1:focus {
 
 .xbs-pinned-list .xbs-row:last-child { margin-bottom: 0.25rem; }
 
+/* Location flash: highlights the row we jumped to. */
+@keyframes xbs-flash {
+    0%, 100% { box-shadow: none; }
+    25%, 75% { box-shadow: 0 0 0 3px #1b6ec2; }
+}
+
+.xbs-row-inner.xbs-flash { animation: xbs-flash 0.7s ease-in-out 3; }
+
 /* Bottom sheet editor */
 .xbs-sheet-backdrop {
     position: fixed;

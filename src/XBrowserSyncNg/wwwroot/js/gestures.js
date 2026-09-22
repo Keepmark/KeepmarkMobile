@@ -51,6 +51,10 @@ window.xbsGestures = (() => {
             document.addEventListener('pointerup', onUp, { passive: true });
             document.addEventListener('pointercancel', onUp, { passive: true });
         },
-        closeAll() { /* kept for Blazor callers; no snapped rows anymore */ }
+        closeAll() { /* kept for Blazor callers; no snapped rows anymore */ },
+        scrollToRow(rowId) {
+            const el = document.querySelector(`.xbs-row[data-rowid="${rowId}"]`);
+            if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
     };
 })();

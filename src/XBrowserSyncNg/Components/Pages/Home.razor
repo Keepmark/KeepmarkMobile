@@ -33,7 +33,7 @@ else
         <p class="text-muted">@hits.Count result(s)</p>
         @foreach (var id in hitRows)
         {
-            <BookmarkRow Row="byRow[id]" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+            <BookmarkRow Row="byRow[id]" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
                          FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
     }
@@ -59,7 +59,7 @@ else
                     <div class="xbs-pinned-list">
                         @foreach (var r in pinnedRows)
                         {
-                            <BookmarkRow Row="r" Pinned="true" OnOpen="OpenRow" OnAction="OnRowAction" />
+                            <BookmarkRow Row="r" Pinned="true" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
                 }
@@ -67,7 +67,7 @@ else
         }
         @foreach (var r in rows)
         {
-            <BookmarkRow Row="r" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
+            <BookmarkRow Row="r" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
@@ -100,6 +100,7 @@ else
                 }
                 <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
                 <button class="btn btn-secondary" @onclick="() => TogglePin(menuFor)">@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? "Unpin" : "Pin")</button>
+                <button class="btn btn-secondary" @onclick="() => GoToLocation(menuFor)">Go to location</button>
                 <button class="btn btn-danger" @onclick="() => DeleteRow(menuFor)">Delete</button>
                 <button class="btn btn-link" @onclick="() => menuFor = null">Cancel</button>
             </div>
@@ -137,6 +138,8 @@ else
     private SheetTarget? sheetFor;
     private ItemRow? menuFor;
     private bool pinnedOpen = true;
+    private int? flashRowId;
+    private CancellationTokenSource? flashTimer;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
     private CancellationTokenSource? undoTimer;
 
@@ -368,6 +371,7 @@ else
 
     private async Task GoRoot()
     {
+        ClearFlash();
         crumbs.Clear();
         query = string.Empty;
         isSearch = false;
@@ -376,6 +380,7 @@ else
 
     private async Task JumpTo(int rowId)
     {
+        ClearFlash();
         while (crumbs.Count > 0 && crumbs.Peek().RowId != rowId)
         {
             crumbs.Pop();
@@ -384,6 +389,48 @@ else
         query = string.Empty;
         isSearch = false;
         await RefreshAsync();
+    }
+
+    private async Task GoToLocation(ItemRow? row)
+    {
+        menuFor = null;
+        if (row is null || Session.Store is null) return;
+
+        var chain = await Session.Store.GetAncestorChainAsync(row.RowId);
+        ClearFlash();
+        crumbs.Clear();
+        foreach (var folder in chain)
+        {
+            crumbs.Push(folder);
+        }
+
+        query = string.Empty;
+        isSearch = false;
+        await RefreshAsync();
+
+        flashRowId = row.RowId;
+        StateHasChanged();
+        await Task.Delay(120);
+        try { await JS.InvokeVoidAsync("xbsGestures.scrollToRow", row.RowId); } catch { }
+
+        flashTimer?.Cancel();
+        flashTimer = new CancellationTokenSource();
+        var token = flashTimer.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(2400, token);
+                await InvokeAsync(() => { flashRowId = null; StateHasChanged(); });
+            }
+            catch (TaskCanceledException) { }
+        });
+    }
+
+    private void ClearFlash()
+    {
+        flashTimer?.Cancel();
+        flashRowId = null;
     }
 
     private void OnSearchInput(ChangeEventArgs e)
@@ -434,6 +481,8 @@ else
 
         debounce?.Cancel();
         debounce?.Dispose();
+        flashTimer?.Cancel();
+        flashTimer?.Dispose();
         undoTimer?.Cancel();
         undoTimer?.Dispose();
         dotNet?.Dispose();
