@@ -41,6 +41,11 @@ else
     }
     else
     {
+        <div class="xbs-sortbar" role="toolbar" aria-label="Sort">
+            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
+            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
+            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
+        </div>
         <div class="xbs-crumbs" role="navigation" aria-label="Folders">
             <button class="xbs-crumb" @onclick="GoRoot" aria-label="Top level">⌂</button>
             @foreach (var c in crumbs.Reverse())
@@ -68,11 +73,6 @@ else
                 }
             </div>
         }
-        <div class="xbs-sortbar" role="toolbar" aria-label="Sort">
-            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
-            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
-            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
-        </div>
         @foreach (var r in rows)
         {
             <BookmarkRow Row="r" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
