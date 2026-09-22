@@ -72,7 +72,7 @@ else
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
 
-    <p class="text-muted mt-3"><small>Status: @engineStatus · Last sync: @(lastSync?.ToString("u") ?? "never")</small></p>
+    <p class="text-muted mt-3"><small>Status: @engineStatus · Last sync: @(lastSync?.ToLocalTime().ToString("g") ?? "never")</small></p>
     @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
     {
         <button class="btn btn-outline-primary btn-sm" @onclick="SyncNow">Sync now</button>
