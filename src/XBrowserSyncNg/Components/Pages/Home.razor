@@ -39,15 +39,6 @@ else
     }
     else
     {
-        @if (pinnedRows.Count > 0 && crumbs.Count == 0)
-        {
-            <h6 class="text-muted mt-1">Pinned</h6>
-            @foreach (var r in pinnedRows)
-            {
-                <BookmarkRow Row="r" Pinned="true" OnOpen="OpenRow" OnAction="OnRowAction" />
-            }
-            <h6 class="text-muted mt-2">All</h6>
-        }
         <div class="xbs-crumbs" role="navigation" aria-label="Folders">
             <button class="xbs-crumb" @onclick="GoRoot" aria-label="Top level">⌂</button>
             @foreach (var c in crumbs.Reverse())
@@ -56,6 +47,20 @@ else
                 <button class="xbs-crumb" @onclick="() => JumpTo(c.RowId)">@c.Title</button>
             }
         </div>
+        @if (pinnedRows.Count > 0 && crumbs.Count == 0)
+        {
+            <button class="xbs-pinned-head" @onclick="() => pinnedOpen = !pinnedOpen" aria-expanded="@pinnedOpen">
+                <span class="chev">@(pinnedOpen ? "▾" : "▸")</span>
+                <span>📌 Pinned (@pinnedRows.Count)</span>
+            </button>
+            @if (pinnedOpen)
+            {
+                @foreach (var r in pinnedRows)
+                {
+                    <BookmarkRow Row="r" Pinned="true" OnOpen="OpenRow" OnAction="OnRowAction" />
+                }
+            }
+        }
         @foreach (var r in rows)
         {
             <BookmarkRow Row="r" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
@@ -124,6 +129,7 @@ else
     private bool gesturesInit;
     private SheetTarget? sheetFor;
     private ItemRow? menuFor;
+    private bool pinnedOpen = true;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
     private CancellationTokenSource? undoTimer;
 
@@ -258,9 +264,10 @@ else
     {
         menuFor = null;
         if (row?.NodeId is null || Session.Engine is null) return;
-        Pins.Toggle(row.NodeId.Value);
+        bool added = Pins.Toggle(row.NodeId.Value);
         pinned = Pins.Load();
         await RefreshAsync();
+        await Toast.ShowAsync(added ? "Pinned" : "Unpinned");
         StateHasChanged();
     }
 

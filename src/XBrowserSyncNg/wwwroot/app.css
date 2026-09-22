@@ -225,6 +225,26 @@ h1:focus {
     background: transparent;
 }
 
+.xbs-pin { color: #b58900; font-size: 0.9em; }
+
+/* Collapsible pinned section */
+.xbs-pinned-head {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 48px;
+    background: transparent;
+    border: none;
+    font-weight: 600;
+    padding: 0.25rem 0;
+}
+
+.xbs-pinned-head .chev {
+    display: inline-block;
+    width: 2rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
 /* Bottom sheet editor */
 .xbs-sheet-backdrop {
     position: fixed;
