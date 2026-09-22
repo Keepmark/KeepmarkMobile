@@ -1,26 +1,31 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using XBrowserSyncNg.Core.I18n;
+using XBrowserSyncNg.Services;
 
 namespace XBrowserSyncNg;
 
 public static class MauiProgram
 {
-	public static MauiApp CreateMauiApp()
-	{
-		var builder = MauiApp.CreateBuilder();
-		builder
-			.UseMauiApp<App>()
-			.ConfigureFonts(fonts =>
-			{
-				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-			});
+    public static MauiApp CreateMauiApp()
+    {
+        var builder = MauiApp.CreateBuilder();
+        builder
+            .UseMauiApp<App>()
+            .ConfigureFonts(fonts =>
+            {
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+            });
 
-		builder.Services.AddMauiBlazorWebView();
+        builder.Services.AddMauiBlazorWebView();
+
+        builder.Services.AddSingleton<IXbsLocalizer, EnglishLocalizer>();
+        builder.Services.AddSingleton<XbsSettings>();
+        builder.Services.AddSingleton<SecureCredentialStore>();
+        builder.Services.AddSingleton<XbsSession>();
 
 #if DEBUG
-		builder.Services.AddBlazorWebViewDeveloperTools();
-		builder.Logging.AddDebug();
+        builder.Services.AddBlazorWebViewDeveloperTools();
 #endif
 
-		return builder.Build();
-	}
+        return builder.Build();
+    }
 }

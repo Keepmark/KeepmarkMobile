@@ -1,0 +1,33 @@
+@page "/about"
+
+<PageTitle>About</PageTitle>
+
+<h1>About</h1>
+
+<p><strong>XBrowserSyncNg</strong> v@(AppInfo.VersionString) (build @(AppInfo.BuildString))</p>
+<p>A private bookmark sync client, based on the open-source
+    <a href="https://www.xbrowsersync.org/">xBrowserSync</a> project (GPL-3.0).</p>
+
+<h3>Contact</h3>
+<p><a href="mailto:keepmark@proton.me">keepmark@proton.me</a></p>
+<button class="btn btn-outline-primary" @onclick="ReportBug">Report a bug</button>
+
+@code {
+    private async Task ReportBug()
+    {
+        var subject = Uri.EscapeDataString($"[XBrowserSyncNg {AppInfo.VersionString}] Bug report");
+        var body = Uri.EscapeDataString(
+            $"App version: {AppInfo.VersionString} (build {AppInfo.BuildString})\n" +
+            $"API version: {Core.XbsConstants.ApiVersion}\n" +
+            $"Android: {DeviceInfo.VersionString} ({DeviceInfo.Model})\n\n" +
+            $"Describe the issue:\n");
+        try
+        {
+            await Launcher.OpenAsync($"mailto:keepmark@proton.me?subject={subject}&body={body}");
+        }
+        catch
+        {
+            // No email app configured; the address above remains copyable.
+        }
+    }
+}

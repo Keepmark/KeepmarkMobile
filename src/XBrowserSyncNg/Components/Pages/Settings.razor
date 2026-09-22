@@ -1,0 +1,82 @@
+@page "/settings"
+@inject XBrowserSyncNg.Services.XbsSession Session
+@inject XBrowserSyncNg.Services.XbsSettings AppSettings
+
+<PageTitle>Settings</PageTitle>
+
+<h1>Settings</h1>
+
+<div class="mb-3">
+    <label class="form-label">Sync mode (default: Automatic)</label>
+    <select class="form-select" @bind="mode">
+        <option value="@Core.Sync.SyncMode.Auto">Automatic — sync on every change</option>
+        <option value="@Core.Sync.SyncMode.Manual">Manual — only on pull-to-refresh or Sync now</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Service URL</label>
+    <input class="form-control" @bind="serviceUrl" />
+    <small class="text-muted">Changing the service re-links via the Connect page.</small>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Log verbosity</label>
+    <select class="form-select" @bind="verbosity">
+        <option value="@Core.Logging.XbsLogLevel.Error">Error</option>
+        <option value="@Core.Logging.XbsLogLevel.Warning">Warning</option>
+        <option value="@Core.Logging.XbsLogLevel.Info">Info</option>
+        <option value="@Core.Logging.XbsLogLevel.Debug">Debug</option>
+        <option value="@Core.Logging.XbsLogLevel.Verbose">Verbose (may include your bookmark titles/URLs)</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">App lock (device PIN / biometric)</label>
+    <select class="form-select" @bind="appLock">
+        <option value="Off">Off (default)</option>
+        <option value="BiometricOrDeviceCredential">Biometric or device PIN</option>
+        <option value="BiometricOnly">Biometric only</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Auto-lock after (minutes, 0 = on background)</label>
+    <input type="number" class="form-control" @bind="lockTimeout" min="0" max="60" />
+</div>
+
+<button class="btn btn-primary" @onclick="Save">Save</button>
+@if (saved)
+{
+    <span class="text-success ms-2">Saved.</span>
+}
+
+@code {
+    private Core.Sync.SyncMode mode;
+    private string serviceUrl = string.Empty;
+    private Core.Logging.XbsLogLevel verbosity;
+    private string appLock = "Off";
+    private int lockTimeout;
+
+    protected override void OnInitialized()
+    {
+        mode = AppSettings.Mode;
+        serviceUrl = AppSettings.ServiceUrl;
+        verbosity = AppSettings.Verbosity;
+        appLock = AppSettings.AppLock;
+        lockTimeout = AppSettings.LockTimeoutMinutes;
+    }
+
+    private void Save()
+    {
+        AppSettings.Mode = mode;
+        AppSettings.ServiceUrl = serviceUrl.Trim();
+        AppSettings.Verbosity = verbosity;
+        AppSettings.AppLock = appLock;
+        AppSettings.LockTimeoutMinutes = Math.Clamp(lockTimeout, 0, 60);
+        Session.NotifySettingsChanged();
+        saved = true;
+    }
+
+    private bool saved;
+}

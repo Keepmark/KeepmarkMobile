@@ -1,0 +1,68 @@
+@page "/status"
+@inject XBrowserSyncNg.Services.XbsSession Session
+@inject XBrowserSyncNg.Services.XbsSettings AppSettings
+
+<PageTitle>Status</PageTitle>
+
+<h1>Status</h1>
+
+@if (!loaded)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    <h3>Synchronization</h3>
+    <ul>
+        <li>Mode: @AppSettings.Mode</li>
+        <li>State: @status</li>
+        <li>Last sync: @(lastSync?.ToString("u") ?? "never")</li>
+        <li>Service: @AppSettings.ServiceUrl</li>
+    </ul>
+
+    <h3>Storage</h3>
+    <ul>
+        <li>Local database: @dbSize KB</li>
+        <li>Pending edits: @pending</li>
+    </ul>
+
+    <h3>Content</h3>
+    <ul>
+        <li>Folders: @stats?.Folders · Bookmarks: @stats?.Bookmarks · Separators: @stats?.Separators</li>
+        <li>Distinct tags: @stats?.DistinctTags · Max depth: @stats?.MaxDepth · Duplicate URLs: @stats?.DuplicateUrls</li>
+    </ul>
+
+    <h3>App</h3>
+    <ul>
+        <li>Version: @AppInfo.VersionString (build @AppInfo.BuildString)</li>
+        <li>Sync format: @Core.XbsConstants.SyncClientVersion · API: @Core.XbsConstants.ApiVersion</li>
+    </ul>
+}
+
+@code {
+    private bool loaded;
+    private Core.Sync.SyncStatus status;
+    private DateTimeOffset? lastSync;
+    private long dbSize;
+    private int pending;
+    private Core.Data.ContentStats? stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session is { Store: not null, Engine: not null })
+        {
+            status = Session.Engine.Status;
+            lastSync = Session.Engine.LastSyncAt;
+            pending = Session.Engine.PendingEdits;
+            dbSize = Session.Store.GetFileSize() / 1024;
+            stats = await Session.Store.GetStatsAsync();
+        }
+
+        loaded = true;
+    }
+}

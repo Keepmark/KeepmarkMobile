@@ -1,5 +1,209 @@
 ﻿@page "/"
+@inject XBrowserSyncNg.Services.XbsSession Session
+@implements IDisposable
 
-<h1>Hello, world!</h1>
+<PageTitle>Explore</PageTitle>
 
-Welcome to your new app.
+<h1>Explore</h1>
+
+@if (!ready)
+{
+    <p><em>Loading local bookmarks…</em></p>
+}
+else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
+{
+    <p>No sync connected. <a href="connect">Connect to a service</a> to get started.</p>
+}
+else
+{
+    <div class="mb-2">
+        <input class="form-control" placeholder="Search bookmarks (min 2 chars)…"
+               @oninput="OnSearchInput" value="@query" />
+    </div>
+
+    @if (searching)
+    {
+        <p><em>Searching…</em></p>
+    }
+    else if (isSearch)
+    {
+        <p class="text-muted">@hits.Count result(s)</p>
+        <ul class="list-group">
+            @foreach (var h in hits)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <div>@(h.Title ?? h.Url)</div>
+                        @if (!string.IsNullOrEmpty(h.FolderPath)) { <small class="text-muted">@h.FolderPath</small> }
+                    </div>
+                    @if (!h.IsFolder) { <button class="btn btn-sm btn-primary" @onclick="() => OpenUrl(h.Url)">Open</button> }
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="" @onclick="GoRoot" @onclick:preventDefault>Top</a></li>
+                @foreach (var c in crumbs)
+                {
+                    <li class="breadcrumb-item">@c.Title</li>
+                }
+            </ol>
+        </nav>
+        <ul class="list-group">
+            @foreach (var r in rows)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        @if (r.IsFolder) { <strong>@r.Title</strong> }
+                        else { <div>@(r.Title ?? r.Url)</div> }
+                        @if (!string.IsNullOrEmpty(r.Url) && !r.IsFolder) { <small class="text-muted">@r.Url</small> }
+                    </div>
+                    @if (r.IsFolder)
+                    {
+                        <button class="btn btn-sm btn-secondary" @onclick="() => Drill(r)">Open</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="() => OpenUrl(r.Url)">Open</button>
+                    }
+                </li>
+            }
+        </ul>
+        @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
+    }
+
+    <p class="text-muted mt-3"><small>Status: @engineStatus · Last sync: @(lastSync?.ToString("u") ?? "never")</small></p>
+}
+
+@code {
+    private bool ready;
+    private Core.Sync.SyncStatus engineStatus;
+    private DateTimeOffset? lastSync;
+    private List<Core.Data.ItemRow> rows = [];
+    private readonly Stack<Core.Data.ItemRow> crumbs = new();
+    private string query = string.Empty;
+    private List<Core.Data.SearchHit> hits = [];
+    private bool isSearch;
+    private bool searching;
+    private CancellationTokenSource? debounce;
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnStatus;
+            Session.Engine.DataChanged += OnData;
+        }
+
+        await RefreshAsync();
+        ready = true;
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (Session is { Store: not null, Engine: not null })
+        {
+            engineStatus = Session.Engine.Status;
+            lastSync = Session.Engine.LastSyncAt;
+            var parent = crumbs.Count == 0 ? (int?)null : crumbs.Peek().RowId;
+            rows = await Session.Store.GetChildrenAsync(parent);
+        }
+    }
+
+    private void OnStatus(Core.Sync.SyncStatus s)
+    {
+        engineStatus = s;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnData() => InvokeAsync(RefreshAsync);
+
+    private async Task Drill(Core.Data.ItemRow folder)
+    {
+        crumbs.Push(folder);
+        query = string.Empty;
+        isSearch = false;
+        await RefreshAsync();
+    }
+
+    private async Task GoRoot()
+    {
+        crumbs.Clear();
+        query = string.Empty;
+        isSearch = false;
+        await RefreshAsync();
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? string.Empty;
+        debounce?.Cancel();
+        debounce = new CancellationTokenSource();
+        var token = debounce.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(250, token);
+                await InvokeAsync(async () =>
+                {
+                    if (query.Trim().Length >= 2 && Session.Store is not null)
+                    {
+                        searching = true;
+                        isSearch = true;
+                        StateHasChanged();
+                        hits = await Session.Store.SearchAsync(query.Trim(), 50);
+                        searching = false;
+                    }
+                    else
+                    {
+                        isSearch = false;
+                        hits = [];
+                    }
+
+                    StateHasChanged();
+                });
+            }
+            catch (TaskCanceledException)
+            {
+            }
+        });
+    }
+
+    private async Task OpenUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || url == Core.XbsConstants.SeparatorUrl)
+        {
+            return;
+        }
+
+        try
+        {
+            await Launcher.OpenAsync(url);
+        }
+        catch
+        {
+            // Launcher failures surface as toast in a later pass; never crash the list.
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnStatus;
+            Session.Engine.DataChanged -= OnData;
+        }
+
+        debounce?.Cancel();
+        debounce?.Dispose();
+    }
+}

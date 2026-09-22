@@ -80,7 +80,7 @@ public interface IXSyncApiClient
 /// One instance per service URL (HttpClient is injected). Every call logs
 /// START/END with timing at Info; bodies are never logged.
 /// </summary>
-public sealed class XSyncApiClient : IXSyncApiClient
+public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 {
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
@@ -94,6 +94,8 @@ public sealed class XSyncApiClient : IXSyncApiClient
         _str = str;
         _log = log;
     }
+
+    public void Dispose() => _http.Dispose();
 
     /// <summary>Builds a client bound to a service URL with the required Accept-Version header.</summary>
     public static XSyncApiClient ForService(string serviceUrl, IXbsLocalizer str, IXbsLogger log)

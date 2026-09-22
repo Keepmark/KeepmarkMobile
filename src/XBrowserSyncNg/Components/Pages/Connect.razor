@@ -1,0 +1,168 @@
+@page "/connect"
+@inject XBrowserSyncNg.Services.XbsSession Session
+@inject XBrowserSyncNg.Services.XbsSettings AppSettings
+
+<PageTitle>Connect</PageTitle>
+
+<h1>Connect</h1>
+
+@if (!Session.Ready)
+{
+    <p><em>Starting…</em></p>
+}
+else
+{
+    <div class="mb-3">
+        <label class="form-label">Service URL</label>
+        <input class="form-control" @bind="serviceUrl" />
+        <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">Check service</button>
+        @if (serviceInfo is not null)
+        {
+            <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
+        }
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Sync ID (existing sync)</label>
+        <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+        <label class="form-label mt-2">Password</label>
+        <input type="password" class="form-control" @bind="password" />
+        <div class="mt-2">
+            <button class="btn btn-primary me-2" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
+            <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@busy">Create new sync</button>
+        </div>
+    </div>
+
+    @if (reconcile is not null)
+    {
+        <div class="alert alert-warning">
+            <h4>Choose sync direction</h4>
+            <p>Local items: <strong>@reconcile.LocalCount</strong> · Remote items: <strong>@reconcile.RemoteCount</strong>
+                (remote updated @(reconcile.RemoteLastUpdated ?? "unknown")).</p>
+            <p><small>A safety backup of the overwritten side is saved automatically.</small></p>
+            @if (reconcile is { LocalCount: 0 })
+            {
+                <button class="btn btn-primary" @onclick="ApplyRemote" disabled="@busy">Download remote</button>
+            }
+            else if (reconcile is { RemoteCount: 0 })
+            {
+                <button class="btn btn-primary" @onclick="ApplyLocal" disabled="@busy">Upload local</button>
+            }
+            else
+            {
+                <button class="btn btn-primary me-2" @onclick="ApplyLocal" disabled="@busy">Keep mine, upload</button>
+                <button class="btn btn-secondary" @onclick="ApplyRemote" disabled="@busy">Take remote, replace local</button>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+    }
+}
+
+@code {
+    private string serviceUrl = Core.XbsConstants.DefaultServiceUrl;
+    private string syncId = string.Empty;
+    private string password = string.Empty;
+    private bool busy;
+    private string message = string.Empty;
+    private bool isError;
+    private Core.Api.ServiceInfoResponse? serviceInfo;
+    private Services.ReconcileInfo? reconcile;
+
+    protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
+
+    private async Task CheckService()
+    {
+        await RunAsync(async () =>
+        {
+            serviceInfo = await Session.CheckServiceAsync(serviceUrl.Trim());
+            AppSettings.ServiceUrl = serviceUrl.Trim();
+            Ok($"Service is valid: {serviceInfo.Status}, API v{serviceInfo.Version}.");
+        });
+    }
+
+    private async Task LinkExisting()
+    {
+        await RunAsync(async () =>
+        {
+            reconcile = await Session.ProbeLinkAsync(serviceUrl.Trim(), syncId.Trim(), password);
+            AppSettings.ServiceUrl = serviceUrl.Trim();
+            if (reconcile is { LocalCount: 0, RemoteCount: 0 })
+            {
+                await Session.ApplyRemoteAsync(reconcile);
+                reconcile = null;
+                Ok("Linked. Both sides were empty — ready to go.");
+            }
+            else
+            {
+                Ok("Credentials valid. Choose the sync direction above.");
+            }
+        });
+    }
+
+    private async Task CreateNew()
+    {
+        await RunAsync(async () =>
+        {
+            if (password.Length < 8)
+            {
+                throw new InvalidOperationException("Use a password of at least 8 characters.");
+            }
+
+            await Session.CreateNewSyncAsync(serviceUrl.Trim(), password);
+            AppSettings.ServiceUrl = serviceUrl.Trim();
+            reconcile = null;
+            Ok("New sync created and linked.");
+        });
+    }
+
+    private async Task ApplyRemote()
+    {
+        await RunAsync(async () =>
+        {
+            await Session.ApplyRemoteAsync(reconcile!);
+            reconcile = null;
+            Ok("Remote version downloaded.");
+        });
+    }
+
+    private async Task ApplyLocal()
+    {
+        await RunAsync(async () =>
+        {
+            await Session.ApplyLocalAsync(reconcile!);
+            reconcile = null;
+            Ok("Local version uploaded.");
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        isError = false;
+        message = string.Empty;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            isError = true;
+            message = ex.Message;
+        }
+        finally
+        {
+            password = string.Empty;
+            busy = false;
+        }
+    }
+
+    private void Ok(string text)
+    {
+        isError = false;
+        message = text;
+    }
+}

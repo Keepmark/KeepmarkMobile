@@ -224,11 +224,12 @@ public sealed class SyncEngine(
     /// <summary>
     /// Onboarding/server-switch reconciliation: how many items on each side?
     /// Downloads + decrypts the remote tree (password already in hand).
+    /// Also returns the raw blobs so the overwritten side can be safety-backed-up.
     /// </summary>
-    public async Task<(int Local, int Remote, string? RemoteLastUpdated, string? RemoteVersion)> CompareAsync(
+    public async Task<(int Local, int Remote, string? RemoteLastUpdated, string? RemoteVersion, string RemoteBlob, string LocalBlob)> CompareAsync(
         SyncCredentials candidate, CancellationToken ct = default)
     {
-        var (_, _, localLast, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+        var (_, localBlob, localLast, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
         var stats = await store.GetStatsAsync().ConfigureAwait(false);
         int local = stats.Folders + stats.Bookmarks + stats.Separators;
 
@@ -239,7 +240,7 @@ public sealed class SyncEngine(
         var roots = JsonSerializer.Deserialize<List<BookmarkNode>>(json, Json) ?? [];
         int remote = CountNodes(roots);
         _ = localLast;
-        return (local, remote, full.LastUpdated, full.Version);
+        return (local, remote, full.LastUpdated, full.Version, full.Bookmarks ?? string.Empty, localBlob ?? string.Empty);
     }
 
     private void ThrowIfVersionUnsupported(string? remoteVersion)
