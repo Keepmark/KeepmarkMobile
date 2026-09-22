@@ -189,14 +189,19 @@ h1:focus {
     position: absolute;
     top: -1px;
     left: 10px;
-    width: 12px;
-    height: 20px;
+    width: 10px;
+    height: 16px;
     clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+    opacity: 0.85;
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.55));
 }
 
-.xbs-ribbon.mark { background-color: #1b6ec2; }
-.xbs-ribbon.folder { background-color: #2e9e7b; }
-.xbs-ribbon.sep { background-color: #adb5bd; }
+.xbs-ribbon.mark { background: linear-gradient(180deg, #5aa3e0 0%, #1b6ec2 100%); }
+.xbs-ribbon.folder { background: linear-gradient(180deg, #5cc9a7 0%, #2e9e7b 100%); }
+.xbs-ribbon.sep { background: linear-gradient(180deg, #ced4da 0%, #adb5bd 100%); }
+
+.xbs-pin { color: #b58900; font-size: 0.9em; }
+.xbs-pinred { font-size: 0.85em; }
 
 .xbs-row-text {
     min-width: 0;
@@ -230,8 +235,6 @@ h1:focus {
     border: none;
     background: transparent;
 }
-
-.xbs-pin { color: #b58900; font-size: 0.9em; }
 
 /* Collapsible pinned section */
 .xbs-pinned-box {
