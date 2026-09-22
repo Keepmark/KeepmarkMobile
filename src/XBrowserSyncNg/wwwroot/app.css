@@ -511,3 +511,14 @@ h1:focus {
     white-space: normal;
     overflow-wrap: anywhere;
 }
+
+/* Branded app bar under the status spacer. */
+.xbs-appbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0 0.25rem;
+}
+
+.xbs-appbar img { width: 28px; height: 28px; }
+.xbs-appbar span { font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; }

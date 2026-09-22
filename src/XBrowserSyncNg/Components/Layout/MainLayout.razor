@@ -16,6 +16,10 @@
     </div>
 
     <main>
+        <div class="xbs-appbar">
+            <img src="img/mark.svg" alt="" />
+            <span>xBrowserSyncNg</span>
+        </div>
         <article class="content px-2">
             @Body
         </article>
@@ -31,7 +35,7 @@
 {
     <div class="xbs-lock">
         <div class="xbs-lock-card">
-            <h3>XBrowserSyncNg is locked</h3>
+            <h3>xBrowserSyncNg is locked</h3>
             <p class="text-muted">Authenticate to continue.</p>
             <button class="btn btn-primary btn-lg" @onclick="Unlock">Unlock</button>
             @if (!string.IsNullOrEmpty(lockError))

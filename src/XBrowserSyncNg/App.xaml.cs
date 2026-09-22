@@ -16,7 +16,7 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new MainPage()) { Title = "XBrowserSyncNg" };
+        return new Window(new MainPage()) { Title = "xBrowserSyncNg" };
     }
 
     protected override async void OnStart()

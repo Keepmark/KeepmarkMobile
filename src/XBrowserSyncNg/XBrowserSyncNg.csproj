@@ -28,15 +28,15 @@
         <MauiXamlInflator>SourceGen</MauiXamlInflator>
 
         <!-- Display name -->
-        <ApplicationTitle>XBrowserSyncNg</ApplicationTitle>
+        <ApplicationTitle>xBrowserSyncNg</ApplicationTitle>
 
         <!-- App Identifier -->
         <ApplicationId>com.keepmark.legacy.xbsyncng</ApplicationId>
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.6</ApplicationDisplayVersion>
-        <ApplicationVersion>7</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.7</ApplicationDisplayVersion>
+        <ApplicationVersion>8</ApplicationVersion>
 
         <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
         <WindowsPackageType>None</WindowsPackageType>
