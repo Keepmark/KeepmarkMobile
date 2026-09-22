@@ -488,3 +488,26 @@ h1:focus {
     border-color: #1b6ec2;
     color: #fff;
 }
+
+/* Expanded row: full wrapped details (swipe right to expand). */
+.xbs-expanded .xbs-row-title,
+.xbs-expanded .xbs-row-sub,
+.xbs-expanded .xbs-row-path {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.xbs-row-desc {
+    margin-top: 0.35rem;
+    font-size: 0.9rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.xbs-row-tags {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: #1b6ec2;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}

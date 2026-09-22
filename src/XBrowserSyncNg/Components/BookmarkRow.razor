@@ -1,7 +1,7 @@
 @using XBrowserSyncNg.Core.Data
 
 <div class="xbs-row" data-rowid="@Row.RowId" @onclick="() => OnOpen.InvokeAsync(Row)">
-    <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty)">
+    <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
         @if (!Row.IsFolder)
         {
             <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
@@ -9,6 +9,17 @@
         <div class="xbs-row-text">
             <div class="xbs-row-title">@Title @if (Pinned) { <span class="xbs-pinred" title="Pinned">📌</span> }</div>
             <div class="xbs-row-sub">@Sub</div>
+            @if (Expanded && !Row.IsFolder)
+            {
+                @if (!string.IsNullOrEmpty(Row.Description))
+                {
+                    <div class="xbs-row-desc">@Row.Description</div>
+                }
+                @if (!string.IsNullOrEmpty(Row.Tags))
+                {
+                    <div class="xbs-row-tags">#@Row.Tags.Replace("\u001F", " #") </div>
+                }
+            }
             @if (!Row.IsFolder && !string.IsNullOrEmpty(FolderPath))
             {
                 <div class="xbs-row-path">📁 @FolderPath</div>
@@ -22,6 +33,7 @@
     [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
     [Parameter] public bool Pinned { get; set; }
     [Parameter] public bool Flash { get; set; }
+    [Parameter] public bool Expanded { get; set; }
     [Parameter] public string? FolderPath { get; set; }
     [Parameter] public EventCallback<ItemRow> OnOpen { get; set; }
     [Parameter] public EventCallback<(ItemRow Row, RowAction Action)> OnAction { get; set; }

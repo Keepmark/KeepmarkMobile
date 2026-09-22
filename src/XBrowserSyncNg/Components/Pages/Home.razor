@@ -35,7 +35,7 @@ else
         <p class="text-muted">@hits.Count result(s)</p>
         @foreach (var id in hitRows)
         {
-            <BookmarkRow Row="byRow[id]" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+            <BookmarkRow Row="byRow[id]" Expanded="expandedRowId == id" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
                          FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
     }
@@ -61,7 +61,7 @@ else
                     <div class="xbs-pinned-list">
                         @foreach (var r in pinnedRows)
                         {
-                            <BookmarkRow Row="r" Pinned="true" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
+                            <BookmarkRow Row="r" Pinned="true" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
                 }
@@ -74,7 +74,7 @@ else
         </div>
         @foreach (var r in rows)
         {
-            <BookmarkRow Row="r" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
+            <BookmarkRow Row="r" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
         @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
     }
@@ -116,7 +116,10 @@ else
                 }
                 <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
                 <button class="btn btn-secondary" @onclick="() => TogglePin(menuFor)">@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? "Unpin" : "Pin")</button>
-                <button class="btn btn-secondary" @onclick="() => GoToLocation(menuFor)">Go to location</button>
+                @if (menuFor.ParentRowId != CurrentParent)
+                {
+                    <button class="btn btn-secondary" @onclick="() => GoToLocation(menuFor)">Go to location</button>
+                }
                 <button class="btn btn-danger" @onclick="() => DeleteRow(menuFor)">Delete</button>
                 <button class="btn btn-link" @onclick="() => menuFor = null">Cancel</button>
             </div>
@@ -155,6 +158,7 @@ else
     private ItemRow? menuFor;
     private bool pinnedOpen = true;
     private int? flashRowId;
+    private int? expandedRowId;
     private string sortMode = "Default";
     private CancellationTokenSource? flashTimer;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
@@ -235,6 +239,26 @@ else
     // ---- JS gesture callbacks ----
 
     [JSInvokable] public async Task OnRowTap(int rowId) => await OpenRow(await ResolveAsync(rowId));
+
+    [JSInvokable]
+    public Task OnRowSwipeRight(int rowId)
+    {
+        expandedRowId = rowId;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnRowSwipeLeft(int rowId)
+    {
+        if (expandedRowId == rowId)
+        {
+            expandedRowId = null;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
 
     [JSInvokable]
     public async Task OnRowLongPress(int rowId)
@@ -399,6 +423,7 @@ else
     private async Task GoRoot()
     {
         ClearFlash();
+        expandedRowId = null;
         crumbs.Clear();
         query = string.Empty;
         isSearch = false;
@@ -408,6 +433,7 @@ else
     private async Task JumpTo(int rowId)
     {
         ClearFlash();
+        expandedRowId = null;
         while (crumbs.Count > 0 && crumbs.Peek().RowId != rowId)
         {
             crumbs.Pop();
@@ -425,6 +451,7 @@ else
 
         var chain = await Session.Store.GetAncestorChainAsync(row.RowId);
         ClearFlash();
+        expandedRowId = null;
         crumbs.Clear();
         foreach (var folder in chain)
         {
