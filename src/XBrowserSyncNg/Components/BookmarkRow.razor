@@ -2,7 +2,10 @@
 
 <div class="xbs-row" data-rowid="@Row.RowId" @onclick="() => OnOpen.InvokeAsync(Row)">
     <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty)">
-        <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
+        @if (!Row.IsFolder)
+        {
+            <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
+        }
         <div class="xbs-row-text">
             <div class="xbs-row-title">@Title @if (Pinned) { <span class="xbs-pin" title="Pinned">★</span> }</div>
             <div class="xbs-row-sub">@Sub</div>
