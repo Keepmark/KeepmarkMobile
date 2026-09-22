@@ -464,7 +464,19 @@ h1:focus {
     pointer-events: none;
     opacity: 0.7;
 }
-.xbs-search-input { padding-left: 2.5rem; }
+.xbs-search-input { padding-left: 2.5rem; padding-right: 2.5rem; }
+.xbs-search-clear {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    min-width: 44px;
+    min-height: 44px;
+    border: none;
+    background: transparent;
+    font-size: 1.1rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
 
 /* Sort bar under the breadcrumb. */
 .xbs-sortbar {

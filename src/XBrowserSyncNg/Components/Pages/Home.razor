@@ -24,6 +24,10 @@ else
         <span class="xbs-search-icon" aria-hidden="true">🔍</span>
         <input class="form-control xbs-search-input" placeholder="Search bookmarks (min 2 chars)…"
                @oninput="OnSearchInput" value="@query" />
+        @if (!string.IsNullOrEmpty(query))
+        {
+            <button class="xbs-search-clear" @onclick="ClearSearch" aria-label="Clear search">✕</button>
+        }
     </div>
 
     @if (searching)
@@ -529,6 +533,16 @@ else
         sortMode = mode;
         AppSettings.ListSort = mode;
         await RefreshAsync();
+    }
+
+    private void ClearSearch()
+    {
+        debounce?.Cancel();
+        query = string.Empty;
+        isSearch = false;
+        hits = [];
+        hitRows = [];
+        searching = false;
     }
 
     private void OnSearchInput(ChangeEventArgs e)
