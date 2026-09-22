@@ -36,33 +36,28 @@ public sealed class AndroidAppLockService : global::XBrowserSyncNg.Services.IApp
             var executor = ContextCompat.GetMainExecutor(activity)!;
             var prompt = new BiometricPrompt(activity, executor, new AuthCallback(tcs));
 
-            bool deviceCredential;
             int authenticators;
             var mode = Preferences.Get("app_lock", "Off");
-            if (requireDeviceCredential || mode != "BiometricOnly")
+            if (requireDeviceCredential || mode == "PinOnly")
             {
-                // PIN/pattern/password (alone or as biometric fallback).
+                // PIN/pattern/password only — no biometric shortcut.
                 // NOTE: with DEVICE_CREDENTIAL allowed, a custom negative button
                 // is forbidden and makes the builder throw — the system provides
                 // its own cancel/credential UI.
-                authenticators = requireDeviceCredential
-                    ? BiometricManager.Authenticators.DeviceCredential
-                    : BiometricManager.Authenticators.BiometricStrong | BiometricManager.Authenticators.DeviceCredential;
-                deviceCredential = true;
+                authenticators = BiometricManager.Authenticators.DeviceCredential;
             }
             else
             {
-                authenticators = BiometricManager.Authenticators.BiometricStrong;
-                deviceCredential = false;
+                // Biometric with device-credential fallback.
+                authenticators = BiometricManager.Authenticators.BiometricStrong
+                    | BiometricManager.Authenticators.DeviceCredential;
             }
 
             var builder = new BiometricPrompt.PromptInfo.Builder()
                 .SetTitle(title)
                 .SetAllowedAuthenticators(authenticators);
-            if (!deviceCredential)
-            {
-                builder.SetNegativeButtonText("Cancel");
-            }
+            // No custom negative button: DEVICE_CREDENTIAL is always allowed
+            // and forbids it (the system provides its own cancel UI).
 
             var info = builder.Build();
             activity.RunOnUiThread(() =>

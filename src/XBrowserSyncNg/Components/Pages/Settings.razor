@@ -36,8 +36,8 @@
     <label class="form-label">App lock (device PIN / biometric)</label>
     <select class="form-select" @bind="appLock">
         <option value="Off">Off (default)</option>
-        <option value="BiometricOrDeviceCredential">Biometric or device PIN</option>
-        <option value="BiometricOnly">Biometric only</option>
+        <option value="PinOnly">PIN only (device PIN, pattern or password)</option>
+        <option value="BiometricAndPin">Biometric + PIN fallback</option>
     </select>
 </div>
 
