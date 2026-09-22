@@ -61,7 +61,8 @@ else
                     <div class="xbs-pinned-list">
                         @foreach (var r in pinnedRows)
                         {
-                            <BookmarkRow Row="r" Pinned="true" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId" OnOpen="OpenRow" OnAction="OnRowAction" />
+                            <BookmarkRow Row="r" Pinned="true" Expanded="expandedRowId == r.RowId" Flash="flashRowId == r.RowId"
+                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
                 }
@@ -159,6 +160,7 @@ else
     private bool pinnedOpen = true;
     private int? flashRowId;
     private int? expandedRowId;
+    private Dictionary<int, string> pinPaths = new();
     private string sortMode = "Default";
     private CancellationTokenSource? flashTimer;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
@@ -215,6 +217,7 @@ else
             };
             allFolders = await Session.Store.GetAllFoldersAsync();
             pinnedRows = await Session.Store.GetByNodeIdsAsync(pinned);
+            pinPaths = await Session.Store.GetFolderPathsAsync();
             byRow.Clear();
             foreach (var r in rows.Concat(pinnedRows)) byRow[r.RowId] = r;
             foreach (var h in hits)

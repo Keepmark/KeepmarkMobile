@@ -218,7 +218,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                 .Take(limit).ToListAsync().ConfigureAwait(false);
         }
 
-        var paths = await FolderPathsAsync().ConfigureAwait(false);
+        var paths = await GetFolderPathsAsync().ConfigureAwait(false);
         return rows.Select((r, i) => new SearchHit(
             r.RowId, r.NodeId, r.Title, r.Url, r.Description, r.Tags?.Replace($"{TagSep}", ", "),
             r.IsFolder, paths.GetValueOrDefault(r.RowId, string.Empty), i)).ToList();
@@ -445,10 +445,10 @@ public sealed class BookmarkStore : IAsyncDisposable
 
     public long GetFileSize() => new FileInfo(_dbPath).Length;
 
-    private async Task<Dictionary<int, string>> FolderPathsAsync()
+    public async Task<Dictionary<int, string>> GetFolderPathsAsync()
     {
-        var rows = await Db.Table<ItemRow>().ToListAsync().ConfigureAwait(false);
-        var byId = rows.ToDictionary(r => r.RowId);
+        var paths = await Db.Table<ItemRow>().ToListAsync().ConfigureAwait(false);
+        var byId = paths.ToDictionary(r => r.RowId);
         var cache = new Dictionary<int, string>();
 
         string PathOf(int rowId)
@@ -473,7 +473,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             return cache[rowId] = string.Join(" / ", parts);
         }
 
-        foreach (var r in rows)
+        foreach (var r in paths)
         {
             PathOf(r.RowId);
         }
