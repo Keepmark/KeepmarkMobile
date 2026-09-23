@@ -631,26 +631,33 @@ else
 
     private void OnSharedArrived() => InvokeAsync(() =>
     {
-        Nav.NavigateTo("/");
+        // Navigate home only when showing another page: navigating while
+        // already home would recreate this page and discard the sheet below.
+        // The fresh Home instance picks the pending share up in OnInitialized.
+        if (!IsHome())
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
         if (OpenSharedIfPending())
         {
             StateHasChanged();
         }
     });
 
+    private bool IsHome() => string.IsNullOrEmpty(Nav.ToBaseRelativePath(Nav.Uri));
+
     /// <summary>Opens the add sheet prefilled from an incoming share. Returns true if one was pending.</summary>
     private bool OpenSharedIfPending()
     {
         var pending = SharedImport.Consume();
-        System.Diagnostics.Debug.WriteLine($"[share] consumed: {(pending is null ? "none" : pending.Url)}, engineNull={Session.Engine is null}, page={Nav.Uri}");
         if (pending is null || Session.Engine is null)
         {
             return false;
         }
 
         sheetFor = new SheetTarget(null, LastCreateFolder(), pending.Url, pending.Title);
-        System.Diagnostics.Debug.WriteLine("[share] sheet opened");
-        _ = Toast.ShowAsync("New bookmark from share");
         return true;
     }
 

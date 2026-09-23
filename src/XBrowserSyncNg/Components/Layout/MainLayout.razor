@@ -84,7 +84,15 @@
     private void OnLockChanged() => InvokeAsync(StateHasChanged);
     private void OnToast() => InvokeAsync(StateHasChanged);
 
-    private void OnShareArrived() => InvokeAsync(() => Nav.NavigateTo("/"));
+    private void OnShareArrived() => InvokeAsync(() =>
+    {
+        // Home opens the sheet itself when already shown; navigating now would
+        // recreate it and lose the pending share. Only navigate from elsewhere.
+        if (!string.IsNullOrEmpty(Nav.ToBaseRelativePath(Nav.Uri)))
+        {
+            Nav.NavigateTo("/");
+        }
+    });
 
     private async Task Unlock()
     {

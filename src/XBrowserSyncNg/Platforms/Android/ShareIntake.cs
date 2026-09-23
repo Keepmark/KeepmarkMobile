@@ -13,13 +13,9 @@ internal static class ShareIntake
     {
         try
         {
-            System.Diagnostics.Debug.WriteLine(
-                $"[share] intent: action={intent?.Action} type={intent?.Type} hasText={intent?.HasExtra(Intent.ExtraText)}");
-
             if (intent?.Action != Intent.ActionSend ||
                 !string.Equals(intent.Type, "text/plain", StringComparison.OrdinalIgnoreCase))
             {
-                System.Diagnostics.Debug.WriteLine("[share] intent ignored (not SEND/text)");
                 return;
             }
 
@@ -71,28 +67,6 @@ internal static class ShareIntake
         }
 
         share.Publish(text, subject);
-
-        try
-        {
-            var act = Platform.CurrentActivity;
-            var pending = share.Peek();
-            act?.RunOnUiThread(() => global::Android.Widget.Toast.MakeText(act,
-                $"share ok: {(pending is null ? "no-url" : pending.Url)}", global::Android.Widget.ToastLength.Short)?.Show());
-        }
-        catch
-        {
-        }
-
-        try
-        {
-            var services = IPlatformApplication.Current?.Services;
-            var toast = services?.GetService(typeof(global::XBrowserSyncNg.Services.ToastState)) as global::XBrowserSyncNg.Services.ToastState;
-            toast?.ShowAsync("Link received — complete the bookmark");
-        }
-        catch
-        {
-        }
-
         return true;
     }
 }
