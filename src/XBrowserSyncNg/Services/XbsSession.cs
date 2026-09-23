@@ -123,25 +123,42 @@ public sealed class XbsSession : IAsyncDisposable
         // Safety backup of the overwritten remote side.
         await SaveSafetyBackupAsync("remote", info.RemoteBlob).ConfigureAwait(false);
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
-        // Fresh link: no server lastUpdated known locally; push current mirror.
-        // Engine.PushAsync needs a stored lastUpdated, so pull metadata first is skipped:
-        // instead upload, then adopt the returned timestamp.
+        await UploadMirrorAsync(info.Candidate, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Fresh/empty link: upload the current local mirror to the server.</summary>
+    private async Task UploadMirrorAsync(SyncCredentials candidate, CancellationToken ct)
+    {
         var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        var api = ApiFor(info.Candidate.ServiceUrl);
+        var api = ApiFor(candidate.ServiceUrl);
         var json = System.Text.Json.JsonSerializer.Serialize(roots);
-        var blob = _crypto.Encrypt(json, info.Candidate.DerivedKey);
+        var blob = _crypto.Encrypt(json, candidate.DerivedKey);
         // lastUpdated "" forces no precondition on first upload of a fresh/empty sync slot.
-        var res = await api.UpdateBookmarksAsync(info.Candidate.Id, blob, await CurrentLastUpdatedAsync().ConfigureAwait(false) ?? string.Empty, ct: ct)
+        var res = await api.UpdateBookmarksAsync(candidate.Id, blob, await CurrentLastUpdatedAsync().ConfigureAwait(false) ?? string.Empty, ct: ct)
             .ConfigureAwait(false);
-        await Store.ReplaceAllAsync(roots, blob, res.LastUpdated!, info.Candidate.Version).ConfigureAwait(false);
+        await Store.ReplaceAllAsync(roots, blob, res.LastUpdated!, candidate.Version).ConfigureAwait(false);
     }
 
     public async Task CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
+        // Safety backup: the local tree is about to be replaced by an empty sync.
+        var (_, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty).ConfigureAwait(false);
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
         await _creds.SetAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version)).ConfigureAwait(false);
-        await Store!.ReplaceAllAsync([], string.Empty, created.LastUpdated!, created.Version).ConfigureAwait(false);
+        await Store.ReplaceAllAsync([], string.Empty, created.LastUpdated!, created.Version).ConfigureAwait(false);
+        Engine!.Mode = _settings.Mode;
+    }
+
+    /// <summary>Creates the sync on the service, then uploads the current local tree into it.</summary>
+    public async Task CreateNewSyncWithUploadAsync(string serviceUrl, string password, CancellationToken ct = default)
+    {
+        var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
+        var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
+        var candidate = new SyncCredentials(created.Id!, serviceUrl, derived, created.Version);
+        await _creds.SetAsync(candidate).ConfigureAwait(false);
+        await UploadMirrorAsync(candidate, ct).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
     }
 
