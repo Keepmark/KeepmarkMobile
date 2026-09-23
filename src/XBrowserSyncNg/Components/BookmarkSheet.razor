@@ -41,7 +41,11 @@
                 </button>
                 @if (showTree)
                 {
-                    <div class="xbs-tree-box">
+                    <div class="xbs-tree-full" @onclick:stopPropagation="true">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h4 class="mb-0">Choose folder</h4>
+                            <button type="button" class="btn btn-link" @onclick="() => showTree = false">Close</button>
+                        </div>
                         <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnFolderPicked"
                                       ExcludeSubtreeRoot="Existing?.RowId" />
                     </div>
