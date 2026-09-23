@@ -42,10 +42,13 @@
     </select>
 </div>
 
-<div class="mb-3">
-    <label class="form-label">Auto-lock after (minutes, 0 = on background)</label>
-    <input type="number" class="form-control" @bind="lockTimeout" min="0" max="60" />
-</div>
+@if (appLock != "Off")
+{
+    <div class="mb-3">
+        <label class="form-label">Auto-lock after (minutes, 0 = on background)</label>
+        <input type="number" class="form-control" @bind="lockTimeout" min="0" max="60" />
+    </div>
+}
 
 <button class="btn btn-primary" @onclick="Save">Save</button>
 @if (saved)
