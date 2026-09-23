@@ -63,7 +63,8 @@ public class MainActivity : MauiAppCompatActivity
             {
             }
 
-            if (intent?.Action != Intent.ActionSend || intent.Type != "text/plain")
+            if (intent?.Action != Intent.ActionSend ||
+                !string.Equals(intent.Type, "text/plain", StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
