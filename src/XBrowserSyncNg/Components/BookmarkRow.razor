@@ -16,7 +16,7 @@ else
          role="button" tabindex="0" aria-expanded="@RowExpanded"
          aria-label="@RowLabel"
          @onkeydown="OnKey">
-        <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty) @(Row.IsFolder ? string.Empty : "xbs-has-expand")">
+        <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
             @if (!Row.IsFolder)
             {
                 <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
@@ -40,13 +40,6 @@ else
                     <div class="xbs-row-path"><span aria-hidden="true">📁</span> @FolderPath</div>
                 }
             </div>
-            @if (!Row.IsFolder)
-            {
-                <button type="button" class="xbs-row-expand" @onclick="OnToggle" @onclick:stopPropagation="true"
-                        @onkeydown:stopPropagation="true" aria-expanded="@Expanded.ToString().ToLowerInvariant()" aria-label="@(Expanded ? "Collapse details" : "Expand details")">
-                    <span aria-hidden="true" class="xbs-expand-chev @(Expanded ? "open" : string.Empty)">›</span>
-                </button>
-            }
             <button type="button" class="xbs-row-chev" @onclick="OnMenu" @onclick:stopPropagation="true"
                     @onkeydown:stopPropagation="true" aria-label="Actions for @PlainTitle">⋮</button>
         </div>
@@ -71,7 +64,6 @@ else
     private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Row.Url ?? string.Empty;
 
     private Task OnMenu() => OnAction.InvokeAsync((Row, RowAction.Menu));
-    private Task OnToggle() => OnAction.InvokeAsync((Row, RowAction.ToggleExpand));
 
     private Task OnKey(KeyboardEventArgs e)
     {

@@ -6,7 +6,9 @@
     <title>XBrowserSyncNg</title>
     <base href="/" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="app.css" />
+    <!-- Asset cache-buster: bump ?v= on every release that touches CSS/JS,
+         otherwise the WebView may keep serving stale files after update. -->
+    <link rel="stylesheet" href="app.css?v=50" />
     <link rel="stylesheet" href="XBrowserSyncNg.styles.css" />
     <link rel="icon" href="data:,">
 </head>
@@ -35,7 +37,7 @@
         })();
     </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
-    <script src="js/gestures.js"></script>
+    <script src="js/gestures.js?v=50"></script>
 
 </body>
 

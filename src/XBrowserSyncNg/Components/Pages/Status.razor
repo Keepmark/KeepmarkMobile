@@ -2,6 +2,7 @@
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
 @inject XBrowserSyncNg.Services.SecureCredentialStore Creds
+@implements IDisposable
 
 <PageTitle>Status</PageTitle>
 
@@ -13,6 +14,10 @@
 }
 else
 {
+    @if (status == Core.Sync.SyncStatus.Syncing)
+    {
+        <div class="alert alert-info" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Sync in progress… values below refresh when it finishes.</div>
+    }
     <h3>Synchronization</h3>
     <ul>
         <li>Mode: @AppSettings.Mode</li>
@@ -57,6 +62,18 @@ else
         }
 
         serviceUrl = (await Creds.GetAsync())?.ServiceUrl;
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnEngine;
+            Session.Engine.DataChanged += OnEngineData;
+        }
+
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
         if (Session is { Store: not null, Engine: not null })
         {
             status = Session.Engine.Status;
@@ -65,7 +82,17 @@ else
             dbSize = Session.Store.GetFileSize() / 1024;
             stats = await Session.Store.GetStatsAsync();
         }
+    }
 
-        loaded = true;
+    private void OnEngine(Core.Sync.SyncStatus _) => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+    private void OnEngineData() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+
+    public void Dispose()
+    {
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnEngine;
+            Session.Engine.DataChanged -= OnEngineData;
+        }
     }
 }

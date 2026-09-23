@@ -194,32 +194,6 @@ h1:focus {
     opacity: 0.7;
 }
 
-/* Details expander: slim overlay affordance for the swipe-right gesture.
-   Takes no layout space: the text keeps full width. */
-.xbs-has-expand .xbs-row-text { padding-right: 2.5rem; }
-
-.xbs-row-expand {
-    position: absolute;
-    right: 52px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 40px;
-    min-height: 44px;
-    border: none;
-    background: transparent;
-    color: var(--bs-secondary-color, #6c757d);
-    opacity: 0.6;
-}
-
-.xbs-expand-chev {
-    display: inline-block;
-    font-size: 1.3rem;
-    line-height: 1;
-    transition: transform 0.18s ease-out;
-}
-
-.xbs-expand-chev.open { transform: rotate(90deg); }
-
 /* Folder tree expander. */
 .xbs-tree-exp {
     display: flex;
@@ -294,7 +268,6 @@ h1:focus {
     min-height: 44px;
     border: none;
     background: transparent;
-    grid-column: 3;
 }
 
 /* Collapsible pinned section */
@@ -490,7 +463,7 @@ h1:focus {
 .xbs-statusbar-sync { flex-shrink: 0; padding: 0 0.25rem; }
 .xbs-statusbar-ver { flex-shrink: 0; font-size: 0.65rem; opacity: 0.8; }
 
-/* Top indeterminate sync loader. */
+/* Top indeterminate sync loader + visible syncing pill. */
 .xbs-toploader {
     position: fixed;
     top: env(safe-area-inset-top, 0px);
@@ -507,6 +480,24 @@ h1:focus {
 @keyframes xbs-load-slide {
     from { background-position: -40% 0; }
     to { background-position: 140% 0; }
+}
+
+.xbs-syncing-pill {
+    position: fixed;
+    top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1300;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #212529;
+    color: #fff;
+    border-radius: 2rem;
+    padding: 0.5rem 1rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    pointer-events: none;
+    white-space: nowrap;
 }
 
 /* Search bar with lens. */

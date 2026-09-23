@@ -130,6 +130,7 @@ else
                 @if (!menuFor.IsFolder)
                 {
                     <button class="btn btn-primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }">Open</button>
+                    <button class="btn btn-secondary" @onclick="ToggleDetails">@(expandedRows.Contains(menuFor.RowId) ? "Hide details" : "Show details")</button>
                     <button class="btn btn-secondary" @onclick="() => ShareRow(menuFor)">Share</button>
                 }
                 <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
@@ -410,6 +411,16 @@ else
             await Share.Default.RequestAsync(new ShareTextRequest($"{row.Title}\n{row.Url}", "Share bookmark"));
         }
         catch { }
+    }
+
+    private void ToggleDetails(ItemRow? row)
+    {
+        menuFor = null;
+        if (row is null || row.IsFolder) return;
+        if (!expandedRows.Remove(row.RowId))
+        {
+            expandedRows.Add(row.RowId);
+        }
     }
 
     private async Task TogglePin(ItemRow? row)
