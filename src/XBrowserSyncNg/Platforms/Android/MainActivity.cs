@@ -7,17 +7,13 @@ using Android.Views;
 namespace XBrowserSyncNg;
 
 [Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true, LaunchMode = LaunchMode.SingleTop, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
-[IntentFilter([Intent.ActionSend], Categories = [Intent.CategoryDefault], DataMimeType = "text/plain")]
 public class MainActivity : MauiAppCompatActivity
 {
-    // Share intents arriving before MAUI services exist (cold start) wait here
-    // and are flushed on the next resumed state, when resolution is safe.
-    private static (string? Text, string? Subject)? _limboShare;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
-        HandleShareIntent(Intent);
+        Platforms.Android.ShareIntake.Handle(Intent);
 
         // Light status bar background (our spacer): system icons must be dark to stay visible.
         try
@@ -45,106 +41,7 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnNewIntent(Intent? intent)
     {
         base.OnNewIntent(intent);
-        HandleShareIntent(intent);
-    }
-
-    private static void HandleShareIntent(Intent? intent)
-    {
-        try
-        {
-            System.Diagnostics.Debug.WriteLine(
-                $"[share] intent: action={intent?.Action} type={intent?.Type} hasText={intent?.HasExtra(Intent.ExtraText)}");
-            // Field diagnostic: native toast proves the intent reached us.
-            try
-            {
-                var act = Platform.CurrentActivity;
-                act?.RunOnUiThread(() => Android.Widget.Toast.MakeText(act,
-                    $"share: {intent?.Action} [{intent?.Type}]", Android.Widget.ToastLength.Short)?.Show());
-            }
-            catch
-            {
-            }
-
-            if (intent?.Action != Intent.ActionSend ||
-                !string.Equals(intent.Type, "text/plain", StringComparison.OrdinalIgnoreCase))
-            {
-                System.Diagnostics.Debug.WriteLine("[share] intent ignored (not SEND/text)");
-                return;
-            }
-
-            var text = intent.GetStringExtra(Intent.ExtraText);
-            var subject = intent.GetStringExtra(Intent.ExtraSubject);
-            if (!PublishShare(text, subject))
-            {
-                _limboShare = (text, subject);
-            }
-        }
-        catch
-        {
-            // Never break startup for a share intent.
-        }
-    }
-
-    private static void FlushLimboShare()
-    {
-        var pending = _limboShare;
-        if (pending is null)
-        {
-            return;
-        }
-
-        try
-        {
-            if (PublishShare(pending.Value.Text, pending.Value.Subject))
-            {
-                _limboShare = null;
-            }
-        }
-        catch
-        {
-        }
-    }
-
-    private static bool PublishShare(string? text, string? subject)
-    {
-        var share = Services.SharedImportService.Current;
-        if (share is null)
-        {
-            var services = IPlatformApplication.Current?.Services;
-            share = services?.GetService(typeof(Services.SharedImportService)) as Services.SharedImportService;
-        }
-
-        if (share is null)
-        {
-            return false;
-        }
-
-        share.Publish(text, subject);
-
-        // Field diagnostic: shows what was extracted (or not).
-        try
-        {
-            var act = Platform.CurrentActivity;
-            var pending = share.Peek();
-            act?.RunOnUiThread(() => Android.Widget.Toast.MakeText(act,
-                $"share ok: {(pending is null ? "no-url" : pending.Url)}", Android.Widget.ToastLength.Short)?.Show());
-        }
-        catch
-        {
-        }
-
-        // User-visible receipt (Blazor toast).
-        try
-        {
-            var services = IPlatformApplication.Current?.Services;
-            var toast = services?.GetService(typeof(Services.ToastState)) as Services.ToastState;
-            toast?.ShowAsync("Link received — complete the bookmark");
-        }
-        catch
-        {
-        }
-
-        return true;
+        Platforms.Android.ShareIntake.Handle(intent);
     }
 
     protected override void OnPause()
@@ -156,7 +53,7 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnResume()
     {
         base.OnResume();
-        FlushLimboShare();
+        Platforms.Android.ShareIntake.Flush();
         NotifyLock(s => s.OnResumed(GetSettings()));
     }
 
