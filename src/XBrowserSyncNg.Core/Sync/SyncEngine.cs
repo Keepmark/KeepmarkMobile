@@ -340,22 +340,7 @@ public sealed class SyncEngine(
         }
     }
 
-    private static int CompareVersions(string a, string b)
-    {
-        static int[] Parts(string v) => v.Split('.').Select(p => int.TryParse(new string(p.TakeWhile(char.IsDigit).ToArray()), out int n) ? n : 0).ToArray();
-        var pa = Parts(a);
-        var pb = Parts(b);
-        for (int i = 0; i < Math.Max(pa.Length, pb.Length); i++)
-        {
-            int d = (i < pa.Length ? pa[i] : 0) - (i < pb.Length ? pb[i] : 0);
-            if (d != 0)
-            {
-                return Math.Sign(d);
-            }
-        }
-
-        return 0;
-    }
+    private static int CompareVersions(string a, string b) => XbsConstants.CompareVersions(a, b);
 
     /// <summary>Shape the tree exactly like the original cleanBookmark: no empty descriptions/tags.</summary>
     private static void Normalize(List<BookmarkNode> roots)

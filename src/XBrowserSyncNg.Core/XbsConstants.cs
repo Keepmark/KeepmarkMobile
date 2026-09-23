@@ -43,4 +43,27 @@ public static class XbsConstants
 
     /// <summary>Default HTTP timeout for bookmark up/downloads (mirrors the 12s interceptor default).</summary>
     public static readonly TimeSpan DefaultHttpTimeout = TimeSpan.FromSeconds(12);
+
+    /// <summary>
+    /// Numeric dotted-version comparison ("1.1.13" &gt; "1.1.9"; never ordinal).
+    /// Tolerates a leading 'v' and non-digit suffixes per part.
+    /// </summary>
+    public static int CompareVersions(string a, string b)
+    {
+        static int[] Parts(string v) => v.TrimStart('v', 'V').Split('.')
+            .Select(p => int.TryParse(new string(p.TakeWhile(char.IsDigit).ToArray()), out int n) ? n : 0)
+            .ToArray();
+        var pa = Parts(a);
+        var pb = Parts(b);
+        for (int i = 0; i < Math.Max(pa.Length, pb.Length); i++)
+        {
+            int d = (i < pa.Length ? pa[i] : 0) - (i < pb.Length ? pb[i] : 0);
+            if (d != 0)
+            {
+                return Math.Sign(d);
+            }
+        }
+
+        return 0;
+    }
 }

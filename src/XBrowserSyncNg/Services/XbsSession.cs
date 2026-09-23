@@ -91,8 +91,7 @@ public sealed class XbsSession : IAsyncDisposable
         cts.CancelAfter(Core.XbsConstants.ServiceProbeTimeout);
         var info = await ApiFor(serviceUrl).GetInfoAsync(cts.Token).ConfigureAwait(false);
         if (info.Version is not null &&
-            string.Compare(info.Version.TrimStart('v', 'V'), Core.XbsConstants.MinApiVersion.TrimStart('v', 'V'),
-                StringComparison.Ordinal) < 0)
+            Core.XbsConstants.CompareVersions(info.Version, Core.XbsConstants.MinApiVersion) < 0)
         {
             throw new UnsupportedApiVersionException(_str.Get(Str.ErrUnsupportedApiVersion, info.Version, Core.XbsConstants.MinApiVersion));
         }
