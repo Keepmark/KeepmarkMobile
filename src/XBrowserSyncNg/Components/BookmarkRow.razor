@@ -16,7 +16,7 @@ else
          role="button" tabindex="0" aria-expanded="@RowExpanded"
          aria-label="@RowLabel"
          @onkeydown="OnKey">
-        <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
+        <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty) @(Row.IsFolder ? string.Empty : "xbs-has-expand")">
             @if (!Row.IsFolder)
             {
                 <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
