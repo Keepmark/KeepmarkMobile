@@ -160,6 +160,7 @@ else
         }
 
         busy = true;
+        var deleted = 0;
         try
         {
             // Safety net (the UI already enforces it): never wipe a link entirely.
@@ -182,6 +183,7 @@ else
                 try
                 {
                     await Session.Engine.DeleteBookmarkAsync(r.RowId);
+                    deleted++;
                 }
                 catch
                 {
@@ -196,7 +198,7 @@ else
         }
 
         StateHasChanged();
-        await Toast.ShowAsync(targets.Count > 0 ? $"Deleted {targets.Count} duplicate(s)" : "Nothing to delete");
+        await Toast.ShowAsync(deleted > 0 ? $"Deleted {deleted} duplicate(s)" : "Nothing to delete");
     }
 
     private async Task ExecuteAll()
@@ -207,9 +209,9 @@ else
         }
 
         busy = true;
+        var count = 0;
         try
         {
-            var count = 0;
             var byGroup = new List<(Core.Data.DuplicateGroup Group, List<Core.Data.ItemRow> Targets)>();
             foreach (var g in groups)
             {
