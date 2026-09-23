@@ -138,6 +138,26 @@ public sealed class BookmarkStore : IAsyncDisposable
         _log.Info("store", $"Mirror replaced: {CountNodes(roots)} nodes, lastUpdated={lastUpdated}");
     }
 
+    /// <summary>Replaces local rows with a backup tree. Mirror meta (lastUpdated/version)
+    /// is kept and the mirror is marked dirty, so the next auto sync pushes the
+    /// restored tree (or surfaces a real conflict) instead of pulling over it.</summary>
+    public async Task RestoreLocalAsync(List<BookmarkNode> roots)
+    {
+        var db = Db;
+        await db.RunInTransactionAsync(tran =>
+        {
+            tran.Execute("DELETE FROM Items");
+            int order = 0;
+            foreach (var root in roots)
+            {
+                InsertNode(tran, root, parentRowId: null, ref order);
+            }
+
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+        }).ConfigureAwait(false);
+        _log.Info("store", $"Local restore: {CountNodes(roots)} nodes, marked dirty");
+    }
+
     private static void InsertNode(SQLiteConnection tran, BookmarkNode node, int? parentRowId, ref int order)
     {
         var row = new ItemRow

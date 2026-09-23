@@ -1,0 +1,443 @@
+@page "/migrate"
+@inject XBrowserSyncNg.Services.XbsSession Session
+@inject XBrowserSyncNg.Services.XbsSettings AppSettings
+@inject XBrowserSyncNg.Services.ToastState Toast
+@inject NavigationManager Nav
+
+<PageTitle>Migrate</PageTitle>
+
+<h1>Migrate to another service</h1>
+<p class="text-muted">Move your current local bookmarks to a different xBrowserSync service, into a new or an existing sync. Your local data is never deleted by this wizard.</p>
+
+@if (!Session.Ready)
+{
+    <p><em>Starting…</em></p>
+}
+else if (step == 4)
+{
+    <div class="alert alert-success">
+        <h4>Migration complete</h4>
+        @if (createdId is not null)
+        {
+            <p>New sync created on <strong>@targetUrl</strong> with your @localCount item(s).</p>
+            <p>Your new sync ID (save it together with the password — both are needed to open the sync elsewhere):</p>
+            <p><code>@createdId</code></p>
+            <button class="btn btn-secondary" @onclick="CopyId">Copy sync ID</button>
+        }
+        else
+        {
+            <p>Your @localCount local item(s) replaced the @probe?.RemoteCount remote item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten remote side was saved.</p>
+        }
+    </div>
+    <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/")'>Back to Explore</button>
+}
+else
+{
+    <ol class="mb-3 text-muted">
+        <li><strong class="@(step == 1 ? "text-body" : string.Empty)">1. Target service</strong></li>
+        <li><strong class="@(step == 2 ? "text-body" : string.Empty)">2. Target sync</strong></li>
+        <li><strong class="@(step == 3 ? "text-body" : string.Empty)">3. Review &amp; migrate</strong></li>
+    </ol>
+
+    @if (step == 1)
+    {
+        <div class="mb-3">
+            <label class="form-label">Target service URL</label>
+            <input class="form-control" @bind="targetUrl" inputmode="url" />
+            <div class="form-text">The service that will receive your bookmarks. Check verifies it answers with a compatible API version.</div>
+            <div class="mt-2 d-flex gap-2">
+                <button class="btn btn-secondary" @onclick="CheckService" disabled="@busy">Check service</button>
+                <button class="btn btn-primary" @onclick="() => step = 2" disabled="@(busy || !serviceOk)">Continue</button>
+            </div>
+            @if (serviceInfo is not null)
+            {
+                <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version)</p>
+            }
+        </div>
+    }
+    else if (step == 2)
+    {
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="slot" id="slotNew" checked="@(slot == "new")" @onchange='() => slot = "new"' />
+                <label class="form-check-label" for="slotNew"><strong>New sync here</strong> — create it and upload my @localCount item(s).</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="slot" id="slotExisting" checked="@(slot == "existing")" @onchange='() => slot = "existing"' />
+                <label class="form-check-label" for="slotExisting"><strong>Existing sync here</strong> — replace its content with my @localCount item(s).</label>
+            </div>
+        </div>
+
+        @if (slot == "new")
+        {
+            <div class="mb-3">
+                <label class="form-label">New password</label>
+                <input type="password" class="form-control" @bind="newPassword" autocomplete="new-password" />
+                <label class="form-label mt-2">Confirm password</label>
+                <input type="password" class="form-control" @bind="confirmPassword" autocomplete="new-password" />
+                <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered.</div>
+            </div>
+        }
+        else
+        {
+            <div class="mb-3">
+                <label class="form-label">Sync ID on the target service</label>
+                <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+                <label class="form-label mt-2">Password</label>
+                <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
+                <div class="form-text">Verified against the remote data first: a wrong password stops here, nothing is overwritten.</div>
+                <button class="btn btn-secondary mt-2" @onclick="VerifyExisting" disabled="@busy">Verify</button>
+                @if (probe is not null)
+                {
+                    <div class="alert alert-warning mt-2">
+                        Remote holds <strong>@probe.RemoteCount</strong> item(s) — they will be replaced by your <strong>@localCount</strong> local item(s). A safety backup of the remote side is saved first.
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-secondary" @onclick="() => step = 1" disabled="@busy">Back</button>
+            <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">Review</button>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <h4>Review</h4>
+            @if (slot == "new")
+            {
+                <p>Create a <strong>new sync</strong> on <strong>@targetUrl</strong> and upload your <strong>@localCount</strong> local item(s) into it. The app re-links to the new sync.</p>
+            }
+            else
+            {
+                <p>Replace the <strong>@probe?.RemoteCount</strong> remote item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> with your <strong>@localCount</strong> local item(s). Remote backup saved first; the app re-links to that sync.</p>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-secondary" @onclick="() => step = 2" disabled="@busy">Back</button>
+            <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Migrate now</button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")">@message</div>
+    }
+}
+
+<hr />
+<h2>Encrypted local backup</h2>
+<p class="text-muted">Save your local bookmarks to an encrypted file (password of your choice), or restore from one. The file opens only with that password.</p>
+
+<div class="mb-3">
+    <h4>Export</h4>
+    <label class="form-label">Backup password</label>
+    <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
+    <label class="form-label mt-2">Confirm password</label>
+    <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
+    <div class="form-text">Encrypts your current @localCount local item(s). Keep the password: without it the file is unreadable.</div>
+    <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">Export encrypted backup</button>
+</div>
+
+<div class="mb-3">
+    <h4>Import</h4>
+    <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
+    @if (impPath is not null)
+    {
+        <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
+        <label class="form-label">Backup password</label>
+        <input type="password" class="form-control" @bind="impPassword" autocomplete="current-password" />
+        <div class="form-text">Reading the file verifies the password first — a wrong password stops here.</div>
+        <div class="mt-2 d-flex gap-2">
+            <button class="btn btn-secondary" @onclick="PreviewImport" disabled="@busy">Read backup</button>
+        </div>
+        @if (impCount is not null)
+        {
+            @if (!armedImp)
+            {
+                <div class="alert alert-warning mt-2">
+                    Backup holds <strong>@impCount</strong> item(s); your local tree has <strong>@localCount</strong>.
+                    <div class="mt-2">
+                        <button class="btn btn-danger" @onclick='() => armedImp = true' disabled="@busy">Replace local with backup…</button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger mt-2">
+                    <strong>Replace your @localCount local item(s) with the @impCount from backup?</strong>
+                    A safety backup of the current local tree is saved first; the restored tree syncs up right after.
+                    <div class="mt-2 d-flex gap-2">
+                        <button class="btn btn-danger" @onclick="ExecuteImport" disabled="@busy">Yes, restore</button>
+                        <button class="btn btn-secondary" @onclick="() => armedImp = false" disabled="@busy">Cancel</button>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    private int step = 1;
+    private string targetUrl = Core.XbsConstants.DefaultServiceUrl;
+    private Core.Api.ServiceInfoResponse? serviceInfo;
+    private string? checkedUrl;
+    private string slot = "new";
+    private string newPassword = string.Empty;
+    private string confirmPassword = string.Empty;
+    private string syncId = string.Empty;
+    private string password = string.Empty;
+    private Services.ReconcileInfo? probe;
+    private string? verifiedFor;
+    private string? createdId;
+    private int localCount;
+    private bool busy;
+    private string message = string.Empty;
+    private bool isError;
+    private string bkpPassword = string.Empty;
+    private string bkpConfirm = string.Empty;
+    private string? impPath;
+    private string? impFileName;
+    private string impPassword = string.Empty;
+    private int? impCount;
+    private bool armedImp;
+
+    private bool serviceOk =>
+        serviceInfo is not null && checkedUrl == targetUrl.Trim();
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Store is not null)
+        {
+            var stats = await Session.Store.GetStatsAsync();
+            localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+        }
+    }
+
+    private static string ShortId(string? id) =>
+        id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
+
+    private bool CanReview() => slot == "new"
+        ? newPassword.Length > 0 && confirmPassword.Length > 0
+        : probe is not null && verifiedFor == $"{targetUrl.Trim()}|{syncId.Trim()}";
+
+    private async Task CheckService()
+    {
+        await RunAsync(async () =>
+        {
+            serviceInfo = await Session.CheckServiceAsync(targetUrl.Trim());
+            checkedUrl = targetUrl.Trim();
+            Ok($"Target service is valid: {serviceInfo.Status}, API v{serviceInfo.Version}.");
+        });
+    }
+
+    private async Task VerifyExisting()
+    {
+        await RunAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
+            {
+                throw new InvalidOperationException("Enter both the sync ID and its password.");
+            }
+
+            probe = await Session.ProbeLinkAsync(targetUrl.Trim(), syncId.Trim(), password);
+            verifiedFor = $"{targetUrl.Trim()}|{syncId.Trim()}";
+            Ok("Remote sync opened. Check the counts, then Review.");
+        });
+    }
+
+    private void GoReview()
+    {
+        if (slot == "new")
+        {
+            RequireMatchingPasswords(newPassword, confirmPassword);
+        }
+
+        message = string.Empty;
+        step = 3;
+    }
+
+    private async Task Execute()
+    {
+        await RunAsync(async () =>
+        {
+            if (!serviceOk)
+            {
+                throw new InvalidOperationException("Re-check the target service first.");
+            }
+
+            if (slot == "new")
+            {
+                RequireMatchingPasswords(newPassword, confirmPassword);
+                createdId = await Session.CreateNewSyncWithUploadAsync(targetUrl.Trim(), newPassword);
+            }
+            else
+            {
+                if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
+                {
+                    throw new InvalidOperationException("Verify the existing sync first.");
+                }
+
+                await Session.ApplyLocalAsync(probe);
+            }
+
+            AppSettings.ServiceUrl = targetUrl.Trim();
+            newPassword = string.Empty;
+            step = 4;
+        });
+    }
+
+    private async Task CopyId()
+    {
+        if (createdId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Clipboard.Default.SetTextAsync(createdId);
+            await Toast.ShowAsync("Sync ID copied — store it with the password");
+        }
+        catch
+        {
+            await Toast.ShowAsync("Copy failed — transcribe the ID manually", isError: true);
+        }
+    }
+
+    private static void RequireMatchingPasswords(string first, string second)
+    {
+        if (first.Length < 8)
+        {
+            throw new InvalidOperationException("Use a password of at least 8 characters.");
+        }
+
+        if (!string.Equals(first, second, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Passwords do not match — retype the confirmation.");
+        }
+    }
+
+    private async Task ExportBackup()
+    {
+        await RunAsync(async () =>
+        {
+            RequireMatchingPasswords(bkpPassword, bkpConfirm);
+            var path = await Session.ExportBackupAsync(bkpPassword);
+            bkpPassword = string.Empty;
+            try
+            {
+                await Share.Default.RequestAsync(new ShareFileRequest(
+                    "Save encrypted backup", new ShareFile(path)));
+                Ok($"Backup exported ({localCount} items). Choose where to keep the file.");
+            }
+            catch
+            {
+                Ok($"Backup saved privately. Export it from the app folder when needed.");
+            }
+        });
+    }
+
+    private async Task PickBackup()
+    {
+        await RunAsync(async () =>
+        {
+            var picked = await FilePicker.Default.PickAsync();
+            if (picked is null)
+            {
+                return;
+            }
+
+            // Copy into our cache: the picked URI may not be a direct file path.
+            var tmp = Path.Combine(FileSystem.CacheDirectory, picked.FileName);
+            await using (var src = await picked.OpenReadAsync())
+            await using (var dst = File.Create(tmp))
+            {
+                await src.CopyToAsync(dst);
+            }
+
+            impPath = tmp;
+            impFileName = picked.FileName;
+            impCount = null;
+            armedImp = false;
+            Ok("File selected. Enter its password and Read backup.");
+        });
+    }
+
+    private async Task PreviewImport()
+    {
+        await RunAsync(async () =>
+        {
+            if (impPath is null)
+            {
+                throw new InvalidOperationException("Choose a backup file first.");
+            }
+
+            if (string.IsNullOrEmpty(impPassword))
+            {
+                throw new InvalidOperationException("Enter the backup password.");
+            }
+
+            impCount = await Session.PreviewBackupAsync(impPath, impPassword);
+            armedImp = false;
+            Ok("Backup reads correctly. Review the counts above.");
+        });
+    }
+
+    private async Task ExecuteImport()
+    {
+        await RunAsync(async () =>
+        {
+            if (impPath is null || impCount is null)
+            {
+                throw new InvalidOperationException("Read the backup first.");
+            }
+
+            var restored = await Session.ImportBackupAsync(impPath, impPassword);
+            impPassword = string.Empty;
+            impCount = null;
+            armedImp = false;
+            if (Session.Store is not null)
+            {
+                var stats = await Session.Store.GetStatsAsync();
+                localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+            }
+
+            Ok($"Restored {restored} item(s). They sync up automatically.");
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        isError = false;
+        message = string.Empty;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            isError = true;
+            message = ex.Message;
+        }
+        finally
+        {
+            password = string.Empty;
+            confirmPassword = string.Empty;
+            busy = false;
+        }
+    }
+
+    private void Ok(string text)
+    {
+        isError = false;
+        message = text;
+    }
+}

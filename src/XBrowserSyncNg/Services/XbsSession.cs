@@ -151,8 +151,9 @@ public sealed class XbsSession : IAsyncDisposable
         Engine!.Mode = _settings.Mode;
     }
 
-    /// <summary>Creates the sync on the service, then uploads the current local tree into it.</summary>
-    public async Task CreateNewSyncWithUploadAsync(string serviceUrl, string password, CancellationToken ct = default)
+    /// <summary>Creates the sync on the service, then uploads the current local tree into it.
+    /// Returns the new sync ID (the caller must show it: it is not derivable later).</summary>
+    public async Task<string> CreateNewSyncWithUploadAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
@@ -160,6 +161,7 @@ public sealed class XbsSession : IAsyncDisposable
         await _creds.SetAsync(candidate).ConfigureAwait(false);
         await UploadMirrorAsync(candidate, ct).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
+        return created.Id!;
     }
 
     public void NotifySettingsChanged()
@@ -173,6 +175,77 @@ public sealed class XbsSession : IAsyncDisposable
 
     private async Task<string?> CurrentLastUpdatedAsync() =>
         await Store!.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
+
+    /// <summary>Encrypted local backup (password chosen by the user) + import.
+    /// Same verified envelope as sync crypto: PBKDF2-SHA256/250k with a random
+    /// salt stored in the file, AES-GCM + lzutf8 payload.</summary>
+    public async Task<string> ExportBackupAsync(string password, CancellationToken ct = default)
+    {
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var json = System.Text.Json.JsonSerializer.Serialize(roots);
+        var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+        var derived = _crypto.DeriveKey(password, salt, Core.XbsConstants.SyncClientVersion);
+        var envelope = new BackupEnvelope("xBrowserSyncNg", 1, salt, _crypto.Encrypt(json, derived));
+        var dir = Path.Combine(FileSystem.AppDataDirectory, "backups");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, $"xbs-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xbs.json");
+        await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(envelope), ct).ConfigureAwait(false);
+        _log.Info("session", $"Encrypted backup exported ({CountBackupNodes(roots)} nodes)");
+        return path;
+    }
+
+    /// <summary>Reads a backup file: validates the password and returns the item count.</summary>
+    public async Task<int> PreviewBackupAsync(string path, string password, CancellationToken ct = default)
+    {
+        var roots = await OpenBackupAsync(path, password, ct).ConfigureAwait(false);
+        return CountBackupNodes(roots);
+    }
+
+    /// <summary>Replaces the local tree with a backup (current local side safety-backed-up first).</summary>
+    public async Task<int> ImportBackupAsync(string path, string password, CancellationToken ct = default)
+    {
+        var roots = await OpenBackupAsync(path, password, ct).ConfigureAwait(false);
+        var (_, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty).ConfigureAwait(false);
+        await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
+        return CountBackupNodes(roots);
+    }
+
+    private async Task<List<BookmarkNode>> OpenBackupAsync(string path, string password, CancellationToken ct)
+    {
+        var raw = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+        var envelope = System.Text.Json.JsonSerializer.Deserialize<BackupEnvelope>(raw)
+            ?? throw new InvalidOperationException("Not a backup file.");
+        if (envelope.App != "xBrowserSyncNg" || envelope.Format != 1 || string.IsNullOrEmpty(envelope.Salt))
+        {
+            throw new InvalidOperationException("Not a backup file.");
+        }
+
+        var derived = _crypto.DeriveKey(password, envelope.Salt, Core.XbsConstants.SyncClientVersion);
+        // Wrong password: GCM authentication fails here with an invalid-credentials error.
+        var json = _crypto.Decrypt(envelope.Blob, derived);
+        return System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(json) ?? [];
+    }
+
+    private static int CountBackupNodes(List<BookmarkNode> roots)
+    {
+        int n = 0;
+        var queue = new Queue<BookmarkNode>(roots);
+        while (queue.Count > 0)
+        {
+            var cur = queue.Dequeue();
+            n++;
+            if (cur.Children is not null)
+            {
+                foreach (var c in cur.Children)
+                {
+                    queue.Enqueue(c);
+                }
+            }
+        }
+
+        return n;
+    }
 
     /// <summary>Safety backup of a side about to be overwritten (plaintext JSON, app-private dir).</summary>
     public async Task<string> SaveSafetyBackupAsync(string side, string plaintextJson)
@@ -242,3 +315,5 @@ public sealed record ReconcileInfo(
     SyncCredentials Candidate, int LocalCount, int RemoteCount,
     string? RemoteLastUpdated, string? RemoteVersion,
     string RemoteBlob, string LocalBlob);
+
+public sealed record BackupEnvelope(string App, int Format, string Salt, string Blob);
