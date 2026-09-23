@@ -5,12 +5,19 @@
 
 window.xbsGestures = (() => {
     let dotNet = null;
+    let listenersAttached = false;
     let state = null;
     let suppressUntil = 0;
 
     const LONG_PRESS_MS = 500;
     const MOVE_TOLERANCE_PX = 12;
     const SWIPE_TRIGGER_PX = 60;
+
+    // The live Home may be replaced at any moment (old ref disposed, new one
+    // not yet registered): never let a gesture crash on a dead reference.
+    function call(method, id) {
+        try { if (dotNet) dotNet.invokeMethodAsync(method, id); } catch { /* noop */ }
+    }
 
     function onDown(e) {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -24,7 +31,7 @@ window.xbsGestures = (() => {
                 state = null;
                 suppressUntil = Date.now() + 400; // finger-up click must not open the row after a long-press
                 try { if (navigator.vibrate) navigator.vibrate(25); } catch { /* noop */ }
-                dotNet.invokeMethodAsync('OnRowLongPress', id);
+                call('OnRowLongPress', id);
             }, LONG_PRESS_MS)
         };
     }
@@ -54,15 +61,18 @@ window.xbsGestures = (() => {
         if (s.swiping) {
             const dx = s.dx || 0;
             suppressUntil = Date.now() + 400; // a swipe must never trigger the row tap
-            if (dx >= SWIPE_TRIGGER_PX) dotNet.invokeMethodAsync('OnRowSwipeRight', s.id);
-            else if (dx <= -SWIPE_TRIGGER_PX) dotNet.invokeMethodAsync('OnRowSwipeLeft', s.id);
+            if (dx >= SWIPE_TRIGGER_PX) call('OnRowSwipeRight', s.id);
+            else if (dx <= -SWIPE_TRIGGER_PX) call('OnRowSwipeLeft', s.id);
         }
     }
 
     return {
         init(ref) {
-            if (dotNet) return;
+            // Home instances come and go with navigation (and the old one
+            // disposes its reference): always point at the live instance.
             dotNet = ref;
+            if (listenersAttached) return;
+            listenersAttached = true;
             document.addEventListener('pointerdown', onDown, { passive: true });
             document.addEventListener('pointermove', onMove, { passive: true });
             document.addEventListener('pointerup', onUp, { passive: true });
