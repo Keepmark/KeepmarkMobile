@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>XBrowserSyncNg</title>
     <base href="/" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
@@ -23,6 +23,17 @@
         <span class="dismiss">🗙</span>
     </div>
 
+    <script>
+        // Follow the system theme for Bootstrap + our custom classes.
+        (function () {
+            try {
+                var mq = window.matchMedia('(prefers-color-scheme: dark)');
+                function apply() { document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light'); }
+                apply();
+                if (mq.addEventListener) mq.addEventListener('change', apply);
+            } catch (e) { /* light default */ }
+        })();
+    </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
     <script src="js/gestures.js"></script>
 

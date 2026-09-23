@@ -22,6 +22,7 @@ window.xbsGestures = (() => {
             id, x0: e.clientX, y0: e.clientY, pointerId: e.pointerId,
             timer: setTimeout(() => {
                 state = null;
+                suppressUntil = Date.now() + 400; // finger-up click must not open the row after a long-press
                 try { if (navigator.vibrate) navigator.vibrate(25); } catch { /* noop */ }
                 dotNet.invokeMethodAsync('OnRowLongPress', id);
             }, LONG_PRESS_MS)

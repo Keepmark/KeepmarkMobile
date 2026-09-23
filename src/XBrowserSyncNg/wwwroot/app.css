@@ -2,6 +2,7 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     overflow-x: clip;
     max-width: 100vw;
+    color-scheme: light dark;
 }
 
 .page, main, article.content {
@@ -102,13 +103,13 @@ h1:focus {
     position: sticky;
     top: 0;
     height: env(safe-area-inset-top, 0px);
-    background-color: #f7f7f7;
+    background-color: var(--bs-body-bg, #f7f7f7);
     width: 100%;
     z-index: 1050;
 }
 
 .content {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
     padding-left: max(1rem, env(safe-area-inset-left, 0px));
     padding-right: max(1rem, env(safe-area-inset-right, 0px));
 }
@@ -303,12 +304,12 @@ h1:focus {
     padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* Undo bar */
+/* Undo bar: sits above the fixed status bar. */
 .xbs-undo {
     position: fixed;
     left: 1rem;
     right: 1rem;
-    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    bottom: max(3.75rem, calc(env(safe-area-inset-bottom, 0px) + 3.75rem));
     z-index: 1090;
     display: flex;
     justify-content: space-between;
@@ -355,12 +356,12 @@ h1:focus {
     color: var(--bs-secondary-color, #6c757d);
 }
 
-/* Global toast */
+/* Global toast: floats above the FAB, never under it. */
 .xbs-toast {
     position: fixed;
     left: 1rem;
     right: 1rem;
-    bottom: max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem));
+    bottom: max(9rem, calc(env(safe-area-inset-bottom, 0px) + 9rem));
     z-index: 1200;
     text-align: center;
     background: #212529;
@@ -384,7 +385,6 @@ h1:focus {
     font-size: 1.8rem;
     line-height: 1;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    opacity: 0.55;
 }
 
 /* App lock overlay */
@@ -401,7 +401,7 @@ h1:focus {
 }
 
 .xbs-lock-card {
-    background: #fff;
+    background: var(--bs-body-bg, #fff);
     border-radius: 1rem;
     padding: 2rem;
     text-align: center;
@@ -576,4 +576,28 @@ h1:focus {
     padding: 1rem;
     padding-top: max(1rem, env(safe-area-inset-top, 0px));
     padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* ---- Dark theme: Bootstrap handles its own components via data-bs-theme;
+   here only our hardcoded-light customs. ---- */
+[data-bs-theme="dark"] a,
+[data-bs-theme="dark"] .btn-link {
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .xbs-row-tags {
+    color: #6ea8fe;
+}
+
+[data-bs-theme="dark"] .xbs-pinned-head,
+[data-bs-theme="dark"] .xbs-pinned-head .chev {
+    color: #e3b808;
+}
+
+[data-bs-theme="dark"] .xbs-pin {
+    color: #e3b808;
+}
+
+[data-bs-theme="dark"] .xbs-pinned-box {
+    background: rgba(227, 184, 8, 0.08);
 }

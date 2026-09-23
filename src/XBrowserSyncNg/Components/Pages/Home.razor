@@ -39,6 +39,10 @@ else
     else if (isSearch)
     {
         <p class="text-muted">@hits.Count result(s)</p>
+        @if (hitRows.Count == 0 && !searching)
+        {
+            <p class="text-muted">No matches. Try fewer words, check spelling, or clear the search.</p>
+        }
         @foreach (var id in hitRows)
         {
             <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRows.Contains(id)" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
@@ -83,11 +87,14 @@ else
         {
             <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
         }
-        @if (rows.Count == 0) { <p class="text-muted">Empty here.</p> }
+        @if (rows.Count == 0)
+        {
+            <p class="text-muted">@(crumbs.Count == 0 ? "No bookmarks yet. Tap + below to add your first." : "This folder is empty. Tap + below to add one here.")</p>
+        }
     }
 
-    <div class="xbs-statusbar">
-        <span class="xbs-statusbar-main">@if (engineStatus != Core.Sync.SyncStatus.Idle){<text>● @engineStatus · </text>}Last sync: @FormatLastSync(lastSync)</span>
+    <div class="xbs-statusbar" role="status">
+        <span class="xbs-statusbar-main">@if (!string.IsNullOrEmpty(FriendlyStatus())){<text>● @FriendlyStatus() · </text>}Last sync: @FormatLastSync(lastSync)</span>
         @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
         {
             <button class="btn btn-link btn-sm xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
@@ -96,7 +103,10 @@ else
     </div>
 }
 
-<button class="btn btn-primary xbs-fab" @onclick="AddNew" aria-label="Add">+</button>
+@if (ready && Session.Engine is not null)
+{
+    <button class="btn btn-primary xbs-fab" @onclick="AddNew" aria-label="Add bookmark or folder">+</button>
+}
 
 @if (sheetFor is not null)
 {
@@ -287,6 +297,15 @@ else
 
         InvokeAsync(StateHasChanged);
     }
+
+    private string FriendlyStatus() => engineStatus switch
+    {
+        Core.Sync.SyncStatus.Syncing => "Syncing…",
+        Core.Sync.SyncStatus.Offline => "Offline — will retry",
+        Core.Sync.SyncStatus.Conflict => "Conflict — see Status",
+        Core.Sync.SyncStatus.Error => "Sync error",
+        _ => string.Empty
+    };
 
     private static string FormatLastSync(DateTimeOffset? value)
     {
