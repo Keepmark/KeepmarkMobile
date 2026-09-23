@@ -10,6 +10,10 @@ namespace XBrowserSyncNg;
 [IntentFilter([Intent.ActionSend], Categories = [Intent.CategoryDefault], DataMimeType = "text/plain")]
 public class MainActivity : MauiAppCompatActivity
 {
+    // Share intents arriving before MAUI services exist (cold start) wait here
+    // and are flushed on the next resumed state, when resolution is safe.
+    private static (string? Text, string? Subject)? _limboShare;
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
@@ -53,14 +57,50 @@ public class MainActivity : MauiAppCompatActivity
                 return;
             }
 
-            var services = IPlatformApplication.Current?.Services;
-            var share = services?.GetService(typeof(Services.SharedImportService)) as Services.SharedImportService;
-            share?.Publish(intent.GetStringExtra(Intent.ExtraText), intent.GetStringExtra(Intent.ExtraSubject));
+            var text = intent.GetStringExtra(Intent.ExtraText);
+            var subject = intent.GetStringExtra(Intent.ExtraSubject);
+            if (!PublishShare(text, subject))
+            {
+                _limboShare = (text, subject);
+            }
         }
         catch
         {
             // Never break startup for a share intent.
         }
+    }
+
+    private static void FlushLimboShare()
+    {
+        var pending = _limboShare;
+        if (pending is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (PublishShare(pending.Value.Text, pending.Value.Subject))
+            {
+                _limboShare = null;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static bool PublishShare(string? text, string? subject)
+    {
+        var services = IPlatformApplication.Current?.Services;
+        var share = services?.GetService(typeof(Services.SharedImportService)) as Services.SharedImportService;
+        if (share is null)
+        {
+            return false;
+        }
+
+        share.Publish(text, subject);
+        return true;
     }
 
     protected override void OnPause()
@@ -72,6 +112,7 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnResume()
     {
         base.OnResume();
+        FlushLimboShare();
         NotifyLock(s => s.OnResumed(GetSettings()));
     }
 
