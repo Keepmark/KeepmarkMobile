@@ -32,7 +32,10 @@
 
 @if (Toast.Message is not null)
 {
-    <div class="xbs-toast @(Toast.IsError ? "error" : string.Empty)" role="status">@Toast.Message</div>
+    <div class="xbs-toast @(Toast.IsError ? "error" : "ok")" role="status">
+        <span class="xbs-toast-icon" aria-hidden="true">@(Toast.IsError ? "⚠" : "✓")</span>
+        <span>@Toast.Message</span>
+    </div>
 }
 
 @if (LockState.Locked)

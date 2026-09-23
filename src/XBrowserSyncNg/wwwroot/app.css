@@ -379,22 +379,47 @@ h1:focus {
     color: var(--bs-secondary-color, #6c757d);
 }
 
-/* Global toast: floats above the FAB, never under it. */
+/* Global toast: theme-aware card with status icon, floats above the FAB. */
 .xbs-toast {
     position: fixed;
-    left: 1rem;
-    right: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92vw, 480px);
     bottom: max(9rem, calc(env(safe-area-inset-bottom, 0px) + 9rem));
     z-index: 1200;
-    text-align: center;
-    background: #212529;
-    color: #fff;
-    border-radius: 0.5rem;
-    padding: 0.6rem 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--bs-body-bg, #fff);
+    color: var(--bs-body-color, #212529);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-left: 5px solid #1b6ec2;
+    border-radius: 0.75rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    padding: 0.75rem 1rem;
+    font-weight: 600;
     pointer-events: none;
+    animation: xbs-toast-in 0.25s ease-out;
 }
 
-.xbs-toast.error { background: #b32121; }
+.xbs-toast.ok .xbs-toast-icon {
+    color: #2e9e7b;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.xbs-toast.error { border-left-color: #b32121; }
+
+.xbs-toast.error .xbs-toast-icon {
+    color: #b32121;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+@keyframes xbs-toast-in {
+    from { opacity: 0; transform: translate(-50%, 12px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
 
 /* Add button */
 .xbs-fab {
