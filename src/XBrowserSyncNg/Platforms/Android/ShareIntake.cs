@@ -58,11 +58,11 @@ internal static class ShareIntake
 
     private static bool Publish(string? text, string? subject)
     {
-        var share = Services.SharedImportService.Current;
+        var share = global::XBrowserSyncNg.Services.SharedImportService.Current;
         if (share is null)
         {
             var services = IPlatformApplication.Current?.Services;
-            share = services?.GetService(typeof(Services.SharedImportService)) as Services.SharedImportService;
+            share = services?.GetService(typeof(global::XBrowserSyncNg.Services.SharedImportService)) as global::XBrowserSyncNg.Services.SharedImportService;
         }
 
         if (share is null)
@@ -76,8 +76,8 @@ internal static class ShareIntake
         {
             var act = Platform.CurrentActivity;
             var pending = share.Peek();
-            act?.RunOnUiThread(() => Android.Widget.Toast.MakeText(act,
-                $"share ok: {(pending is null ? "no-url" : pending.Url)}", Android.Widget.ToastLength.Short)?.Show());
+            act?.RunOnUiThread(() => global::Android.Widget.Toast.MakeText(act,
+                $"share ok: {(pending is null ? "no-url" : pending.Url)}", global::global::Android.Widget.ToastLength.Short)?.Show());
         }
         catch
         {
@@ -86,7 +86,7 @@ internal static class ShareIntake
         try
         {
             var services = IPlatformApplication.Current?.Services;
-            var toast = services?.GetService(typeof(Services.ToastState)) as Services.ToastState;
+            var toast = services?.GetService(typeof(global::XBrowserSyncNg.Services.ToastState)) as global::XBrowserSyncNg.Services.ToastState;
             toast?.ShowAsync("Link received — complete the bookmark");
         }
         catch
