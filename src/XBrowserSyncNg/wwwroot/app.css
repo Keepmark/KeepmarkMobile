@@ -669,28 +669,36 @@ h1:focus {
     background: rgba(227, 184, 8, 0.08);
 }
 
-/* Duplicates cleanup page. */
+/* Duplicates cleanup page: compact star-and-go rows. */
+.xbs-dupgroup {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.75rem;
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.6rem;
+    background: var(--bs-body-bg, #fff);
+}
+
 .xbs-duprow {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr;
     align-items: center;
     gap: 0.6rem;
-    padding: 0.5rem 0.5rem;
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 0.5rem;
-    background: var(--bs-body-bg, #fff);
-    margin-bottom: 0.4rem;
+    padding: 0.35rem 0;
 }
 
-.xbs-dupcheck {
-    width: 1.5rem;
-    height: 1.5rem;
+.xbs-duprow + .xbs-duprow {
+    border-top: 1px dashed var(--bs-border-color, #dee2e6);
+}
+
+.xbs-dupstar {
+    min-width: 44px;
+    min-height: 44px;
+    border: none;
+    background: transparent;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #b58900;
     flex-shrink: 0;
-}
-
-.xbs-dupkept {
-    font-size: 0.85rem;
-    justify-self: start;
 }
 
 .xbs-duptext {

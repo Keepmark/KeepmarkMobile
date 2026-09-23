@@ -5,7 +5,7 @@
 <PageTitle>Duplicates</PageTitle>
 
 <h1>Duplicate bookmarks</h1>
-<p class="text-muted">Same URL saved more than once. Tick copies to remove — one copy of each link is always kept. Delete has no undo, so review first.</p>
+<p class="text-muted">Same URL saved more than once. Star the copy to keep, then clean up. One copy always survives.</p>
 
 @if (!ready)
 {
@@ -17,24 +17,35 @@ else if (groups.Count == 0)
 }
 else
 {
-    <div class="btn-group mb-3" role="group" aria-label="Grouping">
+    <div class="btn-group mb-2" role="group" aria-label="Grouping">
         <button class="btn @(byFolder ? "btn-outline-primary" : "btn-primary")" @onclick="() => byFolder = false">By link</button>
         <button class="btn @(byFolder ? "btn-primary" : "btn-outline-primary")" @onclick="() => byFolder = true">By folder</button>
     </div>
+    <p class="text-muted"><small>@TotalOthers() duplicate(s) can go. Tap a title to open it.</small></p>
 
     @if (!byFolder)
     {
         @foreach (var g in groups)
         {
-            <section class="mb-3">
-                <h4 class="mb-1 text-break">@g.Url <small class="text-muted">(@g.Rows.Count)</small></h4>
-                <p class="text-muted mb-1"><small>Kept: @(KeptTitle(g)) — one copy always stays.</small></p>
-                <div class="mb-2">
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => KeepFirst(g)">Keep first</button>
-                </div>
+            <section class="xbs-dupgroup">
+                <div class="xbs-duptext-sub text-break">@g.Url <span class="badge text-bg-secondary">@g.Rows.Count</span></div>
                 @foreach (var r in g.Rows)
                 {
-                    @DupRow(r)
+                    @DupRow(r, r.Title ?? r.Url ?? string.Empty, PathOf(r.RowId))
+                }
+                @if (armedGroup == g.Url)
+                {
+                    <div class="d-flex gap-2 align-items-center flex-wrap mt-1">
+                        <span><strong>Delete @(g.Rows.Count - 1)?</strong> Keeps “@KeptTitle(g)”.</span>
+                        <button class="btn btn-sm btn-danger" @onclick="() => ExecuteGroup(g)">Yes</button>
+                        <button class="btn btn-sm btn-secondary" @onclick="() => armedGroup = null">No</button>
+                    </div>
+                }
+                else
+                {
+                    <button class="btn btn-sm btn-outline-danger mt-1" @onclick="() => armedGroup = g.Url">
+                        Delete @(g.Rows.Count - 1) duplicate(s)
+                    </button>
                 }
             </section>
         }
@@ -43,34 +54,30 @@ else
     {
         @foreach (var f in folders)
         {
-            <section class="mb-3">
-                <h4 class="mb-1">@(string.IsNullOrEmpty(f.Path) ? "⌂ Top level" : f.Path)</h4>
-                <div class="mb-2">
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => SelectFolder(f)">Select all here</button>
-                </div>
+            <section class="xbs-dupgroup">
+                <div class="fw-bold mb-1">@(string.IsNullOrEmpty(f.Path) ? "⌂ Top level" : f.Path)</div>
                 @foreach (var r in f.Rows)
                 {
-                    @DupRow(r)
+                    @DupRow(r, r.Title ?? r.Url ?? string.Empty, r.Url ?? string.Empty)
                 }
             </section>
         }
     }
 
     <div class="xbs-dupbar">
-        <span>@selected.Count selected</span>
-        <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-outline-secondary" @onclick="SelectAll">Select all</button>
-            <button class="btn btn-outline-secondary" disabled="@(selected.Count == 0)" @onclick="ClearAll">Clear</button>
-            @if (!armed)
-            {
-                <button class="btn btn-danger" disabled="@(selected.Count == 0)" @onclick="() => armed = true">Delete…</button>
-            }
-            else
-            {
-                <button class="btn btn-danger" @onclick="ExecuteDelete">Confirm delete @selected.Count</button>
-                <button class="btn btn-secondary" @onclick="() => armed = false">Cancel</button>
-            }
-        </div>
+        <span>@TotalOthers() duplicate(s)</span>
+        @if (!armedAll)
+        {
+            <button class="btn btn-danger" @onclick="() => armedAll = true">Clean all…</button>
+        }
+        else
+        {
+            <span><strong>Delete all duplicates?</strong> First copy of each link stays.</span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-danger" @onclick="ExecuteAll">Yes, clean</button>
+                <button class="btn btn-secondary" @onclick="() => armedAll = false">Cancel</button>
+            </div>
+        }
     </div>
 }
 
@@ -79,10 +86,10 @@ else
     private List<Core.Data.DuplicateGroup> groups = [];
     private List<FolderSection> folders = [];
     private Dictionary<int, string> paths = new();
-    private Dictionary<int, Core.Data.DuplicateGroup> groupOf = new();
-    private readonly HashSet<int> selected = [];
+    private Dictionary<string, int> keepers = new();
     private bool byFolder;
-    private bool armed;
+    private string? armedGroup;
+    private bool armedAll;
 
     private sealed record FolderSection(string Path, List<Core.Data.ItemRow> Rows);
 
@@ -99,8 +106,8 @@ else
 
     private async Task ReloadAsync()
     {
-        selected.Clear();
-        armed = false;
+        armedGroup = null;
+        armedAll = false;
         if (Session.Store is null)
         {
             return;
@@ -108,14 +115,12 @@ else
 
         groups = await Session.Store.GetDuplicateUrlsAsync();
         paths = await Session.Store.GetFolderPathsAsync();
-        groupOf = groups.SelectMany(g => g.Rows.Select(r => (r.RowId, g)))
-            .ToDictionary(x => x.RowId, x => x.g);
-        // Default: keep the first occurrence of each link, select the rest.
+        // Default keeper: first occurrence. Unknown groups start there too.
         foreach (var g in groups)
         {
-            foreach (var r in g.Rows.Skip(1))
+            if (!keepers.TryGetValue(g.Url, out var id) || g.Rows.All(r => r.RowId != id))
             {
-                selected.Add(r.RowId);
+                keepers[g.Url] = g.Rows[0].RowId;
             }
         }
 
@@ -128,90 +133,23 @@ else
 
     private string PathOf(int rowId) => paths.GetValueOrDefault(rowId, string.Empty);
 
-    /// <summary>The copy currently kept for a link: first unselected row, else the first row.</summary>
-    private string KeptTitle(Core.Data.DuplicateGroup g) =>
-        (g.Rows.FirstOrDefault(r => !selected.Contains(r.RowId)) ?? g.Rows[0]).Title
-        ?? g.Rows[0].Url ?? "(no title)";
-
-    /// <summary>Invariant: a link's every copy can never be selected at once.</summary>
-    private bool WouldWipeGroup(int rowId) =>
-        groupOf.TryGetValue(rowId, out var g) && g.Rows.All(r => r.RowId == rowId || selected.Contains(r.RowId));
-
-    /// <summary>Structural enforcement: the last remaining copy renders a Kept badge
-    /// instead of a checkbox, so it cannot be ticked at all.</summary>
-    private bool IsKeeper(int rowId) =>
-        !selected.Contains(rowId) &&
-        groupOf.TryGetValue(rowId, out var g) &&
-        g.Rows.Count(r => !selected.Contains(r.RowId)) == 1;
-
-    private void SelectAll()
+    private string KeptTitle(Core.Data.DuplicateGroup g)
     {
-        selected.Clear();
-        foreach (var g in groups)
-        {
-            foreach (var r in g.Rows.Skip(1))
-            {
-                selected.Add(r.RowId);
-            }
-        }
-
-        armed = false;
+        var kept = g.Rows.FirstOrDefault(r => r.RowId == keepers.GetValueOrDefault(g.Url));
+        return (kept ?? g.Rows[0]).Title ?? g.Rows[0].Url ?? "(no title)";
     }
 
-    private void ClearAll()
+    private int TotalOthers() => groups.Sum(g => g.Rows.Count - 1);
+
+    private bool IsKept(Core.Data.ItemRow r) => keepers.TryGetValue(r.Url ?? string.Empty, out var id) && id == r.RowId;
+
+    private void Star(Core.Data.ItemRow r)
     {
-        selected.Clear();
-        armed = false;
-    }
-
-    private void KeepFirst(Core.Data.DuplicateGroup g)
-    {
-        foreach (var r in g.Rows)
+        if (r.Url is not null)
         {
-            selected.Remove(r.RowId);
+            keepers[r.Url] = r.RowId;
+            armedGroup = null;
         }
-
-        foreach (var r in g.Rows.Skip(1))
-        {
-            selected.Add(r.RowId);
-        }
-    }
-
-    private void SelectFolder(FolderSection f)
-    {
-        foreach (var r in f.Rows)
-        {
-            // Same invariant as manual ticking: always leave one copy behind.
-            if (!WouldWipeGroup(r.RowId))
-            {
-                selected.Add(r.RowId);
-            }
-        }
-    }
-
-    private async Task Toggle(int rowId)
-    {
-        if (IsKeeper(rowId))
-        {
-            await Toast.ShowAsync("This copy is kept — untick another copy to keep that one instead");
-            return;
-        }
-
-        if (selected.Contains(rowId))
-        {
-            selected.Remove(rowId);
-        }
-        else if (WouldWipeGroup(rowId))
-        {
-            await Toast.ShowAsync("Keeping one copy of this link — untick another copy first");
-            return;
-        }
-        else
-        {
-            selected.Add(rowId);
-        }
-
-        armed = false;
     }
 
     private async Task Open(Core.Data.ItemRow r)
@@ -222,59 +160,74 @@ else
         }
     }
 
-    private async Task ExecuteDelete()
+    private async Task ExecuteGroup(Core.Data.DuplicateGroup g)
     {
-        if (Session.Engine is null || selected.Count == 0)
+        if (Session.Engine is null)
         {
             return;
         }
 
-        // Safety net (the UI already enforces it): never wipe a link entirely.
-        var safe = selected
-            .Where(id => !groupOf.TryGetValue(id, out var g) ||
-                         g.Rows.Any(r => r.RowId != id && !selected.Contains(r.RowId)))
-            .ToList();
-        var skipped = selected.Count - safe.Count;
-        var count = safe.Count;
-        foreach (var id in safe)
+        var keeper = keepers.GetValueOrDefault(g.Url, g.Rows[0].RowId);
+        var count = 0;
+        foreach (var r in g.Rows.Where(r => r.RowId != keeper))
         {
             try
             {
-                await Session.Engine.DeleteBookmarkAsync(id);
+                await Session.Engine.DeleteBookmarkAsync(r.RowId);
+                count++;
             }
             catch
             {
-                // Keep going: remaining ones are retried on the next pass.
             }
         }
 
         await ReloadAsync();
-        await Toast.ShowAsync(skipped > 0
-            ? $"Deleted {count} duplicate(s), kept one copy each ({skipped} refused)"
-            : $"Deleted {count} duplicate(s)");
+        await Toast.ShowAsync(count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
     }
 
-    private RenderFragment DupRow(Core.Data.ItemRow r) => __builder =>
+    private async Task ExecuteAll()
+    {
+        if (Session.Engine is null)
+        {
+            return;
+        }
+
+        var count = 0;
+        foreach (var g in groups)
+        {
+            var keeper = keepers.GetValueOrDefault(g.Url, g.Rows[0].RowId);
+            foreach (var r in g.Rows.Where(r => r.RowId != keeper))
+            {
+                try
+                {
+                    await Session.Engine.DeleteBookmarkAsync(r.RowId);
+                    count++;
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        await ReloadAsync();
+        await Toast.ShowAsync(count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
+    }
+
+    private RenderFragment DupRow(Core.Data.ItemRow r, string line1, string line2) => __builder =>
     {
         <div class="xbs-duprow">
-            @if (IsKeeper(r.RowId))
-            {
-                <span class="badge text-bg-success xbs-dupkept">Kept</span>
-            }
-            else
-            {
-                <input type="checkbox" class="form-check-input xbs-dupcheck" checked="@selected.Contains(r.RowId)"
-                       aria-label="Select @(r.Title ?? r.Url)" @onchange="() => Toggle(r.RowId)" />
-            }
-            <button type="button" class="xbs-duptext" @onclick="() => Toggle(r.RowId)">
-                <span class="xbs-duptext-title">@(r.Title ?? r.Url)</span>
-                <span class="xbs-duptext-sub">@r.Url</span>
-                @if (!string.IsNullOrEmpty(PathOf(r.RowId)))
+            <button type="button" class="xbs-dupstar" aria-pressed="@IsKept(r).ToString().ToLowerInvariant()"
+                    aria-label="@(IsKept(r) ? "Kept copy" : $"Keep this copy instead")"
+                    @onclick="() => Star(r)" @onclick:stopPropagation="true">
+                <span aria-hidden="true">@(IsKept(r) ? "★" : "☆")</span>
+            </button>
+            <button type="button" class="xbs-duptext" aria-label="Open @(r.Title ?? r.Url)" @onclick="() => Open(r)">
+                <span class="xbs-duptext-title">@line1</span>
+                @if (!string.IsNullOrEmpty(line2))
                 {
-                    <span class="xbs-duptext-path"><span aria-hidden="true">📁</span> @PathOf(r.RowId)</span>
+                    <span class="xbs-duptext-sub">@line2</span>
                 }
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Open(r)">Open</button>
         </div>
     };
 }
