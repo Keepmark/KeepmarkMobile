@@ -640,12 +640,14 @@ else
     private bool OpenSharedIfPending()
     {
         var pending = SharedImport.Consume();
+        System.Diagnostics.Debug.WriteLine($"[share] consumed: {(pending is null ? "none" : pending.Url)}, engineNull={Session.Engine is null}");
         if (pending is null || Session.Engine is null)
         {
             return false;
         }
 
         sheetFor = new SheetTarget(null, LastCreateFolder(), pending.Url, pending.Title);
+        System.Diagnostics.Debug.WriteLine("[share] sheet opened");
         return true;
     }
 
