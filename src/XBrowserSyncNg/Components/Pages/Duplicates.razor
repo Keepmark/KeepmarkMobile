@@ -189,12 +189,14 @@ else
             }
 
             await ReloadAsync();
-            await Toast.ShowAsync(targets.Count > 0 ? $"Deleted {targets.Count} duplicate(s)" : "Nothing to delete");
         }
         finally
         {
             busy = false;
         }
+
+        StateHasChanged();
+        await Toast.ShowAsync(targets.Count > 0 ? $"Deleted {targets.Count} duplicate(s)" : "Nothing to delete");
     }
 
     private async Task ExecuteAll()
@@ -250,12 +252,14 @@ else
             }
 
             await ReloadAsync();
-            await Toast.ShowAsync(count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
         }
         finally
         {
             busy = false;
         }
+
+        StateHasChanged();
+        await Toast.ShowAsync(count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
     }
 
     private RenderFragment DupRow(Core.Data.ItemRow r, string line1, string line2) => __builder =>
