@@ -1,0 +1,128 @@
+@page "/settings"
+@inject Keepmark.Services.XbsSession Session
+@inject Keepmark.Services.XbsSettings AppSettings
+@inject Keepmark.Services.SecureCredentialStore Creds
+@inject Keepmark.Services.IAppLockService AppLock
+
+<PageTitle>Settings</PageTitle>
+
+<h1>Settings</h1>
+
+<div class="mb-3">
+    <label class="form-label">Sync mode (default: Automatic)</label>
+    <select class="form-select" @bind="mode">
+        <option value="@Core.Sync.SyncMode.Auto">Automatic — sync on every change</option>
+        <option value="@Core.Sync.SyncMode.Manual">Manual — only via Sync now</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Linked service</label>
+    <p class="form-control-plaintext"><strong>@(linkedUrl ?? "Not linked")</strong></p>
+    <small class="text-muted">To move your data to another service, use the <a href="migrate">Migrate</a> section.</small>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Log verbosity</label>
+    <select class="form-select" @bind="verbosity">
+        <option value="@Core.Logging.XbsLogLevel.Error">Error</option>
+        <option value="@Core.Logging.XbsLogLevel.Warning">Warning</option>
+        <option value="@Core.Logging.XbsLogLevel.Info">Info</option>
+        <option value="@Core.Logging.XbsLogLevel.Debug">Debug</option>
+        <option value="@Core.Logging.XbsLogLevel.Verbose">Verbose (may include your bookmark titles/URLs)</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">App lock (device PIN / biometric)</label>
+    <select class="form-select" @bind="appLock">
+        <option value="Off">Off (default)</option>
+        <option value="PinOnly">PIN only (device PIN, pattern or password)</option>
+        <option value="BiometricAndPin">Biometric + PIN fallback</option>
+    </select>
+</div>
+
+@if (appLock != "Off")
+{
+    <div class="mb-3">
+        <label class="form-label">Auto-lock after (minutes, 0 = on background)</label>
+        <input type="number" class="form-control" @bind="lockTimeout" min="0" max="60" />
+    </div>
+}
+
+<button class="btn btn-primary" @onclick="Save">Save</button>
+@if (saved)
+{
+    <span class="text-success ms-2">Saved.</span>
+}
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger mt-2">@error</div>
+}
+
+<h3 class="mt-4">Gestures</h3>
+<ul>
+    <li><strong>Tap</strong> a bookmark to open it, a folder to enter it.</li>
+    <li><strong>Swipe right</strong> to expand full details, <strong>swipe left</strong> to collapse.</li>
+    <li><strong>⋮ button or long-press</strong> for details and all actions (Open, Edit, Share, Pin, Delete).</li>
+</ul>
+
+@code {
+    private Core.Sync.SyncMode mode;
+    private Core.Logging.XbsLogLevel verbosity;
+    private string appLock = "Off";
+    private int lockTimeout;
+    private string error = string.Empty;
+    private bool saved;
+    private string? linkedUrl;
+
+    protected override void OnInitialized()
+    {
+        mode = AppSettings.Mode;
+        verbosity = AppSettings.Verbosity;
+        appLock = AppSettings.AppLock;
+        lockTimeout = AppSettings.LockTimeoutMinutes;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var c = await Creds.GetAsync();
+        linkedUrl = c?.ServiceUrl;
+    }
+
+    private async Task Save()
+    {
+        error = string.Empty;
+        saved = false;
+
+        // Enabling or disabling app lock always requires device-PIN confirmation.
+        if (appLock != AppSettings.AppLock)
+        {
+            bool confirmed = false;
+            try
+            {
+                confirmed = await AppLock.AuthenticateAsync(
+                    appLock == "Off" ? "Confirm disabling app lock" : "Confirm app lock activation",
+                    requireDeviceCredential: true);
+            }
+            catch
+            {
+                confirmed = false;
+            }
+
+            if (!confirmed)
+            {
+                appLock = AppSettings.AppLock;
+                error = "Not confirmed with the device PIN. App lock unchanged.";
+                return;
+            }
+        }
+
+        AppSettings.Mode = mode;
+        AppSettings.Verbosity = verbosity;
+        AppSettings.AppLock = appLock;
+        AppSettings.LockTimeoutMinutes = Math.Clamp(lockTimeout, 0, 60);
+        Session.NotifySettingsChanged();
+        saved = true;
+    }
+}

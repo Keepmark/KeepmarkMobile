@@ -1,0 +1,103 @@
+@page "/status"
+@inject Keepmark.Services.XbsSession Session
+@inject Keepmark.Services.XbsSettings AppSettings
+@inject Keepmark.Services.SecureCredentialStore Creds
+@implements IDisposable
+
+<PageTitle>Status</PageTitle>
+
+<h1>Status</h1>
+
+@if (!loaded)
+{
+    <p><em>Loading…</em></p>
+}
+else
+{
+    @if (status == Core.Sync.SyncStatus.Syncing)
+    {
+        <div class="alert alert-info" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Sync in progress… values below refresh when it finishes.</div>
+    }
+    <h3>Synchronization</h3>
+    <ul>
+        <li>Mode: @AppSettings.Mode</li>
+        <li>State: @status</li>
+        <li>Last sync: @(lastSync?.ToString("u") ?? "never")</li>
+        <li>Service: @(serviceUrl ?? "not linked")</li>
+    </ul>
+
+    <h3>Storage</h3>
+    <ul>
+        <li>Local database: @dbSize KB</li>
+        <li>Pending edits: @pending</li>
+    </ul>
+
+    <h3>Content</h3>
+    <ul>
+        <li>Folders: @stats?.Folders · Bookmarks: @stats?.Bookmarks · Separators: @stats?.Separators</li>
+        <li>Distinct tags: @stats?.DistinctTags · Max depth: @stats?.MaxDepth · Duplicate URLs: @stats?.DuplicateUrls
+            @if ((stats?.DuplicateUrls ?? 0) > 0)
+            {
+                <text> <a href="duplicates">Resolve →</a></text>
+            }
+        </li>
+    </ul>
+
+    <h3>App</h3>
+    <ul>
+        <li>Version: @AppInfo.VersionString (build @AppInfo.BuildString)</li>
+        <li>Sync format: @Core.XbsConstants.SyncClientVersion · API: @Core.XbsConstants.ApiVersion</li>
+    </ul>
+}
+
+@code {
+    private bool loaded;
+    private Core.Sync.SyncStatus status;
+    private DateTimeOffset? lastSync;
+    private long dbSize;
+    private int pending;
+    private string? serviceUrl;
+    private Core.Data.ContentStats? stats;
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        serviceUrl = (await Creds.GetAsync())?.ServiceUrl;
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnEngine;
+            Session.Engine.DataChanged += OnEngineData;
+        }
+
+        await LoadAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        if (Session is { Store: not null, Engine: not null })
+        {
+            status = Session.Engine.Status;
+            lastSync = Session.Engine.LastSyncAt;
+            pending = Session.Engine.PendingEdits;
+            dbSize = Session.Store.GetFileSize() / 1024;
+            stats = await Session.Store.GetStatsAsync();
+        }
+    }
+
+    private void OnEngine(Core.Sync.SyncStatus _) => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+    private void OnEngineData() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+
+    public void Dispose()
+    {
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnEngine;
+            Session.Engine.DataChanged -= OnEngineData;
+        }
+    }
+}

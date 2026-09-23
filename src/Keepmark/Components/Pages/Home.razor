@@ -1,0 +1,827 @@
+﻿@page "/"
+@using Microsoft.JSInterop
+@using Keepmark.Core.Data
+@inject Keepmark.Services.XbsSession Session
+@inject Keepmark.Services.PinnedStore Pins
+@inject Keepmark.Services.XbsSettings AppSettings
+@inject Keepmark.Services.ToastState Toast
+@inject Keepmark.Services.SharedImportService SharedImport
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Explore</PageTitle>
+
+@if (!ready)
+{
+    <p><em>Loading local bookmarks…</em></p>
+}
+else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
+{
+    <p>No sync connected. <a href="connect">Connect to a service</a> to get started.</p>
+}
+else
+{
+    <div class="mb-2 xbs-search">
+        <span class="xbs-search-icon" aria-hidden="true">🔍</span>
+        <input class="form-control xbs-search-input" placeholder="Search bookmarks (min 2 chars)…" aria-label="Search bookmarks"
+               @oninput="OnSearchInput" value="@query" />
+        @if (!string.IsNullOrEmpty(query))
+        {
+            <button class="xbs-search-clear" @onclick="ClearSearch" aria-label="Clear search">✕</button>
+        }
+    </div>
+
+    @if (searching)
+    {
+        <p><em>Searching…</em></p>
+    }
+    else if (isSearch)
+    {
+        <p class="text-muted" role="status">@hits.Count result(s)</p>
+        @if (hitRows.Count == 0 && !searching)
+        {
+            <p class="text-muted">No matches. Try fewer words, check spelling, or clear the search.</p>
+        }
+        @foreach (var id in hitRows)
+        {
+            <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRows.Contains(id)" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+                         FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
+        }
+    }
+    else
+    {
+        <div class="xbs-sortbar" role="toolbar" aria-label="Sort">
+            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" aria-label="Server order" aria-pressed="@((sortMode == "Default").ToString().ToLowerInvariant())" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
+            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" aria-label="Sort A to Z" aria-pressed="@((sortMode == "Asc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
+            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" aria-label="Sort Z to A" aria-pressed="@((sortMode == "Desc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
+        </div>
+        <div class="xbs-crumbs" role="navigation" aria-label="Folders">
+            <button class="xbs-crumb" @onclick="GoRoot" aria-label="Top level">⌂</button>
+            @foreach (var c in crumbs.Reverse())
+            {
+                <span class="xbs-crumb-sep">/</span>
+                <button class="xbs-crumb" @onclick="() => JumpTo(c.RowId)">@c.Title</button>
+            }
+        </div>
+        @if (pinnedRows.Count > 0 && crumbs.Count == 0)
+        {
+            <div class="xbs-pinned-box">
+                <button class="xbs-pinned-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
+                    <span class="chev" aria-hidden="true">@(pinnedOpen ? "▾" : "▸")</span>
+                    <span>📌 Pinned (@pinnedRows.Count)</span>
+                </button>
+                @if (pinnedOpen)
+                {
+                    <div class="xbs-pinned-list">
+                        @foreach (var r in pinnedRows)
+                        {
+                            <BookmarkRow @key="@("p" + r.RowId)" Row="r" Pinned="true" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
+                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                        }
+                    </div>
+                }
+            </div>
+        }
+        @foreach (var r in rows)
+        {
+            <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
+        }
+        @if (rows.Count == 0)
+        {
+            <p class="text-muted">@(crumbs.Count == 0 ? "No bookmarks yet. Tap + below to add your first." : "This folder is empty. Tap + below to add one here.")</p>
+        }
+    }
+
+    <div class="xbs-statusbar" role="status">
+        <span class="xbs-statusbar-main">@if (!string.IsNullOrEmpty(FriendlyStatus())){<text>● @FriendlyStatus() · </text>}Last sync: @FormatLastSync(lastSync)</span>
+        @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
+        {
+            <button class="btn btn-link btn-sm xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
+        }
+        <span class="xbs-statusbar-ver">v@(AppInfo.VersionString)</span>
+    </div>
+}
+
+@if (ready && Session.Engine is not null)
+{
+    <button class="btn btn-primary xbs-fab" @onclick="AddNew" aria-label="Add bookmark or folder">+</button>
+}
+
+@if (sheetFor is not null)
+{
+    <BookmarkSheet Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
+                   PresetUrl="@sheetFor.PresetUrl" PresetTitle="@sheetFor.PresetTitle"
+                   Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null" />
+}
+
+@if (menuFor is not null)
+{
+    <div class="xbs-sheet-backdrop" @onclick="() => menuFor = null">
+        <div class="xbs-sheet" role="dialog" aria-modal="true" aria-label="Actions for @(menuFor.Title ?? menuFor.Url ?? "item")" @onclick:stopPropagation="true">
+            <h4>@(menuFor.Title ?? menuFor.Url)</h4>
+            @if (!menuFor.IsFolder)
+            {
+                @if (!string.IsNullOrEmpty(menuFor.Url)) { <p class="text-break">@menuFor.Url</p> }
+                @if (!string.IsNullOrEmpty(menuFor.Description)) { <p>@menuFor.Description</p> }
+                @if (!string.IsNullOrEmpty(menuFor.Tags)) { <p class="text-muted">#@menuFor.Tags.Replace("", " #") </p> }
+            }
+            <div class="d-grid gap-2">
+                @if (!menuFor.IsFolder)
+                {
+                    <button class="btn btn-primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }">Open</button>
+                    <button class="btn btn-secondary" @onclick="() => ToggleDetails(menuFor)">@(expandedRows.Contains(menuFor.RowId) ? "Hide details" : "Show details")</button>
+                    <button class="btn btn-secondary" @onclick="() => ShareRow(menuFor)">Share</button>
+                }
+                <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
+                <button class="btn btn-secondary" @onclick="() => TogglePin(menuFor)">@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? "Unpin" : "Pin")</button>
+                @if (isSearch || menuFor.ParentRowId != CurrentParent)
+                {
+                    <button class="btn btn-secondary" @onclick="() => GoToLocation(menuFor)">Go to location</button>
+                }
+                <button class="btn btn-danger" @onclick="() => DeleteRow(menuFor)">Delete</button>
+                <button class="btn btn-link" @onclick="() => menuFor = null">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (undo is not null)
+{
+    <div class="xbs-undo">
+        <span>Bookmark deleted.</span>
+        <button class="btn btn-sm btn-light" @onclick="UndoDelete">Undo</button>
+    </div>
+}
+
+@code {
+    private bool ready;
+    private Core.Sync.SyncStatus engineStatus;
+    private DateTimeOffset? lastSync;
+    private List<ItemRow> rows = [];
+    private List<ItemRow> pinnedRows = [];
+    private List<ItemRow> allFolders = [];
+    private HashSet<int> pinned = [];
+    private readonly Stack<ItemRow> crumbs = new();
+    private readonly Dictionary<int, ItemRow> byRow = new();
+    private string query = string.Empty;
+    private List<SearchHit> hits = [];
+    private List<int> hitRows = [];
+    private Dictionary<int, string> hitPaths = new();
+    private bool isSearch;
+    private bool searching;
+    private int searchGen;
+    private CancellationTokenSource? debounce;
+    private DotNetObjectReference<Home>? dotNet;
+    private bool gesturesInit;
+    private SheetTarget? sheetFor;
+    private ItemRow? menuFor;
+    private bool pinnedOpen = false;
+    private int? flashRowId;
+    private readonly HashSet<int> expandedRows = new();
+    private Dictionary<int, string> pinPaths = new();
+    private string sortMode = "Default";
+    private CancellationTokenSource? flashTimer;
+    private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
+    private CancellationTokenSource? undoTimer;
+
+    private int? CurrentParent => crumbs.Count == 0 ? null : crumbs.Peek().RowId;
+
+    private sealed record SheetTarget(ItemRow? Row, int? Parent, string? PresetUrl = null, string? PresetTitle = null);
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnStatus;
+            Session.Engine.DataChanged += OnData;
+        }
+
+        pinned = Pins.Load();
+        sortMode = AppSettings.ListSort;
+        await RefreshAsync();
+        ready = true;
+        SharedImport.Arrived += OnSharedArrived;
+        OpenSharedIfPending();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!gesturesInit && ready)
+        {
+            gesturesInit = true;
+            dotNet = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("xbsGestures.init", dotNet);
+        }
+
+        if (ready && sheetFor is null && Session.Engine is not null && SharedImport.Peek() is not null)
+        {
+            if (OpenSharedIfPending())
+            {
+                StateHasChanged();
+            }
+        }
+
+        // A modal sheet is open: freeze the page behind it so no scroll
+        // leaks through the backdrop (touch or wheel). Owner-keyed with the
+        // nav drawer: whoever is still open keeps the lock.
+        if (ready)
+        {
+            try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", menuFor is not null || sheetFor is not null, "sheet"); } catch { }
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (Session is { Store: not null, Engine: not null })
+        {
+            // Every successful push/pull rewrites all rows (new RowIds): rebase
+            // in-memory RowId references on the stable NodeId first, otherwise
+            // the open folder (and expansions) silently point nowhere.
+            await RebaseCrumbsAsync();
+            // Capture expanded folders by stable NodeId before byRow is refilled below.
+            var expandedNodes = expandedRows
+                .Where(id => byRow.TryGetValue(id, out _))
+                .Select(id => byRow[id].NodeId)
+                .Where(n => n is not null)
+                .Select(n => n!.Value)
+                .ToHashSet();
+            engineStatus = Session.Engine.Status;
+            lastSync = Session.Engine.LastSyncAt;
+            var parent = CurrentParent;
+            rows = await Session.Store.GetChildrenAsync(parent);
+            // Display-only sort: stored SortOrder (and therefore the sync blob)
+            // is never touched — folders first, separators last.
+            rows = sortMode switch
+            {
+                "Asc" => rows.OrderBy(RankForSort)
+                    .ThenBy(r => SortTitle(r), StringComparer.OrdinalIgnoreCase).ToList(),
+                "Desc" => rows.OrderBy(RankForSort)
+                    .ThenByDescending(r => SortTitle(r), StringComparer.OrdinalIgnoreCase).ToList(),
+                _ => rows
+            };
+            allFolders = await Session.Store.GetAllFoldersAsync();
+            pinnedRows = await Session.Store.GetByNodeIdsAsync(pinned);
+            pinPaths = await Session.Store.GetFolderPathsAsync();
+            byRow.Clear();
+            foreach (var r in rows.Concat(pinnedRows)) byRow[r.RowId] = r;
+            foreach (var h in hits)
+            {
+                var node = await Session.Store.GetNodeAsync(h.RowId);
+                if (node is not null) byRow[h.RowId] = node;
+            }
+
+            hitRows = hits.Where(h => byRow.ContainsKey(h.RowId)).Select(h => h.RowId).ToList();
+            hitPaths = hits.ToDictionary(h => h.RowId, h => h.FolderPath);
+            // Sync rewrites rekey every RowId: restore expansions via stable NodeId.
+            if (expandedRows.Count > 0)
+            {
+                var byNode = byRow.Values
+                    .Where(r => r.NodeId is not null)
+                    .GroupBy(r => r.NodeId!.Value)
+                    .ToDictionary(g => g.Key, g => g.First().RowId);
+                expandedRows.IntersectWith(byRow.Keys);
+                foreach (var n in expandedNodes)
+                {
+                    if (byNode.TryGetValue(n, out var freshId))
+                    {
+                        expandedRows.Add(freshId);
+                    }
+                }
+            }
+        }
+    }
+
+    private void OnStatus(Core.Sync.SyncStatus s)
+    {
+        engineStatus = s;
+        if (Session.Engine is not null)
+        {
+            lastSync = Session.Engine.LastSyncAt;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string FriendlyStatus() => engineStatus switch
+    {
+        Core.Sync.SyncStatus.Syncing => "Syncing…",
+        Core.Sync.SyncStatus.Offline => "Offline — will retry",
+        Core.Sync.SyncStatus.Conflict => "Conflict — see Status",
+        Core.Sync.SyncStatus.Error => "Sync error",
+        _ => string.Empty
+    };
+
+    private static string FormatLastSync(DateTimeOffset? value)
+    {
+        if (value is null)
+        {
+            return "never";
+        }
+
+        var local = value.Value.ToLocalTime();
+        return local.Date == DateTime.Now.Date ? local.ToString("t") : local.ToString("g");
+    }
+
+    private void OnData() => InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); });
+
+    // ---- JS gesture callbacks ----
+
+    [JSInvokable] public async Task OnRowTap(int rowId) => await OpenRow(await ResolveAsync(rowId));
+
+    [JSInvokable]
+    public Task OnRowSwipeRight(int rowId)
+    {
+        // Swipe right: expand details. Multiple rows stay expanded together.
+        expandedRows.Add(rowId);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnRowSwipeLeft(int rowId)
+    {
+        // Swipe left: collapse this row only.
+        if (expandedRows.Remove(rowId))
+        {
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task OnRowLongPress(int rowId)
+    {
+        var row = await ResolveAsync(rowId);
+        if (row is not null)
+        {
+            menuFor = row;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<ItemRow?> ResolveAsync(int rowId)
+    {
+        if (byRow.TryGetValue(rowId, out var cached)) return cached;
+        if (Session.Store is null) return null;
+        var node = await Session.Store.GetNodeAsync(rowId);
+        if (node is not null) byRow[rowId] = node;
+        return node;
+    }
+
+    // ---- Actions ----
+
+    private async Task OpenRow(ItemRow? row)
+    {
+        if (row is null) return;
+        if (row.IsFolder)
+        {
+            crumbs.Push(row);
+            query = string.Empty;
+            isSearch = false;
+            await RefreshAsync();
+        }
+        else if (!string.IsNullOrWhiteSpace(row.Url) && row.Url != Core.XbsConstants.SeparatorUrl)
+        {
+            try { await Launcher.OpenAsync(row.Url); } catch { }
+        }
+    }
+
+    private async Task OnRowAction((ItemRow Row, RowAction Action) a)
+    {
+        _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
+        switch (a.Action)
+        {
+            case RowAction.Share: await ShareRow(a.Row); break;
+            case RowAction.Delete: await DeleteRow(a.Row); break;
+            case RowAction.Menu: menuFor = a.Row; break;
+            case RowAction.ToggleExpand:
+                if (!expandedRows.Remove(a.Row.RowId))
+                {
+                    expandedRows.Add(a.Row.RowId);
+                }
+
+                break;
+        }
+    }
+
+    private async Task ShareRow(ItemRow? row)
+    {
+        menuFor = null;
+        if (row is null || row.IsFolder) return;
+        try
+        {
+            await Share.Default.RequestAsync(new ShareTextRequest($"{row.Title}\n{row.Url}", "Share bookmark"));
+        }
+        catch { }
+    }
+
+    private void ToggleDetails(ItemRow? row)
+    {
+        menuFor = null;
+        if (row is null || row.IsFolder) return;
+        if (!expandedRows.Remove(row.RowId))
+        {
+            expandedRows.Add(row.RowId);
+        }
+    }
+
+    private async Task TogglePin(ItemRow? row)
+    {
+        menuFor = null;
+        StateHasChanged();
+        await Task.Delay(1);
+        if (row?.NodeId is null || Session.Engine is null) return;
+        bool added = Pins.Toggle(row.NodeId.Value);
+        pinned = Pins.Load();
+        sortMode = AppSettings.ListSort;
+        await RefreshAsync();
+        await Toast.ShowAsync(added ? "Pinned" : "Unpinned");
+        StateHasChanged();
+    }
+
+    private async Task DeleteRow(ItemRow? row)
+    {
+        menuFor = null;
+        if (row is null)
+        {
+            return;
+        }
+
+        // Optimistic UI: vanish the row (and close the menu) immediately,
+        // reconcile with the store right after.
+        rows.RemoveAll(r => r.RowId == row.RowId);
+        pinnedRows.RemoveAll(r => r.RowId == row.RowId);
+        expandedRows.Remove(row.RowId);
+        StateHasChanged();
+        await Task.Delay(1);
+        _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
+        if (Session.Engine is null)
+        {
+            await RefreshAsync();
+            return;
+        }
+        undoTimer?.Cancel();
+        undo = await Session.Engine.DeleteBookmarkAsync(row.RowId);
+        await RefreshAsync();
+        StateHasChanged();
+        undoTimer = new CancellationTokenSource();
+        var token = undoTimer.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(6000, token);
+                await InvokeAsync(() => { undo = null; StateHasChanged(); });
+            }
+            catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException) { }
+        });
+    }
+
+    private async Task UndoDelete()
+    {
+        if (undo is null || Session.Engine is null) return;
+        undoTimer?.Cancel();
+        // A sync in the 6s undo window rekeys every RowId: a stale parent would orphan the restore.
+        var parent = undo.Value.Parent;
+        if (parent is not null && Session.Store is not null && await Session.Store.GetNodeAsync(parent.Value) is null)
+        {
+            parent = null;
+        }
+
+        await Session.Engine.RestoreBookmarkAsync(parent, undo.Value.Subtree);
+        undo = null;
+        await RefreshAsync();
+    }
+
+    private int? LastCreateFolder()
+    {
+        var raw = Preferences.Get("last_create_folder", string.Empty);
+        if (int.TryParse(raw, out int id))
+        {
+            // Stored as NodeId (stable across sync rewrites); legacy RowId still honoured.
+            var byNode = allFolders.FirstOrDefault(f => f.NodeId == id);
+            if (byNode is not null)
+            {
+                return byNode.RowId;
+            }
+
+            if (allFolders.Any(f => f.RowId == id))
+            {
+                return id;
+            }
+        }
+
+        return CurrentParent;
+    }
+
+    private async Task AddNew()
+    {
+        // Prefill from clipboard when it holds a URI: full URL in its field,
+        // title as host+path without scheme, query or fragment.
+        string? presetUrl = null;
+        string? presetTitle = null;
+        try
+        {
+            var clip = await Clipboard.Default.GetTextAsync();
+            if (Uri.TryCreate(clip?.Trim(), UriKind.Absolute, out var u) &&
+                (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps))
+            {
+                presetUrl = u.ToString();
+                var path = u.AbsolutePath == "/" ? string.Empty : u.AbsolutePath;
+                presetTitle = u.Host + path;
+            }
+        }
+        catch
+        {
+            // Clipboard unavailable: plain empty form.
+        }
+
+        sheetFor = new SheetTarget(null, LastCreateFolder(), presetUrl, presetTitle);
+    }
+
+    private async Task SaveSheet(BookmarkSheet.BookmarkEdit e)
+    {
+        if (Session.Engine is null) return;
+        if (e.RowId is null)
+        {
+            var parent = e.ParentRowId is not null && allFolders.Any(f => f.RowId == e.ParentRowId.Value)
+                ? e.ParentRowId
+                : null;
+            var node = new Core.Models.BookmarkNode
+            {
+                Title = e.Title, Url = e.Url, Description = e.Description, Tags = e.Tags,
+                Children = e.IsFolder ? [] : null
+            };
+            await Session.Engine.AddBookmarkAsync(parent, node);
+            var parentNode = parent is not null
+                ? allFolders.FirstOrDefault(f => f.RowId == parent)?.NodeId
+                : null;
+            Preferences.Set("last_create_folder", parentNode?.ToString() ?? string.Empty);
+        }
+        else
+        {
+            await Session.Engine.UpdateBookmarkAsync(e.RowId.Value, e.Title, e.Url, e.Description, e.Tags);
+            var current = await Session.Store!.GetNodeAsync(e.RowId.Value);
+            if (current is not null && current.ParentRowId != e.ParentRowId)
+            {
+                try
+                {
+                    await Session.Engine.MoveBookmarkAsync(e.RowId.Value, e.ParentRowId);
+                }
+                catch (Exception ex)
+                {
+                    // Move refused (e.g. folder into itself): fields are already saved.
+                    System.Diagnostics.Debug.WriteLine($"Move skipped: {ex.Message}");
+                }
+            }
+        }
+
+        sheetFor = null;
+        await RefreshAsync();
+    }
+
+    private async Task SyncNow()
+    {
+        if (Session.Engine is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Session.Engine.ForceSyncAsync();
+            await Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
+                ? $"Sync complete {DateTime.Now:HH:mm:ss}"
+                : $"Sync finished: {Session.Engine.Status}",
+                isError: Session.Engine.Status is not (Core.Sync.SyncStatus.Idle or Core.Sync.SyncStatus.Offline));
+        }
+        catch (Exception ex)
+        {
+            await Toast.ShowAsync(ex.Message, isError: true);
+        }
+
+        await RefreshAsync();
+    }
+
+    private async Task GoRoot()
+    {
+        ClearFlash();
+        crumbs.Clear();
+        query = string.Empty;
+        isSearch = false;
+        await RefreshAsync();
+    }
+
+    private async Task JumpTo(int rowId)
+    {
+        ClearFlash();
+        while (crumbs.Count > 0 && crumbs.Peek().RowId != rowId)
+        {
+            crumbs.Pop();
+        }
+
+        query = string.Empty;
+        isSearch = false;
+        await RefreshAsync();
+    }
+
+    private async Task GoToLocation(ItemRow? row)
+    {
+        menuFor = null;
+        if (row is null || Session.Store is null) return;
+
+        var chain = await Session.Store.GetAncestorChainAsync(row.RowId);
+        ClearFlash();
+        crumbs.Clear();
+        foreach (var folder in chain)
+        {
+            crumbs.Push(folder);
+        }
+
+        query = string.Empty;
+        isSearch = false;
+        await RefreshAsync();
+
+        flashRowId = row.RowId;
+        StateHasChanged();
+        await Task.Delay(120);
+        try { await JS.InvokeVoidAsync("xbsGestures.scrollToRow", row.RowId); } catch { }
+
+        flashTimer?.Cancel();
+        flashTimer = new CancellationTokenSource();
+        var token = flashTimer.Token;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(2400, token);
+                await InvokeAsync(() => { flashRowId = null; StateHasChanged(); });
+            }
+            catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException) { }
+        });
+    }
+
+    private void ClearFlash()
+    {
+        flashTimer?.Cancel();
+        flashRowId = null;
+    }
+
+    /// <summary>Re-resolves the breadcrumb chain by stable NodeId. Folders deleted
+    /// remotely (or rekeyed by a sync rewrite) are dropped with everything above.</summary>
+    private async Task RebaseCrumbsAsync()
+    {
+        if (crumbs.Count == 0 || Session.Store is null)
+        {
+            return;
+        }
+
+        var ids = crumbs.Where(c => c.NodeId is not null).Select(c => c.NodeId!.Value).ToList();
+        var fresh = await Session.Store.GetByNodeIdsAsync(ids);
+        var byNode = fresh.GroupBy(r => r.NodeId!.Value).ToDictionary(g => g.Key, g => g.First());
+        var ordered = crumbs.Reverse().ToList();
+        crumbs.Clear();
+        foreach (var c in ordered)
+        {
+            if (c.NodeId is not null && byNode.TryGetValue(c.NodeId.Value, out var f))
+            {
+                crumbs.Push(f);
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    private void TogglePinned() => pinnedOpen = !pinnedOpen;
+
+    private static string SortTitle(Core.Data.ItemRow r) => r.Title ?? r.Url ?? string.Empty;
+
+    /// <summary>Display rank only: folders 0, bookmarks 1, separators 2. Never persisted.</summary>
+    private static int RankForSort(Core.Data.ItemRow r) =>
+        r.Url == Core.XbsConstants.SeparatorUrl ? 2 : r.IsFolder ? 0 : 1;
+
+    private async Task SetSort(string mode)
+    {
+        sortMode = mode;
+        AppSettings.ListSort = mode;
+        await RefreshAsync();
+    }
+
+    private void ClearSearch()
+    {
+        debounce?.Cancel();
+        query = string.Empty;
+        isSearch = false;
+        hits = [];
+        hitRows = [];
+        searching = false;
+    }
+
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? string.Empty;
+        debounce?.Cancel();
+        debounce = new CancellationTokenSource();
+        var token = debounce.Token;
+        var gen = ++searchGen;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(250, token);
+                await InvokeAsync(async () =>
+                {
+                    if (query.Trim().Length >= 2 && Session.Store is not null)
+                    {
+                        searching = true;
+                        isSearch = true;
+                        StateHasChanged();
+                        var found = await Session.Store.SearchAsync(query.Trim(), 50);
+                        // A newer keystroke won: drop these stale results.
+                        if (gen != searchGen)
+                        {
+                            return;
+                        }
+
+                        hits = found;
+                        await RefreshAsync();
+                        searching = false;
+                    }
+                    else
+                    {
+                        isSearch = false;
+                        hits = [];
+                        hitRows = [];
+                    }
+
+                    StateHasChanged();
+                });
+            }
+            catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException)
+            {
+            }
+        });
+    }
+
+    private void OnSharedArrived() => InvokeAsync(() =>
+    {
+        // Navigate home only when showing another page: navigating while
+        // already home would recreate this page and discard the sheet below.
+        // The fresh Home instance picks the pending share up in OnInitialized.
+        if (!IsHome())
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        if (OpenSharedIfPending())
+        {
+            StateHasChanged();
+        }
+    });
+
+    private bool IsHome() => string.IsNullOrEmpty(Nav.ToBaseRelativePath(Nav.Uri));
+
+    /// <summary>Opens the add sheet prefilled from an incoming share. Returns true if one was pending.</summary>
+    private bool OpenSharedIfPending()
+    {
+        // Peek first: consuming before the engine exists would drop the share.
+        var pending = SharedImport.Peek();
+        if (pending is null || Session.Engine is null)
+        {
+            return false;
+        }
+
+        SharedImport.Consume();
+        sheetFor = new SheetTarget(null, LastCreateFolder(), pending.Url, pending.Title);
+        return true;
+    }
+
+    public void Dispose()
+    {
+        SharedImport.Arrived -= OnSharedArrived;
+        _ = JS.InvokeVoidAsync("xbsGestures.lockScroll", false, "sheet");
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnStatus;
+            Session.Engine.DataChanged -= OnData;
+        }
+
+        debounce?.Cancel();
+        debounce?.Dispose();
+        flashTimer?.Cancel();
+        flashTimer?.Dispose();
+        undoTimer?.Cancel();
+        undoTimer?.Dispose();
+        dotNet?.Dispose();
+    }
+}

@@ -1,0 +1,11 @@
+<!-- Keepmark launcher icon: official xBrowserSync isometric cube
+     (faces #0A323D / #267D91 / #71D2E2) on a light tile, visible on both
+     dark and light launchers. Artwork kept in the adaptive-icon safe zone. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <g>
+    <polygon points="54,26 80,41 54,56 28,41" fill="#267D91"/>
+    <polygon points="28,41 54,56 54,86 28,71" fill="#0A323D"/>
+    <polygon points="54,56 80,41 80,71 54,86" fill="#71D2E2"/>
+    <polygon points="28,41 54,56 54,60 28,45" fill="#FFFFFF" opacity="0.18"/>
+  </g>
+</svg>

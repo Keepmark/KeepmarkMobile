@@ -1,0 +1,202 @@
+@using Keepmark.Core.Data
+
+<div class="xbs-tree">
+    <div class="mb-2 xbs-search">
+        <span class="xbs-search-icon" aria-hidden="true">🔍</span>
+        <input class="form-control xbs-search-input" placeholder="Filter folders…" aria-label="Filter folders"
+               @oninput="OnFilter" value="@filter" />
+    </div>
+    <div role="tree" aria-label="Folders">
+    <button type="button" role="treeitem" aria-selected="@((Selected is null).ToString().ToLowerInvariant())"
+            class="xbs-tree-node @(Selected is null ? "selected" : string.Empty)" @onclick="() => Highlight(null)">
+        <span aria-hidden="true">⌂</span> Top level
+    </button>
+    @if (string.IsNullOrWhiteSpace(filter))
+    {
+        @foreach (var root in Roots)
+        {
+            @TreeNode(root, 0)
+        }
+    }
+    else
+    {
+        <p class="text-muted" role="status">@Filtered.Count folder(s) match.</p>
+        @foreach (var f in Filtered)
+        {
+            <button type="button" role="treeitem" aria-selected="@((Selected == f.RowId).ToString().ToLowerInvariant())"
+                    class="xbs-tree-node @(Selected == f.RowId ? "selected" : string.Empty)"
+                    @onclick="() => Highlight(f.RowId)">
+                <span aria-hidden="true">📁</span> @(f.Title ?? "Folder")<br />
+                <small class="text-muted">@PathOf(f)</small>
+            </button>
+        }
+        @if (Filtered.Count == 0)
+        {
+            <p class="text-muted">No folders match. Try fewer letters.</p>
+        }
+    }
+    </div>
+    <div class="d-flex gap-2 mt-3">
+        <button type="button" class="btn btn-primary flex-fill" @onclick="Confirm">Select</button>
+        <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public List<ItemRow> Folders { get; set; } = [];
+    [Parameter] public int? Selected { get; set; }
+    [Parameter] public EventCallback<int?> SelectedChanged { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    /// <summary>RowId whose whole subtree is hidden (cannot move a folder into itself).</summary>
+    [Parameter] public int? ExcludeSubtreeRoot { get; set; }
+
+    private List<ItemRow> Roots = [];
+    private Dictionary<int, List<ItemRow>> ByParent = new();
+    private Dictionary<int, ItemRow> ById = new();
+    private readonly HashSet<int> collapsed = new();
+    private string filter = string.Empty;
+    private List<ItemRow> Filtered = [];
+
+    protected override void OnParametersSet()
+    {
+        var childrenOf = Folders.Where(f => f.ParentRowId is not null)
+            .GroupBy(f => f.ParentRowId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(f => f.RowId).ToList());
+
+        var excluded = new HashSet<int>();
+        if (ExcludeSubtreeRoot is not null)
+        {
+            var queue = new Queue<int>([ExcludeSubtreeRoot.Value]);
+            while (queue.Count > 0)
+            {
+                var cur = queue.Dequeue();
+                if (!excluded.Add(cur))
+                {
+                    continue;
+                }
+
+                if (childrenOf.TryGetValue(cur, out var kids))
+                {
+                    foreach (var k in kids)
+                    {
+                        queue.Enqueue(k);
+                    }
+                }
+            }
+        }
+
+        var visible = Folders.Where(f => !excluded.Contains(f.RowId)).ToList();
+        ById = visible.ToDictionary(f => f.RowId);
+        var ids = visible.Select(f => f.RowId).ToHashSet();
+        Roots = visible.Where(f => f.ParentRowId is null || !ids.Contains(f.ParentRowId.Value))
+            .OrderBy(f => f.SortOrder).ToList();
+        ByParent = visible.Where(f => f.ParentRowId is not null)
+            .GroupBy(f => f.ParentRowId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.SortOrder).ToList());
+
+        // Start fully collapsed; the path to the current selection stays open.
+        collapsed.Clear();
+        foreach (var f in visible)
+        {
+            if (ByParent.ContainsKey(f.RowId))
+            {
+                collapsed.Add(f.RowId);
+            }
+        }
+
+        var sel = Selected;
+        while (sel is not null && ById.TryGetValue(sel.Value, out var node) && node.ParentRowId is not null)
+        {
+            collapsed.Remove(node.ParentRowId.Value);
+            sel = node.ParentRowId;
+        }
+    }
+
+    private Task Highlight(int? rowId) => SelectedChanged.InvokeAsync(rowId);
+    private Task Confirm() => OnConfirm.InvokeAsync();
+    private Task Cancel() => OnCancel.InvokeAsync();
+
+    private static string? NodeExpanded(bool hasKids, bool isCollapsed) =>
+        hasKids ? (!isCollapsed).ToString().ToLowerInvariant() : null;
+
+    private static string ExpandLabel(bool isCollapsed, string? title) =>
+        (isCollapsed ? "Expand " : "Collapse ") + (title ?? "Folder");
+
+    private void Toggle(int rowId)
+    {
+        if (!collapsed.Remove(rowId))
+        {
+            collapsed.Add(rowId);
+        }
+    }
+
+    private void OnFilter(ChangeEventArgs e)
+    {
+        filter = e.Value?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            Filtered = [];
+            return;
+        }
+
+        Filtered = ById.Values
+            .Where(f => f.Title is not null && f.Title.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(f => f.Title)
+            .ToList();
+    }
+
+    private string PathOf(ItemRow f)
+    {
+        var parts = new Stack<string>();
+        var cur = f.ParentRowId is not null && ById.TryGetValue(f.ParentRowId.Value, out var p) ? p : null;
+        while (cur is not null)
+        {
+            if (cur.Title is not null)
+            {
+                parts.Push(cur.Title);
+            }
+
+            cur = cur.ParentRowId is not null && ById.TryGetValue(cur.ParentRowId.Value, out var q) ? q : null;
+        }
+
+        var path = string.Join(" / ", parts);
+        return string.IsNullOrEmpty(path) ? "Top level" : path;
+    }
+
+    private RenderFragment TreeNode(ItemRow Node, int Level) => __builder =>
+    {
+        var hasKids = ByParent.TryGetValue(Node.RowId, out var kids) && kids.Count > 0;
+        var isCollapsed = collapsed.Contains(Node.RowId);
+        <div style="margin-left: @(Math.Min(Level, 3))rem">
+            <div class="d-flex align-items-center gap-1">
+                @if (hasKids)
+                {
+                    <button type="button" class="xbs-tree-exp" aria-expanded="@((!isCollapsed).ToString().ToLowerInvariant())"
+                            aria-label="@ExpandLabel(isCollapsed, Node.Title)"
+                            @onclick="() => Toggle(Node.RowId)" @onclick:stopPropagation="true">
+                        <span aria-hidden="true" class="xbs-expand-chev @(isCollapsed ? string.Empty : "open")">›</span>
+                    </button>
+                }
+                <button type="button" role="treeitem" aria-selected="@((Selected == Node.RowId).ToString().ToLowerInvariant())"
+                        aria-expanded="@NodeExpanded(hasKids, isCollapsed)"
+                        class="xbs-tree-node flex-fill @(Selected == Node.RowId ? "selected" : string.Empty)"
+                        @onclick="() => Highlight(Node.RowId)" @onclick:stopPropagation="true">
+                    <span aria-hidden="true">📁</span> @(Node.Title ?? "Folder")
+                    @if (hasKids)
+                    {
+                        <small class="text-muted"> (@kids!.Count)</small>
+                    }
+                </button>
+            </div>
+            @if (hasKids && !isCollapsed)
+            {
+                @foreach (var k in kids!)
+                {
+                    @TreeNode(k, Level + 1)
+                }
+            }
+        </div>
+    };
+}

@@ -1,0 +1,297 @@
+@page "/connect"
+@inject Keepmark.Services.XbsSession Session
+@inject Keepmark.Services.XbsSettings AppSettings
+@inject Keepmark.Services.SecureCredentialStore Creds
+
+<PageTitle>Connect</PageTitle>
+
+<h1>Connect</h1>
+
+@if (!Session.Ready)
+{
+    <p><em>Starting…</em></p>
+}
+else if (linked)
+{
+    <div class="alert alert-success">
+        Linked to <strong>@linkedUrl</strong> (sync <code>@ShortId(linkedId)</code>).
+    </div>
+    <p>To move your bookmarks to another service or sync — or to back them up — use the <a href="migrate">Migrate</a> section.</p>
+}
+else
+{
+    <div class="alert alert-info">
+        <h4>How your bookmarks get here</h4>
+        <ul class="mb-1">
+            <li><strong>Open an existing sync</strong> below — with an empty library this simply downloads everything from the server.</li>
+            <li><strong>Create a new sync</strong> — start empty, or upload bookmarks you already have.</li>
+            <li><strong>Restore an encrypted backup file</strong> — in the <a href="migrate">Migrate</a> section, no connection needed.</li>
+        </ul>
+        <small>Sync exchanges the whole collection at once (never single items). If both sides change independently, the app reports a conflict instead of merging silently — and every overwrite is safety-backed-up first.</small>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Service URL</label>
+        <input class="form-control" @bind="serviceUrl" inputmode="url" />
+        <div class="form-text">Address of the xBrowserSync service to use. Check verifies it answers with a compatible API version.</div>
+        <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">Check service</button>
+        @if (serviceInfo is not null)
+        {
+            <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
+        }
+    </div>
+
+    <div class="mb-3">
+        <h4>Open an existing sync</h4>
+        <label class="form-label">Sync ID</label>
+        <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+        <label class="form-label mt-2">Password</label>
+        <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
+        <div class="form-text">The password is verified against the remote data: a wrong password cannot open the sync. Nothing is changed until you pick a direction below.</div>
+        <div class="mt-2">
+            <button class="btn btn-primary me-2" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <h4>Create a new sync</h4>
+        <label class="form-label">New password</label>
+        <input type="password" class="form-control" @bind="newPassword" autocomplete="new-password" />
+        <label class="form-label mt-2">Confirm password</label>
+        <input type="password" class="form-control" @bind="confirmPassword" autocomplete="new-password" />
+        <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered — lose it and the sync is unreadable.</div>
+        <div class="mt-2 d-grid gap-2">
+            @if (localCount > 0)
+            {
+                <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@busy">Create and upload my @localCount item(s)</button>
+                <div class="form-text">Creates the sync on this service and uploads your current local bookmarks into it. Nothing local is deleted.</div>
+                @if (armed != "createEmpty")
+                {
+                    <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@busy">Create empty instead…</button>
+                }
+                else
+                {
+                    <div class="alert alert-danger">
+                        <strong>Replace your @localCount local item(s) with an empty sync?</strong>
+                        A plaintext safety backup is saved first, but this discards what you see now.
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-danger" @onclick="CreateNew" disabled="@busy">Yes, create empty</button>
+                            <button class="btn btn-secondary" @onclick="Disarm" disabled="@busy">Cancel</button>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@busy">Create new sync</button>
+                <div class="form-text">Creates an empty sync on this service and links the app to it.</div>
+            }
+        </div>
+    </div>
+
+    @if (reconcile is not null)
+    {
+        <div class="alert alert-warning">
+            <h4>Choose sync direction</h4>
+            <p>Local items: <strong>@reconcile.LocalCount</strong> · Remote items: <strong>@reconcile.RemoteCount</strong>
+                (remote updated @(reconcile.RemoteLastUpdated ?? "unknown")).</p>
+            <p><small>A safety backup of the overwritten side is saved automatically.</small></p>
+            @if (reconcile is { LocalCount: 0 })
+            {
+                <button class="btn btn-primary" @onclick="ApplyRemote" disabled="@busy">Download remote</button>
+                <div class="form-text">Takes the @reconcile.RemoteCount remote item(s). Nothing local to lose.</div>
+            }
+            else if (reconcile is { RemoteCount: 0 })
+            {
+                <button class="btn btn-primary" @onclick="ApplyLocal" disabled="@busy">Upload local</button>
+                <div class="form-text">Pushes your @reconcile.LocalCount local item(s) to the service. The remote slot is empty.</div>
+            }
+            else
+            {
+                <button class="btn btn-primary me-2" @onclick="ApplyLocal" disabled="@busy">Keep mine, upload</button>
+                <div class="form-text">Overwrites the @reconcile.RemoteCount remote item(s) with your @reconcile.LocalCount local.</div>
+                <button class="btn btn-secondary mt-2" @onclick="ApplyRemote" disabled="@busy">Take remote, replace local</button>
+                <div class="form-text">Deletes your @reconcile.LocalCount local item(s) and takes the @reconcile.RemoteCount remote (backup saved first).</div>
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+    }
+}
+
+@code {
+    private string serviceUrl = Core.XbsConstants.DefaultServiceUrl;
+    private string syncId = string.Empty;
+    private string password = string.Empty;
+    private string newPassword = string.Empty;
+    private string confirmPassword = string.Empty;
+    private bool busy;
+    private string message = string.Empty;
+    private bool isError;
+    private Core.Api.ServiceInfoResponse? serviceInfo;
+    private Services.ReconcileInfo? reconcile;
+    private bool linked;
+    private string? linkedUrl;
+    private string? linkedId;
+    private int localCount;
+    private string? armed;
+
+    protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await RefreshStateAsync();
+    }
+
+    private async Task RefreshStateAsync()
+    {
+        var c = await Creds.GetAsync();
+        linked = c is not null;
+        linkedUrl = c?.ServiceUrl;
+        linkedId = c?.Id;
+        if (Session.Store is not null)
+        {
+            var stats = await Session.Store.GetStatsAsync();
+            localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+        }
+    }
+
+    private static string ShortId(string? id) =>
+        id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
+
+    private void Disarm() => armed = null;
+
+    private static void RequireMatchingPasswords(string first, string second)
+    {
+        if (first.Length < 8)
+        {
+            throw new InvalidOperationException("Use a password of at least 8 characters.");
+        }
+
+        if (!string.Equals(first, second, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Passwords do not match — retype the confirmation.");
+        }
+    }
+
+    private async Task CheckService()
+    {
+        await RunAsync(async () =>
+        {
+            serviceInfo = await Session.CheckServiceAsync(serviceUrl.Trim());
+            AppSettings.ServiceUrl = serviceUrl.Trim();
+            Ok($"Service is valid: {serviceInfo.Status}, API v{serviceInfo.Version}.");
+        });
+    }
+
+    private async Task LinkExisting()
+    {
+        await RunAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
+            {
+                throw new InvalidOperationException("Enter both the sync ID and its password.");
+            }
+
+            reconcile = await Session.ProbeLinkAsync(serviceUrl.Trim(), syncId.Trim(), password);
+            AppSettings.ServiceUrl = serviceUrl.Trim();
+            if (reconcile is { LocalCount: 0, RemoteCount: 0 })
+            {
+                await Session.ApplyRemoteAsync(reconcile);
+                reconcile = null;
+                await RefreshStateAsync();
+                Ok("Linked. Both sides were empty — ready to go.");
+            }
+            else
+            {
+                Ok("Credentials valid. Choose the sync direction above.");
+            }
+        });
+    }
+
+    private async Task CreateNew()
+    {
+        await RunAsync(async () =>
+        {
+            RequireMatchingPasswords(newPassword, confirmPassword);
+            await Session.CreateNewSyncAsync(serviceUrl.Trim(), newPassword);
+            AppSettings.ServiceUrl = serviceUrl.Trim();
+            reconcile = null;
+            armed = null;
+            newPassword = string.Empty;
+            await RefreshStateAsync();
+            Ok("New empty sync created and linked. A safety backup of the previous local data was saved.");
+        });
+    }
+
+    private async Task CreateWithUpload()
+    {
+        await RunAsync(async () =>
+        {
+            RequireMatchingPasswords(newPassword, confirmPassword);
+            await Session.CreateNewSyncWithUploadAsync(serviceUrl.Trim(), newPassword);
+            AppSettings.ServiceUrl = serviceUrl.Trim();
+            reconcile = null;
+            newPassword = string.Empty;
+            await RefreshStateAsync();
+            Ok("New sync created and your local bookmarks were uploaded into it.");
+        });
+    }
+
+    private async Task ApplyRemote()
+    {
+        await RunAsync(async () =>
+        {
+            await Session.ApplyRemoteAsync(reconcile!);
+            reconcile = null;
+            await RefreshStateAsync();
+            Ok("Remote version downloaded.");
+        });
+    }
+
+    private async Task ApplyLocal()
+    {
+        await RunAsync(async () =>
+        {
+            await Session.ApplyLocalAsync(reconcile!);
+            reconcile = null;
+            await RefreshStateAsync();
+            Ok("Local version uploaded.");
+        });
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        busy = true;
+        isError = false;
+        message = string.Empty;
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            isError = true;
+            message = ex.Message;
+        }
+        finally
+        {
+            password = string.Empty;
+            confirmPassword = string.Empty;
+            busy = false;
+        }
+    }
+
+    private void Ok(string text)
+    {
+        isError = false;
+        message = text;
+    }
+}

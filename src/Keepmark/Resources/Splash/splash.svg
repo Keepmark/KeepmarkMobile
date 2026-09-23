@@ -1,0 +1,9 @@
+<!-- Keepmark splash mark (tinted on navy by MauiSplashScreen color). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <g fill="#71D2E2">
+    <polygon points="54,26 82,42 54,58 26,42"/>
+    <polygon points="47,70 61,70 61,90 54,85 47,90"/>
+  </g>
+  <polygon points="26,42 54,58 54,74 26,58" fill="#2E9E7B"/>
+  <polygon points="54,58 82,42 82,58 54,74" fill="#267D91"/>
+</svg>

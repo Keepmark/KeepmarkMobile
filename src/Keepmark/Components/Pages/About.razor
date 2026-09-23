@@ -1,0 +1,54 @@
+@page "/about"
+
+<PageTitle>About</PageTitle>
+
+<h1>About</h1>
+
+<p><strong>Keepmark</strong> v@(AppInfo.VersionString) (build @(AppInfo.BuildString))</p>
+<p>An independent, private bookmark sync client. Not affiliated with xBrowserSync.</p>
+
+<h3>Compatibility</h3>
+<ul>
+    <li>Works with any <strong>xBrowserSync API v@Core.XbsConstants.ApiVersion</strong> service
+        (official, self-hosted or community), API v@(Core.XbsConstants.MinApiVersion)+ required.</li>
+    <li>Sync format <strong>v@(Core.XbsConstants.SyncClientVersion)</strong>: syncs created here
+        open in the official xBrowserSync apps, and vice versa.</li>
+    <li>Same end-to-end encryption (PBKDF2-SHA256 + AES-GCM): only your password
+        unlocks the data — the service operator cannot read it.</li>
+</ul>
+
+<h3>References</h3>
+<ul>
+    <li><a href="https://www.xbrowsersync.org/">xBrowserSync project</a> (GPL-3.0)</li>
+    <li><a href="https://github.com/xbrowsersync/api">Official API service source</a></li>
+    <li><a href="https://github.com/xbrowsersync/app">Official client source</a></li>
+    <li><a href="https://www.xbrowsersync.org/privacypolicy">Official service privacy policy</a></li>
+</ul>
+
+<h3>License</h3>
+<p>This client is free software under the <strong>GNU GPL v3</strong>: you may share and
+    modify it; see LICENSE in the source repository.</p>
+
+<h3>Contact</h3>
+<p><a href="mailto:keepmark@proton.me">keepmark@proton.me</a></p>
+<button class="btn btn-outline-primary" @onclick="ReportBug">Report a bug</button>
+
+@code {
+    private async Task ReportBug()
+    {
+        var subject = Uri.EscapeDataString($"[Keepmark {AppInfo.VersionString}] Bug report");
+        var body = Uri.EscapeDataString(
+            $"App version: {AppInfo.VersionString} (build {AppInfo.BuildString})\n" +
+            $"API version: {Core.XbsConstants.ApiVersion}\n" +
+            $"Android: {DeviceInfo.VersionString} ({DeviceInfo.Model})\n\n" +
+            $"Describe the issue:\n");
+        try
+        {
+            await Launcher.OpenAsync($"mailto:keepmark@proton.me?subject={subject}&body={body}");
+        }
+        catch
+        {
+            // No email app configured; the address above remains copyable.
+        }
+    }
+}
