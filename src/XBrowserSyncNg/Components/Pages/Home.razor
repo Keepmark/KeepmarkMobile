@@ -206,6 +206,14 @@ else
             dotNet = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("xbsGestures.init", dotNet);
         }
+
+        if (ready && sheetFor is null && Session.Engine is not null && SharedImport.Peek() is not null)
+        {
+            if (OpenSharedIfPending())
+            {
+                StateHasChanged();
+            }
+        }
     }
 
     private async Task RefreshAsync()
@@ -395,6 +403,20 @@ else
         await RefreshAsync();
     }
 
+    private int? LastCreateFolder()
+    {
+        var raw = Preferences.Get("last_create_folder", string.Empty);
+        if (int.TryParse(raw, out int id))
+        {
+            if (allFolders.Any(f => f.RowId == id))
+            {
+                return id;
+            }
+        }
+
+        return CurrentParent;
+    }
+
     private void AddNew()
     {
         // Prefill from clipboard when it holds a URI: full URL in its field,
@@ -417,7 +439,7 @@ else
             // Clipboard unavailable: plain empty form.
         }
 
-        sheetFor = new SheetTarget(null, CurrentParent, presetUrl, presetTitle);
+        sheetFor = new SheetTarget(null, LastCreateFolder(), presetUrl, presetTitle);
     }
 
     private async Task SaveSheet(BookmarkSheet.BookmarkEdit e)
@@ -425,12 +447,16 @@ else
         if (Session.Engine is null) return;
         if (e.RowId is null)
         {
+            var parent = e.ParentRowId is not null && allFolders.Any(f => f.RowId == e.ParentRowId.Value)
+                ? e.ParentRowId
+                : null;
             var node = new Core.Models.BookmarkNode
             {
                 Title = e.Title, Url = e.Url, Description = e.Description, Tags = e.Tags,
                 Children = e.IsFolder ? [] : null
             };
-            await Session.Engine.AddBookmarkAsync(e.ParentRowId, node);
+            await Session.Engine.AddBookmarkAsync(parent, node);
+            Preferences.Set("last_create_folder", parent?.ToString() ?? string.Empty);
         }
         else
         {
@@ -625,7 +651,7 @@ else
             return false;
         }
 
-        sheetFor = new SheetTarget(null, CurrentParent, pending.Url, pending.Title);
+        sheetFor = new SheetTarget(null, LastCreateFolder(), pending.Url, pending.Title);
         return true;
     }
 

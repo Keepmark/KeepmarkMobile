@@ -39,6 +39,14 @@ public sealed partial class SharedImportService
         }
     }
 
+    public PendingShare? Peek()
+    {
+        lock (_gate)
+        {
+            return _pending;
+        }
+    }
+
     private static string? ExtractUrl(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
