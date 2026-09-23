@@ -1,6 +1,7 @@
 @page "/settings"
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
+@inject XBrowserSyncNg.Services.SecureCredentialStore Creds
 @inject XBrowserSyncNg.Services.IAppLockService AppLock
 
 <PageTitle>Settings</PageTitle>
@@ -11,14 +12,14 @@
     <label class="form-label">Sync mode (default: Automatic)</label>
     <select class="form-select" @bind="mode">
         <option value="@Core.Sync.SyncMode.Auto">Automatic — sync on every change</option>
-        <option value="@Core.Sync.SyncMode.Manual">Manual — only on pull-to-refresh or Sync now</option>
+        <option value="@Core.Sync.SyncMode.Manual">Manual — only via Sync now</option>
     </select>
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Service URL</label>
-    <input class="form-control" @bind="serviceUrl" />
-    <small class="text-muted">Changing the service re-links via the Connect page.</small>
+    <label class="form-label">Linked service</label>
+    <p class="form-control-plaintext"><strong>@(linkedUrl ?? "Not linked")</strong></p>
+    <small class="text-muted">To move your data to another service, use the <a href="migrate">Migrate</a> section.</small>
 </div>
 
 <div class="mb-3">
@@ -65,20 +66,25 @@
 
 @code {
     private Core.Sync.SyncMode mode;
-    private string serviceUrl = string.Empty;
     private Core.Logging.XbsLogLevel verbosity;
     private string appLock = "Off";
     private int lockTimeout;
     private string error = string.Empty;
     private bool saved;
+    private string? linkedUrl;
 
     protected override void OnInitialized()
     {
         mode = AppSettings.Mode;
-        serviceUrl = AppSettings.ServiceUrl;
         verbosity = AppSettings.Verbosity;
         appLock = AppSettings.AppLock;
         lockTimeout = AppSettings.LockTimeoutMinutes;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var c = await Creds.GetAsync();
+        linkedUrl = c?.ServiceUrl;
     }
 
     private async Task Save()
@@ -110,7 +116,6 @@
         }
 
         AppSettings.Mode = mode;
-        AppSettings.ServiceUrl = serviceUrl.Trim();
         AppSettings.Verbosity = verbosity;
         AppSettings.AppLock = appLock;
         AppSettings.LockTimeoutMinutes = Math.Clamp(lockTimeout, 0, 60);

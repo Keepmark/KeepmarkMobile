@@ -1,6 +1,7 @@
 @page "/status"
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
+@inject XBrowserSyncNg.Services.SecureCredentialStore Creds
 
 <PageTitle>Status</PageTitle>
 
@@ -17,7 +18,7 @@ else
         <li>Mode: @AppSettings.Mode</li>
         <li>State: @status</li>
         <li>Last sync: @(lastSync?.ToString("u") ?? "never")</li>
-        <li>Service: @AppSettings.ServiceUrl</li>
+        <li>Service: @(serviceUrl ?? "not linked")</li>
     </ul>
 
     <h3>Storage</h3>
@@ -45,6 +46,7 @@ else
     private DateTimeOffset? lastSync;
     private long dbSize;
     private int pending;
+    private string? serviceUrl;
     private Core.Data.ContentStats? stats;
 
     protected override async Task OnInitializedAsync()
@@ -54,6 +56,7 @@ else
             await Task.Delay(100);
         }
 
+        serviceUrl = (await Creds.GetAsync())?.ServiceUrl;
         if (Session is { Store: not null, Engine: not null })
         {
             status = Session.Engine.Status;

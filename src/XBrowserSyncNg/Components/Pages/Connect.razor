@@ -11,19 +11,15 @@
 {
     <p><em>Starting…</em></p>
 }
-else if (linked && !showAdvanced)
+else if (linked)
 {
     <div class="alert alert-success">
         Linked to <strong>@linkedUrl</strong> (sync <code>@ShortId(linkedId)</code>).
     </div>
-    <button class="btn btn-outline-secondary" @onclick="() => showAdvanced = true">Advanced: change service…</button>
+    <p>To move your bookmarks to another service or sync — or to back them up — use the <a href="migrate">Migrate</a> section.</p>
 }
 else
 {
-    @if (linked)
-    {
-        <div class="alert alert-info">Currently linked to <strong>@linkedUrl</strong>. Changing the service below re-links the app (reconciliation applies).</div>
-    }
     <div class="mb-3">
         <label class="form-label">Service URL</label>
         <input class="form-control" @bind="serviceUrl" inputmode="url" />
@@ -130,7 +126,6 @@ else
     private bool linked;
     private string? linkedUrl;
     private string? linkedId;
-    private bool showAdvanced;
     private int localCount;
     private string? armed;
 
