@@ -4,6 +4,8 @@
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
 @inject XBrowserSyncNg.Services.IAppLockService AppLock
 @inject XBrowserSyncNg.Services.ToastState Toast
+@inject XBrowserSyncNg.Services.SharedImportService SharedImport
+@inject NavigationManager Nav
 @implements IDisposable
 
 <div class="page">
@@ -54,6 +56,7 @@
     {
         LockState.Changed += OnLockChanged;
         Toast.Changed += OnToast;
+        SharedImport.Arrived += OnShareArrived;
         _ = WatchSessionAsync();
     }
 
@@ -80,6 +83,8 @@
 
     private void OnLockChanged() => InvokeAsync(StateHasChanged);
     private void OnToast() => InvokeAsync(StateHasChanged);
+
+    private void OnShareArrived() => InvokeAsync(() => Nav.NavigateTo("/"));
 
     private async Task Unlock()
     {
@@ -108,6 +113,7 @@
     {
         LockState.Changed -= OnLockChanged;
         Toast.Changed -= OnToast;
+        SharedImport.Arrived -= OnShareArrived;
         if (Session.Engine is not null)
         {
             Session.Engine.StatusChanged -= OnEngineStatus;
