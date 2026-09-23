@@ -1,12 +1,35 @@
 @using XBrowserSyncNg.Core.Data
 
 <div class="xbs-tree">
+    <div class="mb-2 xbs-search">
+        <span class="xbs-search-icon" aria-hidden="true">🔍</span>
+        <input class="form-control xbs-search-input" placeholder="Filter folders…"
+               @oninput="OnFilter" value="@filter" />
+    </div>
     <button type="button" class="xbs-tree-node @(Selected is null ? "selected" : string.Empty)" @onclick="() => Select(null)">
         <span>⌂ Top level</span>
     </button>
-    @foreach (var root in Roots)
+    @if (string.IsNullOrWhiteSpace(filter))
     {
-        @TreeNode(root, 0)
+        @foreach (var root in Roots)
+        {
+            @TreeNode(root, 0)
+        }
+    }
+    else
+    {
+        @foreach (var f in Filtered)
+        {
+            <button type="button" class="xbs-tree-node @(Selected == f.RowId ? "selected" : string.Empty)"
+                    @onclick="() => Select(f.RowId)">
+                <span>📁 @(f.Title ?? "Folder")</span><br />
+                <small class="text-muted">@PathOf(f)</small>
+            </button>
+        }
+        @if (Filtered.Count == 0)
+        {
+            <p class="text-muted">No folders match.</p>
+        }
     }
 </div>
 
@@ -20,6 +43,9 @@
 
     private List<ItemRow> Roots = [];
     private Dictionary<int, List<ItemRow>> ByParent = new();
+    private Dictionary<int, ItemRow> ById = new();
+    private string filter = string.Empty;
+    private List<ItemRow> Filtered = [];
 
     protected override void OnParametersSet()
     {
@@ -50,6 +76,7 @@
         }
 
         var visible = Folders.Where(f => !excluded.Contains(f.RowId)).ToList();
+        ById = visible.ToDictionary(f => f.RowId);
         var ids = visible.Select(f => f.RowId).ToHashSet();
         Roots = visible.Where(f => f.ParentRowId is null || !ids.Contains(f.ParentRowId.Value))
             .OrderBy(f => f.SortOrder).ToList();
@@ -59,6 +86,39 @@
     }
 
     private Task Select(int? rowId) => SelectedChanged.InvokeAsync(rowId);
+
+    private void OnFilter(ChangeEventArgs e)
+    {
+        filter = e.Value?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            Filtered = [];
+            return;
+        }
+
+        Filtered = ById.Values
+            .Where(f => f.Title is not null && f.Title.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(f => f.Title)
+            .ToList();
+    }
+
+    private string PathOf(ItemRow f)
+    {
+        var parts = new Stack<string>();
+        var cur = f.ParentRowId is not null && ById.TryGetValue(f.ParentRowId.Value, out var p) ? p : null;
+        while (cur is not null)
+        {
+            if (cur.Title is not null)
+            {
+                parts.Push(cur.Title);
+            }
+
+            cur = cur.ParentRowId is not null && ById.TryGetValue(cur.ParentRowId.Value, out var q) ? q : null;
+        }
+
+        var path = string.Join(" / ", parts);
+        return string.IsNullOrEmpty(path) ? "Top level" : path;
+    }
 
     private RenderFragment TreeNode(ItemRow Node, int Level) => __builder =>
     {
