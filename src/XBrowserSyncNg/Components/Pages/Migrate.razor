@@ -154,11 +154,19 @@ else
     <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
     <div class="form-text">Encrypts your current @localCount local item(s). Keep the password: without it the file is unreadable.</div>
     <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">Export encrypted backup</button>
+    @if (!string.IsNullOrEmpty(bkpMessage))
+    {
+        <div class="alert mt-2 @(bkpError ? "alert-danger" : "alert-success")">@bkpMessage</div>
+    }
 </div>
 
 <div class="mb-3">
     <h4>Import</h4>
     <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
+    @if (!string.IsNullOrEmpty(impMessage))
+    {
+        <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")">@impMessage</div>
+    }
     @if (impPath is not null)
     {
         <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
@@ -237,6 +245,10 @@ else
     private bool isError;
     private string bkpPassword = string.Empty;
     private string bkpConfirm = string.Empty;
+    private string bkpMessage = string.Empty;
+    private bool bkpError;
+    private string impMessage = string.Empty;
+    private bool impError;
     private string? impPath;
     private string? impFileName;
     private string impPassword = string.Empty;
@@ -410,6 +422,9 @@ else
                 Ok($"Backup saved privately. Export it from the app folder when needed.");
             }
         });
+        bkpMessage = message;
+        bkpError = isError;
+        message = string.Empty;
     }
 
     private async Task PickBackup()
@@ -436,6 +451,9 @@ else
             armedImp = false;
             Ok("File selected. Enter its password and Read backup.");
         });
+        impMessage = message;
+        impError = isError;
+        message = string.Empty;
     }
 
     private async Task PreviewImport()
@@ -456,6 +474,9 @@ else
             armedImp = false;
             Ok("Backup reads correctly. Review the counts above.");
         });
+        impMessage = message;
+        impError = isError;
+        message = string.Empty;
     }
 
     private async Task ExecuteImport()
@@ -479,6 +500,9 @@ else
 
             Ok($"Restored {restored} item(s). They sync up automatically.");
         });
+        impMessage = message;
+        impError = isError;
+        message = string.Empty;
     }
 
     private async Task RunAsync(Func<Task> action)
