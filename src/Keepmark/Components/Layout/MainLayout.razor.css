@@ -9,7 +9,7 @@ main {
 }
 
 .sidebar {
-    background-color: var(--km-navy);
+    background-color: #0A323D;
 }
 
 @media (min-width: 641px) {
