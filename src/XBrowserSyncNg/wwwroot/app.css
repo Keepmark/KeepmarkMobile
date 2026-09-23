@@ -695,13 +695,25 @@ h1:focus {
 
 .xbs-duptext {
     min-width: 0;
+    overflow: hidden;
     text-align: left;
     border: none;
     background: transparent;
     color: inherit;
     padding: 0.25rem 0;
-    overflow-wrap: anywhere;
 }
+
+.xbs-duptext > span {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.xbs-duptext-title { font-weight: 600; }
+.xbs-duptext-sub { font-size: 0.85rem; color: var(--bs-secondary-color, #6c757d); }
+.xbs-duptext-path { font-size: 0.75rem; color: var(--bs-secondary-color, #6c757d); opacity: 0.85; }
 
 .xbs-dupbar {
     position: sticky;

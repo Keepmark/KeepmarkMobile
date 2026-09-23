@@ -5,7 +5,7 @@
 <PageTitle>Duplicates</PageTitle>
 
 <h1>Duplicate bookmarks</h1>
-<p class="text-muted">Same URL saved more than once. Tick what to remove, then delete once — there is no undo here, a safety backup is taken automatically on the next sync only for overwritten sides, so review first.</p>
+<p class="text-muted">Same URL saved more than once. Tick copies to remove — one copy of each link is always kept. Delete has no undo, so review first.</p>
 
 @if (!ready)
 {
@@ -267,11 +267,11 @@ else
                        aria-label="Select @(r.Title ?? r.Url)" @onchange="() => Toggle(r.RowId)" />
             }
             <button type="button" class="xbs-duptext" @onclick="() => Toggle(r.RowId)">
-                <span class="xbs-row-title">@(r.Title ?? r.Url)</span><br />
-                <span class="xbs-row-sub">@r.Url</span><br />
+                <span class="xbs-duptext-title">@(r.Title ?? r.Url)</span>
+                <span class="xbs-duptext-sub">@r.Url</span>
                 @if (!string.IsNullOrEmpty(PathOf(r.RowId)))
                 {
-                    <span class="xbs-row-path"><span aria-hidden="true">📁</span> @PathOf(r.RowId)</span>
+                    <span class="xbs-duptext-path"><span aria-hidden="true">📁</span> @PathOf(r.RowId)</span>
                 }
             </button>
             <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Open(r)">Open</button>
