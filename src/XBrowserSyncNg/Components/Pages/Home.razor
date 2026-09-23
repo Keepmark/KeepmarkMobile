@@ -130,7 +130,7 @@ else
                 @if (!menuFor.IsFolder)
                 {
                     <button class="btn btn-primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }">Open</button>
-                    <button class="btn btn-secondary" @onclick="ToggleDetails">@(expandedRows.Contains(menuFor.RowId) ? "Hide details" : "Show details")</button>
+                    <button class="btn btn-secondary" @onclick="() => ToggleDetails(menuFor)">@(expandedRows.Contains(menuFor.RowId) ? "Hide details" : "Show details")</button>
                     <button class="btn btn-secondary" @onclick="() => ShareRow(menuFor)">Share</button>
                 }
                 <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
