@@ -42,7 +42,8 @@
                 @if (showTree)
                 {
                     <div class="xbs-tree-box">
-                        <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnFolderPicked" />
+                        <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnFolderPicked"
+                                      ExcludeSubtreeRoot="Existing?.RowId" />
                     </div>
                 }
             </div>
