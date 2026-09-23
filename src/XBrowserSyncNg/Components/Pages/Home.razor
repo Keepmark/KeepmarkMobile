@@ -494,7 +494,7 @@ else
         return CurrentParent;
     }
 
-    private void AddNew()
+    private async Task AddNew()
     {
         // Prefill from clipboard when it holds a URI: full URL in its field,
         // title as host+path without scheme, query or fragment.
@@ -502,7 +502,7 @@ else
         string? presetTitle = null;
         try
         {
-            var clip = Clipboard.Default.GetTextAsync().GetAwaiter().GetResult();
+            var clip = await Clipboard.Default.GetTextAsync();
             if (Uri.TryCreate(clip?.Trim(), UriKind.Absolute, out var u) &&
                 (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps))
             {
@@ -759,12 +759,14 @@ else
     /// <summary>Opens the add sheet prefilled from an incoming share. Returns true if one was pending.</summary>
     private bool OpenSharedIfPending()
     {
-        var pending = SharedImport.Consume();
+        // Peek first: consuming before the engine exists would drop the share.
+        var pending = SharedImport.Peek();
         if (pending is null || Session.Engine is null)
         {
             return false;
         }
 
+        SharedImport.Consume();
         sheetFor = new SheetTarget(null, LastCreateFolder(), pending.Url, pending.Title);
         return true;
     }
