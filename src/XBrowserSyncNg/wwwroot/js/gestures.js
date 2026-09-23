@@ -16,7 +16,7 @@ window.xbsGestures = (() => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (e.target.closest && e.target.closest('button')) return;
         const row = e.target.closest ? e.target.closest('.xbs-row') : null;
-        if (!row || !row.dataset.rowid) return;
+        if (!row || !row.dataset.rowid || row.dataset.sep) return;
         const id = parseInt(row.dataset.rowid, 10);
         state = {
             id, x0: e.clientX, y0: e.clientY, pointerId: e.pointerId,

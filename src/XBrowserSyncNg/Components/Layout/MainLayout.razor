@@ -31,7 +31,7 @@
 
 @if (Toast.Message is not null)
 {
-    <div class="xbs-toast @(Toast.IsError ? "error" : string.Empty)">@Toast.Message</div>
+    <div class="xbs-toast @(Toast.IsError ? "error" : string.Empty)" role="status">@Toast.Message</div>
 }
 
 @if (LockState.Locked)

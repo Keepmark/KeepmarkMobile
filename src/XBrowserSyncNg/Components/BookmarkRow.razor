@@ -1,33 +1,57 @@
 @using XBrowserSyncNg.Core.Data
 
-<div class="xbs-row" data-rowid="@Row.RowId" @onclick="() => OnOpen.InvokeAsync(Row)">
-    <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
-        @if (!Row.IsFolder)
-        {
-            <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
-        }
-        <div class="xbs-row-text">
-            <div class="xbs-row-title">@Title @if (Pinned) { <span class="xbs-pinred" title="Pinned">📌</span> }</div>
-            <div class="xbs-row-sub">@Sub</div>
-            @if (Expanded && !Row.IsFolder)
-            {
-                @if (!string.IsNullOrEmpty(Row.Description))
-                {
-                    <div class="xbs-row-desc">@Row.Description</div>
-                }
-                @if (!string.IsNullOrEmpty(Row.Tags))
-                {
-                    <div class="xbs-row-tags">#@Row.Tags.Replace("\u001F", " #") </div>
-                }
-            }
-            @if (!Row.IsFolder && !string.IsNullOrEmpty(FolderPath))
-            {
-                <div class="xbs-row-path">📁 @FolderPath</div>
-            }
+@if (IsSeparator)
+{
+    <div class="xbs-row xbs-row-sep" data-rowid="@Row.RowId" data-sep="1" aria-hidden="true">
+        <div class="xbs-row-inner">
+            <div class="xbs-row-text">
+                <div class="xbs-row-title">@(Row.Title ?? "—")</div>
+            </div>
         </div>
-        <button class="xbs-row-chev" @onclick="OnMenu" @onclick:stopPropagation="true" aria-label="Actions">⋮</button>
     </div>
-</div>
+}
+else
+{
+    <div class="xbs-row" data-rowid="@Row.RowId" @onclick="() => OnOpen.InvokeAsync(Row)"
+         role="button" tabindex="0" aria-expanded="@RowExpanded"
+         aria-label="@RowLabel"
+         @onkeydown="OnKey">
+        <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
+            @if (!Row.IsFolder)
+            {
+                <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
+            }
+            <div class="xbs-row-text">
+                <div class="xbs-row-title">@TitlePrefix@if (Pinned) { <span aria-hidden="true">📌</span><span class="visually-hidden">(pinned)</span> } @PlainTitle</div>
+                <div class="xbs-row-sub">@Sub</div>
+                @if (Expanded && !Row.IsFolder)
+                {
+                    @if (!string.IsNullOrEmpty(Row.Description))
+                    {
+                        <div class="xbs-row-desc">@Row.Description</div>
+                    }
+                    @if (!string.IsNullOrEmpty(Row.Tags))
+                    {
+                        <div class="xbs-row-tags">#@Row.Tags.Replace(" ", " #") </div>
+                    }
+                }
+                @if (!Row.IsFolder && !string.IsNullOrEmpty(FolderPath))
+                {
+                    <div class="xbs-row-path"><span aria-hidden="true">📁</span> @FolderPath</div>
+                }
+            </div>
+            @if (!Row.IsFolder)
+            {
+                <button type="button" class="xbs-row-expand" @onclick="OnToggle" @onclick:stopPropagation="true"
+                        @onkeydown:stopPropagation="true" aria-expanded="@Expanded.ToString().ToLowerInvariant()" aria-label="@(Expanded ? "Collapse details" : "Expand details")">
+                    <span aria-hidden="true" class="xbs-expand-chev @(Expanded ? "open" : string.Empty)">›</span>
+                </button>
+            }
+            <button type="button" class="xbs-row-chev" @onclick="OnMenu" @onclick:stopPropagation="true"
+                    @onkeydown:stopPropagation="true" aria-label="Actions for @PlainTitle">⋮</button>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
@@ -38,9 +62,25 @@
     [Parameter] public EventCallback<ItemRow> OnOpen { get; set; }
     [Parameter] public EventCallback<(ItemRow Row, RowAction Action)> OnAction { get; set; }
 
-    private string RibbonClass => Row.IsFolder ? "folder" : Row.Url == Core.XbsConstants.SeparatorUrl ? "sep" : "mark";
-    private string Title => Row.IsFolder ? "📁 " + (Row.Title ?? "Folder") : Row.Title ?? Row.Url ?? "(no title)";
+    private bool IsSeparator => !Row.IsFolder && Row.Url == Core.XbsConstants.SeparatorUrl;
+    private string? RowExpanded => Row.IsFolder ? null : Expanded.ToString().ToLowerInvariant();
+    private string RowLabel => (Row.IsFolder ? "Open folder " : "Open bookmark ") + PlainTitle;
+    private string RibbonClass => Row.IsFolder ? "folder" : IsSeparator ? "sep" : "mark";
+    private string PlainTitle => Row.IsFolder ? (Row.Title ?? "Folder") : (Row.Title ?? Row.Url ?? "(no title)");
+    private MarkupString TitlePrefix => new(Row.IsFolder ? "<span aria-hidden=\"true\">📁</span> " : string.Empty);
     private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Row.Url ?? string.Empty;
 
     private Task OnMenu() => OnAction.InvokeAsync((Row, RowAction.Menu));
+    private Task OnToggle() => OnAction.InvokeAsync((Row, RowAction.ToggleExpand));
+
+    private Task OnKey(KeyboardEventArgs e)
+    {
+        // Enter only: Space on a div would also scroll the page.
+        if (e.Key == "Enter")
+        {
+            return OnOpen.InvokeAsync(Row);
+        }
+
+        return Task.CompletedTask;
+    }
 }

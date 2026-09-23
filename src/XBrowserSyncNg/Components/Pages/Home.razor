@@ -24,7 +24,7 @@ else
 {
     <div class="mb-2 xbs-search">
         <span class="xbs-search-icon" aria-hidden="true">🔍</span>
-        <input class="form-control xbs-search-input" placeholder="Search bookmarks (min 2 chars)…"
+        <input class="form-control xbs-search-input" placeholder="Search bookmarks (min 2 chars)…" aria-label="Search bookmarks"
                @oninput="OnSearchInput" value="@query" />
         @if (!string.IsNullOrEmpty(query))
         {
@@ -38,7 +38,7 @@ else
     }
     else if (isSearch)
     {
-        <p class="text-muted">@hits.Count result(s)</p>
+        <p class="text-muted" role="status">@hits.Count result(s)</p>
         @if (hitRows.Count == 0 && !searching)
         {
             <p class="text-muted">No matches. Try fewer words, check spelling, or clear the search.</p>
@@ -52,9 +52,9 @@ else
     else
     {
         <div class="xbs-sortbar" role="toolbar" aria-label="Sort">
-            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
-            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
-            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
+            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" aria-label="Server order" aria-pressed="@((sortMode == "Default").ToString().ToLowerInvariant())" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
+            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" aria-label="Sort A to Z" aria-pressed="@((sortMode == "Asc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
+            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" aria-label="Sort Z to A" aria-pressed="@((sortMode == "Desc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
         </div>
         <div class="xbs-crumbs" role="navigation" aria-label="Folders">
             <button class="xbs-crumb" @onclick="GoRoot" aria-label="Top level">⌂</button>
@@ -67,8 +67,8 @@ else
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
             <div class="xbs-pinned-box">
-                <button class="xbs-pinned-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen">
-                    <span class="chev">@(pinnedOpen ? "▾" : "▸")</span>
+                <button class="xbs-pinned-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
+                    <span class="chev" aria-hidden="true">@(pinnedOpen ? "▾" : "▸")</span>
                     <span>📌 Pinned (@pinnedRows.Count)</span>
                 </button>
                 @if (pinnedOpen)
@@ -118,7 +118,7 @@ else
 @if (menuFor is not null)
 {
     <div class="xbs-sheet-backdrop" @onclick="() => menuFor = null">
-        <div class="xbs-sheet" @onclick:stopPropagation="true">
+        <div class="xbs-sheet" role="dialog" aria-modal="true" aria-label="Actions for @(menuFor.Title ?? menuFor.Url ?? "item")" @onclick:stopPropagation="true">
             <h4>@(menuFor.Title ?? menuFor.Url)</h4>
             @if (!menuFor.IsFolder)
             {
@@ -391,6 +391,13 @@ else
             case RowAction.Share: await ShareRow(a.Row); break;
             case RowAction.Delete: await DeleteRow(a.Row); break;
             case RowAction.Menu: menuFor = a.Row; break;
+            case RowAction.ToggleExpand:
+                if (!expandedRows.Remove(a.Row.RowId))
+                {
+                    expandedRows.Add(a.Row.RowId);
+                }
+
+                break;
         }
     }
 
