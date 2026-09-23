@@ -31,6 +31,7 @@ else
                     <h4 class="mb-0 text-break">@g.Url <small class="text-muted">(@g.Rows.Count)</small></h4>
                     <button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="() => KeepFirst(g)">Keep first</button>
                 </div>
+                <p class="text-muted mb-1"><small>Kept: @(KeptTitle(g)) — at least one copy is always kept.</small></p>
                 @foreach (var r in g.Rows)
                 {
                     @DupRow(r)
@@ -77,6 +78,7 @@ else
     private List<Core.Data.DuplicateGroup> groups = [];
     private List<FolderSection> folders = [];
     private Dictionary<int, string> paths = new();
+    private Dictionary<int, Core.Data.DuplicateGroup> groupOf = new();
     private readonly HashSet<int> selected = [];
     private bool byFolder;
     private bool armed;
@@ -105,6 +107,8 @@ else
 
         groups = await Session.Store.GetDuplicateUrlsAsync();
         paths = await Session.Store.GetFolderPathsAsync();
+        groupOf = groups.SelectMany(g => g.Rows.Select(r => (r.RowId, g)))
+            .ToDictionary(x => x.RowId, x => x.g);
         // Default: keep the first occurrence of each link, select the rest.
         foreach (var g in groups)
         {
@@ -123,6 +127,15 @@ else
 
     private string PathOf(int rowId) => paths.GetValueOrDefault(rowId, string.Empty);
 
+    /// <summary>The copy currently kept for a link: first unselected row, else the first row.</summary>
+    private string KeptTitle(Core.Data.DuplicateGroup g) =>
+        (g.Rows.FirstOrDefault(r => !selected.Contains(r.RowId)) ?? g.Rows[0]).Title
+        ?? g.Rows[0].Url ?? "(no title)";
+
+    /// <summary>Invariant: a link's every copy can never be selected at once.</summary>
+    private bool WouldWipeGroup(int rowId) =>
+        groupOf.TryGetValue(rowId, out var g) && g.Rows.All(r => r.RowId == rowId || selected.Contains(r.RowId));
+
     private void KeepFirst(Core.Data.DuplicateGroup g)
     {
         foreach (var r in g.Rows)
@@ -140,13 +153,26 @@ else
     {
         foreach (var r in f.Rows)
         {
-            selected.Add(r.RowId);
+            // Same invariant as manual ticking: always leave one copy behind.
+            if (!WouldWipeGroup(r.RowId))
+            {
+                selected.Add(r.RowId);
+            }
         }
     }
 
-    private void Toggle(int rowId)
+    private async Task Toggle(int rowId)
     {
-        if (!selected.Remove(rowId))
+        if (selected.Contains(rowId))
+        {
+            selected.Remove(rowId);
+        }
+        else if (WouldWipeGroup(rowId))
+        {
+            await Toast.ShowAsync("Keeping one copy of this link — untick another copy first");
+            return;
+        }
+        else
         {
             selected.Add(rowId);
         }
@@ -169,8 +195,14 @@ else
             return;
         }
 
-        var count = selected.Count;
-        foreach (var id in selected.ToList())
+        // Safety net (the UI already enforces it): never wipe a link entirely.
+        var safe = selected
+            .Where(id => !groupOf.TryGetValue(id, out var g) ||
+                         g.Rows.Any(r => r.RowId != id && !selected.Contains(r.RowId)))
+            .ToList();
+        var skipped = selected.Count - safe.Count;
+        var count = safe.Count;
+        foreach (var id in safe)
         {
             try
             {
@@ -183,7 +215,9 @@ else
         }
 
         await ReloadAsync();
-        await Toast.ShowAsync($"Deleted {count} duplicate(s)");
+        await Toast.ShowAsync(skipped > 0
+            ? $"Deleted {count} duplicate(s), kept one copy each ({skipped} refused)"
+            : $"Deleted {count} duplicate(s)");
     }
 
     private RenderFragment DupRow(Core.Data.ItemRow r) => __builder =>
