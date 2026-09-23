@@ -106,6 +106,11 @@ window.xbsGestures = (() => {
             attach();
         },
         closeAll() { /* kept for Blazor callers; no snapped rows anymore */ },
+        lockScroll(on) {
+            const onOff = !!on;
+            document.documentElement.classList.toggle('xbs-locked', onOff);
+            if (document.body) document.body.classList.toggle('xbs-locked', onOff);
+        },
         scrollToRow(rowId) {
             const el = document.querySelector(`.xbs-row[data-rowid="${rowId}"]`);
             if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });

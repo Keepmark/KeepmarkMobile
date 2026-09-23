@@ -1,7 +1,7 @@
 # XBrowserSyncNg — MAUI Blazor Hybrid (Android only)
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.66 (67)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.67 (68)**,
 app id `com.keepmark.legacy.xbsyncng`, display name `xBrowserSyncNg`.
 
 `XBrowserSyncApp/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -100,6 +100,10 @@ M in `src/XBrowserSyncNg/XBrowserSyncNg.csproj`; CSS/JS releases also bump
   `Toast.ShowAsync` (toast waits ~3.5s; buttons must re-enable immediately).
 - Fire-and-forget no-op JS: `_ = JS.InvokeVoidAsync("xbsGestures.closeAll")`,
   never `await` it before UI work.
+- Modal sheets lock page scroll: `xbsGestures.lockScroll(bool)` toggles
+  `xbs-locked` on html/body; backdrop has `touch-action: none`, sheet
+  `touch-action: pan-y`, both `overscroll-behavior: contain`. Home syncs the
+  lock in `OnAfterRenderAsync` and releases it in `Dispose`.
 - Share consume: peek-before-consume in `Home.OpenSharedIfPending` via
   `ShareIntake` choke point (limbo for cold start).
 - Auto-mode push runs fire-and-forget; UI closes sheets right after local write.

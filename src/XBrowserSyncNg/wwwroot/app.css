@@ -316,6 +316,9 @@ h1:focus {
     display: flex;
     align-items: flex-end;
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Swallowing gestures: touches on the backdrop must never scroll the list behind. */
+    touch-action: none;
+    overscroll-behavior: contain;
 }
 
 .xbs-sheet {
@@ -325,6 +328,15 @@ h1:focus {
     background: var(--bs-body-bg, #fff);
     border-radius: 1rem 1rem 0 0;
     padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    /* The sheet itself scrolls; it never chains to the page. */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+}
+
+/* Scroll lock while a modal sheet is open (toggled from xbsGestures.lockScroll). */
+html.xbs-locked, body.xbs-locked {
+    overflow: hidden;
+    overscroll-behavior: none;
 }
 
 /* Undo bar: sits above the fixed status bar. */
