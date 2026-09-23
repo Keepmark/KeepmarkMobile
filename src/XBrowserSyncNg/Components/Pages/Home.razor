@@ -99,7 +99,7 @@ else
 @if (sheetFor is not null)
 {
     <BookmarkSheet Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
-                   PresetUrl="sheetFor.PresetUrl" PresetDesc="sheetFor.PresetDesc"
+                   PresetUrl="@sheetFor.PresetUrl" PresetDesc="@sheetFor.PresetDesc"
                    Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null" />
 }
 
