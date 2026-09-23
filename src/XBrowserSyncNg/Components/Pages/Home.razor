@@ -170,6 +170,7 @@ else
     private Dictionary<int, string> hitPaths = new();
     private bool isSearch;
     private bool searching;
+    private int searchGen;
     private CancellationTokenSource? debounce;
     private DotNetObjectReference<Home>? dotNet;
     private bool gesturesInit;
@@ -453,7 +454,7 @@ else
                 await Task.Delay(6000, token);
                 await InvokeAsync(() => { undo = null; StateHasChanged(); });
             }
-            catch (TaskCanceledException) { }
+            catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException) { }
         });
     }
 
@@ -637,7 +638,7 @@ else
                 await Task.Delay(2400, token);
                 await InvokeAsync(() => { flashRowId = null; StateHasChanged(); });
             }
-            catch (TaskCanceledException) { }
+            catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException) { }
         });
     }
 
@@ -705,6 +706,7 @@ else
         debounce?.Cancel();
         debounce = new CancellationTokenSource();
         var token = debounce.Token;
+        var gen = ++searchGen;
         _ = Task.Run(async () =>
         {
             try
@@ -717,7 +719,14 @@ else
                         searching = true;
                         isSearch = true;
                         StateHasChanged();
-                        hits = await Session.Store.SearchAsync(query.Trim(), 50);
+                        var found = await Session.Store.SearchAsync(query.Trim(), 50);
+                        // A newer keystroke won: drop these stale results.
+                        if (gen != searchGen)
+                        {
+                            return;
+                        }
+
+                        hits = found;
                         await RefreshAsync();
                         searching = false;
                     }
@@ -731,7 +740,7 @@ else
                     StateHasChanged();
                 });
             }
-            catch (TaskCanceledException)
+            catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException)
             {
             }
         });

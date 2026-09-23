@@ -65,6 +65,19 @@ public sealed class SyncEngine(
 
     public async Task<bool> PullAsync(CancellationToken ct = default)
     {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return await PullCoreAsync(ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<bool> PullCoreAsync(CancellationToken ct)
+    {
         var c = await RequireCredsAsync().ConfigureAwait(false);
         SetStatus(SyncStatus.Syncing);
         try
@@ -107,6 +120,19 @@ public sealed class SyncEngine(
     }
 
     public async Task PushAsync(bool updateVersion = false, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await PushCoreAsync(updateVersion, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task PushCoreAsync(bool updateVersion, CancellationToken ct)
     {
         var c = await RequireCredsAsync().ConfigureAwait(false);
         SetStatus(SyncStatus.Syncing);
@@ -200,11 +226,11 @@ public sealed class SyncEngine(
                     return;
                 }
 
-                await PullAsync(ct).ConfigureAwait(false);
+                await PullCoreAsync(ct).ConfigureAwait(false);
             }
             else if (dirty)
             {
-                await PushAsync(ct: ct).ConfigureAwait(false);
+                await PushCoreAsync(updateVersion: false, ct: ct).ConfigureAwait(false);
             }
             else
             {
