@@ -22,6 +22,15 @@
     position: sticky;
     top: env(safe-area-inset-top, 0px);
     z-index: 1059;
+    /* Reserve room for the fixed hamburger on the right. */
+    padding-right: 4.5rem;
+}
+
+.top-row .navbar-brand {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .top-row .container-fluid {
