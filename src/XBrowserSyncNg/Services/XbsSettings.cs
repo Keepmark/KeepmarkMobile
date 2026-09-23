@@ -40,10 +40,11 @@ public sealed class XbsSettings
         set => Preferences.Set(KAppLock, value);
     }
 
-    /// <summary>Auto-lock timeout in minutes. 0 = on background. Default 2 (plan).</summary>
+    /// <summary>Auto-lock timeout in minutes. 0 = on background. Default 10.
+    /// Applies only when AppLock is configured (anything but Off).</summary>
     public int LockTimeoutMinutes
     {
-        get => Preferences.Get(KLockTimeoutMin, 2);
+        get => Preferences.Get(KLockTimeoutMin, 10);
         set => Preferences.Set(KLockTimeoutMin, value);
     }
 
