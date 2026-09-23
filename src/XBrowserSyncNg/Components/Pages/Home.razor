@@ -163,7 +163,7 @@ else
     private bool gesturesInit;
     private SheetTarget? sheetFor;
     private ItemRow? menuFor;
-    private bool pinnedOpen = true;
+    private bool pinnedOpen = false;
     private int? flashRowId;
     private readonly HashSet<int> expandedRows = new();
     private Dictionary<int, string> pinPaths = new();
@@ -190,7 +190,6 @@ else
         }
 
         pinned = Pins.Load();
-        pinnedOpen = Preferences.Get("pinned_open", true);
         sortMode = AppSettings.ListSort;
         await RefreshAsync();
         ready = true;
@@ -365,7 +364,6 @@ else
         if (row?.NodeId is null || Session.Engine is null) return;
         bool added = Pins.Toggle(row.NodeId.Value);
         pinned = Pins.Load();
-        pinnedOpen = Preferences.Get("pinned_open", true);
         sortMode = AppSettings.ListSort;
         await RefreshAsync();
         await Toast.ShowAsync(added ? "Pinned" : "Unpinned");
@@ -567,11 +565,7 @@ else
         flashRowId = null;
     }
 
-    private void TogglePinned()
-    {
-        pinnedOpen = !pinnedOpen;
-        Preferences.Set("pinned_open", pinnedOpen);
-    }
+    private void TogglePinned() => pinnedOpen = !pinnedOpen;
 
     private static string SortTitle(Core.Data.ItemRow r) => r.Title ?? r.Url ?? string.Empty;
 
