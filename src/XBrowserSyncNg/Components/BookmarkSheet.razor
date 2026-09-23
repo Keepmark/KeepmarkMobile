@@ -64,7 +64,7 @@
     [Parameter] public ItemRow? Existing { get; set; }
     [Parameter] public int? DefaultParent { get; set; }
     [Parameter] public string? PresetUrl { get; set; }
-    [Parameter] public string? PresetDesc { get; set; }
+    [Parameter] public string? PresetTitle { get; set; }
     [Parameter] public List<ItemRow> Folders { get; set; } = [];
     [Parameter] public EventCallback<BookmarkEdit> OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
@@ -133,9 +133,9 @@
         }
         else
         {
-            title = string.Empty;
+            title = PresetTitle ?? string.Empty;
             url = PresetUrl ?? string.Empty;
-            description = PresetDesc ?? string.Empty;
+            description = string.Empty;
             tags = string.Empty;
             NewIsFolder = false;
             selectedFolder = DefaultParent;

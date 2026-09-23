@@ -99,7 +99,7 @@ else
 @if (sheetFor is not null)
 {
     <BookmarkSheet Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
-                   PresetUrl="@sheetFor.PresetUrl" PresetDesc="@sheetFor.PresetDesc"
+                   PresetUrl="@sheetFor.PresetUrl" PresetTitle="@sheetFor.PresetTitle"
                    Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null" />
 }
 
@@ -173,7 +173,7 @@ else
 
     private int? CurrentParent => crumbs.Count == 0 ? null : crumbs.Peek().RowId;
 
-    private sealed record SheetTarget(ItemRow? Row, int? Parent, string? PresetUrl = null, string? PresetDesc = null);
+    private sealed record SheetTarget(ItemRow? Row, int? Parent, string? PresetUrl = null, string? PresetTitle = null);
 
     protected override async Task OnInitializedAsync()
     {
@@ -395,9 +395,9 @@ else
     private void AddNew()
     {
         // Prefill from clipboard when it holds a URI: full URL in its field,
-        // description as host+path without scheme, query or fragment.
+        // title as host+path without scheme, query or fragment.
         string? presetUrl = null;
-        string? presetDesc = null;
+        string? presetTitle = null;
         try
         {
             var clip = Clipboard.Default.GetTextAsync().GetAwaiter().GetResult();
@@ -406,7 +406,7 @@ else
             {
                 presetUrl = u.ToString();
                 var path = u.AbsolutePath == "/" ? string.Empty : u.AbsolutePath;
-                presetDesc = u.Host + path;
+                presetTitle = u.Host + path;
             }
         }
         catch
@@ -414,7 +414,7 @@ else
             // Clipboard unavailable: plain empty form.
         }
 
-        sheetFor = new SheetTarget(null, CurrentParent, presetUrl, presetDesc);
+        sheetFor = new SheetTarget(null, CurrentParent, presetUrl, presetTitle);
     }
 
     private async Task SaveSheet(BookmarkSheet.BookmarkEdit e)
