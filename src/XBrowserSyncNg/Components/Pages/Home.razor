@@ -220,6 +220,17 @@ else
     {
         if (Session is { Store: not null, Engine: not null })
         {
+            // Every successful push/pull rewrites all rows (new RowIds): rebase
+            // in-memory RowId references on the stable NodeId first, otherwise
+            // the open folder (and expansions) silently point nowhere.
+            await RebaseCrumbsAsync();
+            // Capture expanded folders by stable NodeId before byRow is refilled below.
+            var expandedNodes = expandedRows
+                .Where(id => byRow.TryGetValue(id, out _))
+                .Select(id => byRow[id].NodeId)
+                .Where(n => n is not null)
+                .Select(n => n!.Value)
+                .ToHashSet();
             engineStatus = Session.Engine.Status;
             lastSync = Session.Engine.LastSyncAt;
             var parent = CurrentParent;
@@ -247,6 +258,22 @@ else
 
             hitRows = hits.Where(h => byRow.ContainsKey(h.RowId)).Select(h => h.RowId).ToList();
             hitPaths = hits.ToDictionary(h => h.RowId, h => h.FolderPath);
+            // Sync rewrites rekey every RowId: restore expansions via stable NodeId.
+            if (expandedRows.Count > 0)
+            {
+                var byNode = byRow.Values
+                    .Where(r => r.NodeId is not null)
+                    .GroupBy(r => r.NodeId!.Value)
+                    .ToDictionary(g => g.Key, g => g.First().RowId);
+                expandedRows.IntersectWith(byRow.Keys);
+                foreach (var n in expandedNodes)
+                {
+                    if (byNode.TryGetValue(n, out var freshId))
+                    {
+                        expandedRows.Add(freshId);
+                    }
+                }
+            }
         }
     }
 
@@ -397,7 +424,14 @@ else
     {
         if (undo is null || Session.Engine is null) return;
         undoTimer?.Cancel();
-        await Session.Engine.RestoreBookmarkAsync(undo.Value.Parent, undo.Value.Subtree);
+        // A sync in the 6s undo window rekeys every RowId: a stale parent would orphan the restore.
+        var parent = undo.Value.Parent;
+        if (parent is not null && Session.Store is not null && await Session.Store.GetNodeAsync(parent.Value) is null)
+        {
+            parent = null;
+        }
+
+        await Session.Engine.RestoreBookmarkAsync(parent, undo.Value.Subtree);
         undo = null;
         await RefreshAsync();
     }
@@ -407,6 +441,13 @@ else
         var raw = Preferences.Get("last_create_folder", string.Empty);
         if (int.TryParse(raw, out int id))
         {
+            // Stored as NodeId (stable across sync rewrites); legacy RowId still honoured.
+            var byNode = allFolders.FirstOrDefault(f => f.NodeId == id);
+            if (byNode is not null)
+            {
+                return byNode.RowId;
+            }
+
             if (allFolders.Any(f => f.RowId == id))
             {
                 return id;
@@ -455,7 +496,10 @@ else
                 Children = e.IsFolder ? [] : null
             };
             await Session.Engine.AddBookmarkAsync(parent, node);
-            Preferences.Set("last_create_folder", parent?.ToString() ?? string.Empty);
+            var parentNode = parent is not null
+                ? allFolders.FirstOrDefault(f => f.RowId == parent)?.NodeId
+                : null;
+            Preferences.Set("last_create_folder", parentNode?.ToString() ?? string.Empty);
         }
         else
         {
@@ -564,6 +608,33 @@ else
     {
         flashTimer?.Cancel();
         flashRowId = null;
+    }
+
+    /// <summary>Re-resolves the breadcrumb chain by stable NodeId. Folders deleted
+    /// remotely (or rekeyed by a sync rewrite) are dropped with everything above.</summary>
+    private async Task RebaseCrumbsAsync()
+    {
+        if (crumbs.Count == 0 || Session.Store is null)
+        {
+            return;
+        }
+
+        var ids = crumbs.Where(c => c.NodeId is not null).Select(c => c.NodeId!.Value).ToList();
+        var fresh = await Session.Store.GetByNodeIdsAsync(ids);
+        var byNode = fresh.GroupBy(r => r.NodeId!.Value).ToDictionary(g => g.Key, g => g.First());
+        var ordered = crumbs.Reverse().ToList();
+        crumbs.Clear();
+        foreach (var c in ordered)
+        {
+            if (c.NodeId is not null && byNode.TryGetValue(c.NodeId.Value, out var f))
+            {
+                crumbs.Push(f);
+            }
+            else
+            {
+                break;
+            }
+        }
     }
 
     private void TogglePinned() => pinnedOpen = !pinnedOpen;
