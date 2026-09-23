@@ -1,7 +1,10 @@
 @page "/duplicates"
 @using System.Linq
+@using Microsoft.JSInterop
 @inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.ToastState Toast
+@inject IJSRuntime JS
+@implements IDisposable
 
 <PageTitle>Duplicates</PageTitle>
 
@@ -18,16 +21,10 @@ else if (groups.Count == 0)
 }
 else
 {
-    <div class="btn-group mb-2" role="group" aria-label="Grouping">
-        <button class="btn @(byFolder ? "btn-outline-primary" : "btn-primary")" @onclick="() => byFolder = false">By link</button>
-        <button class="btn @(byFolder ? "btn-primary" : "btn-outline-primary")" @onclick="() => byFolder = true">By folder</button>
-    </div>
-    <p class="text-muted"><small>@MarkedCount() marked for deletion.</small></p>
+    <p class="text-muted"><small>@MarkedCount() marked for deletion. Swipe right on a row for full details.</small></p>
 
-    @if (!byFolder)
+    @foreach (var g in groups)
     {
-        @foreach (var g in groups)
-        {
             var markedHere = g.Rows.Count(r => selected.Contains(r.RowId));
             <section class="xbs-dupgroup">
                 <div class="xbs-duptext-sub text-break">@g.Url <span class="badge text-bg-secondary">@g.Rows.Count</span></div>
@@ -51,20 +48,6 @@ else
                 }
             </section>
         }
-    }
-    else
-    {
-        @foreach (var f in folders)
-        {
-            <section class="xbs-dupgroup">
-                <div class="fw-bold mb-1">@(string.IsNullOrEmpty(f.Path) ? "⌂ Top level" : f.Path)</div>
-                @foreach (var r in f.Rows)
-                {
-                    @DupRow(r, r.Title ?? r.Url ?? string.Empty, r.Url ?? string.Empty)
-                }
-            </section>
-        }
-    }
 
     <div class="xbs-dupbar">
         <span>@MarkedCount() marked</span>
@@ -86,16 +69,14 @@ else
 @code {
     private bool ready;
     private List<Core.Data.DuplicateGroup> groups = [];
-    private List<FolderSection> folders = [];
     private Dictionary<int, string> paths = new();
     private Dictionary<int, Core.Data.DuplicateGroup> groupOf = new();
     private readonly HashSet<int> selected = [];
-    private bool byFolder;
+    private readonly HashSet<int> expandedDup = new();
+    private DotNetObjectReference<Duplicates>? dotNet;
     private string? armedGroup;
     private bool armedAll;
     private bool busy;
-
-    private sealed record FolderSection(string Path, List<Core.Data.ItemRow> Rows);
 
     protected override async Task OnInitializedAsync()
     {
@@ -131,12 +112,6 @@ else
                 selected.Add(r.RowId);
             }
         }
-
-        folders = groups.SelectMany(g => g.Rows)
-            .GroupBy(r => paths.GetValueOrDefault(r.RowId, string.Empty))
-            .OrderBy(g => g.Key)
-            .Select(g => new FolderSection(g.Key, g.OrderBy(r => r.SortOrder).ToList()))
-            .ToList();
     }
 
     private string PathOf(int rowId) => paths.GetValueOrDefault(rowId, string.Empty);
@@ -255,12 +230,12 @@ else
     {
         var marked = selected.Contains(r.RowId);
         var locked = IsLocked(r.RowId);
-        <div class="xbs-duprow">
+        <div class="xbs-duprow" data-rowid="@r.RowId">
             <button type="button" class="xbs-dupmark @(marked ? "on" : string.Empty)" disabled="@locked"
                     aria-pressed="@marked.ToString().ToLowerInvariant()"
                     aria-label="@MarkLabel(marked, locked)"
                     @onclick="() => Toggle(r.RowId)" @onclick:stopPropagation="true">
-                <span aria-hidden="true">@(locked ? "🔒" : "✕")</span>
+                <span aria-hidden="true">@(marked ? "✕" : locked ? "🔒" : string.Empty)</span>
             </button>
             <button type="button" class="xbs-duptext" aria-label="Open @(r.Title ?? r.Url)" @onclick="() => Open(r)">
                 <span class="xbs-duptext-title">@line1</span>
@@ -268,7 +243,50 @@ else
                 {
                     <span class="xbs-duptext-sub">@line2</span>
                 }
+                @if (expandedDup.Contains(r.RowId))
+                {
+                    @if (!string.IsNullOrEmpty(r.Description))
+                    {
+                        <span class="xbs-row-desc">@r.Description</span>
+                    }
+                    @if (!string.IsNullOrEmpty(r.Tags))
+                    {
+                        <span class="xbs-row-tags">#@r.Tags.Replace(" ", ", ")</span>
+                    }
+                    @if (string.IsNullOrEmpty(r.Description) && string.IsNullOrEmpty(r.Tags))
+                    {
+                        <span class="xbs-duptext-sub">No details saved.</span>
+                    }
+                }
             </button>
         </div>
     };
+
+    [JSInvokable] public Task OnDupSwipeRight(int rowId)
+    {
+        expandedDup.Add(rowId);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable] public Task OnDupSwipeLeft(int rowId)
+    {
+        if (expandedDup.Remove(rowId))
+        {
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNet = DotNetObjectReference.Create(this);
+            try { await JS.InvokeVoidAsync("xbsGestures.initDup", dotNet); } catch { }
+        }
+    }
+
+    public void Dispose() => dotNet?.Dispose();
 }

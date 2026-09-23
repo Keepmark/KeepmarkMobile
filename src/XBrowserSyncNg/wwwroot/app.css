@@ -684,6 +684,9 @@ h1:focus {
     align-items: center;
     gap: 0.6rem;
     padding: 0.35rem 0;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .xbs-duprow + .xbs-duprow {
