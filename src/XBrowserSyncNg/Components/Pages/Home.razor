@@ -6,6 +6,7 @@
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
 @inject XBrowserSyncNg.Services.ToastState Toast
 @inject XBrowserSyncNg.Services.SharedImportService SharedImport
+@inject NavigationManager Nav
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -630,6 +631,7 @@ else
 
     private void OnSharedArrived() => InvokeAsync(() =>
     {
+        Nav.NavigateTo("/");
         if (OpenSharedIfPending())
         {
             StateHasChanged();
@@ -640,7 +642,7 @@ else
     private bool OpenSharedIfPending()
     {
         var pending = SharedImport.Consume();
-        System.Diagnostics.Debug.WriteLine($"[share] consumed: {(pending is null ? "none" : pending.Url)}, engineNull={Session.Engine is null}");
+        System.Diagnostics.Debug.WriteLine($"[share] consumed: {(pending is null ? "none" : pending.Url)}, engineNull={Session.Engine is null}, page={Nav.Uri}");
         if (pending is null || Session.Engine is null)
         {
             return false;
