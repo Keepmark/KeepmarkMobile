@@ -8,6 +8,7 @@
 window.xbsGestures = (() => {
     let dotNet = null;
     let dupRef = null;
+    const locks = {};
     let listenersAttached = false;
     let state = null;
     let suppressUntil = 0;
@@ -106,10 +107,13 @@ window.xbsGestures = (() => {
             attach();
         },
         closeAll() { /* kept for Blazor callers; no snapped rows anymore */ },
-        lockScroll(on) {
-            const onOff = !!on;
-            document.documentElement.classList.toggle('xbs-locked', onOff);
-            if (document.body) document.body.classList.toggle('xbs-locked', onOff);
+        lockScroll(on, owner) {
+            // Owner-keyed so the nav drawer and modal sheets never fight:
+            // the page stays locked while ANY holder asks for it.
+            locks[owner || 'x'] = !!on;
+            const any = Object.keys(locks).some(k => locks[k]);
+            document.documentElement.classList.toggle('xbs-locked', any);
+            if (document.body) document.body.classList.toggle('xbs-locked', any);
         },
         scrollToRow(rowId) {
             const el = document.querySelector(`.xbs-row[data-rowid="${rowId}"]`);

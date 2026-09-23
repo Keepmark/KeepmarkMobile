@@ -1,5 +1,6 @@
 ﻿@inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.ToastState Toast
+@inject IJSRuntime JS
 @implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-dark">
@@ -9,7 +10,7 @@
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" @onchange="OnNavToggle" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
@@ -93,8 +94,15 @@
 
     private void OnData() => InvokeAsync(async () => { await RefreshDupCountAsync(); StateHasChanged(); });
 
+    // While the drawer is open the page behind must not scroll (same lock as modal sheets).
+    private async Task OnNavToggle(ChangeEventArgs e)
+    {
+        try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", e.Value is true, "nav"); } catch { }
+    }
+
     public void Dispose()
     {
+        _ = JS.InvokeVoidAsync("xbsGestures.lockScroll", false, "nav");
         if (Session.Engine is not null)
         {
             Session.Engine.DataChanged -= OnData;

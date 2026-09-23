@@ -174,7 +174,6 @@ else
     private CancellationTokenSource? debounce;
     private DotNetObjectReference<Home>? dotNet;
     private bool gesturesInit;
-    private bool scrollLocked;
     private SheetTarget? sheetFor;
     private ItemRow? menuFor;
     private bool pinnedOpen = false;
@@ -229,15 +228,11 @@ else
         }
 
         // A modal sheet is open: freeze the page behind it so no scroll
-        // leaks through the backdrop (touch or wheel).
+        // leaks through the backdrop (touch or wheel). Owner-keyed with the
+        // nav drawer: whoever is still open keeps the lock.
         if (ready)
         {
-            var modalOpen = menuFor is not null || sheetFor is not null;
-            if (modalOpen != scrollLocked)
-            {
-                scrollLocked = modalOpen;
-                try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", modalOpen); } catch { }
-            }
+            try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", menuFor is not null || sheetFor is not null, "sheet"); } catch { }
         }
     }
 
@@ -814,11 +809,7 @@ else
     public void Dispose()
     {
         SharedImport.Arrived -= OnSharedArrived;
-        if (scrollLocked)
-        {
-            scrollLocked = false;
-            _ = JS.InvokeVoidAsync("xbsGestures.lockScroll", false);
-        }
+        _ = JS.InvokeVoidAsync("xbsGestures.lockScroll", false, "sheet");
         if (Session.Engine is not null)
         {
             Session.Engine.StatusChanged -= OnStatus;

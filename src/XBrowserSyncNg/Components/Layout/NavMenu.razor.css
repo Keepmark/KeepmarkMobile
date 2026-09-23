@@ -137,6 +137,9 @@
     background-color: #0A323D;
     overflow-y: auto;
     padding: 0 1rem max(1rem, env(safe-area-inset-bottom, 0px));
+    /* The drawer scrolls internally; the page behind stays frozen. */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
 }
 
 @media (min-width: 641px) {

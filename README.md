@@ -1,7 +1,7 @@
 # XBrowserSyncNg — MAUI Blazor Hybrid (Android only)
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.67 (68)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.68 (69)**,
 app id `com.keepmark.legacy.xbsyncng`, display name `xBrowserSyncNg`.
 
 `XBrowserSyncApp/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -104,6 +104,9 @@ M in `src/XBrowserSyncNg/XBrowserSyncNg.csproj`; CSS/JS releases also bump
   `xbs-locked` on html/body; backdrop has `touch-action: none`, sheet
   `touch-action: pan-y`, both `overscroll-behavior: contain`. Home syncs the
   lock in `OnAfterRenderAsync` and releases it in `Dispose`.
+  The nav drawer (`NavMenu` checkbox `@onchange`) uses the same lock,
+  owner-keyed (`"sheet"` / `"nav"`): the page stays locked while ANY holder
+  asks for it.
 - Share consume: peek-before-consume in `Home.OpenSharedIfPending` via
   `ShareIntake` choke point (limbo for cold start).
 - Auto-mode push runs fire-and-forget; UI closes sheets right after local write.
