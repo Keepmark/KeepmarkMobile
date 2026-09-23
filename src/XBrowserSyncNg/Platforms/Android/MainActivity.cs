@@ -100,6 +100,17 @@ public class MainActivity : MauiAppCompatActivity
         }
 
         share.Publish(text, subject);
+
+        // User-visible receipt: also bisects intent vs. UI issues in the field.
+        try
+        {
+            var toast = services?.GetService(typeof(Services.ToastState)) as Services.ToastState;
+            toast?.ShowAsync("Link received — complete the bookmark");
+        }
+        catch
+        {
+        }
+
         return true;
     }
 
