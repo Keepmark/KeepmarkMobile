@@ -6,7 +6,7 @@
     </button>
     @foreach (var root in Roots)
     {
-        <TreeNode Node="root" Level="0" />
+        @TreeNode(root, 0)
     }
 </div>
 
