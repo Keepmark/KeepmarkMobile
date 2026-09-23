@@ -1,9 +1,0 @@
-<!-- Keepmark mark for in-app use (transparent background). -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="20 14 68 82">
-  <g>
-    <polygon points="54,20 84,38 54,56 24,38" fill="#71D2E2"/>
-    <polygon points="24,38 54,56 54,76 24,58" fill="#2E9E7B"/>
-    <polygon points="54,56 84,38 84,58 54,76" fill="#267D91"/>
-    <polygon points="47,71 61,71 61,92 54,87 47,92" fill="#71D2E2"/>
-  </g>
-</svg>
