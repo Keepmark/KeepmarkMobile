@@ -28,7 +28,7 @@ else
     {
         @foreach (var g in groups)
         {
-            var markedHere = g.Rows.Count(selected.Contains);
+            var markedHere = g.Rows.Count(r => selected.Contains(r.RowId));
             <section class="xbs-dupgroup">
                 <div class="xbs-duptext-sub text-break">@g.Url <span class="badge text-bg-secondary">@g.Rows.Count</span></div>
                 @foreach (var r in g.Rows)
