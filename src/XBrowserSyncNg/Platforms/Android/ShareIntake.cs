@@ -77,7 +77,7 @@ internal static class ShareIntake
             var act = Platform.CurrentActivity;
             var pending = share.Peek();
             act?.RunOnUiThread(() => global::Android.Widget.Toast.MakeText(act,
-                $"share ok: {(pending is null ? "no-url" : pending.Url)}", global::global::Android.Widget.ToastLength.Short)?.Show());
+                $"share ok: {(pending is null ? "no-url" : pending.Url)}", global::Android.Widget.ToastLength.Short)?.Show());
         }
         catch
         {
