@@ -441,11 +441,24 @@ else
     private async Task DeleteRow(ItemRow? row)
     {
         menuFor = null;
+        if (row is null)
+        {
+            return;
+        }
+
+        // Optimistic UI: vanish the row (and close the menu) immediately,
+        // reconcile with the store right after.
+        rows.RemoveAll(r => r.RowId == row.RowId);
+        pinnedRows.RemoveAll(r => r.RowId == row.RowId);
+        expandedRows.Remove(row.RowId);
         StateHasChanged();
-        // Paint the menu close first: the list update follows on local data.
         await Task.Delay(1);
         _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
-        if (row is null || Session.Engine is null) return;
+        if (Session.Engine is null)
+        {
+            await RefreshAsync();
+            return;
+        }
         undoTimer?.Cancel();
         undo = await Session.Engine.DeleteBookmarkAsync(row.RowId);
         await RefreshAsync();

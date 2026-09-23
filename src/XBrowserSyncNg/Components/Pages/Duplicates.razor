@@ -167,6 +167,16 @@ else
                 .Where(r => selected.Contains(r.RowId) &&
                             g.Rows.Any(o => o.RowId != r.RowId && !selected.Contains(o.RowId)))
                 .ToList();
+            // Optimistic: hide them now, reconcile with the store after.
+            foreach (var r in targets)
+            {
+                g.Rows.Remove(r);
+                selected.Remove(r.RowId);
+            }
+
+            armedGroup = null;
+            StateHasChanged();
+            await Task.Delay(1);
             foreach (var r in targets)
             {
                 try
@@ -198,12 +208,34 @@ else
         try
         {
             var count = 0;
+            var byGroup = new List<(Core.Data.DuplicateGroup Group, List<Core.Data.ItemRow> Targets)>();
             foreach (var g in groups)
             {
                 var targets = g.Rows
                     .Where(r => selected.Contains(r.RowId) &&
                                 g.Rows.Any(o => o.RowId != r.RowId && !selected.Contains(o.RowId)))
                     .ToList();
+                if (targets.Count > 0)
+                {
+                    byGroup.Add((g, targets));
+                }
+            }
+
+            // Optimistic: hide them now, reconcile with the store after.
+            foreach (var (grp, targets) in byGroup)
+            {
+                foreach (var r in targets)
+                {
+                    grp.Rows.Remove(r);
+                    selected.Remove(r.RowId);
+                }
+            }
+
+            armedAll = false;
+            StateHasChanged();
+            await Task.Delay(1);
+            foreach (var (_, targets) in byGroup)
+            {
                 foreach (var r in targets)
                 {
                     try
