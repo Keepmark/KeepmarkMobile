@@ -52,6 +52,8 @@ public class MainActivity : MauiAppCompatActivity
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine(
+                $"[share] intent: action={intent?.Action} type={intent?.Type} hasText={intent?.HasExtra(Intent.ExtraText)}");
             // Field diagnostic: native toast proves the intent reached us.
             try
             {
@@ -66,6 +68,7 @@ public class MainActivity : MauiAppCompatActivity
             if (intent?.Action != Intent.ActionSend ||
                 !string.Equals(intent.Type, "text/plain", StringComparison.OrdinalIgnoreCase))
             {
+                System.Diagnostics.Debug.WriteLine("[share] intent ignored (not SEND/text)");
                 return;
             }
 
