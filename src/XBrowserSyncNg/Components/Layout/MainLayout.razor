@@ -5,6 +5,7 @@
 @inject XBrowserSyncNg.Services.IAppLockService AppLock
 @inject XBrowserSyncNg.Services.ToastState Toast
 @inject XBrowserSyncNg.Services.SharedImportService SharedImport
+@inject XBrowserSyncNg.Services.SecureCredentialStore Creds
 @inject NavigationManager Nav
 @implements IDisposable
 
@@ -72,6 +73,42 @@
             Session.Engine.StatusChanged += OnEngineStatus;
             syncing = Session.Engine.Status == Core.Sync.SyncStatus.Syncing;
             await InvokeAsync(StateHasChanged);
+        }
+
+        await RedirectFirstRunAsync();
+    }
+
+    /// <summary>Absolute first launch (no credentials, empty library): start on Connect.</summary>
+    private async Task RedirectFirstRunAsync()
+    {
+        try
+        {
+            if (Session.Store is null)
+            {
+                return;
+            }
+
+            if (await Creds.GetAsync().ConfigureAwait(false) is not null)
+            {
+                return;
+            }
+
+            var stats = await Session.Store.GetStatsAsync().ConfigureAwait(false);
+            if (stats.Folders + stats.Bookmarks + stats.Separators > 0)
+            {
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(Nav.ToBaseRelativePath(Nav.Uri).Trim('/')))
+            {
+                return;
+            }
+
+            await InvokeAsync(() => Nav.NavigateTo("/connect"));
+        }
+        catch
+        {
+            // Never break startup for a convenience redirect.
         }
     }
 

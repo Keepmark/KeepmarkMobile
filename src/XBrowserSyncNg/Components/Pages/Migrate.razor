@@ -49,7 +49,7 @@ else
         <div class="mb-3">
             <label class="form-label">Target service URL</label>
             <input class="form-control" @bind="targetUrl" inputmode="url" />
-            <div class="form-text">The service that will receive your bookmarks. Check verifies it answers with a compatible API version.</div>
+            <div class="form-text">The service that will receive your bookmarks. Check verifies it answers with a compatible API version. Your current link (if any) keeps working untouched until the migration completes.</div>
             <div class="mt-2 d-flex gap-2">
                 <button class="btn btn-secondary" @onclick="CheckService" disabled="@busy">Check service</button>
                 <button class="btn btn-primary" @onclick="() => step = 2" disabled="@(busy || !serviceOk)">Continue</button>

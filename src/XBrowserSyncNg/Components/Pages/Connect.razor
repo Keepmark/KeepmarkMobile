@@ -20,6 +20,15 @@ else if (linked)
 }
 else
 {
+    <div class="alert alert-info">
+        <h4>How your bookmarks get here</h4>
+        <ul class="mb-1">
+            <li><strong>Open an existing sync</strong> below — with an empty library this simply downloads everything from the server.</li>
+            <li><strong>Create a new sync</strong> — start empty, or upload bookmarks you already have.</li>
+            <li><strong>Restore an encrypted backup file</strong> — in the <a href="migrate">Migrate</a> section, no connection needed.</li>
+        </ul>
+        <small>Sync exchanges the whole collection at once (never single items). If both sides change independently, the app reports a conflict instead of merging silently — and every overwrite is safety-backed-up first.</small>
+    </div>
     <div class="mb-3">
         <label class="form-label">Service URL</label>
         <input class="form-control" @bind="serviceUrl" inputmode="url" />
