@@ -22,6 +22,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<SecureCredentialStore>();
         builder.Services.AddSingleton<PinnedStore>();
         builder.Services.AddSingleton<ToastState>();
+        builder.Services.AddSingleton<SharedImportService>();
         builder.Services.AddSingleton<AppLockState>();
         builder.Services.AddSingleton<XbsSession>();
 #if ANDROID

@@ -5,6 +5,7 @@
 @inject XBrowserSyncNg.Services.PinnedStore Pins
 @inject XBrowserSyncNg.Services.XbsSettings AppSettings
 @inject XBrowserSyncNg.Services.ToastState Toast
+@inject XBrowserSyncNg.Services.SharedImportService SharedImport
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -193,6 +194,8 @@ else
         sortMode = AppSettings.ListSort;
         await RefreshAsync();
         ready = true;
+        SharedImport.Arrived += OnSharedArrived;
+        OpenSharedIfPending();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -605,8 +608,30 @@ else
         });
     }
 
+    private void OnSharedArrived() => InvokeAsync(() =>
+    {
+        if (OpenSharedIfPending())
+        {
+            StateHasChanged();
+        }
+    });
+
+    /// <summary>Opens the add sheet prefilled from an incoming share. Returns true if one was pending.</summary>
+    private bool OpenSharedIfPending()
+    {
+        var pending = SharedImport.Consume();
+        if (pending is null || Session.Engine is null)
+        {
+            return false;
+        }
+
+        sheetFor = new SheetTarget(null, CurrentParent, pending.Url, pending.Title);
+        return true;
+    }
+
     public void Dispose()
     {
+        SharedImport.Arrived -= OnSharedArrived;
         if (Session.Engine is not null)
         {
             Session.Engine.StatusChanged -= OnStatus;
