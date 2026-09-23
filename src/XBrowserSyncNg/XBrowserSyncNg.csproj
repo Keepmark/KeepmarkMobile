@@ -35,8 +35,8 @@
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.40</ApplicationDisplayVersion>
-        <ApplicationVersion>41</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.41</ApplicationDisplayVersion>
+        <ApplicationVersion>42</ApplicationVersion>
 
         <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
         <WindowsPackageType>None</WindowsPackageType>
@@ -50,7 +50,7 @@
 
     <ItemGroup>
         <!-- App Icon -->
-        <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#0A323D" />
+        <MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#FFFFFF" />
 
         <!-- Splash Screen -->
         <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0A323D" BaseSize="128,128" />
