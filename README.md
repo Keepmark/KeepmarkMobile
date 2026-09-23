@@ -132,3 +132,9 @@ M in `src/XBrowserSyncNg/XBrowserSyncNg.csproj`; CSS/JS releases also bump
 2. Set env (above), `adb connect`, `dotnet test`.
 3. Deploy `-t:Run`, verify `versionName`, screenshot.
 4. Deploy restarts the app → device shows lock screen if auto-lock on; unlock manually.
+
+## License
+
+GNU GPL v3 — see `LICENSE.md`. Interop logic derived from the official
+xBrowserSync `api` + `app` (also GPLv3) by the xBrowserSync team.
+This is an independent client, not affiliated with xBrowserSync.
