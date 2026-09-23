@@ -138,3 +138,14 @@ M in `src/XBrowserSyncNg/XBrowserSyncNg.csproj`; CSS/JS releases also bump
 GNU GPL v3 — see `LICENSE.md`. Interop logic derived from the official
 xBrowserSync `api` + `app` (also GPLv3) by the xBrowserSync team.
 This is an independent client, not affiliated with xBrowserSync.
+
+## Compatibility
+
+- Server: any xBrowserSync API v1.1.13 service (official
+  `https://api.xbrowsersync.org`, self-hosted or community), min API v1.1.9.
+  `Accept-Version` header pinned to v1.1.13 (satisfies the server `^1.1.3` route).
+- Sync format v1.8.0 (≥ latest known official client): syncs open both ways.
+- Crypto (PBKDF2-SHA256/250k + AES-128-GCM-16B-IV + lzutf8) verified
+  byte-for-byte against Node in both directions — blobs are interchangeable
+  with the official clients.
+- Same guarantees: end-to-end encrypted, operators can't read data.
