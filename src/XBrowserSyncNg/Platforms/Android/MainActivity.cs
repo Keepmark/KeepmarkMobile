@@ -52,6 +52,17 @@ public class MainActivity : MauiAppCompatActivity
     {
         try
         {
+            // Field diagnostic: native toast proves the intent reached us.
+            try
+            {
+                var act = Platform.CurrentActivity;
+                act?.RunOnUiThread(() => Android.Widget.Toast.MakeText(act,
+                    $"share: {intent?.Action} [{intent?.Type}]", Android.Widget.ToastLength.Short)?.Show());
+            }
+            catch
+            {
+            }
+
             if (intent?.Action != Intent.ActionSend || intent.Type != "text/plain")
             {
                 return;
