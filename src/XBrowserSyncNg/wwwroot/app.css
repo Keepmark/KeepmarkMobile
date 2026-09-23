@@ -668,3 +668,49 @@ h1:focus {
 [data-bs-theme="dark"] .xbs-pinned-box {
     background: rgba(227, 184, 8, 0.08);
 }
+
+/* Duplicates cleanup page. */
+.xbs-duprow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.5rem;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    background: var(--bs-body-bg, #fff);
+    margin-bottom: 0.4rem;
+}
+
+.xbs-dupcheck {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex-shrink: 0;
+}
+
+.xbs-duptext {
+    min-width: 0;
+    text-align: left;
+    border: none;
+    background: transparent;
+    color: inherit;
+    padding: 0.25rem 0;
+    overflow-wrap: anywhere;
+}
+
+.xbs-dupbar {
+    position: sticky;
+    bottom: max(3.75rem, calc(env(safe-area-inset-bottom, 0px) + 3.75rem));
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    margin-top: 0.5rem;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.12);
+}

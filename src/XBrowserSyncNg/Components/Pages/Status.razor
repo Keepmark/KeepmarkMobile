@@ -35,7 +35,12 @@ else
     <h3>Content</h3>
     <ul>
         <li>Folders: @stats?.Folders · Bookmarks: @stats?.Bookmarks · Separators: @stats?.Separators</li>
-        <li>Distinct tags: @stats?.DistinctTags · Max depth: @stats?.MaxDepth · Duplicate URLs: @stats?.DuplicateUrls</li>
+        <li>Distinct tags: @stats?.DistinctTags · Max depth: @stats?.MaxDepth · Duplicate URLs: @stats?.DuplicateUrls
+            @if ((stats?.DuplicateUrls ?? 0) > 0)
+            {
+                <text> <a href="duplicates">Resolve →</a></text>
+            }
+        </li>
     </ul>
 
     <h3>App</h3>

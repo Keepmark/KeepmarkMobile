@@ -1,5 +1,6 @@
 ﻿@inject XBrowserSyncNg.Services.XbsSession Session
 @inject XBrowserSyncNg.Services.ToastState Toast
+@implements IDisposable
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
@@ -32,6 +33,11 @@
             </NavLink>
         </div>
         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="duplicates">
+                <span aria-hidden="true" class="nav-sync-glyph">⧉</span> Duplicates @if (dupCount > 0) { <span class="badge text-bg-warning ms-1">@dupCount</span> }
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
             <NavLink class="nav-link" href="status">
                 <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Status
             </NavLink>
@@ -50,6 +56,50 @@
 </div>
 
 @code {
+    private int dupCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Engine is not null)
+        {
+            Session.Engine.DataChanged += OnData;
+        }
+
+        await RefreshDupCountAsync();
+    }
+
+    private async Task RefreshDupCountAsync()
+    {
+        if (Session.Store is null)
+        {
+            return;
+        }
+
+        try
+        {
+            dupCount = (await Session.Store.GetDuplicateUrlsAsync()).Sum(g => g.Rows.Count - 1);
+        }
+        catch
+        {
+            dupCount = 0;
+        }
+    }
+
+    private void OnData() => InvokeAsync(async () => { await RefreshDupCountAsync(); StateHasChanged(); });
+
+    public void Dispose()
+    {
+        if (Session.Engine is not null)
+        {
+            Session.Engine.DataChanged -= OnData;
+        }
+    }
+
     private async Task SyncNow()
     {
         if (Session.Engine is null)

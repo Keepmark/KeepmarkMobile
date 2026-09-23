@@ -1,0 +1,205 @@
+@page "/duplicates"
+@inject XBrowserSyncNg.Services.XbsSession Session
+@inject XBrowserSyncNg.Services.ToastState Toast
+
+<PageTitle>Duplicates</PageTitle>
+
+<h1>Duplicate bookmarks</h1>
+<p class="text-muted">Same URL saved more than once. Tick what to remove, then delete once — there is no undo here, a safety backup is taken automatically on the next sync only for overwritten sides, so review first.</p>
+
+@if (!ready)
+{
+    <p><em>Loading…</em></p>
+}
+else if (groups.Count == 0)
+{
+    <div class="alert alert-success">No duplicates. Your library is clean.</div>
+}
+else
+{
+    <div class="btn-group mb-3" role="group" aria-label="Grouping">
+        <button class="btn @(byFolder ? "btn-outline-primary" : "btn-primary")" @onclick="() => byFolder = false">By link</button>
+        <button class="btn @(byFolder ? "btn-primary" : "btn-outline-primary")" @onclick="() => byFolder = true">By folder</button>
+    </div>
+
+    @if (!byFolder)
+    {
+        @foreach (var g in groups)
+        {
+            <section class="mb-3">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <h4 class="mb-0 text-break">@g.Url <small class="text-muted">(@g.Rows.Count)</small></h4>
+                    <button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="() => KeepFirst(g)">Keep first</button>
+                </div>
+                @foreach (var r in g.Rows)
+                {
+                    @DupRow(r)
+                }
+            </section>
+        }
+    }
+    else
+    {
+        @foreach (var f in folders)
+        {
+            <section class="mb-3">
+                <div class="d-flex justify-content-between align-items-center gap-2">
+                    <h4 class="mb-0">@(string.IsNullOrEmpty(f.Path) ? "⌂ Top level" : f.Path)</h4>
+                    <button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="() => SelectFolder(f)">Select all</button>
+                </div>
+                @foreach (var r in f.Rows)
+                {
+                    @DupRow(r)
+                }
+            </section>
+        }
+    }
+
+    <div class="xbs-dupbar">
+        <span>@selected.Count selected</span>
+        @if (!armed)
+        {
+            <button class="btn btn-danger" disabled="@(selected.Count == 0)" @onclick="() => armed = true">Delete selected…</button>
+        }
+        else
+        {
+            <span><strong>Delete @selected.Count bookmark(s)?</strong></span>
+            <div class="d-flex gap-2">
+                <button class="btn btn-danger" @onclick="ExecuteDelete">Yes, delete</button>
+                <button class="btn btn-secondary" @onclick="() => armed = false">Cancel</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool ready;
+    private List<Core.Data.DuplicateGroup> groups = [];
+    private List<FolderSection> folders = [];
+    private Dictionary<int, string> paths = new();
+    private readonly HashSet<int> selected = [];
+    private bool byFolder;
+    private bool armed;
+
+    private sealed record FolderSection(string Path, List<Core.Data.ItemRow> Rows);
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        await ReloadAsync();
+        ready = true;
+    }
+
+    private async Task ReloadAsync()
+    {
+        selected.Clear();
+        armed = false;
+        if (Session.Store is null)
+        {
+            return;
+        }
+
+        groups = await Session.Store.GetDuplicateUrlsAsync();
+        paths = await Session.Store.GetFolderPathsAsync();
+        // Default: keep the first occurrence of each link, select the rest.
+        foreach (var g in groups)
+        {
+            foreach (var r in g.Rows.Skip(1))
+            {
+                selected.Add(r.RowId);
+            }
+        }
+
+        folders = groups.SelectMany(g => g.Rows)
+            .GroupBy(r => paths.GetValueOrDefault(r.RowId, string.Empty))
+            .OrderBy(g => g.Key)
+            .Select(g => new FolderSection(g.Key, g.OrderBy(r => r.SortOrder).ToList()))
+            .ToList();
+    }
+
+    private string PathOf(int rowId) => paths.GetValueOrDefault(rowId, string.Empty);
+
+    private void KeepFirst(Core.Data.DuplicateGroup g)
+    {
+        foreach (var r in g.Rows)
+        {
+            selected.Remove(r.RowId);
+        }
+
+        foreach (var r in g.Rows.Skip(1))
+        {
+            selected.Add(r.RowId);
+        }
+    }
+
+    private void SelectFolder(FolderSection f)
+    {
+        foreach (var r in f.Rows)
+        {
+            selected.Add(r.RowId);
+        }
+    }
+
+    private void Toggle(int rowId)
+    {
+        if (!selected.Remove(rowId))
+        {
+            selected.Add(rowId);
+        }
+
+        armed = false;
+    }
+
+    private async Task Open(Core.Data.ItemRow r)
+    {
+        if (!string.IsNullOrWhiteSpace(r.Url))
+        {
+            try { await Launcher.OpenAsync(r.Url); } catch { }
+        }
+    }
+
+    private async Task ExecuteDelete()
+    {
+        if (Session.Engine is null || selected.Count == 0)
+        {
+            return;
+        }
+
+        var count = selected.Count;
+        foreach (var id in selected.ToList())
+        {
+            try
+            {
+                await Session.Engine.DeleteBookmarkAsync(id);
+            }
+            catch
+            {
+                // Keep going: remaining ones are retried on the next pass.
+            }
+        }
+
+        await ReloadAsync();
+        await Toast.ShowAsync($"Deleted {count} duplicate(s)");
+    }
+
+    private RenderFragment DupRow(Core.Data.ItemRow r) => __builder =>
+    {
+        <div class="xbs-duprow">
+            <input type="checkbox" class="form-check-input xbs-dupcheck" checked="@selected.Contains(r.RowId)"
+                   aria-label="Select @(r.Title ?? r.Url)" @onchange="() => Toggle(r.RowId)" />
+            <button type="button" class="xbs-duptext" @onclick="() => Toggle(r.RowId)">
+                <span class="xbs-row-title">@(r.Title ?? r.Url)</span><br />
+                <span class="xbs-row-sub">@r.Url</span><br />
+                @if (!string.IsNullOrEmpty(PathOf(r.RowId)))
+                {
+                    <span class="xbs-row-path"><span aria-hidden="true">📁</span> @PathOf(r.RowId)</span>
+                }
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => Open(r)">Open</button>
+        </div>
+    };
+}

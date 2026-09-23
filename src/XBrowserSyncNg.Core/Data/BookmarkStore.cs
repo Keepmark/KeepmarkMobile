@@ -46,6 +46,8 @@ public sealed record ContentStats(
     int Folders, int Bookmarks, int Separators, int DistinctTags,
     int MaxDepth, int DuplicateUrls);
 
+public sealed record DuplicateGroup(string Url, List<ItemRow> Rows);
+
 /// <summary>
 /// Encrypted local mirror (SQLCipher) + FTS5 search index.
 /// The encryption key (64 hex chars) is supplied by the platform layer
@@ -242,6 +244,33 @@ public sealed class BookmarkStore : IAsyncDisposable
         return rows.Select((r, i) => new SearchHit(
             r.RowId, r.NodeId, r.Title, r.Url, r.Description, r.Tags?.Replace($"{TagSep}", ", "),
             r.IsFolder, paths.GetValueOrDefault(r.RowId, string.Empty), i)).ToList();
+    }
+
+    /// <summary>Bookmark URLs appearing more than once (separators excluded),
+    /// each with its rows in display order. For the duplicates cleanup page.</summary>
+    public async Task<List<DuplicateGroup>> GetDuplicateUrlsAsync()
+    {
+        var dup = await Db.QueryAsync<DupUrlRow>(
+            "SELECT Url AS Value FROM Items WHERE Url IS NOT NULL AND Url != ? GROUP BY Url HAVING COUNT(*) > 1",
+            Core.XbsConstants.SeparatorUrl).ConfigureAwait(false);
+        var urls = dup.Select(d => d.Value).Where(u => u is not null).Cast<string>().ToList();
+        if (urls.Count == 0)
+        {
+            return [];
+        }
+
+        var placeholders = string.Join(",", Enumerable.Repeat("?", urls.Count));
+        var rows = await Db.QueryAsync<ItemRow>(
+            $"SELECT * FROM Items WHERE Url IN ({placeholders}) ORDER BY Url, SortOrder",
+            urls.Cast<object>().ToArray()).ConfigureAwait(false);
+        return rows.GroupBy(r => r.Url!)
+            .Select(g => new DuplicateGroup(g.Key, g.ToList()))
+            .ToList();
+    }
+
+    private sealed class DupUrlRow
+    {
+        public string? Value { get; set; }
     }
 
     public async Task<List<ItemRow>> GetChildrenAsync(int? parentRowId) =>
