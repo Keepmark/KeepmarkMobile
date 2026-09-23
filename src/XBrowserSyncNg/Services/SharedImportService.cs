@@ -7,10 +7,19 @@ namespace XBrowserSyncNg.Services;
 
 public sealed partial class SharedImportService
 {
+    /// <summary>Latest instance (set by DI ctor). Lets the Activity publish
+    /// without a service locator, which is unreliable during cold start.</summary>
+    public static SharedImportService? Current { get; private set; }
+
     private readonly object _gate = new();
     private PendingShare? _pending;
 
     public event Action? Arrived;
+
+    public SharedImportService()
+    {
+        Current = this;
+    }
 
     public void Publish(string? text, string? subject)
     {

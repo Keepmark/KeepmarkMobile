@@ -104,8 +104,13 @@ public class MainActivity : MauiAppCompatActivity
 
     private static bool PublishShare(string? text, string? subject)
     {
-        var services = IPlatformApplication.Current?.Services;
-        var share = services?.GetService(typeof(Services.SharedImportService)) as Services.SharedImportService;
+        var share = Services.SharedImportService.Current;
+        if (share is null)
+        {
+            var services = IPlatformApplication.Current?.Services;
+            share = services?.GetService(typeof(Services.SharedImportService)) as Services.SharedImportService;
+        }
+
         if (share is null)
         {
             return false;
@@ -113,9 +118,22 @@ public class MainActivity : MauiAppCompatActivity
 
         share.Publish(text, subject);
 
-        // User-visible receipt: also bisects intent vs. UI issues in the field.
+        // Field diagnostic: shows what was extracted (or not).
         try
         {
+            var act = Platform.CurrentActivity;
+            var pending = share.Peek();
+            act?.RunOnUiThread(() => Android.Widget.Toast.MakeText(act,
+                $"share ok: {(pending is null ? "no-url" : pending.Url)}", Android.Widget.ToastLength.Short)?.Show());
+        }
+        catch
+        {
+        }
+
+        // User-visible receipt (Blazor toast).
+        try
+        {
+            var services = IPlatformApplication.Current?.Services;
             var toast = services?.GetService(typeof(Services.ToastState)) as Services.ToastState;
             toast?.ShowAsync("Link received — complete the bookmark");
         }
