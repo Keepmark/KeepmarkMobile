@@ -219,14 +219,30 @@ public sealed class SyncEngine(
         }
     }
 
-    /// <summary>Marks the mirror dirty after a local edit. Pushes immediately in Auto mode.</summary>
+    /// <summary>Marks the mirror dirty after a local edit. In Auto mode the push
+    /// runs in the background so the UI never waits for the network: the edit
+    /// is already durable locally when this returns. Failures surface via
+    /// Status (Offline/Error), never as exceptions to the caller.</summary>
     public async Task NotifyLocalEditAsync(CancellationToken ct = default)
     {
         PendingEdits++;
         await store.SetMetaAsync(BookmarkStore.MetaDirty, "1").ConfigureAwait(false);
         if (Mode == SyncMode.Auto)
         {
-            await PushAsync(ct: ct).ConfigureAwait(false);
+            // Fire-and-forget: overlapping pushes serialize on _gate.
+            _ = PushInBackgroundAsync();
+        }
+    }
+
+    private async Task PushInBackgroundAsync()
+    {
+        try
+        {
+            await PushAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            log.Warn("sync", $"Background push failed: {ex.Message}");
         }
     }
 
