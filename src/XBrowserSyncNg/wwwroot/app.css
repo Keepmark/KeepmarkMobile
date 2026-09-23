@@ -690,15 +690,28 @@ h1:focus {
     border-top: 1px dashed var(--bs-border-color, #dee2e6);
 }
 
-.xbs-dupstar {
+/* Red ✕ delete markers. The always-kept copy shows a lock instead. */
+.xbs-dupmark {
     min-width: 44px;
     min-height: 44px;
-    border: none;
+    border: 2px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
     background: transparent;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
+    font-weight: 700;
     line-height: 1;
-    color: #b58900;
+    color: var(--bs-secondary-color, #6c757d);
     flex-shrink: 0;
+}
+
+.xbs-dupmark.on {
+    border-color: #b32121;
+    background: #b32121;
+    color: #fff;
+}
+
+.xbs-dupmark:disabled {
+    opacity: 0.45;
 }
 
 .xbs-duptext {
