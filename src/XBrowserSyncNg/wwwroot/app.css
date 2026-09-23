@@ -688,6 +688,11 @@ h1:focus {
     flex-shrink: 0;
 }
 
+.xbs-dupkept {
+    font-size: 0.85rem;
+    justify-self: start;
+}
+
 .xbs-duptext {
     min-width: 0;
     text-align: left;

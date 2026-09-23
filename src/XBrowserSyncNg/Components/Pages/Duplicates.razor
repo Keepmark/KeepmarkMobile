@@ -27,11 +27,11 @@ else
         @foreach (var g in groups)
         {
             <section class="mb-3">
-                <div class="d-flex justify-content-between align-items-center gap-2">
-                    <h4 class="mb-0 text-break">@g.Url <small class="text-muted">(@g.Rows.Count)</small></h4>
-                    <button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="() => KeepFirst(g)">Keep first</button>
+                <h4 class="mb-1 text-break">@g.Url <small class="text-muted">(@g.Rows.Count)</small></h4>
+                <p class="text-muted mb-1"><small>Kept: @(KeptTitle(g)) — one copy always stays.</small></p>
+                <div class="mb-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => KeepFirst(g)">Keep first</button>
                 </div>
-                <p class="text-muted mb-1"><small>Kept: @(KeptTitle(g)) — at least one copy is always kept.</small></p>
                 @foreach (var r in g.Rows)
                 {
                     @DupRow(r)
@@ -44,9 +44,9 @@ else
         @foreach (var f in folders)
         {
             <section class="mb-3">
-                <div class="d-flex justify-content-between align-items-center gap-2">
-                    <h4 class="mb-0">@(string.IsNullOrEmpty(f.Path) ? "⌂ Top level" : f.Path)</h4>
-                    <button class="btn btn-sm btn-outline-secondary flex-shrink-0" @onclick="() => SelectFolder(f)">Select all</button>
+                <h4 class="mb-1">@(string.IsNullOrEmpty(f.Path) ? "⌂ Top level" : f.Path)</h4>
+                <div class="mb-2">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => SelectFolder(f)">Select all here</button>
                 </div>
                 @foreach (var r in f.Rows)
                 {
@@ -58,18 +58,19 @@ else
 
     <div class="xbs-dupbar">
         <span>@selected.Count selected</span>
-        @if (!armed)
-        {
-            <button class="btn btn-danger" disabled="@(selected.Count == 0)" @onclick="() => armed = true">Delete selected…</button>
-        }
-        else
-        {
-            <span><strong>Delete @selected.Count bookmark(s)?</strong></span>
-            <div class="d-flex gap-2">
-                <button class="btn btn-danger" @onclick="ExecuteDelete">Yes, delete</button>
+        <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary" @onclick="SelectAll">Select all</button>
+            <button class="btn btn-outline-secondary" disabled="@(selected.Count == 0)" @onclick="ClearAll">Clear</button>
+            @if (!armed)
+            {
+                <button class="btn btn-danger" disabled="@(selected.Count == 0)" @onclick="() => armed = true">Delete…</button>
+            }
+            else
+            {
+                <button class="btn btn-danger" @onclick="ExecuteDelete">Confirm delete @selected.Count</button>
                 <button class="btn btn-secondary" @onclick="() => armed = false">Cancel</button>
-            </div>
-        }
+            }
+        </div>
     </div>
 }
 
@@ -136,6 +137,33 @@ else
     private bool WouldWipeGroup(int rowId) =>
         groupOf.TryGetValue(rowId, out var g) && g.Rows.All(r => r.RowId == rowId || selected.Contains(r.RowId));
 
+    /// <summary>Structural enforcement: the last remaining copy renders a Kept badge
+    /// instead of a checkbox, so it cannot be ticked at all.</summary>
+    private bool IsKeeper(int rowId) =>
+        !selected.Contains(rowId) &&
+        groupOf.TryGetValue(rowId, out var g) &&
+        g.Rows.Count(r => !selected.Contains(r.RowId)) == 1;
+
+    private void SelectAll()
+    {
+        selected.Clear();
+        foreach (var g in groups)
+        {
+            foreach (var r in g.Rows.Skip(1))
+            {
+                selected.Add(r.RowId);
+            }
+        }
+
+        armed = false;
+    }
+
+    private void ClearAll()
+    {
+        selected.Clear();
+        armed = false;
+    }
+
     private void KeepFirst(Core.Data.DuplicateGroup g)
     {
         foreach (var r in g.Rows)
@@ -163,6 +191,12 @@ else
 
     private async Task Toggle(int rowId)
     {
+        if (IsKeeper(rowId))
+        {
+            await Toast.ShowAsync("This copy is kept — untick another copy to keep that one instead");
+            return;
+        }
+
         if (selected.Contains(rowId))
         {
             selected.Remove(rowId);
@@ -223,8 +257,15 @@ else
     private RenderFragment DupRow(Core.Data.ItemRow r) => __builder =>
     {
         <div class="xbs-duprow">
-            <input type="checkbox" class="form-check-input xbs-dupcheck" checked="@selected.Contains(r.RowId)"
-                   aria-label="Select @(r.Title ?? r.Url)" @onchange="() => Toggle(r.RowId)" />
+            @if (IsKeeper(r.RowId))
+            {
+                <span class="badge text-bg-success xbs-dupkept">Kept</span>
+            }
+            else
+            {
+                <input type="checkbox" class="form-check-input xbs-dupcheck" checked="@selected.Contains(r.RowId)"
+                       aria-label="Select @(r.Title ?? r.Url)" @onchange="() => Toggle(r.RowId)" />
+            }
             <button type="button" class="xbs-duptext" @onclick="() => Toggle(r.RowId)">
                 <span class="xbs-row-title">@(r.Title ?? r.Url)</span><br />
                 <span class="xbs-row-sub">@r.Url</span><br />
