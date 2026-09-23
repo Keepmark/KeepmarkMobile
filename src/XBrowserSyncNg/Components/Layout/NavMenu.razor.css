@@ -4,8 +4,8 @@
     width: 3.5rem;
     height: 3rem;
     color: white;
-    position: absolute;
-    top: 0.5rem;
+    position: fixed;
+    top: max(0.5rem, calc(env(safe-area-inset-top, 0px) + 0.5rem));
     right: 1rem;
     z-index: 1060;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -18,7 +18,22 @@
 
 .top-row {
     min-height: 3.5rem;
-    background-color: rgba(0,0,0,0.4);
+    background-color: #0A323D;
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 1059;
+}
+
+.top-row .container-fluid {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-brand-mark {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
 }
 
 .navbar-brand {
@@ -105,7 +120,7 @@
 .navbar-toggler:checked ~ .nav-scrollable {
     display: block;
     position: fixed;
-    top: 3.5rem;
+    top: calc(3.5rem + env(safe-area-inset-top, 0px));
     left: 0;
     right: 0;
     bottom: 0;

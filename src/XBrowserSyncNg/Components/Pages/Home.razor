@@ -387,7 +387,7 @@ else
 
     private async Task OnRowAction((ItemRow Row, RowAction Action) a)
     {
-        await JS.InvokeVoidAsync("xbsGestures.closeAll");
+        _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
         switch (a.Action)
         {
             case RowAction.Share: await ShareRow(a.Row); break;
@@ -427,6 +427,8 @@ else
     private async Task TogglePin(ItemRow? row)
     {
         menuFor = null;
+        StateHasChanged();
+        await Task.Delay(1);
         if (row?.NodeId is null || Session.Engine is null) return;
         bool added = Pins.Toggle(row.NodeId.Value);
         pinned = Pins.Load();
@@ -439,7 +441,10 @@ else
     private async Task DeleteRow(ItemRow? row)
     {
         menuFor = null;
-        await JS.InvokeVoidAsync("xbsGestures.closeAll");
+        StateHasChanged();
+        // Paint the menu close first: the list update follows on local data.
+        await Task.Delay(1);
+        _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
         if (row is null || Session.Engine is null) return;
         undoTimer?.Cancel();
         undo = await Session.Engine.DeleteBookmarkAsync(row.RowId);
