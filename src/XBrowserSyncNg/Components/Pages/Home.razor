@@ -648,6 +648,7 @@ else
 
         sheetFor = new SheetTarget(null, LastCreateFolder(), pending.Url, pending.Title);
         System.Diagnostics.Debug.WriteLine("[share] sheet opened");
+        _ = Toast.ShowAsync("New bookmark from share");
         return true;
     }
 
