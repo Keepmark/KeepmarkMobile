@@ -437,16 +437,26 @@ else
                 return;
             }
 
-            // Copy into our cache: the picked URI may not be a direct file path.
-            var tmp = Path.Combine(FileSystem.CacheDirectory, picked.FileName);
+            // The picker name is untrusted: strip any path, require JSON.
+            var safeName = Path.GetFileName(picked.FileName);
+            if (string.IsNullOrWhiteSpace(safeName) || !Core.Crypto.BackupGuard.HasSupportedExtension(safeName))
+            {
+                throw new InvalidOperationException("Pick a backup file (.xbs.json).");
+            }
+
+            // Copy into our cache with a size cap: the picked URI may not be a
+            // direct file path, and imports must never OOM the app.
+            ForgetImportTmp();
+            var tmp = Path.Combine(FileSystem.CacheDirectory,
+                $"import-{Guid.NewGuid():N}-{safeName}");
             await using (var src = await picked.OpenReadAsync())
             await using (var dst = File.Create(tmp))
             {
-                await src.CopyToAsync(dst);
+                await CopyCappedAsync(src, dst, Core.Crypto.BackupGuard.MaxBytes);
             }
 
             impPath = tmp;
-            impFileName = picked.FileName;
+            impFileName = safeName;
             impCount = null;
             armedImp = false;
             Ok("File selected. Enter its password and Read backup.");
@@ -454,6 +464,33 @@ else
         impMessage = message;
         impError = isError;
         message = string.Empty;
+    }
+
+    private void ForgetImportTmp()
+    {
+        if (impPath is not null)
+        {
+            try { File.Delete(impPath); } catch { }
+            impPath = null;
+        }
+    }
+
+    private static async Task CopyCappedAsync(Stream src, Stream dst, long maxBytes)
+    {
+        var buf = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = await src.ReadAsync(buf).ConfigureAwait(false)) > 0)
+        {
+            total += read;
+            if (total > maxBytes)
+            {
+                throw new InvalidOperationException(
+                    $"File is too large (over {maxBytes / 1024 / 1024} MB).");
+            }
+
+            await dst.WriteAsync(buf.AsMemory(0, read)).ConfigureAwait(false);
+        }
     }
 
     private async Task PreviewImport()
@@ -492,6 +529,7 @@ else
             impPassword = string.Empty;
             impCount = null;
             armedImp = false;
+            ForgetImportTmp();
             if (Session.Store is not null)
             {
                 var stats = await Session.Store.GetStatsAsync();

@@ -180,6 +180,7 @@ public sealed class XbsSession : IAsyncDisposable
     /// salt stored in the file, AES-GCM + lzutf8 payload.</summary>
     public async Task<string> ExportBackupAsync(string password, CancellationToken ct = default)
     {
+        BackupGuard.RequirePassword(password);
         var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
         var json = System.Text.Json.JsonSerializer.Serialize(roots);
         var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
@@ -196,34 +197,87 @@ public sealed class XbsSession : IAsyncDisposable
     /// <summary>Reads a backup file: validates the password and returns the item count.</summary>
     public async Task<int> PreviewBackupAsync(string path, string password, CancellationToken ct = default)
     {
+        BackupGuard.RequirePath(path);
+        BackupGuard.RequirePassword(password);
         var roots = await OpenBackupAsync(path, password, ct).ConfigureAwait(false);
-        return CountBackupNodes(roots);
+        return BackupGuard.ValidateTree(roots);
     }
 
     /// <summary>Replaces the local tree with a backup (current local side safety-backed-up first).</summary>
     public async Task<int> ImportBackupAsync(string path, string password, CancellationToken ct = default)
     {
+        BackupGuard.RequirePath(path);
+        BackupGuard.RequirePassword(password);
         var roots = await OpenBackupAsync(path, password, ct).ConfigureAwait(false);
+        var count = BackupGuard.ValidateTree(roots);
         var (_, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", localBlob ?? string.Empty).ConfigureAwait(false);
         await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
-        return CountBackupNodes(roots);
+        return count;
     }
 
     private async Task<List<BookmarkNode>> OpenBackupAsync(string path, string password, CancellationToken ct)
     {
-        var raw = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
-        var envelope = System.Text.Json.JsonSerializer.Deserialize<BackupEnvelope>(raw)
-            ?? throw new InvalidOperationException("Not a backup file.");
-        if (envelope.App != "xBrowserSyncNg" || envelope.Format != 1 || string.IsNullOrEmpty(envelope.Salt))
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException("Backup file not found — pick it again.");
+        }
+
+        if (new FileInfo(path).Length > BackupGuard.MaxBytes)
+        {
+            throw new InvalidOperationException(
+                $"Backup file is too large (over {BackupGuard.MaxBytes / 1024 / 1024} MB).");
+        }
+
+        string raw;
+        try
+        {
+            raw = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException("Backup file cannot be read.", ex);
+        }
+
+        BackupEnvelope? envelope;
+        try
+        {
+            envelope = System.Text.Json.JsonSerializer.Deserialize<BackupEnvelope>(raw);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new InvalidOperationException("Not a backup file or the file is damaged.", ex);
+        }
+
+        if (envelope is null || envelope.App != "xBrowserSyncNg" || envelope.Format != 1 ||
+            string.IsNullOrEmpty(envelope.Salt) || string.IsNullOrEmpty(envelope.Blob))
         {
             throw new InvalidOperationException("Not a backup file.");
+        }
+
+        // Damaged file vs wrong password: base64 must parse before GCM runs,
+        // otherwise every corruption looks like bad credentials.
+        try
+        {
+            _ = Convert.FromBase64String(envelope.Salt);
+            _ = Convert.FromBase64String(envelope.Blob);
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidOperationException("Backup file is damaged.", ex);
         }
 
         var derived = _crypto.DeriveKey(password, envelope.Salt, Core.XbsConstants.SyncClientVersion);
         // Wrong password: GCM authentication fails here with an invalid-credentials error.
         var json = _crypto.Decrypt(envelope.Blob, derived);
-        return System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(json) ?? [];
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(json) ?? [];
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new InvalidOperationException("Backup decrypts but its content is damaged.", ex);
+        }
     }
 
     private static int CountBackupNodes(List<BookmarkNode> roots)
