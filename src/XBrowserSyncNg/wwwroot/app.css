@@ -34,7 +34,8 @@ a, .btn-link {
 }
 
 .content {
-    padding-top: 1.1rem;
+    /* Top padding clears the fixed top bar. */
+    padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 1.1rem);
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)); /* clears the fixed status bar */
 }
 
@@ -358,7 +359,7 @@ html.xbs-locked, body.xbs-locked {
 /* Breadcrumb bar: horizontally scrollable, 48px touch targets. */
 .xbs-crumbs {
     position: sticky;
-    top: env(safe-area-inset-top, 0px);
+    top: calc(3.5rem + env(safe-area-inset-top, 0px));
     z-index: 900;
     background: var(--bs-body-bg, #fff);
     display: flex;

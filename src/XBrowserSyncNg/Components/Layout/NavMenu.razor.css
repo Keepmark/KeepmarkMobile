@@ -19,8 +19,13 @@
 .top-row {
     min-height: 3.5rem;
     background-color: #0A323D;
-    position: sticky;
+    /* Fixed, not sticky: the .sidebar parent is only as tall as the bar,
+       so sticky would have zero room and scroll away (only the fixed
+       hamburger stayed). */
+    position: fixed;
     top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
     z-index: 1059;
     /* Reserve room for the fixed hamburger on the right. */
     padding-right: 4.5rem;
@@ -145,6 +150,12 @@
 @media (min-width: 641px) {
     .navbar-toggler {
         display: none;
+    }
+
+    .top-row {
+        /* The desktop sidebar is full-height: sticky works there. */
+        position: sticky;
+        top: 0;
     }
 
     .nav-scrollable {

@@ -1,7 +1,7 @@
 # XBrowserSyncNg — MAUI Blazor Hybrid (Android only)
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.68 (69)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.69 (70)**,
 app id `com.keepmark.legacy.xbsyncng`, display name `xBrowserSyncNg`.
 
 `XBrowserSyncApp/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -20,7 +20,9 @@ is NOT a git repo). Solution `XBrowserSyncNg.slnx`:
   left collapses, pinned section, clickable breadcrumb, folder-first sorting,
   share-receiving with prefilled form, full-screen folder tree picker with
   explicit Select/Cancel.
-- Top bar: single sticky bar with brand mark left + hamburger right;
+- Top bar: single fixed bar with brand mark left + hamburger right (fixed, not
+  sticky: the `.sidebar` parent is only as tall as the bar, so sticky had zero
+  room and scrolled away);
   brand truncates, `padding-right: 4.5rem` reserves hamburger space
   (regression seen v1.0.63: title overlapped ☰).
 - Security: SQLCipher store, KeyStore creds, no telemetry, HTTPS-only,
