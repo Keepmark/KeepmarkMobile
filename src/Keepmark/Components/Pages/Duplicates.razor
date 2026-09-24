@@ -198,6 +198,7 @@ else
         }
 
         StateHasChanged();
+        Session.Log.Info("duplicates", deleted > 0 ? $"Deleted {deleted} duplicate(s)" : "Nothing to delete");
         await Toast.ShowAsync(deleted > 0 ? $"Deleted {deleted} duplicate(s)" : "Nothing to delete");
     }
 
@@ -261,6 +262,7 @@ else
         }
 
         StateHasChanged();
+        Session.Log.Info("duplicates", count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
         await Toast.ShowAsync(count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
     }
 

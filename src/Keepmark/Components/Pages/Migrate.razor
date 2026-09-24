@@ -370,6 +370,9 @@ else
             newPassword = string.Empty;
             linked = true;
             step = 4;
+            Session.Log.Info("migrate", createdId is not null
+                ? "Migration complete: new sync created and uploaded"
+                : tookRemote ? "Migration complete: took remote tree" : "Migration complete: uploaded local tree");
         });
     }
 
@@ -543,19 +546,22 @@ else
         message = string.Empty;
     }
 
-    private async Task RunAsync(Func<Task> action)
+    private async Task RunAsync(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
     {
         busy = true;
         isError = false;
         message = string.Empty;
         try
         {
+            Session.Log.Debug("migrate", $"{op}: start");
             await action();
+            Session.Log.Debug("migrate", $"{op}: ok");
         }
         catch (Exception ex)
         {
             isError = true;
             message = ex.Message;
+            Session.Log.Warn("migrate", $"{op} failed: {ex.GetType().Name}");
         }
         finally
         {

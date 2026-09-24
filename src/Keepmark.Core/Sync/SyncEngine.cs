@@ -80,11 +80,13 @@ public sealed class SyncEngine(
     {
         var c = await RequireCredsAsync().ConfigureAwait(false);
         SetStatus(SyncStatus.Syncing);
+        log.Debug("sync", "Pull: start");
         try
         {
             var api = apiFor(c.ServiceUrl);
             var remote = await api.GetLastUpdatedAsync(c.Id, ct).ConfigureAwait(false);
             var local = await store.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
+            log.Debug("sync", $"Pull: remote={remote.LastUpdated} local={local}");
             if (remote.LastUpdated == local)
             {
                 log.Info("sync", "Pull: already up to date");
@@ -121,6 +123,7 @@ public sealed class SyncEngine(
 
     public async Task PushAsync(bool updateVersion = false, CancellationToken ct = default)
     {
+        log.Debug("sync", "Push: start");
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -191,6 +194,7 @@ public sealed class SyncEngine(
     /// <summary>Manual "Sync now": same as the auto tick but runs in any mode.</summary>
     public async Task ForceSyncAsync(CancellationToken ct = default)
     {
+        log.Debug("sync", "ForceSync: start");
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -226,15 +230,18 @@ public sealed class SyncEngine(
                     return;
                 }
 
+                log.Debug("sync", "ForceSync: pulling remote");
                 await PullCoreAsync(ct).ConfigureAwait(false);
             }
             else if (dirty)
             {
+                log.Debug("sync", "ForceSync: pushing local");
                 await PushCoreAsync(updateVersion: false, ct: ct).ConfigureAwait(false);
             }
             else
             {
                 // Successful check, nothing to do: still stamp the check time.
+                log.Debug("sync", "ForceSync: already in sync");
                 LastSyncAt = DateTimeOffset.UtcNow;
                 SetStatus(SyncStatus.Idle);
             }
@@ -277,6 +284,7 @@ public sealed class SyncEngine(
         await RequireCredsAsync().ConfigureAwait(false);
         int rowId = await store.AddNodeAsync(parentRowId, node).ConfigureAwait(false);
         await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        log.Info("sync", node.Children is not null ? "Added folder" : "Added bookmark");
         return rowId;
     }
 
@@ -286,6 +294,7 @@ public sealed class SyncEngine(
         await RequireCredsAsync().ConfigureAwait(false);
         await store.UpdateNodeAsync(rowId, title, url, description, tags).ConfigureAwait(false);
         await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        log.Info("sync", "Updated bookmark");
     }
 
     public async Task<(int? ParentRowId, List<BookmarkNode> Subtree)> DeleteBookmarkAsync(int rowId, CancellationToken ct = default)
@@ -293,6 +302,7 @@ public sealed class SyncEngine(
         await RequireCredsAsync().ConfigureAwait(false);
         var backup = await store.DeleteNodeAsync(rowId).ConfigureAwait(false);
         await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        log.Info("sync", $"Deleted item (+{backup.Subtree.Count - 1} descendants)");
         return backup;
     }
 
@@ -301,6 +311,7 @@ public sealed class SyncEngine(
         await RequireCredsAsync().ConfigureAwait(false);
         await store.MoveNodeAsync(rowId, newParentRowId).ConfigureAwait(false);
         await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        log.Info("sync", "Moved item");
     }
 
     public async Task RestoreBookmarkAsync(int? parentRowId, List<BookmarkNode> subtree, CancellationToken ct = default)
@@ -308,6 +319,7 @@ public sealed class SyncEngine(
         await RequireCredsAsync().ConfigureAwait(false);
         await store.RestoreSubtreeAsync(parentRowId, subtree).ConfigureAwait(false);
         await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        log.Info("sync", $"Restored {subtree.Count} item(s) (undo)");
     }
 
     /// <summary>

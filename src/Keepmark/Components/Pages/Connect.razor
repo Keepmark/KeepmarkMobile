@@ -267,19 +267,22 @@ else
         });
     }
 
-    private async Task RunAsync(Func<Task> action)
+    private async Task RunAsync(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
     {
         busy = true;
         isError = false;
         message = string.Empty;
         try
         {
+            Session.Log.Debug("connect", $"{op}: start");
             await action();
+            Session.Log.Info("connect", $"{op}: ok");
         }
         catch (Exception ex)
         {
             isError = true;
             message = ex.Message;
+            Session.Log.Warn("connect", $"{op} failed: {ex.GetType().Name}");
         }
         finally
         {

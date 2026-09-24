@@ -91,6 +91,7 @@ public sealed class XbsSession : IAsyncDisposable
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(Core.XbsConstants.ServiceProbeTimeout);
         var info = await ApiFor(serviceUrl).GetInfoAsync(cts.Token).ConfigureAwait(false);
+        _log.Debug("session", $"Service check: {info.Status}, API v{info.Version}");
         if (info.Version is not null &&
             Core.XbsConstants.CompareVersions(info.Version, Core.XbsConstants.MinApiVersion) < 0)
         {
@@ -107,6 +108,7 @@ public sealed class XbsSession : IAsyncDisposable
         var candidate = new SyncCredentials(syncId, serviceUrl, derived, Core.XbsConstants.SyncClientVersion);
         var (local, remote, remoteLast, remoteVer, remoteBlob, localBlob) =
             await Engine!.CompareAsync(candidate, ct).ConfigureAwait(false);
+        _log.Info("session", $"Probe: local={local} remote={remote}");
         return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob);
     }
 
@@ -115,6 +117,7 @@ public sealed class XbsSession : IAsyncDisposable
         // Safety backup of the discarded local side (plaintext — user is warned in UI).
         await SaveSafetyBackupAsync("local", info.LocalBlob).ConfigureAwait(false);
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
+        _log.Info("session", "Link: taking remote tree");
         await Engine!.PullAsync(ct).ConfigureAwait(false);
     }
 
@@ -123,6 +126,7 @@ public sealed class XbsSession : IAsyncDisposable
         // Safety backup of the overwritten remote side.
         await SaveSafetyBackupAsync("remote", info.RemoteBlob).ConfigureAwait(false);
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
+        _log.Info("session", "Link: uploading local tree");
         await UploadMirrorAsync(info.Candidate, ct).ConfigureAwait(false);
     }
 
@@ -145,6 +149,7 @@ public sealed class XbsSession : IAsyncDisposable
         var (_, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", localBlob ?? string.Empty).ConfigureAwait(false);
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
+        _log.Info("session", "Created new empty sync");
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
         await _creds.SetAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version)).ConfigureAwait(false);
         await Store.ReplaceAllAsync([], string.Empty, created.LastUpdated!, created.Version).ConfigureAwait(false);
@@ -161,6 +166,7 @@ public sealed class XbsSession : IAsyncDisposable
         await _creds.SetAsync(candidate).ConfigureAwait(false);
         await UploadMirrorAsync(candidate, ct).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
+        _log.Info("session", "Created new sync and uploaded local tree");
         return created.Id!;
     }
 
@@ -214,6 +220,7 @@ public sealed class XbsSession : IAsyncDisposable
         var (_, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", localBlob ?? string.Empty).ConfigureAwait(false);
         await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
+        _log.Info("session", $"Imported backup ({count} items)");
         return count;
     }
 
