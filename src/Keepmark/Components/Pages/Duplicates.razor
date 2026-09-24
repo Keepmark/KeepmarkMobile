@@ -85,9 +85,25 @@ else
             await Task.Delay(100);
         }
 
+        if (Session.Engine is not null)
+        {
+            Session.Engine.DataChanged += OnData;
+        }
+
         await ReloadAsync();
         ready = true;
     }
+
+    private void OnData() => InvokeAsync(async () =>
+    {
+        // A push/pull rekeys every RowId: refresh unless a delete is in
+        // flight (its final ReloadAsync reconciles everything).
+        if (!busy)
+        {
+            await ReloadAsync();
+            StateHasChanged();
+        }
+    });
 
     private async Task ReloadAsync()
     {
@@ -152,6 +168,41 @@ else
         }
     }
 
+    /// <summary>Deletes targets by stable NodeId: every push/pull rekeys all
+    /// RowIds, so each one is re-resolved fresh right before deleting.
+    /// Failures are logged, never swallowed silently.</summary>
+    private async Task<int> DeleteTargetsAsync(List<Core.Data.ItemRow> targets)
+    {
+        var count = 0;
+        foreach (var r in targets)
+        {
+            try
+            {
+                var rowId = r.RowId;
+                if (r.NodeId is not null && Session.Store is not null)
+                {
+                    var fresh = (await Session.Store.GetByNodeIdsAsync([r.NodeId.Value])).FirstOrDefault();
+                    if (fresh is null)
+                    {
+                        Session.Log.Warn("duplicates", "Skip delete: item already gone");
+                        continue;
+                    }
+
+                    rowId = fresh.RowId;
+                }
+
+                await Session.Engine!.DeleteBookmarkAsync(rowId);
+                count++;
+            }
+            catch (Exception ex)
+            {
+                Session.Log.Warn("duplicates", $"Delete failed: {ex.GetType().Name}");
+            }
+        }
+
+        return count;
+    }
+
     private async Task ExecuteGroup(Core.Data.DuplicateGroup g)
     {
         if (Session.Engine is null || busy)
@@ -178,17 +229,7 @@ else
             armedGroup = null;
             StateHasChanged();
             await Task.Delay(1);
-            foreach (var r in targets)
-            {
-                try
-                {
-                    await Session.Engine.DeleteBookmarkAsync(r.RowId);
-                    deleted++;
-                }
-                catch
-                {
-                }
-            }
+            deleted = await DeleteTargetsAsync(targets);
 
             await ReloadAsync();
         }
@@ -241,17 +282,7 @@ else
             await Task.Delay(1);
             foreach (var (_, targets) in byGroup)
             {
-                foreach (var r in targets)
-                {
-                    try
-                    {
-                        await Session.Engine.DeleteBookmarkAsync(r.RowId);
-                        count++;
-                    }
-                    catch
-                    {
-                    }
-                }
+                count += await DeleteTargetsAsync(targets);
             }
 
             await ReloadAsync();
@@ -328,5 +359,13 @@ else
         }
     }
 
-    public void Dispose() => dotNet?.Dispose();
+    public void Dispose()
+    {
+        if (Session.Engine is not null)
+        {
+            Session.Engine.DataChanged -= OnData;
+        }
+
+        dotNet?.Dispose();
+    }
 }
