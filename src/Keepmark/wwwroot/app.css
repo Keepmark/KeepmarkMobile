@@ -5,6 +5,16 @@ html, body {
     color-scheme: light dark;
 }
 
+/* ---- Keepmark brand tokens (logo navy + white, verdone accent). ---- */
+:root {
+    --km-navy: #172552;
+    --km-navy-deep: #0e1430;
+    --km-accent: #4a5fc1;
+    --km-danger: #b32121;
+    --km-gold: #b58900;
+    --km-green: #1f6f5c;
+}
+
 .page, main, article.content {
     min-width: 0;
     max-width: 100%;
@@ -34,8 +44,8 @@ a, .btn-link {
 }
 
 .content {
-    /* Top padding clears the fixed top bar. */
-    padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 1.1rem);
+    /* Top padding clears the fixed top bar (no second bar anymore: keep it tight). */
+    padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 0.5rem);
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)); /* clears the fixed status bar */
 }
 
@@ -157,7 +167,7 @@ h1:focus {
     font-weight: 600;
 }
 
-.xbs-under-left { background-color: #2e9e7b; }
+.xbs-under-left { background-color: #1f6f5c; }
 .xbs-under-right { background-color: #1b6ec2; }
 .xbs-under-right .danger { background-color: #b32121; border-radius: 0.375rem; }
 
@@ -223,7 +233,7 @@ h1:focus {
 }
 
 .xbs-ribbon.mark { background: linear-gradient(180deg, #5aa3e0 0%, #1b6ec2 100%); }
-.xbs-ribbon.folder { background: linear-gradient(180deg, #5cc9a7 0%, #2e9e7b 100%); }
+.xbs-ribbon.folder { background: linear-gradient(180deg, #35a37e 0%, #1f6f5c 100%); }
 .xbs-ribbon.sep { background: linear-gradient(180deg, #ced4da 0%, #adb5bd 100%); }
 
 .xbs-pin { color: #b58900; font-size: 0.9em; }
@@ -382,6 +392,9 @@ html.xbs-locked, body.xbs-locked {
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: 1.5rem;
     background: var(--bs-body-bg, #fff);
+    /* Never trust the UA button color: with color-scheme auto it follows the
+       OS theme and goes white-on-white in light mode. */
+    color: var(--bs-body-color, #212529);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -416,7 +429,7 @@ html.xbs-locked, body.xbs-locked {
 }
 
 .xbs-toast.ok .xbs-toast-icon {
-    color: #2e9e7b;
+    color: #1f6f5c;
     font-size: 1.3rem;
     font-weight: 700;
 }
@@ -454,7 +467,7 @@ html.xbs-locked, body.xbs-locked {
     position: fixed;
     inset: 0;
     z-index: 2000;
-    background: #0a323d;
+    background: #172552;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -577,6 +590,8 @@ html.xbs-locked, body.xbs-locked {
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: 0.5rem;
     background: var(--bs-body-bg, #fff);
+    /* Same UA-button-color trap as .xbs-crumb: force theme text color. */
+    color: var(--bs-body-color, #212529);
     font-weight: 600;
 }
 
@@ -639,6 +654,7 @@ html.xbs-locked, body.xbs-locked {
     border: none;
     border-radius: 0.375rem;
     background: transparent;
+    color: var(--bs-body-color, #212529);
 }
 
 .xbs-tree-node.selected {
@@ -681,6 +697,38 @@ html.xbs-locked, body.xbs-locked {
 [data-bs-theme="dark"] .xbs-pinned-box {
     background: rgba(227, 184, 8, 0.08);
 }
+
+/* Logs viewer page. */
+.xbs-loglist {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.xbs-logrow {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-left: 4px solid var(--bs-secondary-color, #6c757d);
+    border-radius: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    overflow-wrap: anywhere;
+}
+
+.xbs-logrow .xbs-logtime { color: var(--bs-secondary-color, #6c757d); flex-shrink: 0; }
+.xbs-logrow .xbs-loglevel { font-weight: 700; flex-shrink: 0; min-width: 3.5rem; }
+.xbs-logrow .xbs-logtag { color: var(--bs-secondary-color, #6c757d); flex-shrink: 0; }
+.xbs-logrow .xbs-logmsg { min-width: 0; }
+.xbs-log-error { border-left-color: var(--km-danger, #b32121); }
+.xbs-log-error .xbs-loglevel { color: var(--km-danger, #b32121); }
+.xbs-log-warning { border-left-color: var(--km-gold, #b58900); }
+.xbs-log-warning .xbs-loglevel { color: var(--km-gold, #b58900); }
+.xbs-log-info { border-left-color: var(--km-accent, #4a5fc1); }
+.xbs-log-info .xbs-loglevel { color: var(--km-accent, #4a5fc1); }
 
 /* Duplicates cleanup page: compact star-and-go rows. */
 .xbs-dupgroup {

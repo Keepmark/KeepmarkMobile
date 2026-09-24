@@ -48,6 +48,13 @@ public sealed class XbsSettings
         set => Preferences.Set(KLockTimeoutMin, value);
     }
 
+    /// <summary>Color theme: System (default), Light or Dark.</summary>
+    public string Theme
+    {
+        get => Preferences.Get("theme", "System");
+        set => Preferences.Set("theme", value);
+    }
+
     public string OpenMode
     {
         get => Preferences.Get(KOpenMode, "CustomTabs");

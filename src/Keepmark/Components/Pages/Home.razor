@@ -130,7 +130,6 @@ else
                 @if (!menuFor.IsFolder)
                 {
                     <button class="btn btn-primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }">Open</button>
-                    <button class="btn btn-secondary" @onclick="() => ToggleDetails(menuFor)">@(expandedRows.Contains(menuFor.RowId) ? "Hide details" : "Show details")</button>
                     <button class="btn btn-secondary" @onclick="() => ShareRow(menuFor)">Share</button>
                 }
                 <button class="btn btn-secondary" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }">Edit</button>
@@ -140,7 +139,7 @@ else
                     <button class="btn btn-secondary" @onclick="() => GoToLocation(menuFor)">Go to location</button>
                 }
                 <button class="btn btn-danger" @onclick="() => DeleteRow(menuFor)">Delete</button>
-                <button class="btn btn-link" @onclick="() => menuFor = null">Cancel</button>
+                <button class="btn btn-secondary" @onclick="() => menuFor = null">Cancel</button>
             </div>
         </div>
     </div>
@@ -278,6 +277,33 @@ else
 
             hitRows = hits.Where(h => byRow.ContainsKey(h.RowId)).Select(h => h.RowId).ToList();
             hitPaths = hits.ToDictionary(h => h.RowId, h => h.FolderPath);
+            // Search results hold RowIds: any store rewrite (delete, sync)
+            // rekeys them. If some no longer resolve, re-run the live query
+            // instead of showing a stale count with an empty list.
+            if (isSearch && Session.Store is not null && query.Trim().Length >= 2 &&
+                hits.Count > hitRows.Count)
+            {
+                var gen = ++searchGen;
+                var found = await Session.Store.SearchAsync(query.Trim(), 50);
+                if (gen == searchGen)
+                {
+                    hits = found;
+                    foreach (var h in hits)
+                    {
+                        if (!byRow.ContainsKey(h.RowId))
+                        {
+                            var node = await Session.Store.GetNodeAsync(h.RowId);
+                            if (node is not null)
+                            {
+                                byRow[h.RowId] = node;
+                            }
+                        }
+                    }
+
+                    hitRows = hits.Where(h => byRow.ContainsKey(h.RowId)).Select(h => h.RowId).ToList();
+                    hitPaths = hits.ToDictionary(h => h.RowId, h => h.FolderPath);
+                }
+            }
             // Sync rewrites rekey every RowId: restore expansions via stable NodeId.
             if (expandedRows.Count > 0)
             {
@@ -422,16 +448,6 @@ else
         catch { }
     }
 
-    private void ToggleDetails(ItemRow? row)
-    {
-        menuFor = null;
-        if (row is null || row.IsFolder) return;
-        if (!expandedRows.Remove(row.RowId))
-        {
-            expandedRows.Add(row.RowId);
-        }
-    }
-
     private async Task TogglePin(ItemRow? row)
     {
         menuFor = null;
@@ -458,6 +474,8 @@ else
         // reconcile with the store right after.
         rows.RemoveAll(r => r.RowId == row.RowId);
         pinnedRows.RemoveAll(r => r.RowId == row.RowId);
+        hits.RemoveAll(h => h.RowId == row.RowId);
+        hitRows.Remove(row.RowId);
         expandedRows.Remove(row.RowId);
         StateHasChanged();
         await Task.Delay(1);

@@ -27,6 +27,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<XbsSession>();
 #if ANDROID
         builder.Services.AddSingleton<IAppLockService, Platforms.Android.Services.AndroidAppLockService>();
+        builder.Services.AddSingleton<IStatusBarService, Platforms.Android.Services.AndroidStatusBarService>();
 #endif
 
 #if DEBUG

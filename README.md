@@ -1,7 +1,7 @@
 # Keepmark — MAUI Blazor Hybrid (Android only)
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.76 (77)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.82 (83)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
 
 `XBrowserSyncApp/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -27,6 +27,14 @@ is NOT a git repo). Solution `Keepmark.slnx`:
   `com.keepmark.legacy.keepmark` (= fresh install, old app data stays in the old app —
   re-link or backup-import). Backup envelope `App` stays `"xBrowserSyncNg"`
   so old backup files keep importing.
+- v1.0.81 batch: navy top bar/drawer + white mark, item sheet without
+  Show-details and uniform Cancel, verdone `#1F6F5C` accents, Theme
+  System/Light/Dark setting (`xbsSetTheme` + `IStatusBarService` for OS icons),
+  Logs viewer page (`/logs`, filter + share export), search re-runs after
+  store rewrites (no stale counts).
+- v1.0.82: explicit theme text color on native buttons (`.xbs-sort`,
+  `.xbs-crumb`, `.xbs-tree-node`) — the UA button color followed the OS theme
+  and went white-on-white in light mode.
   brand truncates, `padding-right: 4.5rem` reserves hamburger space
   (regression seen v1.0.63: title overlapped ☰).
 - Security: SQLCipher store, KeyStore creds, no telemetry, HTTPS-only,

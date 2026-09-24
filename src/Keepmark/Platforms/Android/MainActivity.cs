@@ -2,7 +2,6 @@
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
-using Android.Views;
 
 namespace Keepmark;
 
@@ -15,27 +14,8 @@ public class MainActivity : MauiAppCompatActivity
         base.OnCreate(savedInstanceState);
         Platforms.Android.ShareIntake.Handle(Intent);
 
-        // Light status bar background (our spacer): system icons must be dark to stay visible.
-        try
-        {
-            Window?.SetStatusBarColor(Android.Graphics.Color.ParseColor("#F7F7F7"));
-            if (Build.VERSION.SdkInt >= BuildVersionCodes.R)
-            {
-                Window?.InsetsController?.SetSystemBarsAppearance(
-                    (int)WindowInsetsControllerAppearance.LightStatusBars,
-                    (int)WindowInsetsControllerAppearance.LightStatusBars);
-            }
-            else
-            {
-#pragma warning disable CA1422 // deprecated on 30+, required on 29
-                Window.DecorView.SystemUiVisibility |= (StatusBarVisibility)SystemUiFlags.LightStatusBar;
-#pragma warning restore CA1422
-            }
-        }
-        catch
-        {
-            // Cosmetic only: never break startup.
-        }
+        // Status bar follows the stored theme (white icons on dark).
+        ApplyStatusBar();
     }
 
     protected override void OnNewIntent(Intent? intent)
@@ -55,6 +35,21 @@ public class MainActivity : MauiAppCompatActivity
         base.OnResume();
         Platforms.Android.ShareIntake.Flush();
         NotifyLock(s => s.OnResumed(GetSettings()));
+        ApplyStatusBar();
+    }
+
+    private static void ApplyStatusBar()
+    {
+        try
+        {
+            var services = IPlatformApplication.Current?.Services;
+            var bar = services?.GetService(typeof(Services.IStatusBarService)) as Services.IStatusBarService;
+            bar?.ApplyTheme(GetSettings().Theme);
+        }
+        catch
+        {
+            // Cosmetic only.
+        }
     }
 
     private static void NotifyLock(Action<Services.AppLockState> action)

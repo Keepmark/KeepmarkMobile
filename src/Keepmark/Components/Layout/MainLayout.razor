@@ -6,6 +6,8 @@
 @inject Keepmark.Services.ToastState Toast
 @inject Keepmark.Services.SharedImportService SharedImport
 @inject Keepmark.Services.SecureCredentialStore Creds
+@inject Keepmark.Services.IStatusBarService StatusBar
+@inject Microsoft.JSInterop.IJSRuntime JS
 @inject NavigationManager Nav
 @implements IDisposable
 
@@ -59,6 +61,20 @@
         Toast.Changed += OnToast;
         SharedImport.Arrived += OnShareArrived;
         _ = WatchSessionAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ApplyThemeAsync();
+        }
+    }
+
+    public async Task ApplyThemeAsync()
+    {
+        try { await JS.InvokeVoidAsync("xbsSetTheme", AppSettings.Theme); } catch { }
+        try { StatusBar.ApplyTheme(AppSettings.Theme); } catch { }
     }
 
     private async Task WatchSessionAsync()

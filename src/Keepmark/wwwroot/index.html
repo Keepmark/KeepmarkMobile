@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <!-- Asset cache-buster: bump ?v= on every release that touches CSS/JS,
          otherwise the WebView may keep serving stale files after update. -->
-    <link rel="stylesheet" href="app.css?v=80" />
+    <link rel="stylesheet" href="app.css?v=83" />
     <link rel="stylesheet" href="Keepmark.styles.css" />
     <link rel="icon" href="favicon.png?v=77">
 </head>
@@ -26,14 +26,26 @@
     </div>
 
     <script>
-        // Follow the system theme for Bootstrap + our custom classes.
+        // Theme: System (default) follows the OS; Light/Dark are forced.
+        // Blazor calls xbsSetTheme with the stored Settings value on startup.
         (function () {
-            try {
-                var mq = window.matchMedia('(prefers-color-scheme: dark)');
-                function apply() { document.documentElement.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light'); }
-                apply();
-                if (mq.addEventListener) mq.addEventListener('change', apply);
-            } catch (e) { /* light default */ }
+            var mq = null;
+            try { mq = window.matchMedia('(prefers-color-scheme: dark)'); } catch (e) { }
+            function resolve(mode) {
+                if (mode === 'Light') return 'light';
+                if (mode === 'Dark') return 'dark';
+                return (mq && mq.matches) ? 'dark' : 'light';
+            }
+            window.xbsSetTheme = function (mode) {
+                try {
+                    window.__xbsThemeMode = mode || 'System';
+                    document.documentElement.setAttribute('data-bs-theme', resolve(window.__xbsThemeMode));
+                } catch (e) { }
+            };
+            if (mq && mq.addEventListener) mq.addEventListener('change', function () {
+                if ((window.__xbsThemeMode || 'System') === 'System') window.xbsSetTheme('System');
+            });
+            window.xbsSetTheme('System');
         })();
     </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>

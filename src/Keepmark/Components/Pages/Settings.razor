@@ -3,6 +3,8 @@
 @inject Keepmark.Services.XbsSettings AppSettings
 @inject Keepmark.Services.SecureCredentialStore Creds
 @inject Keepmark.Services.IAppLockService AppLock
+@inject Keepmark.Services.IStatusBarService StatusBar
+@inject Microsoft.JSInterop.IJSRuntime JS
 
 <PageTitle>Settings</PageTitle>
 
@@ -30,6 +32,15 @@
         <option value="@Core.Logging.XbsLogLevel.Info">Info</option>
         <option value="@Core.Logging.XbsLogLevel.Debug">Debug</option>
         <option value="@Core.Logging.XbsLogLevel.Verbose">Verbose (may include your bookmark titles/URLs)</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Theme</label>
+    <select class="form-select" @bind="theme">
+        <option value="System">System (default)</option>
+        <option value="Light">Light</option>
+        <option value="Dark">Dark</option>
     </select>
 </div>
 
@@ -70,6 +81,7 @@
 @code {
     private Core.Sync.SyncMode mode;
     private Core.Logging.XbsLogLevel verbosity;
+    private string theme = "System";
     private string appLock = "Off";
     private int lockTimeout;
     private string error = string.Empty;
@@ -80,6 +92,7 @@
     {
         mode = AppSettings.Mode;
         verbosity = AppSettings.Verbosity;
+        theme = AppSettings.Theme;
         appLock = AppSettings.AppLock;
         lockTimeout = AppSettings.LockTimeoutMinutes;
     }
@@ -120,6 +133,12 @@
 
         AppSettings.Mode = mode;
         AppSettings.Verbosity = verbosity;
+        AppSettings.Theme = theme is "Light" or "Dark" ? theme : "System";
+        theme = AppSettings.Theme;
+        Session.NotifySettingsChanged();
+        try { await JS.InvokeVoidAsync("xbsSetTheme", theme); } catch { }
+        try { StatusBar.ApplyTheme(theme); } catch { }
+        saved = true;
         AppSettings.AppLock = appLock;
         AppSettings.LockTimeoutMinutes = Math.Clamp(lockTimeout, 0, 60);
         Session.NotifySettingsChanged();
