@@ -366,10 +366,11 @@ html.xbs-locked, body.xbs-locked {
     padding: 0.6rem 0.8rem;
 }
 
-/* Breadcrumb bar: horizontally scrollable, 48px touch targets. */
+/* Breadcrumb bar: horizontally scrollable, 48px touch targets.
+   Sticks below the sticky search (solution A stack). */
 .xbs-crumbs {
     position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px));
+    top: calc(3rem + env(safe-area-inset-top, 0px) + 4.5rem);
     z-index: 900;
     background: var(--bs-body-bg, #fff);
     display: flex;
@@ -552,8 +553,16 @@ html.xbs-locked, body.xbs-locked {
     white-space: nowrap;
 }
 
-/* Search bar with lens. */
-.xbs-search { position: relative; }
+/* Search bar with lens. Sticky under the top bar (solution A): the crumbs
+   stick below it, so search + navigation stay put while rows scroll. */
+.xbs-search {
+    position: relative;
+    position: sticky;
+    top: calc(3rem + env(safe-area-inset-top, 0px) + 0.15rem);
+    z-index: 950;
+    background: var(--bs-body-bg, #fff);
+    padding: 0.25rem 0 0.5rem;
+}
 .xbs-search-icon {
     position: absolute;
     left: 0.75rem;
