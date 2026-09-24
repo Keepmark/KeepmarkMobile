@@ -1,7 +1,7 @@
 # Keepmark — MAUI Blazor Hybrid (Android only)
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.82 (83)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.83 (84)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
 
 `XBrowserSyncApp/` is its own git repo (root `$HOME/Projects/xBrowserSync`
