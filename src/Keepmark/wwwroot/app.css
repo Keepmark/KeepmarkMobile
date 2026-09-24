@@ -371,7 +371,7 @@ html.xbs-locked, body.xbs-locked {
    overlap beats any gap showing rows through. */
 .xbs-crumbs {
     position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px) + 3.3rem);
+    top: calc(3rem + env(safe-area-inset-top, 0px) + 3.2rem);
     z-index: 900;
     background: var(--bs-body-bg, #fff);
     display: flex;
