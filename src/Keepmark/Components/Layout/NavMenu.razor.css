@@ -19,14 +19,15 @@
 .top-row {
     min-height: 3rem;
     background-color: #172552;
-    /* Fixed, not sticky: the .sidebar parent is only as tall as the bar,
-       so sticky would have zero room and scroll away (only the fixed
-       hamburger stayed). */
+    /* Start at viewport top with the inset as padding: the navy covers the
+       translucent system status bar, so scrolled rows can never bleed
+       through behind the system icons. */
     position: fixed;
-    top: env(safe-area-inset-top, 0px);
+    top: 0;
     left: 0;
     right: 0;
     z-index: 1059;
+    padding-top: env(safe-area-inset-top, 0px);
     /* Reserve room for the fixed hamburger on the right. */
     padding-right: 4.5rem;
 }
