@@ -2,14 +2,14 @@
     appearance: none;
     cursor: pointer;
     width: 3.5rem;
-    height: 3rem;
+    height: 2.75rem;
     color: white;
     position: fixed;
-    top: max(0.5rem, calc(env(safe-area-inset-top, 0px) + 0.5rem));
+    top: max(0.25rem, calc(env(safe-area-inset-top, 0px) + 0.25rem));
     right: 1rem;
     z-index: 1060;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.55%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem rgba(255, 255, 255, 0.1);
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.55%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.5rem rgba(255, 255, 255, 0.1);
 }
 
 .navbar-toggler:checked {
@@ -17,7 +17,7 @@
 }
 
 .top-row {
-    min-height: 3.5rem;
+    min-height: 3rem;
     background-color: #172552;
     /* Fixed, not sticky: the .sidebar parent is only as tall as the bar,
        so sticky would have zero room and scroll away (only the fixed
@@ -134,7 +134,7 @@
 .navbar-toggler:checked ~ .nav-scrollable {
     display: block;
     position: fixed;
-    top: calc(3.5rem + env(safe-area-inset-top, 0px));
+    top: calc(3rem + env(safe-area-inset-top, 0px));
     left: 0;
     right: 0;
     bottom: 0;
@@ -165,7 +165,7 @@
         display: block;
 
         /* Allow sidebar to scroll for tall menus */
-        height: calc(100vh - 3.5rem);
+        height: calc(100vh - 3rem);
         overflow-y: auto;
     }
 }

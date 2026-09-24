@@ -44,8 +44,8 @@ a, .btn-link {
 }
 
 .content {
-    /* Top padding clears the fixed top bar (no second bar anymore: keep it tight). */
-    padding-top: calc(3.5rem + env(safe-area-inset-top, 0px) + 0.5rem);
+    /* Top padding clears the slim fixed top bar (no second bar anymore: keep it tight). */
+    padding-top: calc(3rem + env(safe-area-inset-top, 0px) + 0.15rem);
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px)); /* clears the fixed status bar */
 }
 
@@ -369,7 +369,7 @@ html.xbs-locked, body.xbs-locked {
 /* Breadcrumb bar: horizontally scrollable, 48px touch targets. */
 .xbs-crumbs {
     position: sticky;
-    top: calc(3.5rem + env(safe-area-inset-top, 0px));
+    top: calc(3rem + env(safe-area-inset-top, 0px));
     z-index: 900;
     background: var(--bs-body-bg, #fff);
     display: flex;
@@ -536,7 +536,7 @@ html.xbs-locked, body.xbs-locked {
 
 .xbs-syncing-pill {
     position: fixed;
-    top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem));
+    top: max(3rem, calc(env(safe-area-inset-top, 0px) + 3rem));
     left: 50%;
     transform: translateX(-50%);
     z-index: 1300;
