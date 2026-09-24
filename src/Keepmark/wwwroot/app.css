@@ -367,10 +367,11 @@ html.xbs-locked, body.xbs-locked {
 }
 
 /* Breadcrumb bar: horizontally scrollable, 48px touch targets.
-   Sticks below the sticky search (solution A stack). */
+   Sticks right under the sticky search (solution A stack): a hair of
+   overlap beats any gap showing rows through. */
 .xbs-crumbs {
     position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px) + 4.5rem);
+    top: calc(3rem + env(safe-area-inset-top, 0px) + 3.3rem);
     z-index: 900;
     background: var(--bs-body-bg, #fff);
     display: flex;

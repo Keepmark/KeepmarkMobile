@@ -36,6 +36,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    /* Never link-colored: solid white brand on the navy bar. */
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 0.02rem;
 }
 
 .top-row .container-fluid {
