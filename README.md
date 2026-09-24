@@ -97,10 +97,13 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
   duplicates query, `RestoreLocalAsync`. Rows rekeyed by every push/pull
   `ReplaceAll`: UI crumbs/expansions rebase on stable `NodeId`.
 - `src/Keepmark/Services/XbsSession.cs` — session, backup export/import,
-  create+upload. Connect = first link only; Migrate = moves + backup + unlink.
+  create+upload. Connect = link/create + unlink; SwitchService = move-service
+  wizard (`/switch-service`, alias `/migrate`); Backup = encrypted backup
+  export/import (`/backup`).
 - `src/Keepmark/Components/Pages/` — `Home` (explore, sheets, share
-  consume, sort, status bar), `Duplicates`, `Connect` (first-link only),
-  `Migrate` (move/encrypted backup/unlink), `Settings`, `Status`, `About`.
+  consume, sort, status bar), `Duplicates`, `Connect` (link/create + unlink),
+  `Backup` (encrypted export/import), `SwitchService` (move-service wizard),
+  `Settings`, `Status`, `About`.
 - `Components/{BookmarkSheet,BookmarkRow,FolderPicker}.razor` — edit dialog,
   row rendering, collapsible tree with Select/Cancel protocol.
 - `Platforms/Android/ShareActivity.cs` — translucent, owns SEND filter,

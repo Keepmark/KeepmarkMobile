@@ -1,13 +1,13 @@
+@page "/switch-service"
 @page "/migrate"
 @inject Keepmark.Services.XbsSession Session
 @inject Keepmark.Services.XbsSettings AppSettings
-@inject Keepmark.Services.SecureCredentialStore Creds
 @inject Keepmark.Services.ToastState Toast
 @inject NavigationManager Nav
 
-<PageTitle>Migrate</PageTitle>
+<PageTitle>Switch service</PageTitle>
 
-<h1>Migrate to another service</h1>
+<h1>Switch to another service</h1>
 <p class="text-muted">Move your current local bookmarks to a different xBrowserSync service, into a new or an existing sync. Your local data is never deleted by this wizard.</p>
 
 @if (!Session.Ready)
@@ -17,7 +17,7 @@
 else if (step == 4)
 {
     <div class="alert alert-success">
-        <h4>Migration complete</h4>
+        <h4>Switch complete</h4>
         @if (createdId is not null)
         {
             <p>New sync created on <strong>@targetUrl</strong> with your @localCount item(s).</p>
@@ -41,7 +41,7 @@ else
     <ol class="mb-3 text-muted">
         <li><strong class="@(step == 1 ? "text-body" : string.Empty)">Target service</strong></li>
         <li><strong class="@(step == 2 ? "text-body" : string.Empty)">Target sync</strong></li>
-        <li><strong class="@(step == 3 ? "text-body" : string.Empty)">Review &amp; migrate</strong></li>
+        <li><strong class="@(step == 3 ? "text-body" : string.Empty)">Review &amp; switch</strong></li>
     </ol>
 
     @if (step == 1)
@@ -133,7 +133,7 @@ else
         </div>
         <div class="d-flex gap-2">
             <button class="btn btn-secondary" @onclick="() => step = 2" disabled="@busy">Back</button>
-            <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Migrate now</button>
+            <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Switch now</button>
         </div>
     }
 
@@ -143,85 +143,6 @@ else
     }
 }
 
-<hr />
-<h2>Encrypted local backup</h2><p class="text-muted">Save your local bookmarks to an encrypted file (password of your choice), or restore from one. The file opens only with that password.</p>
-
-<div class="mb-3">
-    <h4>Export</h4>
-    <label class="form-label">Backup password</label>
-    <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
-    <label class="form-label mt-2">Confirm password</label>
-    <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
-    <div class="form-text">Encrypts your current @localCount local item(s). Keep the password: without it the file is unreadable.</div>
-    <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">Export encrypted backup</button>
-    @if (!string.IsNullOrEmpty(bkpMessage))
-    {
-        <div class="alert mt-2 @(bkpError ? "alert-danger" : "alert-success")">@bkpMessage</div>
-    }
-</div>
-
-<div class="mb-3">
-    <h4>Import</h4>
-    <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
-    @if (!string.IsNullOrEmpty(impMessage))
-    {
-        <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")">@impMessage</div>
-    }
-    @if (impPath is not null)
-    {
-        <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
-        <label class="form-label">Backup password</label>
-        <input type="password" class="form-control" @bind="impPassword" autocomplete="current-password" />
-        <div class="form-text">Reading the file verifies the password first — a wrong password stops here.</div>
-        <div class="mt-2 d-flex gap-2">
-            <button class="btn btn-secondary" @onclick="PreviewImport" disabled="@busy">Read backup</button>
-        </div>
-        @if (impCount is not null)
-        {
-            @if (!armedImp)
-            {
-                <div class="alert alert-warning mt-2">
-                    Backup holds <strong>@impCount</strong> item(s); your local tree has <strong>@localCount</strong>.
-                    <div class="mt-2">
-                        <button class="btn btn-danger" @onclick='() => armedImp = true' disabled="@busy">Replace local with backup…</button>
-                    </div>
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-danger mt-2">
-                    <strong>Replace your @localCount local item(s) with the @impCount from backup?</strong>
-                    A safety backup of the current local tree is saved first; the restored tree syncs up right after.
-                    <div class="mt-2 d-flex gap-2">
-                        <button class="btn btn-danger" @onclick="ExecuteImport" disabled="@busy">Yes, restore</button>
-                        <button class="btn btn-secondary" @onclick="() => armedImp = false" disabled="@busy">Cancel</button>
-                    </div>
-                </div>
-            }
-        }
-    }
-</div>
-
-@if (linked)
-{
-    <hr />
-    <h2>Unlink this device</h2>
-    <p class="text-muted">Forget the sync credentials on this device. Your @localCount local item(s) stay untouched; syncing stops until you link again.</p>
-    @if (!armedUnlink)
-    {
-        <button class="btn btn-outline-danger" @onclick="() => armedUnlink = true" disabled="@busy">Unlink…</button>
-    }
-    else
-    {
-        <div class="alert alert-danger">
-            <strong>Forget the credentials and stop syncing?</strong> Local data stays.
-            <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-danger" @onclick="ExecuteUnlink" disabled="@busy">Yes, unlink</button>
-                <button class="btn btn-secondary" @onclick="() => armedUnlink = false" disabled="@busy">Cancel</button>
-            </div>
-        </div>
-    }
-}
 
 @code {
     private int step = 1;
@@ -239,33 +160,9 @@ else
     private bool tookRemote;
     private string? createdId;
     private int localCount;
-    private bool linked;
     private bool busy;
     private string message = string.Empty;
     private bool isError;
-    private string bkpPassword = string.Empty;
-    private string bkpConfirm = string.Empty;
-    private string bkpMessage = string.Empty;
-    private bool bkpError;
-    private string impMessage = string.Empty;
-    private bool impError;
-    private string? impPath;
-    private string? impFileName;
-    private string impPassword = string.Empty;
-    private int? impCount;
-    private bool armedImp;
-    private bool armedUnlink;
-
-    private async Task ExecuteUnlink()
-    {
-        await RunAsync(async () =>
-        {
-            await Creds.ClearAsync();
-            linked = false;
-            armedUnlink = false;
-            Ok("Device unlinked. Local bookmarks kept; link again to resume syncing.");
-        });
-    }
 
     private bool serviceOk =>
         serviceInfo is not null && checkedUrl == targetUrl.Trim();
@@ -282,8 +179,6 @@ else
             var stats = await Session.Store.GetStatsAsync();
             localCount = stats.Folders + stats.Bookmarks + stats.Separators;
         }
-
-        linked = await Creds.GetAsync() is not null;
     }
 
     private static string ShortId(string? id) =>
@@ -368,11 +263,10 @@ else
 
             AppSettings.ServiceUrl = targetUrl.Trim();
             newPassword = string.Empty;
-            linked = true;
             step = 4;
-            Session.Log.Info("migrate", createdId is not null
-                ? "Migration complete: new sync created and uploaded"
-                : tookRemote ? "Migration complete: took remote tree" : "Migration complete: uploaded local tree");
+            Session.Log.Info("switch", createdId is not null
+                ? "Switch complete: new sync created and uploaded"
+                : tookRemote ? "Switch complete: took remote tree" : "Switch complete: uploaded local tree");
         });
     }
 
@@ -407,144 +301,6 @@ else
         }
     }
 
-    private async Task ExportBackup()
-    {
-        await RunAsync(async () =>
-        {
-            RequireMatchingPasswords(bkpPassword, bkpConfirm);
-            var path = await Session.ExportBackupAsync(bkpPassword);
-            bkpPassword = string.Empty;
-            try
-            {
-                await Share.Default.RequestAsync(new ShareFileRequest(
-                    "Save encrypted backup", new ShareFile(path)));
-                Ok($"Backup exported ({localCount} items). Choose where to keep the file.");
-            }
-            catch
-            {
-                Ok($"Backup saved privately. Export it from the app folder when needed.");
-            }
-        });
-        bkpMessage = message;
-        bkpError = isError;
-        message = string.Empty;
-    }
-
-    private async Task PickBackup()
-    {
-        await RunAsync(async () =>
-        {
-            var picked = await FilePicker.Default.PickAsync();
-            if (picked is null)
-            {
-                return;
-            }
-
-            // The picker name is untrusted: strip any path, require JSON.
-            var safeName = Path.GetFileName(picked.FileName);
-            if (string.IsNullOrWhiteSpace(safeName) || !Core.Crypto.BackupGuard.HasSupportedExtension(safeName))
-            {
-                throw new InvalidOperationException("Pick a backup file (.xbs.json).");
-            }
-
-            // Copy into our cache with a size cap: the picked URI may not be a
-            // direct file path, and imports must never OOM the app.
-            ForgetImportTmp();
-            var tmp = Path.Combine(FileSystem.CacheDirectory,
-                $"import-{Guid.NewGuid():N}-{safeName}");
-            await using (var src = await picked.OpenReadAsync())
-            await using (var dst = File.Create(tmp))
-            {
-                await CopyCappedAsync(src, dst, Core.Crypto.BackupGuard.MaxBytes);
-            }
-
-            impPath = tmp;
-            impFileName = safeName;
-            impCount = null;
-            armedImp = false;
-            Ok("File selected. Enter its password and Read backup.");
-        });
-        impMessage = message;
-        impError = isError;
-        message = string.Empty;
-    }
-
-    private void ForgetImportTmp()
-    {
-        if (impPath is not null)
-        {
-            try { File.Delete(impPath); } catch { }
-            impPath = null;
-        }
-    }
-
-    private static async Task CopyCappedAsync(Stream src, Stream dst, long maxBytes)
-    {
-        var buf = new byte[81920];
-        long total = 0;
-        int read;
-        while ((read = await src.ReadAsync(buf).ConfigureAwait(false)) > 0)
-        {
-            total += read;
-            if (total > maxBytes)
-            {
-                throw new InvalidOperationException(
-                    $"File is too large (over {maxBytes / 1024 / 1024} MB).");
-            }
-
-            await dst.WriteAsync(buf.AsMemory(0, read)).ConfigureAwait(false);
-        }
-    }
-
-    private async Task PreviewImport()
-    {
-        await RunAsync(async () =>
-        {
-            if (impPath is null)
-            {
-                throw new InvalidOperationException("Choose a backup file first.");
-            }
-
-            if (string.IsNullOrEmpty(impPassword))
-            {
-                throw new InvalidOperationException("Enter the backup password.");
-            }
-
-            impCount = await Session.PreviewBackupAsync(impPath, impPassword);
-            armedImp = false;
-            Ok("Backup reads correctly. Review the counts above.");
-        });
-        impMessage = message;
-        impError = isError;
-        message = string.Empty;
-    }
-
-    private async Task ExecuteImport()
-    {
-        await RunAsync(async () =>
-        {
-            if (impPath is null || impCount is null)
-            {
-                throw new InvalidOperationException("Read the backup first.");
-            }
-
-            var restored = await Session.ImportBackupAsync(impPath, impPassword);
-            impPassword = string.Empty;
-            impCount = null;
-            armedImp = false;
-            ForgetImportTmp();
-            if (Session.Store is not null)
-            {
-                var stats = await Session.Store.GetStatsAsync();
-                localCount = stats.Folders + stats.Bookmarks + stats.Separators;
-            }
-
-            Ok($"Restored {restored} item(s). They sync up automatically.");
-        });
-        impMessage = message;
-        impError = isError;
-        message = string.Empty;
-    }
 
     private async Task RunAsync(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
     {
@@ -553,15 +309,15 @@ else
         message = string.Empty;
         try
         {
-            Session.Log.Debug("migrate", $"{op}: start");
+            Session.Log.Debug("switch", $"{op}: start");
             await action();
-            Session.Log.Debug("migrate", $"{op}: ok");
+            Session.Log.Debug("switch", $"{op}: ok");
         }
         catch (Exception ex)
         {
             isError = true;
             message = ex.Message;
-            Session.Log.Warn("migrate", $"{op} failed: {ex.GetType().Name}");
+            Session.Log.Warn("switch", $"{op} failed: {ex.GetType().Name}");
         }
         finally
         {

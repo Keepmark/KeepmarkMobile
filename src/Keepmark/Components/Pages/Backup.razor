@@ -1,0 +1,285 @@
+@page "/backup"
+@inject Keepmark.Services.XbsSession Session
+@inject Keepmark.Services.ToastState Toast
+
+<PageTitle>Backup</PageTitle>
+
+<h1>Backup</h1>
+
+@if (!Session.Ready)
+{
+    <p><em>Starting…</em></p>
+}
+else
+{
+    <p class="text-muted">Save your local bookmarks to an encrypted file (password of your choice), or restore from one. The file opens only with that password.</p>
+
+    <div class="mb-3">
+        <h4>Export</h4>
+        <label class="form-label">Backup password</label>
+        <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
+        <label class="form-label mt-2">Confirm password</label>
+        <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
+        <div class="form-text">Encrypts your current @localCount local item(s). Keep the password: without it the file is unreadable.</div>
+        <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">Export encrypted backup</button>
+        @if (!string.IsNullOrEmpty(bkpMessage))
+        {
+            <div class="alert mt-2 @(bkpError ? "alert-danger" : "alert-success")">@bkpMessage</div>
+        }
+    </div>
+
+    <div class="mb-3">
+        <h4>Import</h4>
+        <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
+        @if (!string.IsNullOrEmpty(impMessage))
+        {
+            <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")">@impMessage</div>
+        }
+        @if (impPath is not null)
+        {
+            <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
+            <label class="form-label">Backup password</label>
+            <input type="password" class="form-control" @bind="impPassword" autocomplete="current-password" />
+            <div class="form-text">Reading the file verifies the password first — a wrong password stops here.</div>
+            <div class="mt-2 d-flex gap-2">
+                <button class="btn btn-secondary" @onclick="PreviewImport" disabled="@busy">Read backup</button>
+            </div>
+            @if (impCount is not null)
+            {
+                @if (!armedImp)
+                {
+                    <div class="alert alert-warning mt-2">
+                        Backup holds <strong>@impCount</strong> item(s); your local tree has <strong>@localCount</strong>.
+                        <div class="mt-2">
+                            <button class="btn btn-danger" @onclick='() => armedImp = true' disabled="@busy">Replace local with backup…</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-danger mt-2">
+                        <strong>Replace your @localCount local item(s) with the @impCount from backup?</strong>
+                        A safety backup of the current local tree is saved first; the restored tree syncs up right after.
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-danger" @onclick="ExecuteImport" disabled="@busy">Yes, restore</button>
+                            <button class="btn btn-secondary" @onclick="() => armedImp = false" disabled="@busy">Cancel</button>
+                        </div>
+                    </div>
+                }
+            }
+        }
+    </div>
+}
+
+@code {
+    private int localCount;
+    private bool busy;
+    private string message = string.Empty;
+    private bool isError;
+    private string bkpPassword = string.Empty;
+    private string bkpConfirm = string.Empty;
+    private string bkpMessage = string.Empty;
+    private bool bkpError;
+    private string impMessage = string.Empty;
+    private bool impError;
+    private string? impPath;
+    private string? impFileName;
+    private string impPassword = string.Empty;
+    private int? impCount;
+    private bool armedImp;
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Store is not null)
+        {
+            var stats = await Session.Store.GetStatsAsync();
+            localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+        }
+    }
+
+    private static void RequireMatchingPasswords(string first, string second)
+    {
+        if (first.Length < 8)
+        {
+            throw new InvalidOperationException("Use a password of at least 8 characters.");
+        }
+
+        if (!string.Equals(first, second, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Passwords do not match — retype the confirmation.");
+        }
+    }
+
+    private async Task ExportBackup()
+    {
+        await RunAsync(async () =>
+        {
+            RequireMatchingPasswords(bkpPassword, bkpConfirm);
+            var path = await Session.ExportBackupAsync(bkpPassword);
+            bkpPassword = string.Empty;
+            try
+            {
+                await Share.Default.RequestAsync(new ShareFileRequest(
+                    "Save encrypted backup", new ShareFile(path)));
+                Ok($"Backup exported ({localCount} items). Choose where to keep the file.");
+            }
+            catch
+            {
+                Ok($"Backup saved privately. Export it from the app folder when needed.");
+            }
+        });
+        bkpMessage = message;
+        bkpError = isError;
+        message = string.Empty;
+    }
+
+    private async Task PickBackup()
+    {
+        await RunAsync(async () =>
+        {
+            var picked = await FilePicker.Default.PickAsync();
+            if (picked is null)
+            {
+                return;
+            }
+
+            // The picker name is untrusted: strip any path, require JSON.
+            var safeName = Path.GetFileName(picked.FileName);
+            if (string.IsNullOrWhiteSpace(safeName) || !Core.Crypto.BackupGuard.HasSupportedExtension(safeName))
+            {
+                throw new InvalidOperationException("Pick a backup file (.xbs.json).");
+            }
+
+            // Copy into our cache with a size cap: the picked URI may not be a
+            // direct file path, and imports must never OOM the app.
+            ForgetImportTmp();
+            var tmp = Path.Combine(FileSystem.CacheDirectory,
+                $"import-{Guid.NewGuid():N}-{safeName}");
+            await using (var src = await picked.OpenReadAsync())
+            await using (var dst = File.Create(tmp))
+            {
+                await CopyCappedAsync(src, dst, Core.Crypto.BackupGuard.MaxBytes);
+            }
+
+            impPath = tmp;
+            impFileName = safeName;
+            impCount = null;
+            armedImp = false;
+            Ok("File selected. Enter its password and Read backup.");
+        });
+        impMessage = message;
+        impError = isError;
+        message = string.Empty;
+    }
+
+    private void ForgetImportTmp()
+    {
+        if (impPath is not null)
+        {
+            try { File.Delete(impPath); } catch { }
+            impPath = null;
+        }
+    }
+
+    private static async Task CopyCappedAsync(Stream src, Stream dst, long maxBytes)
+    {
+        var buf = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = await src.ReadAsync(buf).ConfigureAwait(false)) > 0)
+        {
+            total += read;
+            if (total > maxBytes)
+            {
+                throw new InvalidOperationException(
+                    $"File is too large (over {maxBytes / 1024 / 1024} MB).");
+            }
+
+            await dst.WriteAsync(buf.AsMemory(0, read)).ConfigureAwait(false);
+        }
+    }
+
+    private async Task PreviewImport()
+    {
+        await RunAsync(async () =>
+        {
+            if (impPath is null)
+            {
+                throw new InvalidOperationException("Choose a backup file first.");
+            }
+
+            if (string.IsNullOrEmpty(impPassword))
+            {
+                throw new InvalidOperationException("Enter the backup password.");
+            }
+
+            impCount = await Session.PreviewBackupAsync(impPath, impPassword);
+            armedImp = false;
+            Ok("Backup reads correctly. Review the counts above.");
+        });
+        impMessage = message;
+        impError = isError;
+        message = string.Empty;
+    }
+
+    private async Task ExecuteImport()
+    {
+        await RunAsync(async () =>
+        {
+            if (impPath is null || impCount is null)
+            {
+                throw new InvalidOperationException("Read the backup first.");
+            }
+
+            var restored = await Session.ImportBackupAsync(impPath, impPassword);
+            impPassword = string.Empty;
+            impCount = null;
+            armedImp = false;
+            ForgetImportTmp();
+            if (Session.Store is not null)
+            {
+                var stats = await Session.Store.GetStatsAsync();
+                localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+            }
+
+            Ok($"Restored {restored} item(s). They sync up automatically.");
+        });
+        impMessage = message;
+        impError = isError;
+        message = string.Empty;
+    }
+
+    private async Task RunAsync(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
+    {
+        busy = true;
+        isError = false;
+        message = string.Empty;
+        try
+        {
+            Session.Log.Debug("backup", $"{op}: start");
+            await action();
+            Session.Log.Debug("backup", $"{op}: ok");
+        }
+        catch (Exception ex)
+        {
+            isError = true;
+            message = ex.Message;
+            Session.Log.Warn("backup", $"{op} failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void Ok(string text)
+    {
+        isError = false;
+        message = text;
+    }
+}

@@ -16,7 +16,29 @@ else if (linked)
     <div class="alert alert-success">
         Linked to <strong>@linkedUrl</strong> (sync <code>@ShortId(linkedId)</code>).
     </div>
-    <p>To move your bookmarks to another service or sync — or to back them up — use the <a href="migrate">Migrate</a> section.</p>
+    <p>To switch to another service use <a href="switch-service">Switch service</a>, to save or restore an encrypted copy use <a href="backup">Backup</a>.</p>
+
+    <hr />
+    <h2>Unlink this device</h2>
+    <p class="text-muted">Forget the sync credentials on this device. Your @localCount local item(s) stay untouched; syncing stops until you link again.</p>
+    @if (!armedUnlink)
+    {
+        <button class="btn btn-outline-danger" @onclick="() => armedUnlink = true" disabled="@busy">Unlink…</button>
+    }
+    else
+    {
+        <div class="alert alert-danger">
+            <strong>Forget the credentials and stop syncing?</strong> Local data stays.
+            <div class="mt-2 d-flex gap-2">
+                <button class="btn btn-danger" @onclick="ExecuteUnlink" disabled="@busy">Yes, unlink</button>
+                <button class="btn btn-secondary" @onclick="() => armedUnlink = false" disabled="@busy">Cancel</button>
+            </div>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert @(isError ? "alert-danger" : "alert-success")">@message</div>
+    }
 }
 else
 {
@@ -25,7 +47,7 @@ else
         <ul class="mb-1">
             <li><strong>Open an existing sync</strong> below — with an empty library this simply downloads everything from the server.</li>
             <li><strong>Create a new sync</strong> — start empty, or upload bookmarks you already have.</li>
-            <li><strong>Restore an encrypted backup file</strong> — in the <a href="migrate">Migrate</a> section, no connection needed.</li>
+            <li><strong>Restore an encrypted backup file</strong> — in the <a href="backup">Backup</a> section, no connection needed.</li>
         </ul>
         <small>Sync exchanges the whole collection at once (never single items). If both sides change independently, the app reports a conflict instead of merging silently — and every overwrite is safety-backed-up first.</small>
     </div>
@@ -137,6 +159,7 @@ else
     private string? linkedId;
     private int localCount;
     private string? armed;
+    private bool armedUnlink;
 
     protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
 
@@ -167,6 +190,18 @@ else
         id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
 
     private void Disarm() => armed = null;
+
+    private async Task ExecuteUnlink()
+    {
+        await RunAsync(async () =>
+        {
+            await Creds.ClearAsync();
+            armedUnlink = false;
+            await RefreshStateAsync();
+            Session.Log.Info("connect", "Device unlinked");
+            Ok("Device unlinked. Local bookmarks kept; link again to resume syncing.");
+        });
+    }
 
     private static void RequireMatchingPasswords(string first, string second)
     {
