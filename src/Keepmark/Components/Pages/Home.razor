@@ -458,8 +458,9 @@ else
         pinned = Pins.Load();
         sortMode = AppSettings.ListSort;
         await RefreshAsync();
-        await Toast.ShowAsync(added ? "Pinned" : "Unpinned");
+        // Paint first: the toast must never gate the list update.
         StateHasChanged();
+        _ = Toast.ShowAsync(added ? "Pinned" : "Unpinned");
     }
 
     private async Task DeleteRow(ItemRow? row)
@@ -615,17 +616,18 @@ else
         try
         {
             await Session.Engine.ForceSyncAsync();
-            await Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
+            await RefreshAsync();
+            // Paint first: the toast must never gate the list update.
+            StateHasChanged();
+            _ = Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
                 ? $"Sync complete {DateTime.Now:HH:mm:ss}"
                 : $"Sync finished: {Session.Engine.Status}",
                 isError: Session.Engine.Status is not (Core.Sync.SyncStatus.Idle or Core.Sync.SyncStatus.Offline));
         }
         catch (Exception ex)
         {
-            await Toast.ShowAsync(ex.Message, isError: true);
+            _ = Toast.ShowAsync(ex.Message, isError: true);
         }
-
-        await RefreshAsync();
     }
 
     private async Task GoRoot()

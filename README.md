@@ -125,6 +125,11 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
   The nav drawer (`NavMenu` checkbox `@onchange`) uses the same lock,
   owner-keyed (`"sheet"` / `"nav"`): the page stays locked while ANY holder
   asks for it.
+- Toast is fire-and-forget on the UI path: every action renders its list
+  update (`StateHasChanged`) BEFORE `_ = Toast.ShowAsync(...)`. Never `await`
+  a toast while list state is still unpainted (Blazor paints the handler's
+  renders only around explicit `StateHasChanged`, so awaiting first delays
+  the visible update by the toast duration).
 - Share consume: peek-before-consume in `Home.OpenSharedIfPending` via
   `ShareIntake` choke point (limbo for cold start).
 - Auto-mode push runs fire-and-forget; UI closes sheets right after local write.
