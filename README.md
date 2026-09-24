@@ -4,7 +4,7 @@ Rewrite of the xBrowserSync Android client, interoperable with the public
 xBrowserSync API **v1.1.13**. Current version: **v1.0.85 (86)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
 
-`XBrowserSyncApp/` is its own git repo (root `$HOME/Projects/xBrowserSync`
+`Keepmark/` is its own git repo (root `$HOME/Projects/xBrowserSync`
 is NOT a git repo). Solution `Keepmark.slnx`:
 `src/Keepmark` (MAUI Blazor, `net10.0-android` only, min API 29),
 `src/Keepmark.Core` (net10.0, UI-free logic),
@@ -43,7 +43,7 @@ is NOT a git repo). Solution `Keepmark.slnx`:
   (structural enforcement, never just a warning). Single By-link view,
   compact rows, red-✕ marking with locked 🔒 last copy, per-group + global
   delete with busy guard, swipe-right on dup rows shows details.
-- Every user-facing change bumps version + is committed in `XBrowserSyncApp/`
+- Every user-facing change bumps version + is committed in `Keepmark/`
   and pushed to `origin/master`. Docs-only changes don't bump.
 
 ## Environment
@@ -63,7 +63,7 @@ adb disconnect; adb connect <device-ip>:<port>; adb devices
 # device offline on deploy: disconnect ghost entries, reconnect explicit
 ```
 
-## Commands (from `XBrowserSyncApp/`)
+## Commands (from `Keepmark/`)
 
 ```sh
 dotnet test                                            # Core unit + interop (31 tests)
@@ -148,7 +148,7 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
 
 ## Restart checklist
 
-1. `cd $HOME/Projects/xBrowserSync/XBrowserSyncApp && git log --oneline | head -3`
+1. `cd $HOME/Projects/xBrowserSync/Keepmark && git log --oneline | head -3`
 2. Set env (above), `adb connect`, `dotnet test`.
 3. Deploy `-t:Run`, verify `versionName`, screenshot.
 4. Deploy restarts the app → device shows lock screen if auto-lock on; unlock manually.
