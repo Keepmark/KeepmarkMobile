@@ -5,7 +5,7 @@
 <PageTitle>Logs</PageTitle>
 
 <h1>Logs</h1>
-<p class="text-muted">In-memory (last @Shown().Count shown, newest first). At Verbose level entries may include your bookmark titles/URLs — check before sharing.</p>
+<p class="text-muted">Buffer: <strong>@entries.Count</strong> entries · recording at <strong>@minLevel</strong> (change in Settings → Log verbosity). Newest first. At Verbose level entries may include your bookmark titles/URLs — check before sharing.</p>
 
 <div class="d-flex gap-2 flex-wrap mb-2">
     <select class="form-select" style="max-width: 12rem" @bind="level">
@@ -44,15 +44,18 @@ else
 @code {
     private string level = string.Empty;
     private string filter = string.Empty;
+    private string minLevel = "?";
     private List<Core.Logging.LogEntry> entries = [];
 
     protected override void OnInitialized()
     {
+        minLevel = Session.Log.MinLevel.ToString();
         Refresh();
     }
 
     private void Refresh()
     {
+        minLevel = Session.Log.MinLevel.ToString();
         entries = Session.Log.Entries.Reverse().Take(300).ToList();
     }
 

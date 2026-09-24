@@ -54,6 +54,7 @@ public sealed class XbsSession : IAsyncDisposable
         };
         Engine = engine;
         Ready = true;
+        _log.Info("session", $"Log started (level {_log.MinLevel}, mode {_settings.Mode})");
         StartPollTimer();
 
         // Cold-start background sync (auto mode only, credentials present).

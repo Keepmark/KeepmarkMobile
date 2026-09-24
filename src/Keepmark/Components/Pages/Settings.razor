@@ -26,13 +26,14 @@
 
 <div class="mb-3">
     <label class="form-label">Log verbosity</label>
-    <select class="form-select" @bind="verbosity">
+    <select class="form-select" @bind="verbosity" @bind:after="ApplyVerbosity">
         <option value="@Core.Logging.XbsLogLevel.Error">Error</option>
         <option value="@Core.Logging.XbsLogLevel.Warning">Warning</option>
         <option value="@Core.Logging.XbsLogLevel.Info">Info</option>
         <option value="@Core.Logging.XbsLogLevel.Debug">Debug</option>
         <option value="@Core.Logging.XbsLogLevel.Verbose">Verbose (may include your bookmark titles/URLs)</option>
     </select>
+    <div class="form-text">Applies instantly, no Save needed.</div>
 </div>
 
 <div class="mb-3">
@@ -103,11 +104,18 @@
         linkedUrl = c?.ServiceUrl;
     }
 
+    /// <summary>Verbosity applies instantly (no Save needed): later entries
+    /// are recorded at the new level right away.</summary>
+    private void ApplyVerbosity()
+    {
+        AppSettings.Verbosity = verbosity;
+        Session.NotifySettingsChanged();
+    }
+
     private async Task Save()
     {
         error = string.Empty;
         saved = false;
-
         // Enabling or disabling app lock always requires device-PIN confirmation.
         if (appLock != AppSettings.AppLock)
         {
