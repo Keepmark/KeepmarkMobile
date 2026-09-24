@@ -306,6 +306,22 @@ public sealed class SyncEngine(
         return backup;
     }
 
+    /// <summary>Bulk delete by stable NodeId: ONE transaction + ONE push, no
+    /// matter how many rows. The only sane path for multi-delete (sync storms
+    /// get services to throttle you).</summary>
+    public async Task<int> DeleteBookmarksByNodeIdsAsync(IEnumerable<int> nodeIds, CancellationToken ct = default)
+    {
+        await RequireCredsAsync().ConfigureAwait(false);
+        int n = await store.DeleteNodesByNodeIdsAsync(nodeIds).ConfigureAwait(false);
+        if (n > 0)
+        {
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+        }
+
+        log.Info("sync", $"Batch deleted {n} item(s)");
+        return n;
+    }
+
     public async Task MoveBookmarkAsync(int rowId, int? newParentRowId, CancellationToken ct = default)
     {
         await RequireCredsAsync().ConfigureAwait(false);

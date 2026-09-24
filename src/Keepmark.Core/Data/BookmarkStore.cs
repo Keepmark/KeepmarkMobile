@@ -349,6 +349,66 @@ public sealed class BookmarkStore : IAsyncDisposable
         await Db.UpdateAsync(node).ConfigureAwait(false);
     }
 
+    /// <summary>Deletes many nodes by stable NodeId in ONE transaction
+    /// (resolve + delete atomically, so a concurrent push/pull rekey cannot
+    /// strand half the batch). Missing ids are already gone: skipped.
+    /// Returns the number of deleted rows. One caller = one push.</summary>
+    public async Task<int> DeleteNodesByNodeIdsAsync(IEnumerable<int> nodeIds)
+    {
+        var ids = nodeIds.Distinct().ToList();
+        if (ids.Count == 0)
+        {
+            return 0;
+        }
+
+        var db = Db;
+        int deleted = 0;
+        await db.RunInTransactionAsync(tran =>
+        {
+            var placeholders = string.Join(",", Enumerable.Repeat("?", ids.Count));
+            var targets = tran.Query<ItemRow>(
+                $"SELECT * FROM Items WHERE NodeId IN ({placeholders})", ids.Cast<object>().ToArray());
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
+            var rows = tran.Query<ItemRow>("SELECT * FROM Items");
+            var kids = rows.Where(r => r.ParentRowId is not null)
+                .GroupBy(r => r.ParentRowId!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.RowId).ToList());
+
+            var doomed = new HashSet<int>();
+            var queue = new Queue<int>(targets.Select(r => r.RowId));
+            while (queue.Count > 0)
+            {
+                var cur = queue.Dequeue();
+                if (!doomed.Add(cur))
+                {
+                    continue;
+                }
+
+                if (kids.TryGetValue(cur, out var c))
+                {
+                    foreach (var k in c)
+                    {
+                        queue.Enqueue(k);
+                    }
+                }
+            }
+
+            foreach (var id in doomed)
+            {
+                tran.Execute("DELETE FROM Items WHERE RowId = ?", id);
+            }
+
+            deleted = doomed.Count;
+        }).ConfigureAwait(false);
+
+        _log.Debug("store", $"Batch deleted {deleted} row(s)");
+        return deleted;
+    }
+
     /// <summary>Deletes a node and its whole subtree. Returns the parent + subtree for undo.</summary>
     public async Task<(int? ParentRowId, List<BookmarkNode> Subtree)> DeleteNodeAsync(int rowId)
     {

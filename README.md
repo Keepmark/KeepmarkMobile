@@ -137,6 +137,20 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
   `ShareIntake` choke point (limbo for cold start).
 - Auto-mode push runs fire-and-forget; UI closes sheets right after local write.
 
+## Engineering rules (non-negotiable)
+
+- **Efficiency**: batch work into the fewest transactions and network calls.
+  Never loop single-item operations when a bulk path exists — one sync storm
+  can get the service to throttle or blacklist us (it has anti-abuse limits).
+  Example: duplicates cleanup deletes everything in ONE store transaction +
+  ONE push, never one push per row.
+- **Safety**: destructive work resolves by stable identity (NodeId, never a
+  possibly-rekeyed RowId), validates before acting, keeps an undo or
+  safety-backup path, and never swallows errors silently — log them with context.
+- **Atomicity**: multi-step mutations go in a single transaction where SQLite
+  allows it (resolve + delete inside one `tran`), so a concurrent push/pull
+  rekey cannot strand half a batch.
+
 ## Razor/blazor gotchas
 
 - String component params without `@` pass literals.
