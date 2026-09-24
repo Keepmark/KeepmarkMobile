@@ -92,6 +92,77 @@ window.xbsGestures = (() => {
                 e.preventDefault();
             }
         }, true);
+        window.addEventListener('scroll', onScroll, { passive: true });
+        ensureGoButtons();
+    }
+
+    // ---- Scroll jump arrows (↓ below the FAB, ↑ under the breadcrumb) ----
+    let goDown = null, goUp = null, lastY = -1, idleTimer = 0, jumpUntil = 0;
+
+    function ensureGoButtons() {
+        if (goDown) return;
+        const mk = (id, label, dir) => {
+            const b = document.createElement('button');
+            b.id = id;
+            b.type = 'button';
+            b.className = 'xbs-go';
+            b.setAttribute('aria-label', label);
+            b.innerHTML = `<span aria-hidden="true">${dir === 'down' ? '↓' : '↑'}</span>`;
+            b.addEventListener('click', () => jump(dir));
+            document.body.appendChild(b);
+            return b;
+        };
+        goDown = mk('xbs-go-down', 'Go to bottom', 'down');
+        goUp = mk('xbs-go-up', 'Go to top', 'up');
+    }
+
+    function modalOpen() {
+        if (document.documentElement.classList.contains('xbs-locked')) return true;
+        const t = document.querySelector('.navbar-toggler');
+        return !!(t && t.checked);
+    }
+
+    function hideGo() {
+        if (goDown) goDown.classList.remove('show');
+        if (goUp) goUp.classList.remove('show');
+    }
+
+    function onScroll() {
+        if (!goDown || Date.now() < jumpUntil || modalOpen()) { hideGo(); lastY = window.scrollY; return; }
+        const y = window.scrollY;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        clearTimeout(idleTimer);
+        if (max < 120 || lastY < 0) { lastY = y; return; }
+        if (y > lastY + 4 && y < max - 40) {
+            // Scrolling down: offer the jump to bottom.
+            goUp.classList.remove('show');
+            goDown.classList.add('show');
+        } else if (y < lastY - 4 && y > 40) {
+            // Scrolling up: offer the jump to top, right under the crumbs.
+            const crumbs = document.querySelector('.xbs-crumbs');
+            if (crumbs) {
+                const r = crumbs.getBoundingClientRect();
+                goUp.style.top = `${Math.max(0, r.bottom + 8)}px`;
+            }
+            goDown.classList.remove('show');
+            goUp.classList.add('show');
+        } else if (y <= 40 || y >= max - 40) {
+            hideGo();
+        }
+        lastY = y;
+        idleTimer = setTimeout(hideGo, 2000);
+    }
+
+    function jump(dir) {
+        hideGo();
+        // Don't let the programmatic glide re-trigger the arrows.
+        jumpUntil = Date.now() + 900;
+        lastY = -1;
+        try {
+            window.scrollTo({ top: dir === 'down' ? document.documentElement.scrollHeight : 0, behavior: 'smooth' });
+        } catch {
+            window.scrollTo(0, dir === 'down' ? document.documentElement.scrollHeight : 0);
+        }
     }
 
     return {

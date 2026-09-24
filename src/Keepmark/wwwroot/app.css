@@ -708,6 +708,50 @@ html.xbs-locked, body.xbs-locked {
     background: rgba(227, 184, 8, 0.08);
 }
 
+/* Scroll jump arrows: 30px visual (half the FAB), 44px hit area,
+   same 0.85 transparency as the FAB. ↓ sits below the FAB, ↑ under the crumbs. */
+.xbs-go {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    z-index: 1075;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    padding: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease-out;
+}
+
+.xbs-go.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.xbs-go > span {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #1b6ec2;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 30px;
+    text-align: center;
+    opacity: 0.85;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+#xbs-go-down {
+    bottom: max(0.5rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
+}
+
+/* #xbs-go-up top is measured in JS from the live crumbs bottom. */
+
 /* Logs viewer page. */
 .xbs-loglist {
     font-family: ui-monospace, monospace;
