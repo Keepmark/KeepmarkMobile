@@ -24,7 +24,11 @@ public sealed class DataOutOfSyncException(string message, Exception? inner = nu
 public sealed class SyncTooLargeException(string message, Exception? inner = null) : XbsException(message, inner);
 
 /// <summary>429 — throttled by the service.</summary>
-public sealed class ThrottledException(string message, Exception? inner = null) : XbsException(message, inner);
+public sealed class ThrottledException(string message, Exception? inner = null) : XbsException(message, inner)
+{
+    /// <summary>Seconds from the service Retry-After header, if present.</summary>
+    public int? RetryAfterSeconds { get; init; }
+}
 
 /// <summary>5xx or unreachable — service considered offline.</summary>
 public sealed class ServiceOfflineException(string message, Exception? inner = null) : XbsException(message, inner);

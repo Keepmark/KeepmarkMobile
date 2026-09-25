@@ -134,6 +134,97 @@ public sealed class ApiClientTests
     }
 
     [Fact]
+    public async Task TransientFailure_RetriedThenSucceeds()
+    {
+        var (client, handler, _) = Create();
+        var calls = 0;
+        handler.Responder = _ =>
+        {
+            calls++;
+            if (calls == 1)
+            {
+                throw new HttpRequestException("flaky");
+            }
+
+            return Json(new { lastUpdated = "t" });
+        };
+
+        var res = await client.GetLastUpdatedAsync("id");
+
+        Assert.Equal("t", res.LastUpdated);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task PersistentFailure_StopsAfterMaxAttempts()
+    {
+        var (client, handler, _) = Create();
+        var calls = 0;
+        handler.Responder = _ =>
+        {
+            calls++;
+            throw new HttpRequestException("down");
+        };
+
+        await Assert.ThrowsAsync<ServiceOfflineException>(() => client.GetLastUpdatedAsync("id"));
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task Create_NeverRetried()
+    {
+        var (client, handler, _) = Create();
+        var calls = 0;
+        handler.Responder = _ =>
+        {
+            calls++;
+            return Json(new { message = "boom" }, HttpStatusCode.InternalServerError);
+        };
+
+        await Assert.ThrowsAsync<ServiceOfflineException>(() => client.CreateSyncAsync());
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task Throttled_CarriesRetryAfter_AndRetries()
+    {
+        var (client, handler, _) = Create();
+        var calls = 0;
+        handler.Responder = _ =>
+        {
+            calls++;
+            if (calls <= 2)
+            {
+                var r = Json(new { message = "slow" }, HttpStatusCode.TooManyRequests);
+                r.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.Zero);
+                return r;
+            }
+
+            return Json(new { lastUpdated = "t" });
+        };
+
+        var res = await client.GetLastUpdatedAsync("id");
+
+        Assert.Equal("t", res.LastUpdated);
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task NonTransient_NeverRetried()
+    {
+        var (client, handler, _) = Create();
+        var calls = 0;
+        handler.Responder = _ =>
+        {
+            calls++;
+            return Json(new { message = "no" }, HttpStatusCode.Unauthorized);
+        };
+
+        await Assert.ThrowsAsync<SyncNotFoundException>(() => client.GetLastUpdatedAsync("id"));
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
     public async Task Responses_DeserializeMetaAndCapabilities()
     {
         var (client, handler, _) = Create();

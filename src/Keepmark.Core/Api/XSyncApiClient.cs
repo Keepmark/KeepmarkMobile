@@ -153,7 +153,8 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
     {
         var body = new { version = XbsConstants.SyncClientVersion };
         var res = await SendAsync<CreateSyncResponse>(HttpMethod.Post, "bookmarks", body,
-            static r => r.Id is not null && r.LastUpdated is not null && r.Version is not null, ct);
+            static r => r.Id is not null && r.LastUpdated is not null && r.Version is not null, ct,
+            idempotent: false);
         return res;
     }
 
@@ -189,8 +190,14 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
             static r => r.LastUpdated is not null, ct, syncId, XbsConstants.ApiVersion12);
     }
 
-    public async Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(
+    public Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(
         string syncId, string knownHash, CancellationToken ct = default)
+        => WithRetryAsync(
+            () => AttemptConditionalAsync(syncId, knownHash, ct),
+            $"GET bookmarks/{{id}}", syncId, idempotent: true, ct);
+
+    private async Task<GetBookmarksResponse?> AttemptConditionalAsync(
+        string syncId, string knownHash, CancellationToken ct)
     {
         var label = LogSanitizer.PathFor($"GET bookmarks/{{id}}", syncId);
         var sw = Stopwatch.StartNew();
@@ -210,7 +217,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 
             if (!res.IsSuccessStatusCode)
             {
-                throw MapError(res.StatusCode, await ReadMessageAsync(res, ct).ConfigureAwait(false));
+                throw MapError(res.StatusCode, await ReadMessageAsync(res, ct).ConfigureAwait(false), res);
             }
 
             var dto = await res.Content.ReadFromJsonAsync<GetBookmarksResponse>(Json, ct).ConfigureAwait(false);
@@ -239,9 +246,48 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         }
     }
 
-    private async Task<T> SendAsync<T>(
+    private Task<T> SendAsync<T>(
         HttpMethod method, string path, object? body, Func<T, bool> valid, CancellationToken ct,
-        string? syncId = null, string? apiVersion = null)
+        string? syncId = null, string? apiVersion = null, bool idempotent = true)
+        => WithRetryAsync(
+            () => AttemptAsync<T>(method, path, body, valid, apiVersion, syncId, ct),
+            $"{method} {path}", syncId, idempotent, ct);
+
+    /// <summary>Retry loop: transient failures are retried with backoff, user
+    /// cancellation and non-transient errors propagate immediately.
+    /// Non-idempotent calls (sync creation) run exactly once.</summary>
+    private async Task<T> WithRetryAsync<T>(
+        Func<Task<T>> attempt, string route, string? syncId, bool idempotent, CancellationToken ct)
+    {
+        var done = 0;
+        while (true)
+        {
+            done++;
+            try
+            {
+                return await attempt().ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is XbsException or HttpRequestException or TaskCanceledException)
+            {
+                ct.ThrowIfCancellationRequested();
+                var retryAfter = ex is ThrottledException th && th.RetryAfterSeconds.HasValue
+                    ? TimeSpan.FromSeconds(th.RetryAfterSeconds.Value)
+                    : (TimeSpan?)null;
+                var (retry, delay) = Resilience.RetryPolicy.ForAttempt(ex, done, retryAfter);
+                if (!idempotent || !retry)
+                {
+                    throw;
+                }
+
+                _log.Warn("net", $"↻ RETRY {LogSanitizer.PathFor(route, syncId)} attempt {done} in {(int)delay.TotalMilliseconds}ms ({ex.GetType().Name})");
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task<T> AttemptAsync<T>(
+        HttpMethod method, string path, object? body, Func<T, bool> valid,
+        string? apiVersion, string? syncId, CancellationToken ct)
     {
         var label = LogSanitizer.PathFor($"{method} {path}", syncId);
         var sw = Stopwatch.StartNew();
@@ -263,7 +309,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 
             if (!res.IsSuccessStatusCode)
             {
-                throw MapError(res.StatusCode, await ReadMessageAsync(res, ct).ConfigureAwait(false));
+                throw MapError(res.StatusCode, await ReadMessageAsync(res, ct).ConfigureAwait(false), res);
             }
 
             var dto = await res.Content.ReadFromJsonAsync<T>(Json, ct).ConfigureAwait(false);
@@ -310,7 +356,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         return string.Empty;
     }
 
-    private XbsException MapError(HttpStatusCode status, string serverMessage) => status switch
+    private XbsException MapError(HttpStatusCode status, string serverMessage, HttpResponseMessage? res = null) => status switch
     {
         HttpStatusCode.Unauthorized => new SyncNotFoundException(WithServer(_str.Get(Str.ErrSyncNotFound), serverMessage)),
         HttpStatusCode.NotFound => new InvalidServiceException(WithServer(_str.Get(Str.ErrInvalidService), serverMessage)),
@@ -318,10 +364,23 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         HttpStatusCode.NotAcceptable => new DailyNewSyncLimitException(WithServer(_str.Get(Str.ErrDailyNewSyncLimit), serverMessage)),
         HttpStatusCode.Conflict => new DataOutOfSyncException(WithServer(_str.Get(Str.ErrDataOutOfSync), serverMessage)),
         HttpStatusCode.RequestEntityTooLarge => new SyncTooLargeException(WithServer(_str.Get(Str.ErrSyncTooLarge, 0), serverMessage)),
-        HttpStatusCode.TooManyRequests => new ThrottledException(WithServer(_str.Get(Str.ErrThrottled), serverMessage)),
+        HttpStatusCode.TooManyRequests => new ThrottledException(WithServer(_str.Get(Str.ErrThrottled), serverMessage))
+        {
+            RetryAfterSeconds = ReadRetryAfter(res),
+        },
         >= HttpStatusCode.InternalServerError => new ServiceOfflineException(WithServer(_str.Get(Str.ErrServiceOffline), serverMessage)),
         _ => new ServiceOfflineException(WithServer(_str.Get(Str.ErrServiceOffline), serverMessage)),
     };
+
+    private static int? ReadRetryAfter(HttpResponseMessage? res)
+    {
+        if (res?.Headers.RetryAfter?.Delta is TimeSpan delta)
+        {
+            return (int)delta.TotalSeconds;
+        }
+
+        return null;
+    }
 
     private static string WithServer(string local, string server) =>
         string.IsNullOrWhiteSpace(server) ? local : $"{local} (server: {server})";

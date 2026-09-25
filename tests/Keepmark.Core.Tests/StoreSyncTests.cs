@@ -20,9 +20,13 @@ sealed class FakeApi : IXSyncApiClient
     public string? LastPushed { get; private set; }
     public bool V12 { get; set; }
     public long Revision { get; set; } = 7;
-    public string Hash { get; set; } = "hash-7";
+    public string Hash => Crypto.BlobHash.Of(Blob);
     public long? LastBaseRevision { get; private set; }
     public int ConditionalHits { get; private set; }
+    /// <summary>Applies the write, then throws conflict (ambiguous-timeout simulation).</summary>
+    public bool ApplyThenConflict { get; set; }
+    /// <summary>When set, a conflicting write replaces the remote blob with this instead.</summary>
+    public string? ConflictSwapBlob { get; set; }
 
     public Task<ServiceInfoResponse> GetInfoAsync(CancellationToken ct = default) =>
         Task.FromResult(new ServiceInfoResponse
@@ -45,12 +49,14 @@ sealed class FakeApi : IXSyncApiClient
     public Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(string syncId, string knownHash, CancellationToken ct = default)
     {
         ConditionalHits++;
-        return Task.FromResult<GetBookmarksResponse?>(knownHash == Hash ? null : new GetBookmarksResponse
+        // Match when the known hash equals the hash of the current remote blob.
+        var current = Crypto.BlobHash.Of(Blob);
+        return Task.FromResult<GetBookmarksResponse?>(string.Equals(knownHash, current, StringComparison.Ordinal) ? null : new GetBookmarksResponse
         {
             Bookmarks = Blob,
             Version = Version,
             LastUpdated = LastUpdated,
-            Meta = new SyncMeta { Revision = Revision, Hash = Hash },
+            Meta = new SyncMeta { Revision = Revision, Hash = current },
         });
     }
     public Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default) =>
@@ -60,7 +66,7 @@ sealed class FakeApi : IXSyncApiClient
     public Task<UpdateBookmarksResponse> UpdateBookmarksAsync(
         string syncId, string encryptedBookmarks, string lastUpdated, bool updateVersion = false, CancellationToken ct = default)
     {
-        if (FailConflict)
+        if (FailConflict && !ApplyThenConflict)
         {
             throw new DataOutOfSyncException("conflict");
         }
@@ -68,7 +74,12 @@ sealed class FakeApi : IXSyncApiClient
         PushCount++;
         LastPushed = encryptedBookmarks;
         LastUpdated = "2024-02-02T00:00:00.000Z";
-        Blob = encryptedBookmarks;
+        Blob = ConflictSwapBlob ?? encryptedBookmarks;
+        if (ApplyThenConflict)
+        {
+            throw new DataOutOfSyncException("conflict");
+        }
+
         return Task.FromResult(new UpdateBookmarksResponse { LastUpdated = LastUpdated });
     }
 
@@ -76,7 +87,7 @@ sealed class FakeApi : IXSyncApiClient
         string syncId, string encryptedBookmarks, long baseRevision, bool updateVersion = false, CancellationToken ct = default)
     {
         LastBaseRevision = baseRevision;
-        if (FailConflict || baseRevision != Revision)
+        if ((FailConflict && !ApplyThenConflict) || baseRevision != Revision)
         {
             throw new DataOutOfSyncException("conflict");
         }
@@ -84,13 +95,17 @@ sealed class FakeApi : IXSyncApiClient
         PushCount++;
         LastPushed = encryptedBookmarks;
         LastUpdated = "2024-02-02T00:00:00.000Z";
-        Blob = encryptedBookmarks;
+        Blob = ConflictSwapBlob ?? encryptedBookmarks;
+        if (ApplyThenConflict)
+        {
+            throw new DataOutOfSyncException("conflict");
+        }
+
         Revision++;
-        Hash = $"hash-{Revision}";
         return Task.FromResult(new UpdateBookmarksResponse
         {
             LastUpdated = LastUpdated,
-            Meta = new SyncMeta { Revision = Revision, Hash = Hash },
+            Meta = new SyncMeta { Revision = Revision, Hash = Crypto.BlobHash.Of(Blob) },
         });
     }
 }
@@ -313,7 +328,7 @@ public sealed class StoreSyncTests : IAsyncLifetime
 
         Assert.Equal(7, _api.LastBaseRevision);
         Assert.Equal("8", await _store.GetMetaAsync(BookmarkStore.MetaRevision));
-        Assert.Equal("hash-8", await _store.GetMetaAsync(BookmarkStore.MetaHash));
+        Assert.Equal(Crypto.BlobHash.Of(_api.LastPushed!), await _store.GetMetaAsync(BookmarkStore.MetaHash));
     }
 
     [Fact]
@@ -366,6 +381,46 @@ public sealed class StoreSyncTests : IAsyncLifetime
         Assert.True(await _engine.PullAsync());
         Assert.Null(await _store.GetMetaAsync(BookmarkStore.MetaRevision));
         Assert.Null(await _store.GetMetaAsync(BookmarkStore.MetaHash));
+    }
+
+    [Fact]
+    public async Task Engine_Push_AmbiguousTimeout_AdoptsRemote_WhenBlobMatches()
+    {
+        _api.V12 = true;
+        _api.ApplyThenConflict = true; // write landed, response lost
+        await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0", revision: 7, hash: "old");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+
+        await _engine.PushAsync(); // must NOT throw
+
+        Assert.Equal(SyncStatus.Idle, _engine.Status);
+        Assert.Equal("0", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+    }
+
+    [Fact]
+    public async Task Engine_Push_AmbiguousTimeout_KeepsConflict_WhenBlobDiffers()
+    {
+        _api.V12 = true;
+        _api.ApplyThenConflict = true;
+        _api.ConflictSwapBlob = "someone-elses-blob";
+        await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0", revision: 7, hash: "old");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+
+        await Assert.ThrowsAsync<DataOutOfSyncException>(() => _engine.PushAsync());
+        Assert.Equal(SyncStatus.Conflict, _engine.Status);
+    }
+
+    [Fact]
+    public async Task Engine_Push_AmbiguousTimeout_LegacyServer_ComparesCiphertext()
+    {
+        _api.V12 = false;
+        _api.ApplyThenConflict = true;
+        await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+
+        await _engine.PushAsync();
+
+        Assert.Equal(SyncStatus.Idle, _engine.Status);
     }
 
     [Fact]

@@ -189,6 +189,29 @@ public sealed class SyncEngine(
         return cached;
     }
 
+    /// <summary>Best-effort check: does the server already hold exactly this blob?
+    /// v1.2 uses the content hash (one conditional GET); legacy downloads and
+    /// compares ciphertext. Any failure answers false (caller keeps the conflict).</summary>
+    private async Task<bool> RemoteHasBlobAsync(string serviceUrl, string syncId, string blob, CancellationToken ct)
+    {
+        try
+        {
+            var api = apiFor(serviceUrl);
+            if (await IsV12Async(serviceUrl, ct).ConfigureAwait(false))
+            {
+                return await api.GetBookmarksIfChangedAsync(syncId, BlobHash.Of(blob), ct).ConfigureAwait(false) is null;
+            }
+
+            var full = await api.GetBookmarksAsync(syncId, ct).ConfigureAwait(false);
+            return string.Equals(full.Bookmarks, blob, StringComparison.Ordinal);
+        }
+        catch (Exception ex)
+        {
+            log.Debug("sync", $"RemoteHasBlob check failed: {ex.GetType().Name}");
+            return false;
+        }
+    }
+
     public async Task PushAsync(bool updateVersion = false, CancellationToken ct = default)
     {
         log.Debug("sync", "Push: start");
@@ -207,9 +230,14 @@ public sealed class SyncEngine(
     {
         var c = await RequireCredsAsync().ConfigureAwait(false);
         SetStatus(SyncStatus.Syncing);
+        List<BookmarkNode> roots = [];
+        string blob = string.Empty;
         try
         {
-            var (roots, _, lastUpdated, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+            List<BookmarkNode> loaded;
+            string? lastUpdated;
+            (loaded, _, lastUpdated, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+            roots = loaded;
             var dirty = await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false);
             if (lastUpdated is null)
             {
@@ -218,7 +246,7 @@ public sealed class SyncEngine(
 
             Normalize(roots);
             var json = JsonSerializer.Serialize(roots, Json);
-            var blob = crypto.Encrypt(json, c.DerivedKey);
+            blob = crypto.Encrypt(json, c.DerivedKey);
 
             var api = apiFor(c.ServiceUrl);
             UpdateBookmarksResponse res;
@@ -250,6 +278,28 @@ public sealed class SyncEngine(
         }
         catch (DataOutOfSyncException)
         {
+            // Ambiguous timeout? If the server already holds our exact blob
+            // (our push landed but the response was lost), adopt it instead
+            // of reporting a phantom conflict.
+            if (await RemoteHasBlobAsync(c.ServiceUrl, c.Id, blob, ct).ConfigureAwait(false))
+            {
+                log.Info("sync", "Push: server already had our blob, adopting");
+                var remote = await apiFor(c.ServiceUrl).GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
+                await store.ReplaceAllAsync(roots, blob, remote.LastUpdated!,
+                    updateVersion ? XbsConstants.SyncClientVersion : c.Version,
+                    remote.Meta?.Revision, remote.Meta?.Hash).ConfigureAwait(false);
+                if (updateVersion)
+                {
+                    await creds.SetAsync(c with { Version = XbsConstants.SyncClientVersion }).ConfigureAwait(false);
+                }
+
+                PendingEdits = 0;
+                LastSyncAt = DateTimeOffset.UtcNow;
+                SetStatus(SyncStatus.Idle);
+                DataChanged?.Invoke();
+                return;
+            }
+
             SetStatus(SyncStatus.Conflict);
             throw;
         }
