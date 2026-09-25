@@ -18,13 +18,41 @@ sealed class FakeApi : IXSyncApiClient
     public bool FailConflict { get; set; }
     public int PushCount { get; private set; }
     public string? LastPushed { get; private set; }
+    public bool V12 { get; set; }
+    public long Revision { get; set; } = 7;
+    public string Hash { get; set; } = "hash-7";
+    public long? LastBaseRevision { get; private set; }
+    public int ConditionalHits { get; private set; }
 
     public Task<ServiceInfoResponse> GetInfoAsync(CancellationToken ct = default) =>
-        Task.FromResult(new ServiceInfoResponse { Status = ServiceStatus.Online, Version = "1.1.13", MaxSyncSize = 1048576 });
+        Task.FromResult(new ServiceInfoResponse
+        {
+            Status = ServiceStatus.Online,
+            Version = "1.1.13",
+            MaxSyncSize = 1048576,
+            Capabilities = V12 ? new ApiCapabilities { Revision = true, ConditionalGet = true, Delete = true } : null,
+        });
     public Task<CreateSyncResponse> CreateSyncAsync(CancellationToken ct = default) =>
         Task.FromResult(new CreateSyncResponse { Id = "new-id", LastUpdated = LastUpdated, Version = Version });
     public Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default) =>
-        Task.FromResult(new GetBookmarksResponse { Bookmarks = Blob, Version = Version, LastUpdated = LastUpdated });
+        Task.FromResult(new GetBookmarksResponse
+        {
+            Bookmarks = Blob,
+            Version = Version,
+            LastUpdated = LastUpdated,
+            Meta = V12 ? new SyncMeta { Revision = Revision, Hash = Hash } : null,
+        });
+    public Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(string syncId, string knownHash, CancellationToken ct = default)
+    {
+        ConditionalHits++;
+        return Task.FromResult<GetBookmarksResponse?>(knownHash == Hash ? null : new GetBookmarksResponse
+        {
+            Bookmarks = Blob,
+            Version = Version,
+            LastUpdated = LastUpdated,
+            Meta = new SyncMeta { Revision = Revision, Hash = Hash },
+        });
+    }
     public Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default) =>
         Task.FromResult(new LastUpdatedResponse { LastUpdated = LastUpdated });
     public Task<VersionResponse> GetVersionAsync(string syncId, CancellationToken ct = default) =>
@@ -42,6 +70,28 @@ sealed class FakeApi : IXSyncApiClient
         LastUpdated = "2024-02-02T00:00:00.000Z";
         Blob = encryptedBookmarks;
         return Task.FromResult(new UpdateBookmarksResponse { LastUpdated = LastUpdated });
+    }
+
+    public Task<UpdateBookmarksResponse> UpdateBookmarksV12Async(
+        string syncId, string encryptedBookmarks, long baseRevision, bool updateVersion = false, CancellationToken ct = default)
+    {
+        LastBaseRevision = baseRevision;
+        if (FailConflict || baseRevision != Revision)
+        {
+            throw new DataOutOfSyncException("conflict");
+        }
+
+        PushCount++;
+        LastPushed = encryptedBookmarks;
+        LastUpdated = "2024-02-02T00:00:00.000Z";
+        Blob = encryptedBookmarks;
+        Revision++;
+        Hash = $"hash-{Revision}";
+        return Task.FromResult(new UpdateBookmarksResponse
+        {
+            LastUpdated = LastUpdated,
+            Meta = new SyncMeta { Revision = Revision, Hash = Hash },
+        });
     }
 }
 
@@ -250,6 +300,72 @@ public sealed class StoreSyncTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<DataOutOfSyncException>(() => _engine.PushAsync());
         Assert.Equal(SyncStatus.Conflict, _engine.Status);
+    }
+
+    [Fact]
+    public async Task Engine_Push_V12_UsesRevisionBase_AndPersistsMeta()
+    {
+        _api.V12 = true;
+        await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0", revision: 7, hash: "hash-7");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+
+        await _engine.PushAsync();
+
+        Assert.Equal(7, _api.LastBaseRevision);
+        Assert.Equal("8", await _store.GetMetaAsync(BookmarkStore.MetaRevision));
+        Assert.Equal("hash-8", await _store.GetMetaAsync(BookmarkStore.MetaHash));
+    }
+
+    [Fact]
+    public async Task Engine_Push_V12_StaleRevision_SurfacesConflict()
+    {
+        _api.V12 = true;
+        _api.Revision = 9; // server moved on
+        await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0", revision: 7, hash: "hash-7");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+
+        await Assert.ThrowsAsync<DataOutOfSyncException>(() => _engine.PushAsync());
+        Assert.Equal(SyncStatus.Conflict, _engine.Status);
+    }
+
+    [Fact]
+    public async Task Engine_Push_LegacyServer_NeverSendsRevision()
+    {
+        _api.V12 = false;
+        await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0", revision: 7, hash: "hash-7");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+
+        await _engine.PushAsync();
+
+        Assert.Null(_api.LastBaseRevision);
+    }
+
+    [Fact]
+    public async Task Engine_Pull_V12_PersistsMeta_AndSkipsDownloadOn304()
+    {
+        _api.V12 = true;
+        await _store.ReplaceAllAsync([], string.Empty, "old", "1.8.0");
+        _api.Blob = _crypto.Encrypt("[{\"id\":9,\"title\":\"Remote\",\"url\":\"https://r.example\"}]", Key);
+
+        Assert.True(await _engine.PullAsync());
+        Assert.Equal("7", await _store.GetMetaAsync(BookmarkStore.MetaRevision));
+
+        // Server metadata touched but content identical → 304, no download.
+        _api.LastUpdated = "2024-03-03T00:00:00.000Z";
+        Assert.False(await _engine.PullAsync());
+        Assert.Equal(1, _api.ConditionalHits);
+    }
+
+    [Fact]
+    public async Task Engine_Pull_LegacyServer_ClearsStaleRevision()
+    {
+        _api.V12 = false;
+        await _store.ReplaceAllAsync([], string.Empty, "old", "1.8.0", revision: 7, hash: "hash-7");
+        _api.Blob = _crypto.Encrypt("[{\"id\":9,\"title\":\"Remote\",\"url\":\"https://r.example\"}]", Key);
+
+        Assert.True(await _engine.PullAsync());
+        Assert.Null(await _store.GetMetaAsync(BookmarkStore.MetaRevision));
+        Assert.Null(await _store.GetMetaAsync(BookmarkStore.MetaHash));
     }
 
     [Fact]

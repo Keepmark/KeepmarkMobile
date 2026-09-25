@@ -57,6 +57,8 @@ public sealed class BookmarkStore : IAsyncDisposable
 {
     public const string MetaLastUpdated = "lastUpdated";
     public const string MetaVersion = "syncVersion";
+    public const string MetaRevision = "syncRevision";
+    public const string MetaHash = "syncHash";
     public const string MetaDirty = "dirty";
     public const string BlobBookmarks = "bookmarks";
 
@@ -120,7 +122,8 @@ public sealed class BookmarkStore : IAsyncDisposable
         _db ?? throw new InvalidOperationException("Call InitializeAsync first.");
 
     public async Task ReplaceAllAsync(
-        List<BookmarkNode> roots, string encryptedBlob, string lastUpdated, string? version)
+        List<BookmarkNode> roots, string encryptedBlob, string lastUpdated, string? version,
+        long? revision = null, string? hash = null)
     {
         var db = Db;
         await db.RunInTransactionAsync(tran =>
@@ -136,6 +139,25 @@ public sealed class BookmarkStore : IAsyncDisposable
             tran.InsertOrReplace(new MetaRow { Key = MetaLastUpdated, Value = lastUpdated });
             tran.InsertOrReplace(new MetaRow { Key = MetaVersion, Value = version });
             tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "0" });
+            // v1.2 meta: stored when the server speaks it, cleared otherwise
+            // so a legacy pull never leaves a stale revision behind.
+            if (revision.HasValue)
+            {
+                tran.InsertOrReplace(new MetaRow { Key = MetaRevision, Value = revision.Value.ToString() });
+            }
+            else
+            {
+                tran.Execute("DELETE FROM Meta WHERE Key = ?", MetaRevision);
+            }
+
+            if (hash is not null)
+            {
+                tran.InsertOrReplace(new MetaRow { Key = MetaHash, Value = hash });
+            }
+            else
+            {
+                tran.Execute("DELETE FROM Meta WHERE Key = ?", MetaHash);
+            }
         }).ConfigureAwait(false);
         _log.Info("store", $"Mirror replaced: {CountNodes(roots)} nodes, lastUpdated={lastUpdated}");
     }

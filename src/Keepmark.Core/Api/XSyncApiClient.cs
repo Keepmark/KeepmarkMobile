@@ -20,6 +20,8 @@ public sealed class CreateSyncResponse
     public string? LastUpdated { get; set; }
     [JsonPropertyName("version")]
     public string? Version { get; set; }
+    [JsonPropertyName("meta")]
+    public SyncMeta? Meta { get; set; }
 }
 
 public sealed class GetBookmarksResponse
@@ -30,6 +32,8 @@ public sealed class GetBookmarksResponse
     public string? Version { get; set; }
     [JsonPropertyName("lastUpdated")]
     public string? LastUpdated { get; set; }
+    [JsonPropertyName("meta")]
+    public SyncMeta? Meta { get; set; }
 }
 
 public sealed class LastUpdatedResponse
@@ -48,6 +52,32 @@ public sealed class UpdateBookmarksResponse
 {
     [JsonPropertyName("lastUpdated")]
     public string? LastUpdated { get; set; }
+    [JsonPropertyName("meta")]
+    public SyncMeta? Meta { get; set; }
+}
+
+/// <summary>v1.2 sync metadata envelope (absent on legacy servers).</summary>
+public sealed class SyncMeta
+{
+    [JsonPropertyName("revision")]
+    public long Revision { get; set; }
+    [JsonPropertyName("hash")]
+    public string? Hash { get; set; }
+    [JsonPropertyName("size")]
+    public long Size { get; set; }
+    [JsonPropertyName("createdAt")]
+    public string? CreatedAt { get; set; }
+}
+
+/// <summary>v1.2 capability advertisement (absent on legacy servers).</summary>
+public sealed class ApiCapabilities
+{
+    [JsonPropertyName("revision")]
+    public bool Revision { get; set; }
+    [JsonPropertyName("conditionalGet")]
+    public bool ConditionalGet { get; set; }
+    [JsonPropertyName("delete")]
+    public bool Delete { get; set; }
 }
 
 public sealed class ServiceInfoResponse
@@ -62,6 +92,8 @@ public sealed class ServiceInfoResponse
     public ServiceStatus Status { get; set; }
     [JsonPropertyName("version")]
     public string? Version { get; set; }
+    [JsonPropertyName("capabilities")]
+    public ApiCapabilities? Capabilities { get; set; }
 }
 
 public interface IXSyncApiClient
@@ -69,10 +101,15 @@ public interface IXSyncApiClient
     Task<ServiceInfoResponse> GetInfoAsync(CancellationToken ct = default);
     Task<CreateSyncResponse> CreateSyncAsync(CancellationToken ct = default);
     Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default);
+    /// <summary>v1.2 conditional GET: null when the server answers 304.</summary>
+    Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(string syncId, string knownHash, CancellationToken ct = default);
     Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default);
     Task<VersionResponse> GetVersionAsync(string syncId, CancellationToken ct = default);
     Task<UpdateBookmarksResponse> UpdateBookmarksAsync(
         string syncId, string encryptedBookmarks, string lastUpdated, bool updateVersion = false, CancellationToken ct = default);
+    /// <summary>v1.2 revision-based update (atomic CAS on revision).</summary>
+    Task<UpdateBookmarksResponse> UpdateBookmarksV12Async(
+        string syncId, string encryptedBookmarks, long baseRevision, bool updateVersion = false, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -97,7 +134,8 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 
     public void Dispose() => _http.Dispose();
 
-    /// <summary>Builds a client bound to a service URL with the required Accept-Version header.</summary>
+    /// <summary>Builds a client bound to a service URL. The Accept-Version header
+    /// is set per request (SendAsync), defaulting to ApiVersion (1.1.x contract).</summary>
     public static XSyncApiClient ForService(string serviceUrl, IXbsLocalizer str, IXbsLogger log)
     {
         var http = new HttpClient
@@ -105,7 +143,6 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
             BaseAddress = new Uri(serviceUrl.TrimEnd('/') + '/'),
             Timeout = XbsConstants.DefaultHttpTimeout
         };
-        http.DefaultRequestHeaders.Add("Accept-Version", XbsConstants.ApiVersion);
         return new XSyncApiClient(http, str, log);
     }
 
@@ -142,8 +179,69 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
             static r => r.LastUpdated is not null, ct, syncId);
     }
 
+    public Task<UpdateBookmarksResponse> UpdateBookmarksV12Async(
+        string syncId, string encryptedBookmarks, long baseRevision, bool updateVersion = false, CancellationToken ct = default)
+    {
+        object body = updateVersion
+            ? new { bookmarks = encryptedBookmarks, baseRevision, version = XbsConstants.SyncClientVersion }
+            : new { bookmarks = encryptedBookmarks, baseRevision };
+        return SendAsync<UpdateBookmarksResponse>(HttpMethod.Put, $"bookmarks/{syncId}", body,
+            static r => r.LastUpdated is not null, ct, syncId, XbsConstants.ApiVersion12);
+    }
+
+    public async Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(
+        string syncId, string knownHash, CancellationToken ct = default)
+    {
+        var label = LogSanitizer.PathFor($"GET bookmarks/{{id}}", syncId);
+        var sw = Stopwatch.StartNew();
+        _log.Info("net", $"→ START {label} (If-None-Match)");
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"bookmarks/{syncId}");
+            req.Headers.TryAddWithoutValidation("Accept-Version", XbsConstants.ApiVersion12);
+            req.Headers.TryAddWithoutValidation("If-None-Match", $"\"{knownHash}\"");
+            using var res = await _http.SendAsync(req, ct).ConfigureAwait(false);
+            sw.Stop();
+            _log.Info("net", $"← END {label} {(int)res.StatusCode} in {sw.ElapsedMilliseconds}ms");
+            if (res.StatusCode == HttpStatusCode.NotModified)
+            {
+                return null;
+            }
+
+            if (!res.IsSuccessStatusCode)
+            {
+                throw MapError(res.StatusCode, await ReadMessageAsync(res, ct).ConfigureAwait(false));
+            }
+
+            var dto = await res.Content.ReadFromJsonAsync<GetBookmarksResponse>(Json, ct).ConfigureAwait(false);
+            if (dto is null || dto.LastUpdated is null)
+            {
+                throw new UnexpectedResponseException(_str.Get(Str.ErrUnexpectedResponse));
+            }
+
+            return dto;
+        }
+        catch (XbsException)
+        {
+            throw;
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            sw.Stop();
+            _log.Warn("net", $"← TIMEOUT {label} after {sw.ElapsedMilliseconds}ms");
+            throw new ServiceOfflineException(_str.Get(Str.ErrServiceOffline), ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            _log.Warn("net", $"← FAIL {label} after {sw.ElapsedMilliseconds}ms: {ex.GetType().Name}");
+            throw new ServiceOfflineException(_str.Get(Str.ErrServiceOffline), ex);
+        }
+    }
+
     private async Task<T> SendAsync<T>(
-        HttpMethod method, string path, object? body, Func<T, bool> valid, CancellationToken ct, string? syncId = null)
+        HttpMethod method, string path, object? body, Func<T, bool> valid, CancellationToken ct,
+        string? syncId = null, string? apiVersion = null)
     {
         var label = LogSanitizer.PathFor($"{method} {path}", syncId);
         var sw = Stopwatch.StartNew();
@@ -151,6 +249,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         try
         {
             using var req = new HttpRequestMessage(method, path);
+            req.Headers.TryAddWithoutValidation("Accept-Version", apiVersion ?? XbsConstants.ApiVersion);
             if (body is not null)
             {
                 req.Content = JsonContent.Create(body);

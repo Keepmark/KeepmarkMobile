@@ -13,6 +13,10 @@ public static class XbsConstants
     /// <summary>API version sent in the Accept-Version header. Must satisfy the server's ^1.1.3 route.</summary>
     public const string ApiVersion = "1.1.13";
 
+    /// <summary>Extended contract (revision metadata, conditional GET). Sent only
+    /// after the server advertises capabilities — legacy servers answer 412 to it.</summary>
+    public const string ApiVersion12 = "1.2.0";
+
     /// <summary>
     /// Sync format version advertised when creating/upgrading a sync.
     /// Kept >= latest known client (1.8.0) so existing syncs are never rejected

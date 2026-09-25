@@ -26,7 +26,6 @@ public sealed class ApiClientTests
     {
         var handler = new FakeHandler();
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
-        http.DefaultRequestHeaders.Add("Accept-Version", XbsConstants.ApiVersion);
         var log = new InMemoryLogger();
         return (new XSyncApiClient(http, new EnglishLocalizer(), log), handler, log);
     }
@@ -106,5 +105,49 @@ public sealed class ApiClientTests
         await client.CreateSyncAsync();
 
         Assert.Contains(XbsConstants.SyncClientVersion, sent);
+    }
+
+    [Fact]
+    public async Task Requests_CarryVersionHeaderPerCall()
+    {
+        var (client, handler, _) = Create();
+        var versions = new List<string>();
+        handler.Responder = req =>
+        {
+            versions.Add(req.Headers.GetValues("Accept-Version").Single());
+            return Json(new { lastUpdated = "t" });
+        };
+
+        await client.GetLastUpdatedAsync("id");
+        await client.UpdateBookmarksV12Async("id", "blob", 3);
+
+        Assert.Equal(new[] { XbsConstants.ApiVersion, XbsConstants.ApiVersion12 }, versions);
+    }
+
+    [Fact]
+    public async Task ConditionalGet_ReturnsNullOn304()
+    {
+        var (client, handler, _) = Create();
+        handler.Responder = _ => new HttpResponseMessage(HttpStatusCode.NotModified);
+
+        Assert.Null(await client.GetBookmarksIfChangedAsync("id", "hash"));
+    }
+
+    [Fact]
+    public async Task Responses_DeserializeMetaAndCapabilities()
+    {
+        var (client, handler, _) = Create();
+        handler.Responder = req => req.RequestUri!.AbsolutePath.EndsWith("/info")
+            ? Json(new { location = "GB", maxSyncSize = 1, message = "", status = 1, version = "1.2.0",
+                capabilities = new { revision = true, conditionalGet = true, delete = true } })
+            : Json(new { bookmarks = "b", version = "1.8.0", lastUpdated = "t",
+                meta = new { revision = 4, hash = "h", size = 1 } });
+
+        var info = await client.GetInfoAsync();
+        var full = await client.GetBookmarksAsync("id");
+
+        Assert.True(info.Capabilities?.Revision);
+        Assert.Equal(4, full.Meta?.Revision);
+        Assert.Equal("h", full.Meta?.Hash);
     }
 }

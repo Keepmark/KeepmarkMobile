@@ -55,6 +55,10 @@ public sealed class SyncEngine(
 
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    /// <summary>v1.2 capability per service URL (null = not probed yet).
+    /// Probed via /info capabilities; legacy servers stay on the 1.1 contract.</summary>
+    private readonly Dictionary<string, bool> _v12 = new(StringComparer.OrdinalIgnoreCase);
+
     public SyncMode Mode { get; set; } = SyncMode.Auto;
     public SyncStatus Status { get; private set; } = SyncStatus.Idle;
     public DateTimeOffset? LastSyncAt { get; private set; }
@@ -105,24 +109,27 @@ public sealed class SyncEngine(
                 return false;
             }
 
-            var full = await api.GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
-            ThrowIfVersionUnsupported(full.Version);
-            var json = crypto.Decrypt(full.Bookmarks ?? string.Empty, c.DerivedKey);
-            var roots = JsonSerializer.Deserialize<List<BookmarkNode>>(json, Json) ?? [];
-            await store.ReplaceAllAsync(roots, full.Bookmarks ?? string.Empty, full.LastUpdated!, full.Version)
-                .ConfigureAwait(false);
-
-            if (full.Version != c.Version)
+            // v1.2: skip the download when the content hash matches.
+            if (await IsV12Async(c.ServiceUrl, ct).ConfigureAwait(false))
             {
-                await creds.SetAsync(c with { Version = full.Version }).ConfigureAwait(false);
+                var knownHash = await store.GetMetaAsync(BookmarkStore.MetaHash).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(knownHash))
+                {
+                    var unchanged = await api.GetBookmarksIfChangedAsync(c.Id, knownHash, ct).ConfigureAwait(false);
+                    if (unchanged is null)
+                    {
+                        log.Info("sync", "Pull: unchanged (304)");
+                        LastSyncAt = DateTimeOffset.UtcNow;
+                        SetStatus(SyncStatus.Idle);
+                        return false;
+                    }
+
+                    return await ApplyPulledAsync(unchanged, c, ct).ConfigureAwait(false);
+                }
             }
 
-            PendingEdits = 0;
-            LastSyncAt = DateTimeOffset.UtcNow;
-            SetStatus(SyncStatus.Idle);
-            DataChanged?.Invoke();
-            log.Info("sync", $"Pull: updated to lastUpdated={full.LastUpdated}");
-            return true;
+            var full = await api.GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
+            return await ApplyPulledAsync(full, c, ct).ConfigureAwait(false);
         }
         catch (DataOutOfSyncException)
         {
@@ -134,6 +141,52 @@ public sealed class SyncEngine(
             SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
             throw;
         }
+    }
+
+    private async Task<bool> ApplyPulledAsync(GetBookmarksResponse full, SyncCredentials c, CancellationToken ct)
+    {
+        ThrowIfVersionUnsupported(full.Version);
+        var json = crypto.Decrypt(full.Bookmarks ?? string.Empty, c.DerivedKey);
+        var roots = JsonSerializer.Deserialize<List<BookmarkNode>>(json, Json) ?? [];
+        // Meta persists only when the server speaks v1.2; otherwise stale
+        // revision/hash is cleared so the next push cannot reuse it.
+        await store.ReplaceAllAsync(roots, full.Bookmarks ?? string.Empty, full.LastUpdated!, full.Version,
+            full.Meta?.Revision, full.Meta?.Hash).ConfigureAwait(false);
+
+        if (full.Version != c.Version)
+        {
+            await creds.SetAsync(c with { Version = full.Version }).ConfigureAwait(false);
+        }
+
+        PendingEdits = 0;
+        LastSyncAt = DateTimeOffset.UtcNow;
+        SetStatus(SyncStatus.Idle);
+        DataChanged?.Invoke();
+        log.Info("sync", $"Pull: updated to lastUpdated={full.LastUpdated}");
+        return true;
+    }
+
+    /// <summary>Capability probe, cached per service URL. Any failure means legacy.</summary>
+    private async Task<bool> IsV12Async(string serviceUrl, CancellationToken ct)
+    {
+        if (_v12.TryGetValue(serviceUrl, out var cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            var info = await apiFor(serviceUrl).GetInfoAsync(ct).ConfigureAwait(false);
+            cached = info.Capabilities?.Revision == true;
+        }
+        catch
+        {
+            cached = false;
+        }
+
+        _v12[serviceUrl] = cached;
+        log.Debug("sync", $"Capabilities for {serviceUrl}: v12={cached}");
+        return cached;
     }
 
     public async Task PushAsync(bool updateVersion = false, CancellationToken ct = default)
@@ -168,10 +221,22 @@ public sealed class SyncEngine(
             var blob = crypto.Encrypt(json, c.DerivedKey);
 
             var api = apiFor(c.ServiceUrl);
-            var res = await api.UpdateBookmarksAsync(c.Id, blob, lastUpdated, updateVersion, ct).ConfigureAwait(false);
+            UpdateBookmarksResponse res;
+            var revRaw = await store.GetMetaAsync(BookmarkStore.MetaRevision).ConfigureAwait(false);
+            if (await IsV12Async(c.ServiceUrl, ct).ConfigureAwait(false)
+                && long.TryParse(revRaw, out var baseRevision))
+            {
+                // v1.2 revision CAS: races lose with 409 instead of overwriting.
+                res = await api.UpdateBookmarksV12Async(c.Id, blob, baseRevision, updateVersion, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                res = await api.UpdateBookmarksAsync(c.Id, blob, lastUpdated, updateVersion, ct).ConfigureAwait(false);
+            }
 
-            await store.ReplaceAllAsync(roots, blob, res.LastUpdated!, updateVersion ? XbsConstants.SyncClientVersion : c.Version)
-                .ConfigureAwait(false);
+            await store.ReplaceAllAsync(roots, blob, res.LastUpdated!,
+                updateVersion ? XbsConstants.SyncClientVersion : c.Version,
+                res.Meta?.Revision, res.Meta?.Hash).ConfigureAwait(false);
             if (updateVersion)
             {
                 await creds.SetAsync(c with { Version = XbsConstants.SyncClientVersion }).ConfigureAwait(false);
