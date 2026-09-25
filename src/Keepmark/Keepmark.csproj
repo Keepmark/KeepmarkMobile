@@ -38,6 +38,12 @@
         <ApplicationDisplayVersion>1.0.99</ApplicationDisplayVersion>
         <ApplicationVersion>100</ApplicationVersion>
 
+        <!-- monodroid mmaps lib/*.so straight from the APK: those entries MUST
+             be STORED, never Deflated, or the app SIGABRTs on startup outside
+             Fast Deployment (when no .__override__ shadow exists). The SDK only
+             adds .so when _EmbeddedDSOsEnabled resolves True, so force it here. -->
+        <AndroidStoreUncompressedFileExtensions>.so;$(AndroidStoreUncompressedFileExtensions)</AndroidStoreUncompressedFileExtensions>
+
         <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
         <WindowsPackageType>None</WindowsPackageType>
 
