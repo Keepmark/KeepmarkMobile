@@ -24,12 +24,24 @@ else
         <li>State: @status</li>
         <li>Last sync: @(lastSync?.ToString("u") ?? "never")</li>
         <li>Service: @(serviceUrl ?? "not linked")</li>
+        <li>Service version: @(serviceVersion ?? (serviceUrl is null ? "—" : "unknown (offline?)"))</li>
     </ul>
 
     <h3>Storage</h3>
     <ul>
         <li>Local database: @FormatBytes(dbSize)</li>
         <li>Server copy (last sync): @(serverBytes is null ? "never synced" : FormatBytes(serverBytes.Value))
+            @if (serverBytes is not null)
+            {
+                <text> of @(maxSyncSize is null ? "unknown max (offline?)" : FormatBytes(maxSyncSize.Value))</text>
+                @if (maxSyncSize is not null && maxSyncSize.Value > 0)
+                {
+                    <text> (@(100.0 * serverBytes.Value / maxSyncSize.Value).ToString("0.#")%)</text>
+                    <div class="progress mt-1" role="progressbar" aria-label="Service space used">
+                        <div class="progress-bar" style="width: @Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                    </div>
+                }
+            }
             <small class="text-muted"> — exact bytes your sync occupies on the service</small></li>
         <li>Pending edits: @pending
             @if (pending > 0)
@@ -63,8 +75,10 @@ else
     private DateTimeOffset? lastSync;
     private long dbSize;
     private long? serverBytes;
+    private long? maxSyncSize;
     private int pending;
     private string? serviceUrl;
+    private string? serviceVersion;
     private Core.Data.ContentStats? stats;
 
     protected override async Task OnInitializedAsync()
@@ -82,6 +96,7 @@ else
         }
 
         await LoadAsync();
+        await LoadServiceAsync();
         loaded = true;
     }
 
@@ -98,6 +113,28 @@ else
             var (_, blob, _, _) = await Session.Store.LoadMirrorAsync();
             serverBytes = blob is null ? null : (long?)blob.Length;
             stats = await Session.Store.GetStatsAsync();
+        }
+    }
+
+    /// <summary>Service quota + version, fetched once per visit (not on every
+    /// sync event). An offline service leaves max/version unknown.</summary>
+    private async Task LoadServiceAsync()
+    {
+        if (string.IsNullOrEmpty(serviceUrl))
+        {
+            return;
+        }
+
+        try
+        {
+            var info = await Session.CheckServiceAsync(serviceUrl);
+            maxSyncSize = info.MaxSyncSize;
+            serviceVersion = info.Version;
+        }
+        catch
+        {
+            maxSyncSize = null;
+            serviceVersion = null;
         }
     }
 

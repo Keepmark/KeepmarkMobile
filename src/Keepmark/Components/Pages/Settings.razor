@@ -72,6 +72,35 @@
     <div class="alert alert-danger mt-2">@error</div>
 }
 
+@if (linkedUrl is not null)
+{
+    <h3 class="mt-4">Change password</h3>
+    <p class="text-muted">Re-encrypts the sync with a new password. Your current password is verified
+        first and never leaves this device. The old password stops working on all devices
+        immediately — update your vault and other devices.</p>
+    @if (!string.IsNullOrEmpty(pwError))
+    {
+        <div class="alert alert-danger">@pwError</div>
+    }
+    <div class="mb-3">
+        <label class="form-label">Current password</label>
+        <input type="password" class="form-control" @bind="pwCurrent" autocomplete="current-password" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">New password</label>
+        <input type="password" class="form-control" @bind="pwNew" autocomplete="new-password" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Confirm new password</label>
+        <input type="password" class="form-control" @bind="pwConfirm" autocomplete="new-password" />
+    </div>
+    <button class="btn btn-warning" @onclick="ChangePassword" disabled="@pwBusy">Change password</button>
+    @if (pwDone)
+    {
+        <div class="alert alert-success mt-2">Password changed. Update your other devices and vault now.</div>
+    }
+}
+
 <h3 class="mt-4">Gestures</h3>
 <ul>
     <li><strong>Tap</strong> a bookmark to open it, a folder to enter it.</li>
@@ -88,6 +117,12 @@
     private string error = string.Empty;
     private bool saved;
     private string? linkedUrl;
+    private string pwCurrent = string.Empty;
+    private string pwNew = string.Empty;
+    private string pwConfirm = string.Empty;
+    private string pwError = string.Empty;
+    private bool pwDone;
+    private bool pwBusy;
 
     protected override void OnInitialized()
     {
@@ -151,5 +186,61 @@
         AppSettings.LockTimeoutMinutes = Math.Clamp(lockTimeout, 0, 60);
         Session.NotifySettingsChanged();
         saved = true;
+    }
+
+    private static string? ValidatePasswordChange(string current, string next, string confirm)
+    {
+        if (string.IsNullOrEmpty(current))
+        {
+            return "Current password is required.";
+        }
+
+        if (string.IsNullOrEmpty(next))
+        {
+            return "A new password is required.";
+        }
+
+        if (next == current)
+        {
+            return "The new password must be different from the current one.";
+        }
+
+        if (next != confirm)
+        {
+            return "New passwords do not match.";
+        }
+
+        return null;
+    }
+
+    private async Task ChangePassword()
+    {
+        pwError = string.Empty;
+        pwDone = false;
+        var invalid = ValidatePasswordChange(pwCurrent, pwNew, pwConfirm);
+        if (invalid is not null)
+        {
+            pwError = invalid;
+            return;
+        }
+
+        pwBusy = true;
+        try
+        {
+            await Session.ChangePasswordAsync(pwCurrent, pwNew);
+            pwCurrent = pwNew = pwConfirm = string.Empty;
+            pwDone = true;
+        }
+        catch (Exception ex)
+        {
+            // Never leave the current password or its confirmation in memory;
+            // the new password stays so only the proof has to be retyped.
+            pwCurrent = pwConfirm = string.Empty;
+            pwError = ex.Message;
+        }
+        finally
+        {
+            pwBusy = false;
+        }
     }
 }

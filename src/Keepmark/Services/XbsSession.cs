@@ -170,6 +170,41 @@ public sealed class XbsSession : IAsyncDisposable
         return created.Id!;
     }
 
+    /// <summary>Rotates the sync password. The current password is verified
+    /// first (derived key must match the stored one) — on mismatch nothing
+    /// is downloaded, backed up, or overwritten. The re-encrypted tree is
+    /// pushed through the engine, so revision CAS / 409 semantics apply as
+    /// usual. The old password stops working everywhere immediately.</summary>
+    public async Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(currentPassword))
+        {
+            throw new IncompleteSyncInfoException("Current password is required.");
+        }
+
+        if (string.IsNullOrEmpty(newPassword))
+        {
+            throw new IncompleteSyncInfoException("A new password is required.");
+        }
+
+        var creds = await _creds.GetAsync().ConfigureAwait(false)
+            ?? throw new IncompleteSyncInfoException(_str.Get(Str.ErrIncompleteSyncInfo));
+        var version = creds.Version ?? Core.XbsConstants.SyncClientVersion;
+        var currentDerived = _crypto.DeriveKey(currentPassword, creds.Id, version);
+        if (currentDerived != creds.DerivedKey)
+        {
+            throw new InvalidCredentialsException("Current password is incorrect.");
+        }
+
+        // Safety backup of the server copy we are about to overwrite.
+        var (_, blob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote", blob ?? string.Empty).ConfigureAwait(false);
+        var newDerived = _crypto.DeriveKey(newPassword, creds.Id, version);
+        await _creds.SetAsync(creds with { DerivedKey = newDerived }).ConfigureAwait(false);
+        _log.Info("session", "Password changed, blob re-encrypted");
+        await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
+    }
+
     public void NotifySettingsChanged()
     {
         _log.MinLevel = _settings.Verbosity;

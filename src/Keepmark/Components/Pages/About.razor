@@ -10,7 +10,9 @@
 <h3>Compatibility</h3>
 <ul>
     <li>Works with any <strong>xBrowserSync API v@Core.XbsConstants.ApiVersion</strong> service
-        (official, self-hosted or community), API v@(Core.XbsConstants.MinApiVersion)+ required.</li>
+        (official, self-hosted or community), API v@(Core.XbsConstants.MinApiVersion)+ required.
+        When the service advertises it, the <strong>v@(Core.XbsConstants.ApiVersion12) extended contract</strong>
+        is used (revision-based sync, conditional download, server delete) with automatic fallback to v1.1.</li>
     <li>Sync format <strong>v@(Core.XbsConstants.SyncClientVersion)</strong>: syncs created here
         open in the official xBrowserSync apps, and vice versa.</li>
     <li>Same end-to-end encryption (PBKDF2-SHA256 + AES-GCM): only your password
@@ -39,7 +41,7 @@
         var subject = Uri.EscapeDataString($"[Keepmark {AppInfo.VersionString}] Bug report");
         var body = Uri.EscapeDataString(
             $"App version: {AppInfo.VersionString} (build {AppInfo.BuildString})\n" +
-            $"API version: {Core.XbsConstants.ApiVersion}\n" +
+            $"API version: {Core.XbsConstants.ApiVersion} (v1.2: {Core.XbsConstants.ApiVersion12})\n" +
             $"Android: {DeviceInfo.VersionString} ({DeviceInfo.Model})\n\n" +
             $"Describe the issue:\n");
         try
