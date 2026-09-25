@@ -83,6 +83,16 @@ public sealed class SyncEngine(
         log.Debug("sync", "Pull: start");
         try
         {
+            // Never silently discard unpushed local edits: a dirty mirror means
+            // the user must resolve the conflict first (push or explicit take-remote).
+            var dirty = await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1";
+            if (dirty)
+            {
+                SetStatus(SyncStatus.Conflict);
+                log.Warn("sync", "Pull: refused, local edits pending (dirty)");
+                throw new DataOutOfSyncException(str.Get(Str.ErrDataOutOfSync));
+            }
+
             var api = apiFor(c.ServiceUrl);
             var remote = await api.GetLastUpdatedAsync(c.Id, ct).ConfigureAwait(false);
             var local = await store.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
@@ -113,6 +123,11 @@ public sealed class SyncEngine(
             DataChanged?.Invoke();
             log.Info("sync", $"Pull: updated to lastUpdated={full.LastUpdated}");
             return true;
+        }
+        catch (DataOutOfSyncException)
+        {
+            SetStatus(SyncStatus.Conflict);
+            throw;
         }
         catch (XbsException ex)
         {

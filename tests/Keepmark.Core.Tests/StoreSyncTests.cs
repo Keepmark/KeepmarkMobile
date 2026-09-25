@@ -211,6 +211,20 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Engine_Pull_RefusesWhenDirty_PreservesLocalEdits()
+    {
+        await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+        _api.Blob = _crypto.Encrypt("[{\"id\":9,\"title\":\"Remote\",\"url\":\"https://r.example\"}]", Key);
+
+        await Assert.ThrowsAsync<DataOutOfSyncException>(() => _engine.PullAsync());
+        Assert.Equal(SyncStatus.Conflict, _engine.Status);
+        // Local tree untouched.
+        var (roots, _, _, _) = await _store.LoadMirrorAsync();
+        Assert.Equal(3, roots.Count);
+    }
+
+    [Fact]
     public async Task Engine_Push_UploadsAndClearsDirty()
     {
         await _store.ReplaceAllAsync(Sample(), "oldblob", "t0", "1.8.0");
