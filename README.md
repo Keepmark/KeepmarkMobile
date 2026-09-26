@@ -1,5 +1,9 @@
 # Keepmark — MAUI Blazor Hybrid (Android only)
 
+> Behavioral spec for outsourced code verification:
+> [`docs/verification-spec.md`](docs/verification-spec.md) (requirements Rxx —
+> read it before reviewing code; it also records the one known gap).
+
 Rewrite of the xBrowserSync Android client, interoperable with the public
 xBrowserSync API **v1.1.13**. Current version: **v1.0.85 (86)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.

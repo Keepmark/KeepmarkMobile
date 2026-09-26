@@ -1,0 +1,141 @@
+# Keepmark — Verification Specification (for outsourced code review)
+
+This document states the REQUIRED behavior of the Keepmark Android app in
+verifiable form. A third-party reviewer checks the code (and the running app)
+against each numbered requirement. Where the code is known to violate a
+requirement, it is marked **[KNOWN GAP]** instead of being silently adjusted.
+
+Conventions: `Rxx` = requirement IDs. "Must" = fail the review if violated.
+File paths are relative to `Keepmark/`. Commands run from `Keepmark/` with
+`ANDROID_HOME=$HOME/android-sdk`, `JAVA_HOME=$HOME/jdk-21`
+(JDK 21; system JDK is rejected): `dotnet test` (xUnit, no device),
+Android build `dotnet build src/Keepmark -f net10.0-android -c Debug`.
+
+Global rules (verify everywhere): English-only UI strings; no telemetry;
+HTTPS-only service URLs (reject `http://` except `localhost` for dev);
+no `any`-style dynamic typing leaks into persisted state; raw passwords exist
+only as method arguments, never stored, never logged.
+
+## 1. Interop constants (`src/Keepmark.Core/XbsConstants.cs`)
+
+| R | Constant | Required value / behavior |
+|---|---|---|
+| R1.1 | `DefaultServiceUrl` | `https://api.xbrowsersync.org` |
+| R1.2 | `MinApiVersion` | `1.1.9` — services below are refused (R4.5) |
+| R1.3 | `ApiVersion` | `1.1.13` — default `Accept-Version`, satisfies server `^1.1.3` route |
+| R1.4 | `ApiVersion12` | `1.2.0` — extended contract, sent ONLY after capability probe (R4.2) |
+| R1.5 | `SyncClientVersion` | `1.8.0` — advertised on create/upgrade; remote `version` greater than this MUST be refused (R4.6) |
+| R1.6 | `KeyDerivationIterations` | `250_000` (PBKDF2-SHA256) |
+| R1.7 | `GcmNonceLength` | `16` bytes, prepended to ciphertext (NOT the 12-byte .NET default) |
+| R1.8 | `DescriptionMaxLength` | `300` chars, enforced on push (truncate) |
+| R1.9 | `SeparatorUrl` | `xbs:separator` |
+| R1.10 | `SyncPollInterval` / `ServiceProbeTimeout` / `DefaultHttpTimeout` | 15 min / 3 s / 12 s |
+| R1.11 | `CompareVersions` | numeric dotted compare, tolerates leading `v` (`1.1.13` > `1.1.9`); unit-pinned in `VersionCompareTests.cs` |
+
+## 2. Crypto (`src/Keepmark.Core/Crypto/`)
+
+| R | Requirement | How to verify |
+|---|---|---|
+| R2.1 | Envelope = `base64(IV16B \|\| AES-GCM-256(lzutf8(JSON)))`; key = PBKDF2-SHA256/250k over UTF-8(password), salt = UTF-8(syncId) | `XCryptoService.cs:DeriveKey/Encrypt/Decrypt`; BouncyCastle required (16B IV — .NET `AesGcm` only does 12B) |
+| R2.2 | Byte-interop BOTH directions with `lzutf8@0.6.0` + original JS client | `CryptoInteropTests.cs` + `TestData/vectors.json` green; never change `Crypto/` without running both Node directions |
+| R2.3 | Legacy sync without version rejected ("open once in the original client") | `DeriveKey` throws `UnsupportedSyncVersionException` on empty version |
+| R2.4 | Decrypt failure (wrong password / corrupt) surfaces as `InvalidCredentialsException`, never as generic error | Code + wrong-password tests |
+| R2.5 | Encrypted backup envelope `{App:"xBrowserSyncNg", Format:1, Salt:Base64(16B random), Blob}`; password ≥ 8, file ≤ 50 MB, tree ≤ 200k nodes (`BackupGuard`) | `BackupGuardTests.cs`; damaged-file vs wrong-password distinguished (base64 pre-check) |
+
+## 3. API client (`src/Keepmark.Core/Api/XSyncApiClient.cs`)
+
+| R | Requirement |
+|---|---|
+| R3.1 | Endpoints used: `GET info`, `POST bookmarks {version}`, `GET bookmarks/{id}`, `GET …/lastUpdated`, `GET …/version`, `PUT bookmarks/{id}` (timestamp or `baseRevision` CAS), conditional `GET` with `If-None-Match: "<hash>"` → `304` = null. NO server-side sync DELETE exists in this client. |
+| R3.2 | `Accept-Version` per request: `1.1.13` default; `1.2.0` only for `UpdateBookmarksV12Async` and conditional GET. |
+| R3.3 | Timeouts: 12 s default, 3 s probes; timeout/`HttpRequestException` → `ServiceOfflineException`. Retries with backoff ONLY for idempotent reads (never on create/PUT — see `WithRetryAsync(idempotent:)`); `Retry-After` honored. |
+| R3.4 | HTTP→error mapping: 401 SyncNotFound, 404 InvalidService, 405 NotAcceptingNewSyncs, 406 DailyNewSyncLimit, 409 DataOutOfSync, 413 SyncTooLarge, 429 Throttled (+Retry-After secs), 5xx/other ServiceOffline. `code`/`message` shape preserved for display. |
+| R3.5 | Bodies never logged; sync IDs truncated via `LogSanitizer` (`abcd…xy`); timings + byte counts at Info ok. |
+
+## 4. Sync engine (`src/Keepmark.Core/Sync/SyncEngine.cs`)
+
+| R | Requirement |
+|---|---|
+| R4.1 | Whole-blob only (API has no deltas). `Mode` Auto (poll + push-on-edit) / Manual (explicit only). Statuses: Idle/Syncing/Offline/Conflict/Error/NoCredentials + `DataChanged`/`StatusChanged` events; UI preserves scroll/query across events. |
+| R4.2 | v1.2 capability probed via `/info` capabilities per service URL, cached; legacy → timestamp path. Conditional GET (304) skips download when hash known. Revision CAS on push when revision stored; 409 on races, never overwrite. |
+| R4.3 | **[KNOWN GAP]** The probe (`IsV12Async`, `SyncEngine.cs:170-190`) calls `GetInfoAsync`, which sends the LEGACY header — the server strips `capabilities` on the legacy contract, so the probe can never succeed and the v1.2 path is dead code. REQUIRED fix: probe with `Accept-Version: 1.2.0` (new `GetInfoV12Async`), treat 412/absence as legacy. Verifier: against a v1.2 server, conditional GET and revision CAS must be observed in logs; today they never trigger. |
+| R4.4 | Pull MUST refuse when the mirror is dirty (unpushed edits): status Conflict + `DataOutOfSyncException`, never silent discard. |
+| R4.5 | `ForceSyncAsync` matrix: remote≠local + dirty → Conflict (no auto-merge); remote≠local + clean → pull; equal + dirty → push; equal + clean → stamp `LastSyncAt`. Offline → Offline status, no throw to UI. |
+| R4.6 | Version gates: service < MinApiVersion refused at check; remote sync format > SyncClientVersion refused on pull/compare. |
+| R4.7 | `Normalize` on push: empty description/tags → null, descriptions truncated to 300 chars (byte-compatible with the original client). |
+| R4.8 | Bulk delete by stable NodeId = ONE transaction + ONE push (no sync storms). Single delete returns the subtree for 6 s undo. |
+
+## 5. Credentials & local store
+
+| R | Requirement |
+|---|---|
+| R5.1 | Android KeyStore-backed `SecureStorage` keys ONLY: `xbs_sync_id`, `xbs_service_url`, `xbs_derived_key` (base64, NEVER raw password), `xbs_sync_version`, `xbs_db_key` (64 hex, created once). `ClearAsync` removes the 4 sync keys, keeps DB key. |
+| R5.2 | Non-secrets in `Preferences` (`XbsSettings.cs`): service URL, sync mode, verbosity, app lock + timeout, theme, open mode, list sort. |
+| R5.3 | SQLCipher mirror `Meta`/`Blob`/`Items` (+FTS5): `lastUpdated`, `syncVersion`, `syncRevision`, `syncHash`, `dirty` ("1"/"0"); `Blob.bookmarks` = last encrypted blob. `ReplaceAll` clears revision/hash on legacy pulls. |
+
+## 6. Session flows (`src/Keepmark/Services/XbsSession.cs`)
+
+Each flow states preconditions, mutations in order, and the REQUIRED user-visible outcome. Raw passwords are method args only, cleared in UI `finally`.
+
+| R | Flow | Required behavior |
+|---|---|---|
+| R6.1 | Create empty (`CreateNewSyncAsync`) | Safety-backup local → POST → derive → store creds → replace mirror EMPTY. UI arms with explicit confirm. Message states the backup + where to find it (R7). |
+| R6.2 | Create with upload (`CreateNewSyncWithUploadAsync`) | POST → derive → store creds → upload mirror. Nothing local deleted. Returns new ID for display/copy. |
+| R6.3 | Link existing, pull (`ProbeLinkAsync` + `ApplyRemoteAsync`) | Password verified by decrypting remote BEFORE any overwrite (wrong → `InvalidCredentials`, zero mutations). Safety-backup local side. `0/0` items → auto-apply; else explicit Download/Upload choice with counts. |
+| R6.4 | Link existing, push (`ApplyLocalAsync`) | Same verify-first; safety-backup remote side; PUT on remote base (409 honest). |
+| R6.5 | Switch service (wizard: new / existing-pull / existing-push) | Nothing syncs before explicit confirm; safety-backup of the scrapped side first; password verified by decrypt before mutation; wizard never deletes local data; draft survives navigation (no secrets in draft), cleared on complete/start-over. |
+| R6.6 | Unlink | Clears credentials ONLY; local items stay; sync stops. Requires explicit confirm. |
+| R6.7 | Backup export/import/preview | Envelope R2.5; import = preview (count) → two-step confirm → safety-backup local → dirty mirror (auto-push/conflict, never pull-over). 50 MB stream cap, tmp cleanup. |
+| R6.8 | Change password (`ChangePasswordAsync`) | Guards: current required, new required; current derived key MUST equal stored (else `InvalidCredentials`, zero mutations/downloads/queue). Then: safety-backup remote side → store new derived key → `PushAsync` (revision CAS/409 as usual) → rotate safety master (R7.3, best-effort). Old password stops working everywhere. |
+| R6.9 | Duplicates bulk delete (`DeleteBookmarksAsync`) | Safety backup (local, `duplicates-cleanup`) BEFORE delete; one transaction + one push; result toast names the backup location. Last-copy-locked plan (never wipe a group). |
+
+## 7. Safety backups (summary — full spec in `README.md` § Safety backups)
+
+| R | Requirement |
+|---|---|
+| R7.1 | Obligation matrix (§1 of README spec): every overwrite snapshots the DESTROYED side first (upload mode = server copy). Single Home delete keeps 6 s undo instead. No snapshot → operation must fail closed. |
+| R7.2 | Identity: `safety-{ts}-{operation}[-n].json` + manifest `{FileName, CreatedAtUtc, Operation, Side, Items, SizeBytes, SyncId(truncated), Enc}`; legacy files listed as "Older backup"; retention newest 5 (+ manual delete, two-tap). |
+| R7.3 | Encryption (envelope): files encrypted ONCE under random Master Key; record holds max 3 wraps `{KekId, WrappedKey}` (KEK = sync-derived key, id = SHA256 hex[..8]); rotation = single atomic write (tmp+fsync+rename, `.prev` kept until test-unwrap passes); rotation never fails the user flow. Pre-link/misaligned writes stay plaintext flagged "not encrypted". |
+| R7.4 | Restore: local-side → pre-restore snapshot + replace local (dirty → push/conflict); remote-side → requires link + re-encrypt under CURRENT key + push (409 honest); never deletes the used entry; counts match `ValidateTree`; damaged → refuse. |
+| R7.5 | Every destructive success message names the safety net + its location ("… — see Backup → Safety backups"). |
+
+## 8. UI rules (pages in `src/Keepmark/Components/Pages/`)
+
+| R | Requirement |
+|---|---|
+| R8.1 | Validation catalog (exact strings): "Current password is required.", "A new password is required.", "The new password must be different from the current one.", "New passwords do not match.", "Use a password of at least 8 characters.", "Passwords do not match — retype the confirmation.", "Enter both the sync ID and its password.", "Sync ID is required for an existing sync.", "Choose the sync direction above." (reconcile), "Verify the existing sync first.", "Re-check the target service first." |
+| R8.2 | Destructive confirms: unlink (1), delete server-side n/a (no client), create-empty (armed), import (two-step), switch (Review + Switch now), bulk delete (armed), safety restore/delete (armed inline). |
+| R8.3 | Secrets hygiene: password fields cleared on success AND failure (keep-new convenience only where stated); password never in logs, toasts, or backup filenames. |
+| R8.4 | Gating matrix: Switch-service menu + page require an existing link (disabled + guard page); Sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty); danger buttons outline-first/solid-confirm. |
+| R8.5 | Status page: mode/state/last-sync/service (+version) / local DB bytes / server copy bytes + max + % + bar (one `/info` probe per visit, offline = "unknown") / content stats / app + sync-format + API versions. |
+| R8.6 | About page declares v1.1 + v1.2 extended contract (with fallback) + encryption + independence + GPLv3. Bug-report mail includes app/API versions. |
+
+## 9. Logging (`Logging.cs`, `InMemoryLogger`, Logs page)
+
+R9.1 levels Error→Verbose, persisted verbosity, 200-entry viewer. R9.2 NEVER logged: bodies, passwords/keys, full sync IDs (truncate), DB password. R9.3 Network: START/END + ms + bytes at Info; timeouts/failures at Warn with type only. R9.4 Safety/master rotation events at Info without values.
+
+## 10. Error catalog (`XbsErrors.cs` → UI)
+
+401 SyncNotFound / 404 InvalidService / 405 NotAcceptingNewSyncs / 406 DailyNewSyncLimit / 409 DataOutOfSync (pull-first, never merge) / 413 SyncTooLarge / 429 Throttled (+Retry-After) / ServiceOffline (5xx/unreachable) / InvalidCredentials (decrypt fail) / UnsupportedSyncVersion / UnsupportedApiVersion / IncompleteSyncInfo / UnexpectedResponse. Each MUST surface its message verbatim (with optional `(server: …)` suffix), never swallowed, never shown as a different error.
+
+## 11. Test matrix (what proves what)
+
+| Suite | Proves |
+|---|---|
+| `ApiClientTests.cs` | routes, shapes, error mapping, timeouts |
+| `CryptoInteropTests.cs` + `vectors.json` | R2.1–R2.2 both directions |
+| `BackupGuardTests.cs` | R2.5 limits |
+| `RetryPolicyTests.cs` | R3.3 backoff/idempotence |
+| `StoreSyncTests.cs` | R4–R5 mirror/meta/engine flows |
+| `SafetyBackupTests.cs` | naming, describe, prune-5, legacy parse, index round-trip/damage, fingerprint, wrap trim |
+| `VersionCompareTests.cs` | R1.11 |
+| Manual/device | R8 UI flows, R4.2 live v1.2 (blocked by KNOWN GAP), R7.4 restore against real server, uninstall/reinstall data-loss behavior |
+
+## 12. Static checks (reviewer-run, must all pass)
+
+1. `grep -rn "SecureStorage.SetAsync" src/Keepmark --include=*.cs` → only derived keys + db key, never a variable named `*password*` (raw).
+2. `grep -rniE "password.*log|Log.*password" src/Keepmark.Core --include=*.cs` → no hits (secrets in logs).
+3. `grep -rn "Accept-Version" src/Keepmark.Core --include=*.cs` → `1.1.13` default sites + `1.2.0` ONLY in `UpdateBookmarksV12Async`/conditional GET (+ the R4.3 fix site).
+4. `grep -rn "HttpMethod.Delete" src/Keepmark.Core` → no hits (no server delete in this client — by design).
+5. `grep -rn "TODO\|FIXME\|HACK" src/ | tests/` → triage list, none load-bearing.
+6. `dotnet test` green + both-direction crypto vectors green + `dotnet build … -f net10.0-android` 0 errors before any commit.
