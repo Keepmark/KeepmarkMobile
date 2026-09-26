@@ -36,9 +36,9 @@ else
                 <text> of @(maxSyncSize is null ? "unknown max (offline?)" : FormatBytes(maxSyncSize.Value))</text>
                 @if (maxSyncSize is not null && maxSyncSize.Value > 0)
                 {
-                    <text> (@(100.0 * serverBytes.Value / maxSyncSize.Value).ToString("0.#")%)</text>
+                    <text> (@ServerPctText%)</text>
                     <div class="progress mt-1" role="progressbar" aria-label="Service space used">
-                        <div class="progress-bar" style="width: @Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                        <div class="progress-bar" style="width: @ServerPctText%"></div>
                     </div>
                 }
             }
@@ -141,8 +141,17 @@ else
     private void OnEngine(Core.Sync.SyncStatus _) => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
     private void OnEngineData() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
 
-    private static string FormatBytes(long bytes)
-    {
+    /// <summary>Server quota usage as "14.9" (InvariantCulture, clamped).
+    /// Computed in code, not in markup: explicit Razor `@(...)` expressions
+    /// end at the first `)`, so a trailing `.ToString(...)` would leak into
+    /// the rendered text (seen live as `14,89….ToString("0.#")`).</summary>
+    private string ServerPctText =>
+        serverBytes is null || maxSyncSize is null || maxSyncSize.Value <= 0
+            ? "0"
+            : Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value)
+                .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string FormatBytes(long bytes)    {
         if (bytes < 1024)
         {
             return $"{bytes} B";
