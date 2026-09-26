@@ -405,11 +405,25 @@ public sealed class XbsSession : IAsyncDisposable
             await Store.DisposeAsync().ConfigureAwait(false);
         }
     }
+
+    /// <summary>Unfinished Switch-service wizard, kept while the user inspects
+    /// other pages (e.g. the bookmarks) mid-review. In-memory only, never
+    /// persisted: secrets are re-asked on return, the probe (with its derived
+    /// key + pre-images) survives navigation. Cleared when the switch
+    /// completes or the user starts over.</summary>
+    public SwitchDraft? PendingSwitch { get; set; }
 }
 
 public sealed record ReconcileInfo(
     SyncCredentials Candidate, int LocalCount, int RemoteCount,
     string? RemoteLastUpdated, string? RemoteVersion,
     string RemoteBlob, string LocalBlob);
+
+/// <summary>Draft of an unfinished Switch-service wizard (see
+/// <see cref="XbsSession.PendingSwitch"/>). Secrets are deliberately absent:
+/// passwords are always retyped after navigation.</summary>
+public sealed record SwitchDraft(
+    string TargetUrl, string Slot, string SyncId, bool TakeUpload,
+    ReconcileInfo? Probe, string? VerifiedFor, int Step);
 
 public sealed record BackupEnvelope(string App, int Format, string Salt, string Blob);

@@ -151,10 +151,18 @@ else
         <div class="d-flex gap-2">
             <button class="btn btn-secondary" @onclick="() => step = 1" disabled="@busy">Back</button>
             <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">Review</button>
+            <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
         </div>
     }
     else
     {
+        @if (resumed)
+        {
+            <div class="alert alert-info">
+                Resumed your unfinished switch — counts may have changed while you were away;
+                press Verify again if in doubt, or Start over below.
+            </div>
+        }
         <div class="alert alert-info">
             <h4>Review</h4>
             @if (slot == "new")
@@ -173,6 +181,7 @@ else
         <div class="d-flex gap-2">
             <button class="btn btn-secondary" @onclick="() => step = 2" disabled="@busy">Back</button>
             <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Switch now</button>
+            <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
         </div>
     }
 
@@ -205,6 +214,7 @@ else
     private string message = string.Empty;
     private bool isError;
     private bool linked;
+    private bool resumed;
 
     private bool serviceOk =>
         serviceInfo is not null && checkedUrl == targetUrl.Trim();
@@ -223,6 +233,20 @@ else
         }
 
         linked = await Creds.GetAsync() is not null;
+
+        // Resume an unfinished wizard (user went to inspect the bookmarks
+        // mid-review): secrets were never stored, the probe survives.
+        if (Session.PendingSwitch is { } draft)
+        {
+            targetUrl = draft.TargetUrl;
+            slot = draft.Slot;
+            syncId = draft.SyncId;
+            takeUpload = draft.TakeUpload;
+            probe = draft.Probe;
+            verifiedFor = draft.VerifiedFor;
+            step = draft.Step is >= 2 and <= 3 ? draft.Step : 2;
+            resumed = probe is not null;
+        }
     }
 
     private static string ShortId(string? id) =>
@@ -250,6 +274,8 @@ else
         {
             serviceInfo = await Session.CheckServiceAsync(targetUrl.Trim());
             checkedUrl = targetUrl.Trim();
+            resumed = false;
+            SaveDraft();
             Ok($"Target service is valid: {serviceInfo.Status}, API v{serviceInfo.Version}.");
         });
     }
@@ -267,6 +293,8 @@ else
             verifiedFor = $"{targetUrl.Trim()}|{syncId.Trim()}";
             takeUpload = false;
             tookRemote = false;
+            resumed = false;
+            SaveDraft();
             Ok("Remote sync opened. Pick a direction, then Review.");
         });
     }
@@ -279,7 +307,37 @@ else
         }
 
         message = string.Empty;
+        resumed = false;
         step = 3;
+        SaveDraft();
+    }
+
+    /// <summary>Snapshots the wizard (without secrets) so leaving the page
+    /// to inspect the bookmarks doesn't lose the review.</summary>
+    private void SaveDraft()
+    {
+        Session.PendingSwitch = new Services.SwitchDraft(
+            targetUrl.Trim(), slot, syncId.Trim(), takeUpload, probe, verifiedFor, step);
+    }
+
+    private void StartOver()
+    {
+        Session.PendingSwitch = null;
+        step = 1;
+        slot = "new";
+        syncId = string.Empty;
+        password = string.Empty;
+        newPassword = string.Empty;
+        confirmPassword = string.Empty;
+        probe = null;
+        verifiedFor = null;
+        takeUpload = false;
+        tookRemote = false;
+        createdId = null;
+        serviceInfo = null;
+        checkedUrl = null;
+        resumed = false;
+        message = string.Empty;
     }
 
     private async Task Execute()
@@ -320,6 +378,7 @@ else
             AppSettings.ServiceUrl = targetUrl.Trim();
             newPassword = string.Empty;
             step = 4;
+            Session.PendingSwitch = null;
             Session.Log.Info("switch", createdId is not null
                 ? "Switch complete: new sync created and uploaded"
                 : tookRemote ? "Switch complete: took remote tree" : "Switch complete: uploaded local tree");
