@@ -78,7 +78,7 @@ else
             </div>
             <div class="form-check">
                 <input class="form-check-input" type="radio" name="slot" id="slotExisting" checked="@(slot == "existing")" @onchange='() => slot = "existing"' />
-                <label class="form-check-label" for="slotExisting"><strong>Existing sync here</strong> — replace its content with my @localCount item(s).</label>
+                <label class="form-check-label" for="slotExisting"><strong>Existing sync here</strong> — link it and choose the direction below.</label>
             </div>
         </div>
 
@@ -104,15 +104,32 @@ else
                 @if (probe is not null)
                 {
                     <div class="alert alert-warning mt-2">
-                        Remote holds <strong>@probe.RemoteCount</strong> item(s); local holds <strong>@localCount</strong>.
-                        <div class="form-check mt-2">
-                            <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(!takeUpload)" @onchange="() => takeUpload = false" />
-                            <label class="form-check-label" for="dirDown"><strong>Take remote</strong> — replace the local tree (backup saved first).</label>
+                        <h4>Choose the link direction</h4>
+                        <p>Local holds <strong>@localCount</strong> item(s); remote holds <strong>@probe.RemoteCount</strong> item(s).</p>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(!takeUpload)" disabled="@busy" @onchange="() => takeUpload = false" />
+                            <label class="form-check-label" for="dirDown"><strong>Take remote</strong> — download (safe default)</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@takeUpload" @onchange="() => takeUpload = true" />
-                            <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — replace the remote content (backup saved first).</label>
+                            <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@takeUpload" disabled="@(busy || localCount == 0)" @onchange="() => takeUpload = true" />
+                            <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — overwrite remote</label>
                         </div>
+                        @if (!takeUpload)
+                        {
+                            <div class="alert alert-danger mt-2 mb-0">
+                                <strong>Your @localCount local item(s) will be deleted</strong> and replaced with the
+                                @probe.RemoteCount remote item(s). A plaintext safety backup of your current local tree
+                                is saved first, and the app re-links to this sync.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-danger mt-2 mb-0">
+                                <strong>The @probe.RemoteCount remote item(s) will be overwritten</strong> with your
+                                @localCount local item(s). A plaintext safety backup of the server copy is saved first,
+                                and the app re-links to this sync.
+                            </div>
+                        }
                     </div>
                 }
             </div>
