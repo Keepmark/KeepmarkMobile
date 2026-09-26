@@ -106,12 +106,12 @@ else
                     <div class="alert alert-warning mt-2">
                         Remote holds <strong>@probe.RemoteCount</strong> item(s); local holds <strong>@localCount</strong>.
                         <div class="form-check mt-2">
-                            <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@takeUpload" @onchange="() => takeUpload = true" />
-                            <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — replace the remote content (backup saved first).</label>
-                        </div>
-                        <div class="form-check">
                             <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(!takeUpload)" @onchange="() => takeUpload = false" />
                             <label class="form-check-label" for="dirDown"><strong>Take remote</strong> — replace the local tree (backup saved first).</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@takeUpload" @onchange="() => takeUpload = true" />
+                            <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — replace the remote content (backup saved first).</label>
                         </div>
                     </div>
                 }
@@ -165,7 +165,9 @@ else
     private string password = string.Empty;
     private Services.ReconcileInfo? probe;
     private string? verifiedFor;
-    private bool takeUpload = true;
+    /// <summary>Migration direction: false = take remote (safe default),
+    /// true = upload local over the remote.</summary>
+    private bool takeUpload;
     private bool tookRemote;
     private string? createdId;
     private int localCount;
@@ -221,7 +223,7 @@ else
 
             probe = await Session.ProbeLinkAsync(targetUrl.Trim(), syncId.Trim(), password);
             verifiedFor = $"{targetUrl.Trim()}|{syncId.Trim()}";
-            takeUpload = true;
+            takeUpload = false;
             tookRemote = false;
             Ok("Remote sync opened. Pick a direction, then Review.");
         });
