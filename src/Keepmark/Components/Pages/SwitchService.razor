@@ -94,45 +94,58 @@ else
         }
         else
         {
-            <div class="mb-3">
-                <label class="form-label">Sync ID on the target service</label>
-                <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
-                <label class="form-label mt-2">Password</label>
-                <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-                <div class="form-text">Verified against the remote data first: a wrong password stops here, nothing is overwritten.</div>
-                <button class="btn btn-secondary mt-2" @onclick="VerifyExisting" disabled="@busy">Verify</button>
-                @if (probe is not null)
-                {
-                    <div class="alert alert-warning mt-2">
-                        <h4>Choose the link direction</h4>
-                        <p>Local holds <strong>@localCount</strong> item(s); remote holds <strong>@probe.RemoteCount</strong> item(s).</p>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(!takeUpload)" disabled="@busy" @onchange="() => takeUpload = false" />
-                            <label class="form-check-label" for="dirDown"><strong>Take remote</strong> — download (safe default)</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@takeUpload" disabled="@(busy || localCount == 0)" @onchange="() => takeUpload = true" />
-                            <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — overwrite remote</label>
-                        </div>
-                        @if (!takeUpload)
-                        {
-                            <div class="alert alert-danger mt-2 mb-0">
-                                <strong>Your @localCount local item(s) will be deleted</strong> and replaced with the
-                                @probe.RemoteCount remote item(s). A plaintext safety backup of your current local tree
-                                is saved first, and the app re-links to this sync.
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="alert alert-danger mt-2 mb-0">
-                                <strong>The @probe.RemoteCount remote item(s) will be overwritten</strong> with your
-                                @localCount local item(s). A plaintext safety backup of the server copy is saved first,
-                                and the app re-links to this sync.
-                            </div>
-                        }
+            @if (!VerifiedExisting)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Sync ID on the target service</label>
+                    <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+                    <label class="form-label mt-2">Password</label>
+                    <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
+                    <div class="form-text">Verified against the remote data first: a wrong password stops here, nothing is overwritten.</div>
+                    <button class="btn btn-secondary mt-2" @onclick="VerifyExisting" disabled="@busy">Verify</button>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-success">
+                    Sync <code>@ShortId(probe?.Candidate.Id)</code> opened — @probe?.RemoteCount remote item(s),
+                    password verified and cleared.
+                    <div class="mt-2">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="Unverify" disabled="@busy">Use a different sync…</button>
                     </div>
-                }
-            </div>
+                </div>
+            }
+            @if (VerifiedExisting)
+            {
+                <div class="alert alert-warning mt-2">
+                    <h4>Choose the link direction</h4>
+                    <p>Local holds <strong>@localCount</strong> item(s); remote holds <strong>@probe.RemoteCount</strong> item(s).</p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(!takeUpload)" disabled="@busy" @onchange="() => takeUpload = false" />
+                        <label class="form-check-label" for="dirDown"><strong>Take remote</strong> — download (safe default)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@takeUpload" disabled="@(busy || localCount == 0)" @onchange="() => takeUpload = true" />
+                        <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — overwrite remote</label>
+                    </div>
+                    @if (!takeUpload)
+                    {
+                        <div class="alert alert-danger mt-2 mb-0">
+                            <strong>Your @localCount local item(s) will be deleted</strong> and replaced with the
+                            @probe.RemoteCount remote item(s). A plaintext safety backup of your current local tree
+                            is saved first, and the app re-links to this sync.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-danger mt-2 mb-0">
+                            <strong>The @probe.RemoteCount remote item(s) will be overwritten</strong> with your
+                            @localCount local item(s). A plaintext safety backup of the server copy is saved first,
+                            and the app re-links to this sync.
+                        </div>
+                    }
+                </div>
+            }
         }
 
         <div class="d-flex gap-2">
@@ -218,6 +231,18 @@ else
     private bool CanReview() => slot == "new"
         ? newPassword.Length > 0 && confirmPassword.Length > 0
         : probe is not null && verifiedFor == $"{targetUrl.Trim()}|{syncId.Trim()}";
+
+    /// <summary>An existing sync stays verified only for the exact ID it was
+    /// verified with: editing the ID (or URL) brings the credential inputs
+    /// back automatically.</summary>
+    private bool VerifiedExisting =>
+        probe is not null && verifiedFor == $"{targetUrl.Trim()}|{syncId.Trim()}";
+
+    private void Unverify()
+    {
+        probe = null;
+        verifiedFor = null;
+    }
 
     private async Task CheckService()
     {
