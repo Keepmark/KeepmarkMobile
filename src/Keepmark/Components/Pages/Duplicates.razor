@@ -169,18 +169,19 @@ else
     }
 
     /// <summary>Bulk delete by stable NodeId in ONE shot (one transaction,
-    /// one push). Failures are logged, never swallowed silently.</summary>
+    /// one push). A safety backup of the current tree is saved first.
+    /// Failures are logged, never swallowed silently.</summary>
     private async Task<int> DeleteNodeIdsAsync(IEnumerable<int?> nodeIds)
     {
         var ids = nodeIds.Where(n => n.HasValue).Select(n => n.Value).Distinct().ToList();
-        if (ids.Count == 0 || Session.Engine is null)
+        if (ids.Count == 0)
         {
             return 0;
         }
 
         try
         {
-            return await Session.Engine.DeleteBookmarksByNodeIdsAsync(ids);
+            return await Session.DeleteBookmarksAsync(ids);
         }
         catch (Exception ex)
         {
@@ -228,7 +229,9 @@ else
         // left in background via the engine.
         StateHasChanged();
         Session.Log.Info("duplicates", deleted > 0 ? $"Deleted {deleted} duplicate(s)" : "Nothing to delete");
-        _ = Toast.ShowAsync(deleted > 0 ? $"Deleted {deleted} duplicate(s)" : "Nothing to delete");
+        _ = Toast.ShowAsync(deleted > 0
+            ? $"Deleted {deleted} duplicate(s). Safety backup saved — see Backup → Safety backups."
+            : "Nothing to delete");
     }
 
     private async Task ExecuteAll()
@@ -281,7 +284,9 @@ else
         // left in background via the engine.
         StateHasChanged();
         Session.Log.Info("duplicates", count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
-        _ = Toast.ShowAsync(count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
+        _ = Toast.ShowAsync(count > 0
+            ? $"Deleted {count} duplicate(s). Safety backup saved — see Backup → Safety backups."
+            : "Nothing to delete");
     }
 
     private RenderFragment DupRow(Core.Data.ItemRow r, string line1, string line2) => __builder =>

@@ -300,7 +300,7 @@ else
             armed = null;
             newPassword = string.Empty;
             await RefreshStateAsync();
-            Ok("New empty sync created and linked. A safety backup of the previous local data was saved.");
+            Ok("New empty sync created and linked. Safety backup of the previous local data saved — see Backup → Safety backups.");
         });
     }
 
@@ -325,7 +325,7 @@ else
             await Session.ApplyRemoteAsync(reconcile!);
             reconcile = null;
             await RefreshStateAsync();
-            Ok("Remote version downloaded.");
+            Ok("Remote version downloaded. Safety backup of your previous local tree saved — see Backup → Safety backups.");
         });
     }
 
@@ -336,7 +336,7 @@ else
             await Session.ApplyLocalAsync(reconcile!);
             reconcile = null;
             await RefreshStateAsync();
-            Ok("Local version uploaded.");
+            Ok("Local version uploaded. Safety backup of the previous server copy saved — see Backup → Safety backups.");
         });
     }
 

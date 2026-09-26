@@ -36,11 +36,11 @@ else if (step == 4)
         }
         else if (tookRemote)
         {
-            <p>Your local tree was replaced with the remote item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local tree was saved.</p>
+            <p>Your local tree was replaced with the remote item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local tree was saved — see Backup → Safety backups.</p>
         }
         else
         {
-            <p>Your @localCount local item(s) replaced the @probe?.RemoteCount remote item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten remote side was saved.</p>
+            <p>Your @localCount local item(s) replaced the @probe?.RemoteCount remote item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten remote side was saved — see Backup → Safety backups.</p>
         }
     </div>
     <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/")'>Back to Explore</button>
@@ -366,11 +366,11 @@ else
 
                 if (takeUpload)
                 {
-                    await Session.ApplyLocalAsync(probe);
+                    await Session.ApplyLocalAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchUpload);
                 }
                 else
                 {
-                    await Session.ApplyRemoteAsync(probe);
+                    await Session.ApplyRemoteAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchTakeRemote);
                     tookRemote = true;
                 }
             }

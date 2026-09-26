@@ -6,6 +6,7 @@ using Keepmark.Core.Errors;
 using Keepmark.Core.I18n;
 using Keepmark.Core.Logging;
 using Keepmark.Core.Models;
+using Keepmark.Core.Safety;
 using Keepmark.Core.Sync;
 
 namespace Keepmark.Services;
@@ -112,19 +113,19 @@ public sealed class XbsSession : IAsyncDisposable
         return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob);
     }
 
-    public async Task ApplyRemoteAsync(ReconcileInfo info, CancellationToken ct = default)
+    public async Task ApplyRemoteAsync(ReconcileInfo info, string operation = SafetyOperations.TakeRemote, CancellationToken ct = default)
     {
         // Safety backup of the discarded local side (plaintext — user is warned in UI).
-        await SaveSafetyBackupAsync("local", info.LocalBlob).ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", info.LocalBlob, operation, info.LocalCount).ConfigureAwait(false);
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: taking remote tree");
         await Engine!.PullAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task ApplyLocalAsync(ReconcileInfo info, CancellationToken ct = default)
+    public async Task ApplyLocalAsync(ReconcileInfo info, string operation = SafetyOperations.UploadLocal, CancellationToken ct = default)
     {
         // Safety backup of the overwritten remote side.
-        await SaveSafetyBackupAsync("remote", info.RemoteBlob).ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote", info.RemoteBlob, operation, info.RemoteCount).ConfigureAwait(false);
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: uploading local tree");
         await UploadMirrorAsync(info.Candidate, ct).ConfigureAwait(false);
@@ -146,8 +147,9 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
         // Safety backup: the local tree is about to be replaced by an empty sync.
-        var (_, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty).ConfigureAwait(false);
+        var (roots, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty,
+            SafetyOperations.CreateEmpty, CountBackupNodes(roots)).ConfigureAwait(false);
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
         _log.Info("session", "Created new empty sync");
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
@@ -197,8 +199,9 @@ public sealed class XbsSession : IAsyncDisposable
         }
 
         // Safety backup of the server copy we are about to overwrite.
-        var (_, blob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("remote", blob ?? string.Empty).ConfigureAwait(false);
+        var (treeRoots, blob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote", blob ?? string.Empty,
+            SafetyOperations.ChangePassword, CountBackupNodes(treeRoots)).ConfigureAwait(false);
         var newDerived = _crypto.DeriveKey(newPassword, creds.Id, version);
         await _creds.SetAsync(creds with { DerivedKey = newDerived }).ConfigureAwait(false);
         _log.Info("session", "Password changed, blob re-encrypted");
@@ -252,8 +255,9 @@ public sealed class XbsSession : IAsyncDisposable
         BackupGuard.RequirePassword(password);
         var roots = await OpenBackupAsync(path, password, ct).ConfigureAwait(false);
         var count = BackupGuard.ValidateTree(roots);
-        var (_, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty).ConfigureAwait(false);
+        var (localRoots, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty,
+            SafetyOperations.ImportBackup, CountBackupNodes(localRoots)).ConfigureAwait(false);
         await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
         _log.Info("session", $"Imported backup ({count} items)");
         return count;
@@ -343,23 +347,226 @@ public sealed class XbsSession : IAsyncDisposable
         return n;
     }
 
-    /// <summary>Safety backup of a side about to be overwritten (plaintext JSON, app-private dir).</summary>
-    public async Task<string> SaveSafetyBackupAsync(string side, string plaintextJson)
+    /// <summary>Safety backup of a side about to be overwritten (plaintext JSON,
+    /// app-private dir). The filename carries UTC time + operation so the user
+    /// can pick the right one for rollback; a manifest tracks the rest.</summary>
+    public async Task<string> SaveSafetyBackupAsync(
+        string side, string plaintextJson, string operation, int items = 0, string? syncId = null)
     {
-        var dir = Path.Combine(FileSystem.AppDataDirectory, "safety-backups");
+        var dir = SafetyDir();
         Directory.CreateDirectory(dir);
-        // Keep only the 5 most recent safety backups.
-        foreach (var old in new DirectoryInfo(dir).GetFiles("*.json")
-                     .OrderByDescending(f => f.CreationTimeUtc).Skip(5))
+        var now = DateTime.UtcNow;
+        var name = SafetyBackupFiles.BuildFileName(now, operation);
+        for (int dup = 2; File.Exists(Path.Combine(dir, name)) && dup < 100; dup++)
         {
-            old.Delete();
+            name = $"{Path.GetFileNameWithoutExtension(SafetyBackupFiles.BuildFileName(now, operation))}-{dup}.json";
         }
 
-        var path = Path.Combine(dir, $"safety-{side}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.json");
+        var path = Path.Combine(dir, name);
         await File.WriteAllTextAsync(path, plaintextJson).ConfigureAwait(false);
-        _log.Info("session", $"Safety backup written ({side})");
+        var entries = await ReadSafetyIndexAsync(dir).ConfigureAwait(false);
+        entries.RemoveAll(e => e.FileName == name);
+        entries.Add(new SafetyBackupEntry(name, now, operation, side, items,
+            new FileInfo(path).Length, syncId));
+        MergeLegacySafetyBackups(dir, entries);
+        foreach (var drop in SafetyBackupFiles.Prune(entries))
+        {
+            try { File.Delete(Path.Combine(dir, drop)); } catch { }
+            entries.RemoveAll(e => e.FileName == drop);
+        }
+
+        await WriteSafetyIndexAsync(dir, entries).ConfigureAwait(false);
+        _log.Info("session", $"Safety backup written ({operation}, {side})");
         return path;
     }
+
+    /// <summary>All safety backups, newest first (manifest + legacy files).</summary>
+    public Task<List<SafetyBackupEntry>> ListSafetyBackupsAsync(CancellationToken ct = default)
+    {
+        var dir = SafetyDir();
+        if (!Directory.Exists(dir))
+        {
+            return Task.FromResult(new List<SafetyBackupEntry>());
+        }
+
+        var entries = ReadSafetyIndex(dir);
+        var known = new HashSet<string>(entries.Select(e => e.FileName), StringComparer.Ordinal);
+        foreach (var file in new DirectoryInfo(dir).GetFiles("safety-*.json"))
+        {
+            if (file.Name == SafetyBackupFiles.IndexFileName || known.Contains(file.Name))
+            {
+                continue;
+            }
+
+            var legacy = SafetyBackupFiles.ParseLegacy(file.Name, file.Length);
+            if (legacy is not null)
+            {
+                entries.Add(legacy);
+            }
+        }
+
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(entries.OrderByDescending(e => e.CreatedAtUtc).ToList());
+    }
+
+    /// <summary>Deletes one safety backup (confirmed in UI). Unknown names rejected.</summary>
+    public async Task DeleteSafetyBackupAsync(string fileName)
+    {
+        var path = SafetyPath(fileName);
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException("Backup not found — it may have been pruned.");
+        }
+
+        File.Delete(path);
+        var dir = SafetyDir();
+        var entries = await ReadSafetyIndexAsync(dir).ConfigureAwait(false);
+        entries.RemoveAll(e => e.FileName == fileName);
+        await WriteSafetyIndexAsync(dir, entries).ConfigureAwait(false);
+        _log.Info("session", $"Safety backup deleted ({fileName})");
+    }
+
+    /// <summary>Restores a safety backup. Local-side backups replace the local
+    /// tree (dirty → pushed or honestly conflicted later); remote-side backups
+    /// upload onto the currently linked sync (409 if the server moved). The
+    /// overwritten current state is safety-backed-up first.</summary>
+    public async Task<int> RestoreSafetyBackupAsync(string fileName, CancellationToken ct = default)
+    {
+        var entry = (await ListSafetyBackupsAsync(ct).ConfigureAwait(false))
+            .FirstOrDefault(e => e.FileName == fileName)
+            ?? throw new InvalidOperationException("Backup not found — it may have been pruned.");
+        List<BookmarkNode> roots;
+        try
+        {
+            roots = System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(
+                await File.ReadAllTextAsync(SafetyPath(fileName), ct).ConfigureAwait(false)) ?? [];
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException)
+        {
+            throw new InvalidOperationException("Backup file is damaged.", ex);
+        }
+
+        var count = BackupGuard.ValidateTree(roots);
+        if (entry.Side == "local")
+        {
+            var (localRoots, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+            await SaveSafetyBackupAsync("local", localBlob ?? string.Empty,
+                SafetyOperations.PreRestore, CountBackupNodes(localRoots)).ConfigureAwait(false);
+            await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
+            _log.Info("session", $"Restored local safety backup ({count} items)");
+            return count;
+        }
+
+        var creds = await _creds.GetAsync().ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Link the sync this backup belongs to first.");
+        var (_, blob, lastUpdated, version) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote", blob ?? string.Empty,
+            SafetyOperations.PreRestore, 0, ShortSyncId(creds.Id)).ConfigureAwait(false);
+        var encrypted = _crypto.Encrypt(System.Text.Json.JsonSerializer.Serialize(roots), creds.DerivedKey);
+        var revRaw = await Store.GetMetaAsync(BookmarkStore.MetaRevision).ConfigureAwait(false);
+        _ = long.TryParse(revRaw, out var revision);
+        var hash = await Store.GetMetaAsync(BookmarkStore.MetaHash).ConfigureAwait(false);
+        await Store.ReplaceAllAsync(roots, encrypted,
+            lastUpdated ?? throw new IncompleteSyncInfoException(_str.Get(Str.ErrIncompleteSyncInfo)),
+            version, revision, hash).ConfigureAwait(false);
+        await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
+        _log.Info("session", $"Restored remote safety backup ({count} items)");
+        return count;
+    }
+
+    /// <summary>Bulk delete with a safety backup first (duplicates cleanup).</summary>
+    public async Task<int> DeleteBookmarksAsync(IEnumerable<int> nodeIds, CancellationToken ct = default)
+    {
+        var ids = nodeIds.Distinct().ToList();
+        if (ids.Count == 0 || Store is null || Engine is null)
+        {
+            return 0;
+        }
+
+        var (roots, blob, _, _) = await Store.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", blob ?? "[]",
+            SafetyOperations.DuplicatesCleanup, CountBackupNodes(roots)).ConfigureAwait(false);
+        return await Engine.DeleteBookmarksByNodeIdsAsync(ids, ct).ConfigureAwait(false);
+    }
+
+    private static string SafetyDir() =>
+        Path.Combine(FileSystem.AppDataDirectory, "safety-backups");
+
+    private static string SafetyPath(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || fileName != Path.GetFileName(fileName) ||
+            !fileName.StartsWith(SafetyBackupFiles.FilePrefix, StringComparison.Ordinal) ||
+            !fileName.EndsWith(".json", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Unknown backup.");
+        }
+
+        var dir = SafetyDir();
+        var full = Path.GetFullPath(Path.Combine(dir, fileName));
+        if (full != Path.Combine(dir, fileName))
+        {
+            throw new InvalidOperationException("Unknown backup.");
+        }
+
+        return full;
+    }
+
+    private static List<SafetyBackupEntry> ReadSafetyIndex(string dir)
+    {
+        var index = Path.Combine(dir, SafetyBackupFiles.IndexFileName);
+        if (!File.Exists(index))
+        {
+            return [];
+        }
+
+        try
+        {
+            return SafetyBackupFiles.ParseIndex(File.ReadAllText(index));
+        }
+        catch (IOException)
+        {
+            return [];
+        }
+    }
+
+    private Task<List<SafetyBackupEntry>> ReadSafetyIndexAsync(string dir) =>
+        Task.FromResult(ReadSafetyIndex(dir));
+
+    private static Task WriteSafetyIndexAsync(string dir, List<SafetyBackupEntry> entries)
+    {
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, SafetyBackupFiles.IndexFileName),
+                SafetyBackupFiles.SerializeIndex(entries));
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidOperationException("Cannot update the backup index.", ex);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void MergeLegacySafetyBackups(string dir, List<SafetyBackupEntry> entries)
+    {
+        var known = new HashSet<string>(entries.Select(e => e.FileName), StringComparer.Ordinal);
+        foreach (var file in new DirectoryInfo(dir).GetFiles("safety-*.json"))
+        {
+            if (file.Name == SafetyBackupFiles.IndexFileName || known.Contains(file.Name))
+            {
+                continue;
+            }
+
+            var legacy = SafetyBackupFiles.ParseLegacy(file.Name, file.Length);
+            if (legacy is not null)
+            {
+                entries.Add(legacy);
+            }
+        }
+    }
+
+    private static string? ShortSyncId(string? id) =>
+        id is null ? null : id.Length <= 8 ? id : $"{id[..4]}…{id[^2..]}";
 
     private void StartPollTimer()
     {

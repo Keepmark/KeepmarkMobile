@@ -1,6 +1,7 @@
 @page "/backup"
 @inject Keepmark.Services.XbsSession Session
 @inject Keepmark.Services.ToastState Toast
+@using Keepmark.Core.Safety
 
 <PageTitle>Backup</PageTitle>
 
@@ -69,6 +70,72 @@ else
             }
         }
     </div>
+
+    <div class="mb-3">
+        <h4>Safety backups</h4>
+        <p class="text-muted">Automatic snapshots taken before every overwrite (plaintext, kept in the app folder).
+            Restore one to undo a take-remote, upload, import, password change, move or duplicates cleanup —
+            or delete it to free space. Newest first, oldest auto-pruned beyond five.</p>
+        <button class="btn btn-outline-secondary btn-sm mb-2" @onclick="RefreshSafety" disabled="@busy">Refresh list</button>
+        @if (!string.IsNullOrEmpty(safetyMessage))
+        {
+            <div class="alert mt-2 @(safetyError ? "alert-danger" : "alert-success")">@safetyMessage</div>
+        }
+        @if (safetyList.Count == 0)
+        {
+            <p class="text-muted">No safety backups yet.</p>
+        }
+        @foreach (var sb in safetyList)
+        {
+            <div class="card mb-2">
+                <div class="card-body py-2">
+                    <div><strong>@SafetyBackupFiles.Describe(sb)</strong></div>
+                    <div class="form-text">@sb.FileName · @FormatBytes(sb.SizeBytes)
+                        @if (sb.SyncId is not null)
+                        {
+                            <text> · sync <code>@sb.SyncId</code></text>
+                        }
+                    </div>
+                    @if (armedRestore == sb.FileName)
+                    {
+                        <div class="alert alert-danger mt-2 mb-2">
+                            @if (sb.Side == "local")
+                            {
+                                <text><strong>Replace your @localCount local item(s) with this backup (@sb.Items items)?</strong>
+                                A pre-restore backup of the current tree is saved first; the restored tree syncs up after.</text>
+                            }
+                            else
+                            {
+                                <text><strong>Upload this backup (@sb.Items items) onto the currently linked sync?</strong>
+                                A pre-restore backup of the server copy is saved first. Refused when unlinked.</text>
+                            }
+                            <div class="mt-2 d-flex gap-2">
+                                <button class="btn btn-danger" @onclick="ExecuteSafetyRestore" disabled="@busy">Yes, restore</button>
+                                <button class="btn btn-secondary" @onclick="() => armedRestore = null" disabled="@busy">Cancel</button>
+                            </div>
+                        </div>
+                    }
+                    else if (armedDelete == sb.FileName)
+                    {
+                        <div class="alert alert-warning mt-2 mb-2">
+                            <strong>Delete this safety backup?</strong> There is no undo for this.
+                            <div class="mt-2 d-flex gap-2">
+                                <button class="btn btn-danger" @onclick="ExecuteSafetyDelete" disabled="@busy">Yes, delete</button>
+                                <button class="btn btn-secondary" @onclick="() => armedDelete = null" disabled="@busy">Cancel</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-outline-primary btn-sm" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">Restore…</button>
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">Delete</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
 }
 
 @code {
@@ -87,6 +154,11 @@ else
     private string impPassword = string.Empty;
     private int? impCount;
     private bool armedImp;
+    private List<SafetyBackupEntry> safetyList = new();
+    private string? armedRestore;
+    private string? armedDelete;
+    private string safetyMessage = string.Empty;
+    private bool safetyError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -100,6 +172,35 @@ else
             var stats = await Session.Store.GetStatsAsync();
             localCount = stats.Folders + stats.Bookmarks + stats.Separators;
         }
+
+        await RefreshSafetyListAsync();
+    }
+
+    private async Task RefreshSafetyListAsync()
+    {
+        try
+        {
+            safetyList = await Session.ListSafetyBackupsAsync();
+        }
+        catch
+        {
+            safetyList = new();
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        if (bytes < 1024L * 1024)
+        {
+            return $"{bytes / 1024.0:0.#} KB";
+        }
+
+        return $"{bytes / (1024.0 * 1024):0.##} MB";
     }
 
     private static void RequireMatchingPasswords(string first, string second)
@@ -247,10 +348,66 @@ else
                 localCount = stats.Folders + stats.Bookmarks + stats.Separators;
             }
 
-            Ok($"Restored {restored} item(s). They sync up automatically.");
+            Ok($"Restored {restored} item(s). Safety backup of the replaced tree saved — see Safety backups below. They sync up automatically.");
         });
         impMessage = message;
         impError = isError;
+        message = string.Empty;
+    }
+
+    private async Task RefreshSafety()
+    {
+        await RunAsync(async () =>
+        {
+            await RefreshSafetyListAsync();
+            Ok($"Safety list refreshed ({safetyList.Count} backup(s)).");
+        });
+        safetyMessage = message;
+        safetyError = isError;
+        message = string.Empty;
+    }
+
+    private async Task ExecuteSafetyRestore()
+    {
+        await RunAsync(async () =>
+        {
+            if (armedRestore is null)
+            {
+                throw new InvalidOperationException("Pick a backup first.");
+            }
+
+            var restored = await Session.RestoreSafetyBackupAsync(armedRestore);
+            armedRestore = null;
+            if (Session.Store is not null)
+            {
+                var stats = await Session.Store.GetStatsAsync();
+                localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+            }
+
+            await RefreshSafetyListAsync();
+            Ok($"Restored {restored} item(s). A pre-restore backup was saved first.");
+        });
+        safetyMessage = message;
+        safetyError = isError;
+        message = string.Empty;
+    }
+
+    private async Task ExecuteSafetyDelete()
+    {
+        await RunAsync(async () =>
+        {
+            if (armedDelete is null)
+            {
+                throw new InvalidOperationException("Pick a backup first.");
+            }
+
+            await Session.DeleteSafetyBackupAsync(armedDelete);
+            armedDelete = null;
+            await RefreshSafetyListAsync();
+            Ok("Safety backup deleted.");
+        });
+        safetyMessage = message;
+        safetyError = isError;
         message = string.Empty;
     }
 
