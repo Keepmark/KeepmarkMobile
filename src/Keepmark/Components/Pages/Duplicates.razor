@@ -53,7 +53,7 @@ else
         <span>@MarkedCount() marked</span>
         @if (!armedAll)
         {
-            <button class="btn btn-danger" disabled="@(busy || MarkedCount() == 0)" @onclick="() => armedAll = true">Delete marked…</button>
+            <button class="btn btn-outline-danger" disabled="@(busy || MarkedCount() == 0)" @onclick="() => armedAll = true">Delete marked…</button>
         }
         else
         {
