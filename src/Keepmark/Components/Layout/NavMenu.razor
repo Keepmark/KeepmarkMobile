@@ -1,5 +1,6 @@
 ﻿@inject Keepmark.Services.XbsSession Session
 @inject Keepmark.Services.ToastState Toast
+@inject Keepmark.Services.SecureCredentialStore Creds
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -35,7 +36,7 @@
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="switch-service">
+            <NavLink class="@SwitchCss" href="switch-service" title="@SwitchTitle" aria-disabled="@(!linked)">
                 <span aria-hidden="true" class="nav-sync-glyph">⇄</span> Switch service
             </NavLink>
         </div>
@@ -69,6 +70,10 @@
 
 @code {
     private int dupCount;
+    private bool linked;
+
+    private string SwitchCss => "nav-link" + (linked ? string.Empty : " disabled");
+    private string SwitchTitle => linked ? "Move to another service" : "Link a service first (Connect)";
 
     protected override async Task OnInitializedAsync()
     {
@@ -82,7 +87,22 @@
             Session.Engine.DataChanged += OnData;
         }
 
+        await RefreshLinkedAsync();
         await RefreshDupCountAsync();
+    }
+
+    /// <summary>Switch service needs an existing link: refresh on init, on
+    /// engine changes, and on every drawer open (link/unlink elsewhere).</summary>
+    private async Task RefreshLinkedAsync()
+    {
+        try
+        {
+            linked = await Creds.GetAsync() is not null;
+        }
+        catch
+        {
+            linked = false;
+        }
     }
 
     private async Task RefreshDupCountAsync()
@@ -102,12 +122,16 @@
         }
     }
 
-    private void OnData() => InvokeAsync(async () => { await RefreshDupCountAsync(); StateHasChanged(); });
+    private void OnData() => InvokeAsync(async () => { await RefreshDupCountAsync(); await RefreshLinkedAsync(); StateHasChanged(); });
 
     // While the drawer is open the page behind must not scroll (same lock as modal sheets).
     private async Task OnNavToggle(ChangeEventArgs e)
     {
         try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", e.Value is true, "nav"); } catch { }
+        if (e.Value is true)
+        {
+            await RefreshLinkedAsync();
+        }
     }
 
     public void Dispose()

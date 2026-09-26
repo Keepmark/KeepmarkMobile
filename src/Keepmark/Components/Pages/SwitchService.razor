@@ -3,6 +3,7 @@
 @inject Keepmark.Services.XbsSession Session
 @inject Keepmark.Services.XbsSettings AppSettings
 @inject Keepmark.Services.ToastState Toast
+@inject Keepmark.Services.SecureCredentialStore Creds
 @inject NavigationManager Nav
 
 <PageTitle>Switch service</PageTitle>
@@ -13,6 +14,14 @@
 @if (!Session.Ready)
 {
     <p><em>Starting…</em></p>
+}
+else if (!linked)
+{
+    <div class="alert alert-info">
+        <strong>No service linked yet.</strong>
+        Switch moves an existing connection to another service —
+        <a href="connect">connect a service first</a>, then come back here.
+    </div>
 }
 else if (step == 4)
 {
@@ -163,6 +172,7 @@ else
     private bool busy;
     private string message = string.Empty;
     private bool isError;
+    private bool linked;
 
     private bool serviceOk =>
         serviceInfo is not null && checkedUrl == targetUrl.Trim();
@@ -179,6 +189,8 @@ else
             var stats = await Session.Store.GetStatsAsync();
             localCount = stats.Folders + stats.Bookmarks + stats.Separators;
         }
+
+        linked = await Creds.GetAsync() is not null;
     }
 
     private static string ShortId(string? id) =>
