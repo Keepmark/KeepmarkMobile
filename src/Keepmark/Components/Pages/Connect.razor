@@ -116,23 +116,55 @@ else
             <h4>Choose sync direction</h4>
             <p>Local items: <strong>@reconcile.LocalCount</strong> · Remote items: <strong>@reconcile.RemoteCount</strong>
                 (remote updated @(reconcile.RemoteLastUpdated ?? "unknown")).</p>
-            <p><small>A safety backup of the overwritten side is saved automatically.</small></p>
-            @if (reconcile is { LocalCount: 0 })
+            <div class="mb-2">
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="syncDirection" id="dir-download"
+                           checked="@(direction == "download")" disabled="@(busy || reconcile.RemoteCount == 0)"
+                           @onchange='() => direction = "download"' />
+                    <label class="form-check-label" for="dir-download">
+                        Download remote — replace local
+                        @if (reconcile.RemoteCount == 0)
+                        {
+                            <text>(remote is empty)</text>
+                        }
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="syncDirection" id="dir-upload"
+                           checked="@(direction == "upload")" disabled="@(busy || reconcile.LocalCount == 0)"
+                           @onchange='() => direction = "upload"' />
+                    <label class="form-check-label" for="dir-upload">
+                        Upload local — overwrite remote
+                        @if (reconcile.LocalCount == 0)
+                        {
+                            <text>(nothing local to lose)</text>
+                        }
+                    </label>
+                </div>
+            </div>
+            @if (direction == "download")
             {
-                <button class="btn btn-primary" @onclick="ApplyRemote" disabled="@busy">Download remote</button>
-                <div class="form-text">Takes the @reconcile.RemoteCount remote item(s). Nothing local to lose.</div>
-            }
-            else if (reconcile is { RemoteCount: 0 })
-            {
-                <button class="btn btn-primary" @onclick="ApplyLocal" disabled="@busy">Upload local</button>
-                <div class="form-text">Pushes your @reconcile.LocalCount local item(s) to the service. The remote slot is empty.</div>
+                <div class="alert alert-danger mb-2">
+                    <strong>Takes the @reconcile.RemoteCount remote item(s).</strong>
+                    @if (reconcile.LocalCount > 0)
+                    {
+                        <text>Your @reconcile.LocalCount local item(s) will be deleted.</text>
+                    }
+                    A plaintext safety backup is saved first.
+                    <div class="mt-2">
+                        <button class="btn btn-danger" @onclick="ApplyRemote" disabled="@busy">Yes, download remote</button>
+                    </div>
+                </div>
             }
             else
             {
-                <button class="btn btn-primary me-2" @onclick="ApplyLocal" disabled="@busy">Keep mine, upload</button>
-                <div class="form-text">Overwrites the @reconcile.RemoteCount remote item(s) with your @reconcile.LocalCount local.</div>
-                <button class="btn btn-secondary mt-2" @onclick="ApplyRemote" disabled="@busy">Take remote, replace local</button>
-                <div class="form-text">Deletes your @reconcile.LocalCount local item(s) and takes the @reconcile.RemoteCount remote (backup saved first).</div>
+                <div class="alert alert-danger mb-2">
+                    <strong>Overwrites the @reconcile.RemoteCount remote item(s) with your @reconcile.LocalCount local.</strong>
+                    A plaintext safety backup of the server copy is saved first.
+                    <div class="mt-2">
+                        <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload local</button>
+                    </div>
+                </div>
             }
         </div>
     }
@@ -160,6 +192,10 @@ else
     private int localCount;
     private string? armed;
     private bool armedUnlink;
+    /// <summary>Reconcile direction choice: "download" replaces local with the
+    /// remote copy, "upload" overwrites the remote with local. Preselected to
+    /// the only sensible side when one of them is empty.</summary>
+    private string direction = "download";
 
     protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
 
@@ -246,6 +282,8 @@ else
             }
             else
             {
+                // Preselect the only sensible direction when one side is empty.
+                direction = reconcile.RemoteCount == 0 ? "upload" : "download";
                 Ok("Credentials valid. Choose the sync direction above.");
             }
         });
