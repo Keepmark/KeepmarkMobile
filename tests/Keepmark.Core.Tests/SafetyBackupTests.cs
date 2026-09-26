@@ -71,4 +71,29 @@ public sealed class SafetyBackupTests
         Assert.Empty(SafetyBackupFiles.ParseIndex("{damaged"));
         Assert.Empty(SafetyBackupFiles.ParseIndex(""));
     }
+
+    [Fact]
+    public void Fingerprint_IsStableShortHex()
+    {
+        var key = Convert.ToBase64String(new byte[32]);
+        var fp = SafetyMaster.Fingerprint(key);
+        Assert.Equal(8, fp.Length);
+        Assert.Equal(fp, SafetyMaster.Fingerprint(key));
+        Assert.Matches("^[0-9a-f]{8}$", fp);
+    }
+
+    [Fact]
+    public void Wraps_AddRefreshTrimAndFind()
+    {
+        var wraps = SafetyMaster.AddWrap([], "aaa", "w1");
+        wraps = SafetyMaster.AddWrap(wraps, "bbb", "w2");
+        wraps = SafetyMaster.AddWrap(wraps, "aaa", "w1b"); // refresh moves first
+        Assert.Equal(new[] { "aaa", "bbb" }, wraps.Select(w => w.KekId));
+        Assert.Equal("w1b", SafetyMaster.FindWrap(wraps, "aaa")!.WrappedKey);
+        Assert.Null(SafetyMaster.FindWrap(wraps, "zzz"));
+        wraps = SafetyMaster.AddWrap(wraps, "ccc", "w3");
+        wraps = SafetyMaster.AddWrap(wraps, "ddd", "w4");
+        Assert.Equal(SafetyMaster.MaxWraps, wraps.Count);
+        Assert.DoesNotContain(wraps, w => w.KekId == "bbb"); // oldest trimmed
+    }
 }

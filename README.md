@@ -167,6 +167,112 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
 3. Deploy `-t:Run`, verify `versionName`, screenshot.
 4. Deploy restarts the app → device shows lock screen if auto-lock on; unlock manually.
 
+## Safety backups (behavioral spec — verifiable by a third party)
+
+Every destructive operation snapshots the side it is about to destroy
+("backup what you destroy") BEFORE mutating anything, and tells the user
+where the snapshot went. Snapshots live in `safety-backups/` (app-private),
+are listed/restored/deleted from Backup → Safety backups, and are
+encrypted except legacy/pre-link files (flagged "not encrypted" in the UI).
+
+### 1. What must be backed up (per flow)
+
+| Flow | Destroyed side | Snapshot content | Operation tag |
+|---|---|---|---|
+| Connect → take remote | local tree | current local JSON | `take-remote` |
+| Connect → upload local | server copy | current remote JSON | `upload-local` |
+| Connect → create empty | local tree | current local JSON | `create-empty` |
+| Import encrypted backup | local tree | current local JSON | `import-backup` |
+| Change password | server copy | current remote JSON | `change-password` |
+| Switch → take remote | local tree | current local JSON | `switch-take-remote` |
+| Switch → upload local | server copy | current remote JSON | `switch-upload` |
+| Duplicates bulk delete | local tree | pre-delete local JSON | `duplicates-cleanup` |
+| Safety restore (any) | current state | state being replaced | `pre-restore` |
+
+Rule: no snapshot → the operation must not run (fail closed, error surfaced).
+Exception: single-bookmark delete on Home keeps its 6-second in-memory undo
+instead of a file (documented, no snapshot required).
+
+### 2. File format, naming, manifest
+
+- Payload: bookmark-tree JSON (same shape as sync blobs, plaintext) or, when
+  an aligned link key exists, AES-GCM envelope via `XCryptoService`
+  (see §3). Extension always `.json`.
+- Filename: `safety-{yyyyMMdd-HHmmss}-{operation}[-{n}].json`
+  (human-readable in file managers; `-{n}` disambiguates same-second writes).
+- Manifest `safety-index.json`: array of
+  `{FileName, CreatedAtUtc, Operation, Side, Items, SizeBytes, SyncId, Enc}`.
+  `SyncId` is truncated (`ab12…ef`); `Enc` is `"master"` or absent (plaintext).
+- Legacy files (`safety-{local|remote}-{ts}.json`, no manifest entry) MUST
+  still be listed, restorable and deletable, shown as "Older backup".
+- Retention: newest 5 kept, older pruned automatically (file + index row
+  removed together). Manual delete allowed anytime with two-tap confirm.
+- Corrupt index → treated as empty (legacy scan still lists files).
+  Damaged payload → open refuses with "damaged", never half-restores.
+
+### 3. Encryption (envelope, Master Key)
+
+- Files are encrypted ONCE under a random 256-bit Master Key
+  (`XCryptoService.Encrypt`, same envelope as sync crypto).
+- The Master Key record (`safety-master.json`) holds ONLY wrapped copies:
+  `[{KekId, WrappedKey}]`, newest first, max 3. KEK = current sync-derived
+  key; `KekId` = first 8 hex of SHA-256(KEK). The plaintext master never
+  touches disk.
+- Pre-link / misaligned writes fall back to plaintext flagged `Enc: absent`
+  ("not encrypted" in UI) — never silently, never assumed encrypted.
+- Rotation (switch success, password-change success): unwrap with old KEK,
+  wrap with new KEK, write temp + fsync + atomic rename, then test-unwrap
+  before trusting; previous file kept as `.prev` until verify passes.
+  Rotation failure must NEVER fail the user flow (warn + continue).
+- Atomicity contract: rotation is ONE small atomic write; backup blobs are
+  never re-encrypted. A crash can only leave (a) old master intact, or
+  (b) new master verified — never a torn master. Concurrent access is
+  serialized by a session gate; misaligned states refuse honestly
+  ("locked to another sync (…)" naming the origin sync) instead of guessing.
+- Unlink drops the key from memory; deterministic PBKDF2 means re-linking
+  the same sync+password re-opens everything with no recovery flow.
+
+### 4. Restore semantics
+
+- Local-side entry: pre-restore snapshot of current local first, then
+  replace local tree (dirty → auto-push, or honest 409 later). Works unlinked.
+- Remote-side entry: requires an active link (refuse otherwise: "Link the
+  sync this backup belongs to first"); pre-restore snapshot of current
+  remote; re-encrypt with the CURRENT link key; push (revision CAS or
+  timestamp; 409 surfaces, nothing is clobbered). The entry's origin sync
+  is shown so the user never uploads old data onto the wrong sync silently.
+- Restore never deletes the used entry. Counts shown before confirm must
+  match `ValidateTree` (bounded tree, no nulls).
+
+### 5. UI obligations
+
+- Every destructive success message names the safety net and where to find
+  it ("… — see Backup → Safety backups").
+- Safety list rows show: local time, operation description, side
+  (local tree / server copy), item count, size, origin sync, encrypted flag.
+- Restore and Delete both require explicit confirm; destructive errors show
+  the reason verbatim, secrets are cleared from inputs on failure.
+- Change-password and switch-existing keep their current-password /
+  verify-first gates; nothing in this spec weakens them.
+
+### 6. How to verify (third-party checklist)
+
+1. `dotnet test` green (incl. `SafetyBackupTests`: naming, describe,
+   prune-5, legacy parse, index round-trip/damage, fingerprint, wrap trim).
+2. Trigger each flow in §1 → Backup → Safety backups shows a new row with
+   the right operation/side/count; filename matches on disk.
+3. Restore a local entry → tree replaced, pre-restore row appears, count matches.
+4. Restore a remote entry unlinked → refused with the link message.
+5. Delete a row → file + index row gone; restore-then-delete of the same
+   name → "not found".
+6. Switch service / change password → previous rows still open
+   (re-wrapped, same origin sync shown).
+7. Unlink → encrypted rows refuse with the origin sync named; re-link same
+   credentials → they open again.
+8. Kill the app mid-rotation (or restore `.prev` over master) → master
+   intact or verifiable, no silent lockout; index damage → list falls back
+   to directory scan.
+
 ## License
 
 GNU GPL v3 — see `LICENSE.md`. Interop logic derived from the official

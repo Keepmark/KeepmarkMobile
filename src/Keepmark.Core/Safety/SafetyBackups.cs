@@ -34,10 +34,11 @@ public static class SafetyOperations
 }
 
 /// <summary>One safety-backup file: the overwritten side, snapshotted with
-/// WHEN (UTC) and WHY (operation). Plaintext JSON, app-private dir.</summary>
+/// WHEN (UTC) and WHY (operation). Plaintext only for legacy / pre-link
+/// writes; otherwise encrypted under the safety Master Key.</summary>
 public sealed record SafetyBackupEntry(
     string FileName, DateTime CreatedAtUtc, string Operation, string Side,
-    int Items, long SizeBytes, string? SyncId);
+    int Items, long SizeBytes, string? SyncId, string? Enc = null);
 
 public static class SafetyBackupFiles
 {
@@ -68,7 +69,8 @@ public static class SafetyBackupFiles
 
     public static string Describe(SafetyBackupEntry e) =>
         $"{e.CreatedAtUtc.ToLocalTime():g} · {SafetyOperations.Describe(e.Operation)} · " +
-        $"{(e.Side == "local" ? "local tree" : "server copy")} · {e.Items} items";
+        $"{(e.Side == "local" ? "local tree" : "server copy")} · {e.Items} items" +
+        (e.Enc == "master" ? " · encrypted" : " · not encrypted");
 
     /// <summary>Filenames to delete: everything beyond the newest KeepCount.</summary>
     public static List<string> Prune(IEnumerable<SafetyBackupEntry> entries) =>

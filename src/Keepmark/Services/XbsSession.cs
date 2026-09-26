@@ -23,6 +23,9 @@ public sealed class XbsSession : IAsyncDisposable
     private readonly InMemoryLogger _log = new();
     private readonly XCryptoService _crypto;
     private readonly Dictionary<string, XSyncApiClient> _apiClients = new();
+    /// <summary>Serializes the whole safety subsystem (master rotation, backup
+    /// writes, index rewrites) so a rotation can never interleave a write.</summary>
+    private readonly SemaphoreSlim _safetyGate = new(1, 1);
     private PeriodicTimer? _pollTimer;
     private CancellationTokenSource? _pollCts;
 
@@ -117,18 +120,22 @@ public sealed class XbsSession : IAsyncDisposable
     {
         // Safety backup of the discarded local side (plaintext — user is warned in UI).
         await SaveSafetyBackupAsync("local", info.LocalBlob, operation, info.LocalCount).ConfigureAwait(false);
+        var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: taking remote tree");
         await Engine!.PullAsync(ct).ConfigureAwait(false);
+        await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
     }
 
     public async Task ApplyLocalAsync(ReconcileInfo info, string operation = SafetyOperations.UploadLocal, CancellationToken ct = default)
     {
         // Safety backup of the overwritten remote side.
         await SaveSafetyBackupAsync("remote", info.RemoteBlob, operation, info.RemoteCount).ConfigureAwait(false);
+        var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: uploading local tree");
         await UploadMirrorAsync(info.Candidate, ct).ConfigureAwait(false);
+        await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
     }
 
     /// <summary>Fresh/empty link: upload the current local mirror to the server.</summary>
@@ -153,8 +160,10 @@ public sealed class XbsSession : IAsyncDisposable
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
         _log.Info("session", "Created new empty sync");
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
+        var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         await _creds.SetAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version)).ConfigureAwait(false);
         await Store.ReplaceAllAsync([], string.Empty, created.LastUpdated!, created.Version).ConfigureAwait(false);
+        await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
     }
 
@@ -165,8 +174,10 @@ public sealed class XbsSession : IAsyncDisposable
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
         var candidate = new SyncCredentials(created.Id!, serviceUrl, derived, created.Version);
+        var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         await _creds.SetAsync(candidate).ConfigureAwait(false);
         await UploadMirrorAsync(candidate, ct).ConfigureAwait(false);
+        await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
         _log.Info("session", "Created new sync and uploaded local tree");
         return created.Id!;
@@ -206,6 +217,7 @@ public sealed class XbsSession : IAsyncDisposable
         await _creds.SetAsync(creds with { DerivedKey = newDerived }).ConfigureAwait(false);
         _log.Info("session", "Password changed, blob re-encrypted");
         await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
+        await RotateSafetyMasterBestEffortAsync(currentDerived, newDerived).ConfigureAwait(false);
     }
 
     public void NotifySettingsChanged()
@@ -353,8 +365,43 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task<string> SaveSafetyBackupAsync(
         string side, string plaintextJson, string operation, int items = 0, string? syncId = null)
     {
+        await _safetyGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            return await SaveSafetyBackupCoreAsync(side, plaintextJson, operation, items, syncId).ConfigureAwait(false);
+        }
+        finally
+        {
+            _safetyGate.Release();
+        }
+    }
+
+    private async Task<string> SaveSafetyBackupCoreAsync(
+        string side, string plaintextJson, string operation, int items, string? syncId)
+    {
         var dir = SafetyDir();
         Directory.CreateDirectory(dir);
+        // Encrypt under the Master Key when it opens with the current link key;
+        // otherwise (pre-link, misaligned) store plaintext flagged as such.
+        string payload = plaintextJson;
+        string? enc = null;
+        var master = await LoadSafetyMasterAsync(dir).ConfigureAwait(false);
+        var creds = await _creds.GetAsync().ConfigureAwait(false);
+        if (master is not null && creds?.DerivedKey is not null &&
+            SafetyMaster.FindWrap(master.Wraps, SafetyMaster.Fingerprint(creds.DerivedKey)) is { } wrap)
+        {
+            try
+            {
+                var masterB64 = _crypto.Decrypt(wrap.WrappedKey, creds.DerivedKey);
+                payload = _crypto.Encrypt(plaintextJson, masterB64);
+                enc = "master";
+            }
+            catch (Exception ex) when (ex is XbsException or FormatException)
+            {
+                _log.Warn("session", $"Safety master unwrap failed, storing plaintext: {ex.GetType().Name}");
+            }
+        }
+
         var now = DateTime.UtcNow;
         var name = SafetyBackupFiles.BuildFileName(now, operation);
         for (int dup = 2; File.Exists(Path.Combine(dir, name)) && dup < 100; dup++)
@@ -363,11 +410,11 @@ public sealed class XbsSession : IAsyncDisposable
         }
 
         var path = Path.Combine(dir, name);
-        await File.WriteAllTextAsync(path, plaintextJson).ConfigureAwait(false);
+        await File.WriteAllTextAsync(path, payload).ConfigureAwait(false);
         var entries = await ReadSafetyIndexAsync(dir).ConfigureAwait(false);
         entries.RemoveAll(e => e.FileName == name);
         entries.Add(new SafetyBackupEntry(name, now, operation, side, items,
-            new FileInfo(path).Length, syncId));
+            new FileInfo(path).Length, syncId, enc));
         MergeLegacySafetyBackups(dir, entries);
         foreach (var drop in SafetyBackupFiles.Prune(entries))
         {
@@ -376,8 +423,133 @@ public sealed class XbsSession : IAsyncDisposable
         }
 
         await WriteSafetyIndexAsync(dir, entries).ConfigureAwait(false);
-        _log.Info("session", $"Safety backup written ({operation}, {side})");
+        _log.Info("session", $"Safety backup written ({operation}, {side}, {enc ?? "plaintext"})");
         return path;
+    }
+
+    /// <summary>Loads (or creates) the safety Master Key record. Null only on
+    /// IO failure — callers fall back to plaintext and stay honest about it.</summary>
+    private async Task<SafetyMasterRecord?> LoadSafetyMasterAsync(string dir)
+    {
+        var path = Path.Combine(dir, "safety-master.json");
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            var raw = await File.ReadAllTextAsync(path).ConfigureAwait(false);
+            return System.Text.Json.JsonSerializer.Deserialize<SafetyMasterRecord>(raw);
+        }
+        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException)
+        {
+            _log.Warn("session", $"Safety master unreadable: {ex.GetType().Name}");
+            return null;
+        }
+    }
+
+    /// <summary>Atomic master rotation: unwrap with the old KEK, wrap with the
+    /// new one, write temp + fsync + rename, then verify by test-unwrap.
+    /// The previous file is kept as .prev until the new one verifies.
+    /// Already-aligned masters (relink with same credentials) are left alone;
+    /// missing/damaged masters are minted fresh (old ciphertext stays listed
+    /// but locked, honestly).</summary>
+    private async Task RotateSafetyMasterAsync(string? oldKekB64, string newKekB64)
+    {
+        await _safetyGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var dir = SafetyDir();
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "safety-master.json");
+            var prev = Path.Combine(dir, "safety-master.prev.json");
+            var master = await LoadSafetyMasterAsync(dir).ConfigureAwait(false);
+            if (master is not null &&
+                SafetyMaster.FindWrap(master.Wraps, SafetyMaster.Fingerprint(newKekB64)) is not null)
+            {
+                return;
+            }
+
+            string masterB64;
+            if (master is not null && oldKekB64 is not null &&
+                SafetyMaster.FindWrap(master.Wraps, SafetyMaster.Fingerprint(oldKekB64)) is { } oldWrap)
+            {
+                masterB64 = _crypto.Decrypt(oldWrap.WrappedKey, oldKekB64);
+            }
+            else
+            {
+                masterB64 = Convert.ToBase64String(
+                    System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+                master = new SafetyMasterRecord(SafetyMaster.CurrentFormat, []);
+            }
+
+            var newWrap = new SafetyMasterWrap(
+                SafetyMaster.Fingerprint(newKekB64), _crypto.Encrypt(masterB64, newKekB64));
+            var rotated = new SafetyMasterRecord(
+                SafetyMaster.CurrentFormat, SafetyMaster.AddWrap(master.Wraps, newWrap.KekId, newWrap.WrappedKey));
+            var raw = System.Text.Json.JsonSerializer.Serialize(rotated);
+            var tmp = path + ".tmp";
+            await using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+            await using (var sw = new StreamWriter(fs))
+            {
+                await sw.WriteAsync(raw).ConfigureAwait(false);
+                await sw.FlushAsync().ConfigureAwait(false);
+                fs.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(path))
+            {
+                File.Copy(path, prev, overwrite: true);
+            }
+
+            File.Move(tmp, path, overwrite: true);
+            // Verify before trusting it: test-unwrap the fresh record.
+            var check = await LoadSafetyMasterAsync(dir).ConfigureAwait(false);
+            var verifyWrap = check is not null
+                ? SafetyMaster.FindWrap(check.Wraps, SafetyMaster.Fingerprint(newKekB64))
+                : null;
+            if (verifyWrap is null || _crypto.Decrypt(verifyWrap.WrappedKey, newKekB64) != masterB64)
+            {
+                throw new InvalidOperationException("Rotated master does not verify.");
+            }
+
+            try { File.Delete(prev); } catch { }
+            _log.Info("session", "Safety master rotated");
+        }
+        finally
+        {
+            _safetyGate.Release();
+        }
+    }
+
+    /// <summary>Best-effort master rotation after a key change (link, switch,
+    /// password change). Rotation must never fail the user flow that already
+    /// succeeded — mismatches stay honest and heal on the next rotation.</summary>
+    private async Task RotateSafetyMasterBestEffortAsync(string? oldKekB64, string newKekB64)
+    {
+        try
+        {
+            await RotateSafetyMasterAsync(oldKekB64, newKekB64).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _log.Warn("session", $"Safety master rotation failed: {ex.GetType().Name}");
+        }
+    }
+
+    private static async Task AtomicWriteTextAsync(string path, string content)
+    {
+        var tmp = path + ".tmp";
+        await using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+        await using (var sw = new StreamWriter(fs))
+        {
+            await sw.WriteAsync(content).ConfigureAwait(false);
+            await sw.FlushAsync().ConfigureAwait(false);
+            fs.Flush(flushToDisk: true);
+        }
+
+        File.Move(tmp, path, overwrite: true);
     }
 
     /// <summary>All safety backups, newest first (manifest + legacy files).</summary>
@@ -435,17 +607,7 @@ public sealed class XbsSession : IAsyncDisposable
         var entry = (await ListSafetyBackupsAsync(ct).ConfigureAwait(false))
             .FirstOrDefault(e => e.FileName == fileName)
             ?? throw new InvalidOperationException("Backup not found — it may have been pruned.");
-        List<BookmarkNode> roots;
-        try
-        {
-            roots = System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(
-                await File.ReadAllTextAsync(SafetyPath(fileName), ct).ConfigureAwait(false)) ?? [];
-        }
-        catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException)
-        {
-            throw new InvalidOperationException("Backup file is damaged.", ex);
-        }
-
+        var roots = await OpenSafetyBackupAsync(entry, ct).ConfigureAwait(false);
         var count = BackupGuard.ValidateTree(roots);
         if (entry.Side == "local")
         {
@@ -472,6 +634,55 @@ public sealed class XbsSession : IAsyncDisposable
         await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
         _log.Info("session", $"Restored remote safety backup ({count} items)");
         return count;
+    }
+
+    /// <summary>Reads a safety backup, decrypting envelope-encrypted ones with
+    /// the current link key. A fingerprint mismatch names the origin sync so
+    /// the user can re-link (or supply that password) instead of guessing.</summary>
+    private async Task<List<BookmarkNode>> OpenSafetyBackupAsync(SafetyBackupEntry entry, CancellationToken ct)
+    {
+        string raw;
+        try
+        {
+            raw = await File.ReadAllTextAsync(SafetyPath(entry.FileName), ct).ConfigureAwait(false);
+        }
+        catch (IOException ex)
+        {
+            throw new InvalidOperationException("Backup file cannot be read.", ex);
+        }
+
+        if (entry.Enc == "master")
+        {
+            var creds = await _creds.GetAsync().ConfigureAwait(false);
+            var master = await LoadSafetyMasterAsync(SafetyDir()).ConfigureAwait(false);
+            var wrap = creds?.DerivedKey is not null && master is not null
+                ? SafetyMaster.FindWrap(master.Wraps, SafetyMaster.Fingerprint(creds.DerivedKey))
+                : null;
+            if (wrap is null)
+            {
+                throw new InvalidCredentialsException(
+                    $"This backup is locked to another sync{(entry.SyncId is null ? "" : $" ({entry.SyncId})")} — link it (or its password) to open.");
+            }
+
+            try
+            {
+                var masterB64 = _crypto.Decrypt(wrap.WrappedKey, creds!.DerivedKey);
+                raw = _crypto.Decrypt(raw, masterB64);
+            }
+            catch (Exception ex) when (ex is XbsException or FormatException)
+            {
+                throw new InvalidOperationException("Backup file is damaged.", ex);
+            }
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(raw) ?? [];
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            throw new InvalidOperationException("Backup file is damaged.", ex);
+        }
     }
 
     /// <summary>Bulk delete with a safety backup first (duplicates cleanup).</summary>
@@ -536,15 +747,13 @@ public sealed class XbsSession : IAsyncDisposable
     {
         try
         {
-            File.WriteAllText(Path.Combine(dir, SafetyBackupFiles.IndexFileName),
+            return AtomicWriteTextAsync(Path.Combine(dir, SafetyBackupFiles.IndexFileName),
                 SafetyBackupFiles.SerializeIndex(entries));
         }
         catch (IOException ex)
         {
             throw new InvalidOperationException("Cannot update the backup index.", ex);
         }
-
-        return Task.CompletedTask;
     }
 
     private static void MergeLegacySafetyBackups(string dir, List<SafetyBackupEntry> entries)
