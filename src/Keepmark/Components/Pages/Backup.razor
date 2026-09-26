@@ -223,6 +223,7 @@ else
             RequireMatchingPasswords(bkpPassword, bkpConfirm);
             var path = await Session.ExportBackupAsync(bkpPassword);
             bkpPassword = string.Empty;
+            bkpConfirm = string.Empty;
             try
             {
                 await Share.Default.RequestAsync(new ShareFileRequest(
@@ -234,6 +235,9 @@ else
                 Ok($"Backup saved privately. Export it from the app folder when needed.");
             }
         });
+        // Passwords never linger, on success or failure.
+        bkpPassword = string.Empty;
+        bkpConfirm = string.Empty;
         bkpMessage = message;
         bkpError = isError;
         message = string.Empty;
@@ -350,6 +354,8 @@ else
 
             Ok($"Restored {restored} item(s). Safety backup of the replaced tree saved — see Safety backups below. They sync up automatically.");
         });
+        // The import flow is over either way: never keep the password around.
+        impPassword = string.Empty;
         impMessage = message;
         impError = isError;
         message = string.Empty;

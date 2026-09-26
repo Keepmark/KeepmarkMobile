@@ -99,6 +99,9 @@ public sealed class ServiceInfoResponse
 public interface IXSyncApiClient
 {
     Task<ServiceInfoResponse> GetInfoAsync(CancellationToken ct = default);
+    /// <summary>v1.2 info probe: same route, 1.2.0 contract. Legacy servers
+    /// answer 412 (mapped to <see cref="Errors.ServerPreconditionException"/>) or omit capabilities.</summary>
+    Task<ServiceInfoResponse> GetInfoV12Async(CancellationToken ct = default);
     Task<CreateSyncResponse> CreateSyncAsync(CancellationToken ct = default);
     Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default);
     /// <summary>v1.2 conditional GET: null when the server answers 304.</summary>
@@ -149,6 +152,10 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
     public Task<ServiceInfoResponse> GetInfoAsync(CancellationToken ct = default) =>
         SendAsync<ServiceInfoResponse>(HttpMethod.Get, "info", null, static r => r.Status != 0 && r.Version is not null, ct);
 
+    public Task<ServiceInfoResponse> GetInfoV12Async(CancellationToken ct = default) =>
+        SendAsync<ServiceInfoResponse>(HttpMethod.Get, "info", null, static r => r.Status != 0 && r.Version is not null, ct,
+            apiVersion: XbsConstants.ApiVersion12);
+
     public async Task<CreateSyncResponse> CreateSyncAsync(CancellationToken ct = default)
     {
         var body = new { version = XbsConstants.SyncClientVersion };
@@ -177,7 +184,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
             ? new { bookmarks = encryptedBookmarks, lastUpdated, version = XbsConstants.SyncClientVersion }
             : new { bookmarks = encryptedBookmarks, lastUpdated };
         return SendAsync<UpdateBookmarksResponse>(HttpMethod.Put, $"bookmarks/{syncId}", body,
-            static r => r.LastUpdated is not null, ct, syncId);
+            static r => r.LastUpdated is not null, ct, syncId, idempotent: false);
     }
 
     public Task<UpdateBookmarksResponse> UpdateBookmarksV12Async(
@@ -187,7 +194,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
             ? new { bookmarks = encryptedBookmarks, baseRevision, version = XbsConstants.SyncClientVersion }
             : new { bookmarks = encryptedBookmarks, baseRevision };
         return SendAsync<UpdateBookmarksResponse>(HttpMethod.Put, $"bookmarks/{syncId}", body,
-            static r => r.LastUpdated is not null, ct, syncId, XbsConstants.ApiVersion12);
+            static r => r.LastUpdated is not null, ct, syncId, XbsConstants.ApiVersion12, idempotent: false);
     }
 
     public Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(
@@ -255,7 +262,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 
     /// <summary>Retry loop: transient failures are retried with backoff, user
     /// cancellation and non-transient errors propagate immediately.
-    /// Non-idempotent calls (sync creation) run exactly once.</summary>
+    /// Non-idempotent calls (sync creation, bookmark updates) run exactly once.</summary>
     private async Task<T> WithRetryAsync<T>(
         Func<Task<T>> attempt, string route, string? syncId, bool idempotent, CancellationToken ct)
     {
@@ -363,20 +370,33 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         HttpStatusCode.MethodNotAllowed => new NotAcceptingNewSyncsException(WithServer(_str.Get(Str.ErrNotAcceptingNewSyncs), serverMessage)),
         HttpStatusCode.NotAcceptable => new DailyNewSyncLimitException(WithServer(_str.Get(Str.ErrDailyNewSyncLimit), serverMessage)),
         HttpStatusCode.Conflict => new DataOutOfSyncException(WithServer(_str.Get(Str.ErrDataOutOfSync), serverMessage)),
-        HttpStatusCode.RequestEntityTooLarge => new SyncTooLargeException(WithServer(_str.Get(Str.ErrSyncTooLarge, 0), serverMessage)),
+        HttpStatusCode.PreconditionFailed => new ServerPreconditionException(WithServer("The service refused the requested contract version.", serverMessage)),
+        HttpStatusCode.RequestEntityTooLarge => new SyncTooLargeException(WithServer(_str.Get(Str.ErrSyncTooLarge), serverMessage)),
         HttpStatusCode.TooManyRequests => new ThrottledException(WithServer(_str.Get(Str.ErrThrottled), serverMessage))
         {
             RetryAfterSeconds = ReadRetryAfter(res),
         },
+        HttpStatusCode.BadRequest => new UnexpectedResponseException(WithServer(_str.Get(Str.ErrUnexpectedResponse), serverMessage)),
         >= HttpStatusCode.InternalServerError => new ServiceOfflineException(WithServer(_str.Get(Str.ErrServiceOffline), serverMessage)),
         _ => new ServiceOfflineException(WithServer(_str.Get(Str.ErrServiceOffline), serverMessage)),
     };
 
     private static int? ReadRetryAfter(HttpResponseMessage? res)
     {
-        if (res?.Headers.RetryAfter?.Delta is TimeSpan delta)
+        if (res?.Headers.RetryAfter is null)
+        {
+            return null;
+        }
+
+        if (res.Headers.RetryAfter.Delta is TimeSpan delta)
         {
             return (int)delta.TotalSeconds;
+        }
+
+        if (res.Headers.RetryAfter.Date is DateTimeOffset date)
+        {
+            var secs = (int)(date - DateTimeOffset.UtcNow).TotalSeconds;
+            return secs < 0 ? 0 : secs;
         }
 
         return null;

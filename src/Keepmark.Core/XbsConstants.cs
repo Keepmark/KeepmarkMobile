@@ -54,7 +54,7 @@ public static class XbsConstants
     /// </summary>
     public static int CompareVersions(string a, string b)
     {
-        static int[] Parts(string v) => v.TrimStart('v', 'V').Split('.')
+        static int[] Parts(string v) => v.Trim().TrimStart('v', 'V').Split('.')
             .Select(p => int.TryParse(new string(p.TakeWhile(char.IsDigit).ToArray()), out int n) ? n : 0)
             .ToArray();
         var pa = Parts(a);

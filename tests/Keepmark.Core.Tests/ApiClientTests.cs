@@ -225,6 +225,79 @@ public sealed class ApiClientTests
     }
 
     [Fact]
+    public async Task Update_LegacyAndV12_NeverRetried()
+    {
+        foreach (var v12 in new[] { false, true })
+        {
+            var (client, handler, _) = Create();
+            var calls = 0;
+            handler.Responder = _ =>
+            {
+                calls++;
+                return Json(new { message = "boom" }, HttpStatusCode.InternalServerError);
+            };
+
+            if (v12)
+            {
+                await Assert.ThrowsAsync<ServiceOfflineException>(
+                    () => client.UpdateBookmarksV12Async("id", "blob", 1));
+            }
+            else
+            {
+                await Assert.ThrowsAsync<ServiceOfflineException>(
+                    () => client.UpdateBookmarksAsync("id", "blob", "t"));
+            }
+
+            Assert.Equal(1, calls);
+        }
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest, typeof(UnexpectedResponseException))]
+    [InlineData(HttpStatusCode.PreconditionFailed, typeof(ServerPreconditionException))]
+    public async Task ContractErrors_MapToTypedException(HttpStatusCode status, Type expected)
+    {
+        var (client, handler, _) = Create();
+        handler.Responder = _ => Json(new { message = "contract" }, status);
+
+        var ex = await Assert.ThrowsAsync(expected, () => client.GetLastUpdatedAsync("some-id"));
+        Assert.Contains("contract", ex.Message);
+    }
+
+    [Fact]
+    public async Task Throttled_HonorsRetryAfterDate()
+    {
+        var (client, handler, _) = Create();
+        handler.Responder = _ =>
+        {
+            var r = Json(new { message = "slow" }, HttpStatusCode.TooManyRequests);
+            r.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(
+                DateTimeOffset.UtcNow.AddSeconds(45));
+            return r;
+        };
+
+        // Create is non-idempotent: surfaces immediately without waiting out the delay.
+        var ex = await Assert.ThrowsAsync<ThrottledException>(() => client.CreateSyncAsync());
+        Assert.True(ex.RetryAfterSeconds is >= 30 and <= 60);
+    }
+
+    [Fact]
+    public async Task GetInfoV12_SendsV12Header()
+    {
+        var (client, handler, _) = Create();
+        string? version = null;
+        handler.Responder = req =>
+        {
+            version = req.Headers.GetValues("Accept-Version").Single();
+            return Json(new { location = "GB", maxSyncSize = 1, message = "", status = 1, version = "1.2.0" });
+        };
+
+        await client.GetInfoV12Async();
+
+        Assert.Equal(XbsConstants.ApiVersion12, version);
+    }
+
+    [Fact]
     public async Task Responses_DeserializeMetaAndCapabilities()
     {
         var (client, handler, _) = Create();

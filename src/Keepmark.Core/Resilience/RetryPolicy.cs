@@ -3,7 +3,7 @@ namespace Keepmark.Core.Resilience;
 /// <summary>Retry rules for API calls. Pure and unit-tested.
 /// Retried: network failures, timeouts, 429 (honoring Retry-After), 5xx.
 /// Never retried: 400/401/404/405/406/409/412/413, user cancellation,
-/// and non-idempotent calls (sync creation) — the caller decides those.</summary>
+/// and non-idempotent calls (sync creation AND bookmark updates) — the caller decides those.</summary>
 public static class RetryPolicy
 {
     public const int MaxAttempts = 3;

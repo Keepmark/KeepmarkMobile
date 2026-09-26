@@ -104,6 +104,11 @@ internal static class LzUtf8
             }
 
             int length = b & 31;
+            if (length < MinMatch)
+            {
+                throw new InvalidDataException("Invalid LZUTF8 match length.");
+            }
+
             int distance;
             if (id == 6)
             {

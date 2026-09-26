@@ -494,7 +494,24 @@ else
             return;
         }
         undoTimer?.Cancel();
-        undo = await Session.Engine.DeleteBookmarkAsync(row.RowId);
+        // Stable identity: a sync between render and tap rekeys RowIds,
+        // so the delete resolves by NodeId. Legacy rows without a NodeId
+        // use the RowId path, with the parent converted to NodeId for undo.
+        if (row.NodeId is not null)
+        {
+            undo = await Session.Engine.DeleteBookmarkByNodeIdAsync(row.NodeId.Value);
+        }
+        else
+        {
+            var legacy = await Session.Engine.DeleteBookmarkAsync(row.RowId);
+            int? parentNode = null;
+            if (legacy.ParentRowId is not null && Session.Store is not null)
+            {
+                parentNode = (await Session.Store.GetNodeAsync(legacy.ParentRowId.Value))?.NodeId;
+            }
+
+            undo = (parentNode, legacy.Subtree);
+        }
         await RefreshAsync();
         StateHasChanged();
         undoTimer = new CancellationTokenSource();
@@ -514,14 +531,10 @@ else
     {
         if (undo is null || Session.Engine is null) return;
         undoTimer?.Cancel();
-        // A sync in the 6s undo window rekeys every RowId: a stale parent would orphan the restore.
-        var parent = undo.Value.Parent;
-        if (parent is not null && Session.Store is not null && await Session.Store.GetNodeAsync(parent.Value) is null)
-        {
-            parent = null;
-        }
-
-        await Session.Engine.RestoreBookmarkAsync(parent, undo.Value.Subtree);
+        // undo.Parent is a stable NodeId (see DeleteRow): the restore
+        // resolves it live, so a sync inside the 6s window cannot orphan it.
+        // A missing parent (deleted meanwhile) falls back to top level.
+        await Session.Engine.RestoreBookmarkByNodeIdAsync(undo.Value.Parent, undo.Value.Subtree);
         undo = null;
         await RefreshAsync();
     }
@@ -577,34 +590,75 @@ else
         if (Session.Engine is null) return;
         if (e.RowId is null)
         {
-            var parent = e.ParentRowId is not null && allFolders.Any(f => f.RowId == e.ParentRowId.Value)
-                ? e.ParentRowId
+            var parentRow = e.ParentRowId is not null
+                ? allFolders.FirstOrDefault(f => f.RowId == e.ParentRowId.Value)
                 : null;
+            // A vanished folder falls back to top level (same as before);
+            // a folder without a stable NodeId keeps the legacy RowId path.
+            int? parentRowId = e.ParentRowId is null ? null : parentRow?.RowId;
             var node = new Core.Models.BookmarkNode
             {
                 Title = e.Title, Url = e.Url, Description = e.Description, Tags = e.Tags,
                 Children = e.IsFolder ? [] : null
             };
-            await Session.Engine.AddBookmarkAsync(parent, node);
-            var parentNode = parent is not null
-                ? allFolders.FirstOrDefault(f => f.RowId == parent)?.NodeId
-                : null;
+            if (parentRowId is null || parentRow?.NodeId is not null)
+            {
+                await Session.Engine.AddBookmarkByNodeIdAsync(parentRow?.NodeId, node);
+            }
+            else
+            {
+                await Session.Engine.AddBookmarkAsync(parentRowId, node);
+            }
+
+            var parentNode = parentRow?.NodeId;
             Preferences.Set("last_create_folder", parentNode?.ToString() ?? string.Empty);
         }
         else
         {
-            await Session.Engine.UpdateBookmarkAsync(e.RowId.Value, e.Title, e.Url, e.Description, e.Tags);
+            var nodeId = sheetFor?.Row?.NodeId;
             var current = await Session.Store!.GetNodeAsync(e.RowId.Value);
-            if (current is not null && current.ParentRowId != e.ParentRowId)
+            int? parentNodeId = e.ParentRowId is not null
+                ? allFolders.FirstOrDefault(f => f.RowId == e.ParentRowId.Value)?.NodeId
+                : null;
+            if (nodeId is not null)
             {
-                try
+                await Session.Engine.UpdateBookmarkByNodeIdAsync(nodeId.Value, e.Title, e.Url, e.Description, e.Tags);
+                if (current is not null && current.ParentRowId != e.ParentRowId)
                 {
-                    await Session.Engine.MoveBookmarkAsync(e.RowId.Value, e.ParentRowId);
+                    try
+                    {
+                        // Unknown parent NodeId (legacy row) keeps the RowId path
+                        // instead of silently moving to top level.
+                        if (e.ParentRowId is null || parentNodeId is not null)
+                        {
+                            await Session.Engine.MoveBookmarkByNodeIdAsync(nodeId.Value, parentNodeId);
+                        }
+                        else
+                        {
+                            await Session.Engine.MoveBookmarkAsync(e.RowId.Value, e.ParentRowId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Move refused (e.g. folder into itself): fields are already saved.
+                        System.Diagnostics.Debug.WriteLine($"Move skipped: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
+            }
+            else
+            {
+                await Session.Engine.UpdateBookmarkAsync(e.RowId.Value, e.Title, e.Url, e.Description, e.Tags);
+                if (current is not null && current.ParentRowId != e.ParentRowId)
                 {
-                    // Move refused (e.g. folder into itself): fields are already saved.
-                    System.Diagnostics.Debug.WriteLine($"Move skipped: {ex.Message}");
+                    try
+                    {
+                        await Session.Engine.MoveBookmarkAsync(e.RowId.Value, e.ParentRowId);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Move refused (e.g. folder into itself): fields are already saved.
+                        System.Diagnostics.Debug.WriteLine($"Move skipped: {ex.Message}");
+                    }
                 }
             }
         }

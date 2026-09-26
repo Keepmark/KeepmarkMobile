@@ -62,7 +62,8 @@ public sealed class SyncEngine(
     public SyncMode Mode { get; set; } = SyncMode.Auto;
     public SyncStatus Status { get; private set; } = SyncStatus.Idle;
     public DateTimeOffset? LastSyncAt { get; private set; }
-    public int PendingEdits { get; private set; }
+    private int _pendingEdits;
+    public int PendingEdits => _pendingEdits;
 
     public event Action? DataChanged;
     public event Action<SyncStatus>? StatusChanged;
@@ -158,7 +159,7 @@ public sealed class SyncEngine(
             await creds.SetAsync(c with { Version = full.Version }).ConfigureAwait(false);
         }
 
-        PendingEdits = 0;
+        Interlocked.Exchange(ref _pendingEdits, 0);
         LastSyncAt = DateTimeOffset.UtcNow;
         SetStatus(SyncStatus.Idle);
         DataChanged?.Invoke();
@@ -166,7 +167,10 @@ public sealed class SyncEngine(
         return true;
     }
 
-    /// <summary>Capability probe, cached per service URL. Any failure means legacy.</summary>
+    /// <summary>Capability probe, cached per service URL. Probed on the 1.2.0
+    /// contract (the legacy contract strips capabilities, so probing there
+    /// could never succeed). 412 / missing capabilities = legacy. A service
+    /// older than MinApiVersion throws instead of being silently used.</summary>
     private async Task<bool> IsV12Async(string serviceUrl, CancellationToken ct)
     {
         if (_v12.TryGetValue(serviceUrl, out var cached))
@@ -176,11 +180,25 @@ public sealed class SyncEngine(
 
         try
         {
-            var info = await apiFor(serviceUrl).GetInfoAsync(ct).ConfigureAwait(false);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(XbsConstants.ServiceProbeTimeout);
+            var info = await apiFor(serviceUrl).GetInfoV12Async(cts.Token).ConfigureAwait(false);
+            if (info.Version is not null
+                && XbsConstants.CompareVersions(info.Version, XbsConstants.MinApiVersion) < 0)
+            {
+                throw new UnsupportedApiVersionException(
+                    str.Get(Str.ErrUnsupportedApiVersion, info.Version, XbsConstants.MinApiVersion));
+            }
+
             cached = info.Capabilities?.Revision == true;
+        }
+        catch (UnsupportedApiVersionException)
+        {
+            throw;
         }
         catch
         {
+            // Legacy server (412), offline, or malformed: stay on 1.1.
             cached = false;
         }
 
@@ -259,6 +277,11 @@ public sealed class SyncEngine(
             }
             else
             {
+                if (revRaw is not null)
+                {
+                    log.Info("sync", "Push: no usable revision, falling back to timestamp path");
+                }
+
                 res = await api.UpdateBookmarksAsync(c.Id, blob, lastUpdated, updateVersion, ct).ConfigureAwait(false);
             }
 
@@ -270,7 +293,7 @@ public sealed class SyncEngine(
                 await creds.SetAsync(c with { Version = XbsConstants.SyncClientVersion }).ConfigureAwait(false);
             }
 
-            PendingEdits = 0;
+            Interlocked.Exchange(ref _pendingEdits, 0);
             LastSyncAt = DateTimeOffset.UtcNow;
             SetStatus(SyncStatus.Idle);
             DataChanged?.Invoke();
@@ -284,20 +307,34 @@ public sealed class SyncEngine(
             if (await RemoteHasBlobAsync(c.ServiceUrl, c.Id, blob, ct).ConfigureAwait(false))
             {
                 log.Info("sync", "Push: server already had our blob, adopting");
-                var remote = await apiFor(c.ServiceUrl).GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
-                await store.ReplaceAllAsync(roots, blob, remote.LastUpdated!,
-                    updateVersion ? XbsConstants.SyncClientVersion : c.Version,
-                    remote.Meta?.Revision, remote.Meta?.Hash).ConfigureAwait(false);
-                if (updateVersion)
+                try
                 {
-                    await creds.SetAsync(c with { Version = XbsConstants.SyncClientVersion }).ConfigureAwait(false);
-                }
+                    var remote = await apiFor(c.ServiceUrl).GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
+                    ThrowIfVersionUnsupported(remote.Version);
+                    await store.ReplaceAllAsync(roots, blob, remote.LastUpdated!,
+                        updateVersion ? XbsConstants.SyncClientVersion : c.Version,
+                        remote.Meta?.Revision, remote.Meta?.Hash).ConfigureAwait(false);
+                    if (updateVersion)
+                    {
+                        await creds.SetAsync(c with { Version = XbsConstants.SyncClientVersion }).ConfigureAwait(false);
+                    }
 
-                PendingEdits = 0;
-                LastSyncAt = DateTimeOffset.UtcNow;
-                SetStatus(SyncStatus.Idle);
-                DataChanged?.Invoke();
-                return;
+                    Interlocked.Exchange(ref _pendingEdits, 0);
+                    LastSyncAt = DateTimeOffset.UtcNow;
+                    SetStatus(SyncStatus.Idle);
+                    DataChanged?.Invoke();
+                    return;
+                }
+                catch (XbsException ex)
+                {
+                    SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
+                    throw;
+                }
+                catch (Exception)
+                {
+                    SetStatus(SyncStatus.Error);
+                    throw;
+                }
             }
 
             SetStatus(SyncStatus.Conflict);
@@ -385,10 +422,13 @@ public sealed class SyncEngine(
     /// <summary>Marks the mirror dirty after a local edit. In Auto mode the push
     /// runs in the background so the UI never waits for the network: the edit
     /// is already durable locally when this returns. Failures surface via
-    /// Status (Offline/Error), never as exceptions to the caller.</summary>
+    /// Status (Offline/Error), never as exceptions to the caller.
+    /// The store itself writes dirty=1 inside each mutation transaction;
+    /// the SetMeta here is an idempotent safety net. Callers must hold
+    /// _gate (all engine mutators do) so edits never interleave a push/pull.</summary>
     public async Task NotifyLocalEditAsync(CancellationToken ct = default)
     {
-        PendingEdits++;
+        Interlocked.Increment(ref _pendingEdits);
         await store.SetMetaAsync(BookmarkStore.MetaDirty, "1").ConfigureAwait(false);
         if (Mode == SyncMode.Auto)
         {
@@ -411,29 +451,110 @@ public sealed class SyncEngine(
 
     public async Task<int> AddBookmarkAsync(int? parentRowId, BookmarkNode node, CancellationToken ct = default)
     {
-        await RequireCredsAsync().ConfigureAwait(false);
-        int rowId = await store.AddNodeAsync(parentRowId, node).ConfigureAwait(false);
-        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
-        log.Info("sync", node.Children is not null ? "Added folder" : "Added bookmark");
-        return rowId;
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            int rowId = await store.AddNodeAsync(parentRowId, node).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", node.Children is not null ? "Added folder" : "Added bookmark");
+            return rowId;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Add under the folder with the given stable NodeId (null = top
+    /// level). Prefer over <see cref="AddBookmarkAsync"/>.</summary>
+    public async Task<int> AddBookmarkByNodeIdAsync(int? parentNodeId, BookmarkNode node, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            int rowId = await store.AddNodeByParentNodeIdAsync(parentNodeId, node).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", node.Children is not null ? "Added folder" : "Added bookmark");
+            return rowId;
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task UpdateBookmarkAsync(
         int rowId, string? title, string? url, string? description, List<string>? tags, CancellationToken ct = default)
     {
-        await RequireCredsAsync().ConfigureAwait(false);
-        await store.UpdateNodeAsync(rowId, title, url, description, tags).ConfigureAwait(false);
-        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
-        log.Info("sync", "Updated bookmark");
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            await store.UpdateNodeAsync(rowId, title, url, description, tags).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", "Updated bookmark");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Update by stable NodeId. Prefer over <see cref="UpdateBookmarkAsync"/>.</summary>
+    public async Task UpdateBookmarkByNodeIdAsync(
+        int nodeId, string? title, string? url, string? description, List<string>? tags, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            await store.UpdateNodeByNodeIdAsync(nodeId, title, url, description, tags).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", "Updated bookmark");
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task<(int? ParentRowId, List<BookmarkNode> Subtree)> DeleteBookmarkAsync(int rowId, CancellationToken ct = default)
     {
-        await RequireCredsAsync().ConfigureAwait(false);
-        var backup = await store.DeleteNodeAsync(rowId).ConfigureAwait(false);
-        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
-        log.Info("sync", $"Deleted item (+{backup.Subtree.Count - 1} descendants)");
-        return backup;
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            var backup = await store.DeleteNodeAsync(rowId).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", $"Deleted item (+{backup.Subtree.Count - 1} descendants)");
+            return backup;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Single delete by stable NodeId: immune to push/pull rekey
+    /// between list render and the user action. Returns the parent's stable
+    /// NodeId + subtree for undo. Prefer over <see cref="DeleteBookmarkAsync"/>.</summary>
+    public async Task<(int? ParentNodeId, List<BookmarkNode> Subtree)> DeleteBookmarkByNodeIdAsync(int nodeId, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            var backup = await store.DeleteNodeByNodeIdAsync(nodeId).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", $"Deleted item (+{backup.Subtree.Count - 1} descendants)");
+            return backup;
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     /// <summary>Bulk delete by stable NodeId: ONE transaction + ONE push, no
@@ -441,31 +562,90 @@ public sealed class SyncEngine(
     /// get services to throttle you).</summary>
     public async Task<int> DeleteBookmarksByNodeIdsAsync(IEnumerable<int> nodeIds, CancellationToken ct = default)
     {
-        await RequireCredsAsync().ConfigureAwait(false);
-        int n = await store.DeleteNodesByNodeIdsAsync(nodeIds).ConfigureAwait(false);
-        if (n > 0)
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
-        }
+            await RequireCredsAsync().ConfigureAwait(false);
+            int n = await store.DeleteNodesByNodeIdsAsync(nodeIds).ConfigureAwait(false);
+            if (n > 0)
+            {
+                await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            }
 
-        log.Info("sync", $"Batch deleted {n} item(s)");
-        return n;
+            log.Info("sync", $"Batch deleted {n} item(s)");
+            return n;
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task MoveBookmarkAsync(int rowId, int? newParentRowId, CancellationToken ct = default)
     {
-        await RequireCredsAsync().ConfigureAwait(false);
-        await store.MoveNodeAsync(rowId, newParentRowId).ConfigureAwait(false);
-        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
-        log.Info("sync", "Moved item");
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            await store.MoveNodeAsync(rowId, newParentRowId).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", "Moved item");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Move by stable NodeIds. Prefer over <see cref="MoveBookmarkAsync"/>.</summary>
+    public async Task MoveBookmarkByNodeIdAsync(int nodeId, int? newParentNodeId, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            await store.MoveNodeByNodeIdAsync(nodeId, newParentNodeId).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", "Moved item");
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task RestoreBookmarkAsync(int? parentRowId, List<BookmarkNode> subtree, CancellationToken ct = default)
     {
-        await RequireCredsAsync().ConfigureAwait(false);
-        await store.RestoreSubtreeAsync(parentRowId, subtree).ConfigureAwait(false);
-        await NotifyLocalEditAsync(ct).ConfigureAwait(false);
-        log.Info("sync", $"Restored {subtree.Count} item(s) (undo)");
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            await store.RestoreSubtreeAsync(parentRowId, subtree).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", $"Restored {subtree.Count} item(s) (undo)");
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Undo-restore under the folder with the given stable NodeId
+    /// (null = top level). Prefer over <see cref="RestoreBookmarkAsync"/>.</summary>
+    public async Task RestoreBookmarkByNodeIdAsync(int? parentNodeId, List<BookmarkNode> subtree, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await RequireCredsAsync().ConfigureAwait(false);
+            await store.RestoreSubtreeByNodeIdAsync(parentNodeId, subtree).ConfigureAwait(false);
+            await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            log.Info("sync", $"Restored {subtree.Count} item(s) (undo)");
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     /// <summary>
@@ -481,6 +661,14 @@ public sealed class SyncEngine(
         int local = stats.Folders + stats.Bookmarks + stats.Separators;
 
         var api = apiFor(candidate.ServiceUrl);
+        var info = await api.GetInfoAsync(ct).ConfigureAwait(false);
+        if (info.Version is not null
+            && XbsConstants.CompareVersions(info.Version, XbsConstants.MinApiVersion) < 0)
+        {
+            throw new UnsupportedApiVersionException(
+                str.Get(Str.ErrUnsupportedApiVersion, info.Version, XbsConstants.MinApiVersion));
+        }
+
         var full = await api.GetBookmarksAsync(candidate.Id, ct).ConfigureAwait(false);
         ThrowIfVersionUnsupported(full.Version);
         var json = crypto.Decrypt(full.Bookmarks ?? string.Empty, candidate.DerivedKey);

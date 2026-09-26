@@ -118,8 +118,10 @@ public sealed class XbsSession : IAsyncDisposable
 
     public async Task ApplyRemoteAsync(ReconcileInfo info, string operation = SafetyOperations.TakeRemote, CancellationToken ct = default)
     {
-        // Safety backup of the discarded local side (plaintext — user is warned in UI).
-        await SaveSafetyBackupAsync("local", info.LocalBlob, operation, info.LocalCount).ConfigureAwait(false);
+        // Safety backup of the discarded local side (live tree as plaintext JSON).
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local",
+            System.Text.Json.JsonSerializer.Serialize(localRoots), operation, info.LocalCount).ConfigureAwait(false);
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: taking remote tree");
@@ -129,8 +131,23 @@ public sealed class XbsSession : IAsyncDisposable
 
     public async Task ApplyLocalAsync(ReconcileInfo info, string operation = SafetyOperations.UploadLocal, CancellationToken ct = default)
     {
-        // Safety backup of the overwritten remote side.
-        await SaveSafetyBackupAsync("remote", info.RemoteBlob, operation, info.RemoteCount).ConfigureAwait(false);
+        // Safety backup of the overwritten remote side: the server blob
+        // decrypted with the verified candidate key (plaintext tree JSON).
+        // Empty remote (fresh slot) backs up as an empty tree.
+        string remoteJson = "[]";
+        if (!string.IsNullOrEmpty(info.RemoteBlob))
+        {
+            try
+            {
+                remoteJson = _crypto.Decrypt(info.RemoteBlob, info.Candidate.DerivedKey);
+            }
+            catch (Exception ex) when (ex is XbsException or FormatException)
+            {
+                throw new InvalidOperationException("The server copy cannot be decrypted — safety backup refused.", ex);
+            }
+        }
+
+        await SaveSafetyBackupAsync("remote", remoteJson, operation, info.RemoteCount).ConfigureAwait(false);
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: uploading local tree");
@@ -143,19 +160,53 @@ public sealed class XbsSession : IAsyncDisposable
     {
         var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
         var api = ApiFor(candidate.ServiceUrl);
+        NormalizeForUpload(roots);
         var json = System.Text.Json.JsonSerializer.Serialize(roots);
         var blob = _crypto.Encrypt(json, candidate.DerivedKey);
         // lastUpdated "" forces no precondition on first upload of a fresh/empty sync slot.
         var res = await api.UpdateBookmarksAsync(candidate.Id, blob, await CurrentLastUpdatedAsync().ConfigureAwait(false) ?? string.Empty, ct: ct)
             .ConfigureAwait(false);
-        await Store.ReplaceAllAsync(roots, blob, res.LastUpdated!, candidate.Version).ConfigureAwait(false);
+        await Store.ReplaceAllAsync(roots, blob, res.LastUpdated!, candidate.Version,
+            res.Meta?.Revision, res.Meta?.Hash).ConfigureAwait(false);
+    }
+
+    /// <summary>Same shape as the engine push: no empty descriptions/tags,
+    /// descriptions truncated like the original client.</summary>
+    private static void NormalizeForUpload(List<BookmarkNode> roots)
+    {
+        var stack = new Stack<BookmarkNode>(roots);
+        while (stack.Count > 0)
+        {
+            var n = stack.Pop();
+            if (string.IsNullOrWhiteSpace(n.Description))
+            {
+                n.Description = null;
+            }
+            else if (n.Description.Length > Core.XbsConstants.DescriptionMaxLength)
+            {
+                n.Description = n.Description[..Core.XbsConstants.DescriptionMaxLength];
+            }
+
+            if (n.Tags is { Count: 0 })
+            {
+                n.Tags = null;
+            }
+
+            if (n.Children is not null)
+            {
+                foreach (var c in n.Children)
+                {
+                    stack.Push(c);
+                }
+            }
+        }
     }
 
     public async Task CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
         // Safety backup: the local tree is about to be replaced by an empty sync.
-        var (roots, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty,
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
             SafetyOperations.CreateEmpty, CountBackupNodes(roots)).ConfigureAwait(false);
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
         _log.Info("session", "Created new empty sync");
@@ -209,9 +260,9 @@ public sealed class XbsSession : IAsyncDisposable
             throw new InvalidCredentialsException("Current password is incorrect.");
         }
 
-        // Safety backup of the server copy we are about to overwrite.
-        var (treeRoots, blob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("remote", blob ?? string.Empty,
+        // Safety backup of the server copy we are about to overwrite (live tree as plaintext JSON).
+        var (treeRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote", System.Text.Json.JsonSerializer.Serialize(treeRoots),
             SafetyOperations.ChangePassword, CountBackupNodes(treeRoots)).ConfigureAwait(false);
         var newDerived = _crypto.DeriveKey(newPassword, creds.Id, version);
         await _creds.SetAsync(creds with { DerivedKey = newDerived }).ConfigureAwait(false);
@@ -239,6 +290,7 @@ public sealed class XbsSession : IAsyncDisposable
     {
         BackupGuard.RequirePassword(password);
         var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        BackupGuard.ValidateTree(roots);
         var json = System.Text.Json.JsonSerializer.Serialize(roots);
         var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
         var derived = _crypto.DeriveKey(password, salt, Core.XbsConstants.SyncClientVersion);
@@ -267,8 +319,8 @@ public sealed class XbsSession : IAsyncDisposable
         BackupGuard.RequirePassword(password);
         var roots = await OpenBackupAsync(path, password, ct).ConfigureAwait(false);
         var count = BackupGuard.ValidateTree(roots);
-        var (localRoots, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("local", localBlob ?? string.Empty,
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(localRoots),
             SafetyOperations.ImportBackup, CountBackupNodes(localRoots)).ConfigureAwait(false);
         await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
         _log.Info("session", $"Imported backup ({count} items)");
@@ -346,12 +398,20 @@ public sealed class XbsSession : IAsyncDisposable
         while (queue.Count > 0)
         {
             var cur = queue.Dequeue();
+            if (cur is null)
+            {
+                continue;
+            }
+
             n++;
             if (cur.Children is not null)
             {
                 foreach (var c in cur.Children)
                 {
-                    queue.Enqueue(c);
+                    if (c is not null)
+                    {
+                        queue.Enqueue(c);
+                    }
                 }
             }
         }
@@ -410,19 +470,24 @@ public sealed class XbsSession : IAsyncDisposable
         }
 
         var path = Path.Combine(dir, name);
-        await File.WriteAllTextAsync(path, payload).ConfigureAwait(false);
+        // Atomic payload write: a crash never leaves a half-written backup.
+        await AtomicWriteTextAsync(path, payload).ConfigureAwait(false);
         var entries = await ReadSafetyIndexAsync(dir).ConfigureAwait(false);
         entries.RemoveAll(e => e.FileName == name);
         entries.Add(new SafetyBackupEntry(name, now, operation, side, items,
             new FileInfo(path).Length, syncId, enc));
         MergeLegacySafetyBackups(dir, entries);
-        foreach (var drop in SafetyBackupFiles.Prune(entries))
+        // Decide the prune set first, update the index, and only then delete
+        // files: a crash can leave an orphan payload, never an index row
+        // pointing at a deleted backup.
+        var drops = SafetyBackupFiles.Prune(entries);
+        entries.RemoveAll(e => drops.Contains(e.FileName));
+        await WriteSafetyIndexAsync(dir, entries).ConfigureAwait(false);
+        foreach (var drop in drops)
         {
             try { File.Delete(Path.Combine(dir, drop)); } catch { }
-            entries.RemoveAll(e => e.FileName == drop);
         }
 
-        await WriteSafetyIndexAsync(dir, entries).ConfigureAwait(false);
         _log.Info("session", $"Safety backup written ({operation}, {side}, {enc ?? "plaintext"})");
         return path;
     }
@@ -611,8 +676,8 @@ public sealed class XbsSession : IAsyncDisposable
         var count = BackupGuard.ValidateTree(roots);
         if (entry.Side == "local")
         {
-            var (localRoots, localBlob, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-            await SaveSafetyBackupAsync("local", localBlob ?? string.Empty,
+            var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+            await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(localRoots),
                 SafetyOperations.PreRestore, CountBackupNodes(localRoots)).ConfigureAwait(false);
             await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
             _log.Info("session", $"Restored local safety backup ({count} items)");
@@ -621,16 +686,14 @@ public sealed class XbsSession : IAsyncDisposable
 
         var creds = await _creds.GetAsync().ConfigureAwait(false)
             ?? throw new InvalidOperationException("Link the sync this backup belongs to first.");
-        var (_, blob, lastUpdated, version) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("remote", blob ?? string.Empty,
-            SafetyOperations.PreRestore, 0, ShortSyncId(creds.Id)).ConfigureAwait(false);
-        var encrypted = _crypto.Encrypt(System.Text.Json.JsonSerializer.Serialize(roots), creds.DerivedKey);
-        var revRaw = await Store.GetMetaAsync(BookmarkStore.MetaRevision).ConfigureAwait(false);
-        _ = long.TryParse(revRaw, out var revision);
-        var hash = await Store.GetMetaAsync(BookmarkStore.MetaHash).ConfigureAwait(false);
-        await Store.ReplaceAllAsync(roots, encrypted,
-            lastUpdated ?? throw new IncompleteSyncInfoException(_str.Get(Str.ErrIncompleteSyncInfo)),
-            version, revision, hash).ConfigureAwait(false);
+        var (currentRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote", System.Text.Json.JsonSerializer.Serialize(currentRoots),
+            SafetyOperations.PreRestore, CountBackupNodes(currentRoots), ShortSyncId(creds.Id)).ConfigureAwait(false);
+        // Replace the local tree (dirty) and push: the engine re-encrypts
+        // under the current link key with revision CAS. On 409 the mirror
+        // still holds the restored tree as dirty, so the next sync surfaces
+        // an honest conflict instead of pulling over the restore.
+        await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
         await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
         _log.Info("session", $"Restored remote safety backup ({count} items)");
         return count;
@@ -694,8 +757,8 @@ public sealed class XbsSession : IAsyncDisposable
             return 0;
         }
 
-        var (roots, blob, _, _) = await Store.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("local", blob ?? "[]",
+        var (roots, _, _, _) = await Store.LoadMirrorAsync().ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
             SafetyOperations.DuplicatesCleanup, CountBackupNodes(roots)).ConfigureAwait(false);
         return await Engine.DeleteBookmarksByNodeIdsAsync(ids, ct).ConfigureAwait(false);
     }

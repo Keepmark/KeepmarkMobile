@@ -339,6 +339,193 @@ public sealed class BookmarkStore : IAsyncDisposable
             .ConfigureAwait(false);
     }
 
+    public async Task<int?> GetRowIdByNodeIdAsync(int nodeId) =>
+        (await Db.QueryAsync<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId)
+            .ConfigureAwait(false)).FirstOrDefault()?.RowId;
+
+    /// <summary>Adds a node under the folder with the given stable NodeId
+    /// (null = top level). Parent resolution + insert + dirty happen in one
+    /// transaction, so a concurrent push/pull rekey cannot misplace the node.</summary>
+    public async Task<int> AddNodeByParentNodeIdAsync(int? parentNodeId, BookmarkNode node)
+    {
+        var db = Db;
+        int rowId = 0;
+        await db.RunInTransactionAsync(tran =>
+        {
+            int? parentRowId = null;
+            if (parentNodeId is not null)
+            {
+                parentRowId = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", parentNodeId.Value)
+                    .FirstOrDefault()?.RowId;
+            }
+
+            int nextId = (tran.ExecuteScalar<int?>("SELECT MAX(NodeId) FROM Items") ?? 0) + 1;
+            node.Id ??= nextId;
+            int order = (tran.ExecuteScalar<int?>(
+                parentRowId is null
+                    ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
+                    : "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId = ?", parentRowId) ?? -1) + 1;
+            InsertNode(tran, node, parentRowId, ref order);
+            rowId = tran.ExecuteScalar<int>(
+                "SELECT RowId FROM Items WHERE NodeId = ? ORDER BY RowId DESC LIMIT 1", node.Id);
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+        }).ConfigureAwait(false);
+        _log.Debug("store", $"Node added under parentNode={parentNodeId}");
+        return rowId;
+    }
+
+    /// <summary>Updates a node resolved by stable NodeId (resolve + update +
+    /// dirty in one transaction).</summary>
+    public async Task UpdateNodeByNodeIdAsync(int nodeId, string? title, string? url, string? description, List<string>? tags)
+    {
+        var db = Db;
+        await db.RunInTransactionAsync(tran =>
+        {
+            var row = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId).FirstOrDefault()
+                ?? throw new InvalidOperationException($"Bookmark node {nodeId} not found.");
+            row.Title = title;
+            row.Url = url;
+            row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+            row.Tags = tags is { Count: > 0 } ? string.Join(TagSep, tags) : null;
+            tran.Update(row);
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>Deletes a node (by stable NodeId) and its whole subtree.
+    /// Returns the parent's stable NodeId + subtree for undo.</summary>
+    public async Task<(int? ParentNodeId, List<BookmarkNode> Subtree)> DeleteNodeByNodeIdAsync(int nodeId)
+    {
+        var db = Db;
+        int? parentNodeId = null;
+        List<BookmarkNode> subtree = [];
+        await db.RunInTransactionAsync(tran =>
+        {
+            var target = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId).FirstOrDefault()
+                ?? throw new InvalidOperationException($"Bookmark node {nodeId} not found.");
+            var rowId = target.RowId;
+            parentNodeId = target.ParentRowId is null
+                ? null
+                : tran.Find<ItemRow>(target.ParentRowId.Value)?.NodeId;
+
+            var rows = tran.Query<ItemRow>("SELECT * FROM Items");
+            var kids = rows.Where(r => r.ParentRowId is not null)
+                .GroupBy(r => r.ParentRowId!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.RowId).ToList());
+
+            var doomed = new List<int> { rowId };
+            var queue = new Queue<int>([rowId]);
+            while (queue.Count > 0)
+            {
+                var cur = queue.Dequeue();
+                if (kids.TryGetValue(cur, out var c))
+                {
+                    doomed.AddRange(c);
+                    foreach (var k in c)
+                    {
+                        queue.Enqueue(k);
+                    }
+                }
+            }
+
+            var byId = rows.ToDictionary(r => r.RowId);
+            BookmarkNode BuildRow(int id)
+            {
+                var r = byId[id];
+                return new BookmarkNode
+                {
+                    Id = r.NodeId,
+                    Title = r.Title,
+                    Url = r.Url,
+                    Description = r.Description,
+                    Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
+                    Children = r.IsFolder && kids.TryGetValue(id, out var c)
+                        ? c.Select(BuildRow).ToList()
+                        : null
+                };
+            }
+
+            subtree = [BuildRow(rowId)];
+
+            foreach (var id in doomed)
+            {
+                tran.Execute("DELETE FROM Items WHERE RowId = ?", id);
+            }
+
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+            _log.Debug("store", $"Deleted node {nodeId} (+{doomed.Count - 1} descendants)");
+        }).ConfigureAwait(false);
+
+        return (parentNodeId, subtree);
+    }
+
+    /// <summary>Moves a node (by stable NodeId) under another node (by stable
+    /// NodeId, null = top level). Missing parent falls back to top level.</summary>
+    public async Task MoveNodeByNodeIdAsync(int nodeId, int? newParentNodeId)
+    {
+        var db = Db;
+        await db.RunInTransactionAsync(tran =>
+        {
+            var node = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId).FirstOrDefault()
+                ?? throw new InvalidOperationException($"Bookmark node {nodeId} not found.");
+            int? newParentRowId = null;
+            if (newParentNodeId is not null)
+            {
+                newParentRowId = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", newParentNodeId.Value)
+                    .FirstOrDefault()?.RowId;
+            }
+
+            // Refuse to move a folder into its own subtree.
+            var ancestor = newParentRowId;
+            while (ancestor is not null)
+            {
+                if (ancestor == node.RowId)
+                {
+                    throw new InvalidOperationException("Cannot move a folder into itself.");
+                }
+
+                ancestor = tran.Find<ItemRow>(ancestor.Value)?.ParentRowId;
+            }
+
+            int order = (tran.ExecuteScalar<int?>(
+                newParentRowId is null
+                    ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
+                    : "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId = ?", newParentRowId) ?? -1) + 1;
+            node.ParentRowId = newParentRowId;
+            node.SortOrder = order;
+            tran.Update(node);
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+        }).ConfigureAwait(false);
+        _log.Debug("store", $"Moved node {nodeId} to parentNode={newParentNodeId}");
+    }
+
+    /// <summary>Restores a subtree under the folder with the given stable
+    /// NodeId (null = top level). Missing parent falls back to top level.</summary>
+    public async Task RestoreSubtreeByNodeIdAsync(int? parentNodeId, List<BookmarkNode> subtree)
+    {
+        var db = Db;
+        await db.RunInTransactionAsync(tran =>
+        {
+            int? parentRowId = null;
+            if (parentNodeId is not null)
+            {
+                parentRowId = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", parentNodeId.Value)
+                    .FirstOrDefault()?.RowId;
+            }
+
+            int order = (tran.ExecuteScalar<int?>(
+                parentRowId is null
+                    ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
+                    : "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId = ?", parentRowId) ?? -1) + 1;
+            foreach (var node in subtree)
+            {
+                InsertNode(tran, node, parentRowId, ref order);
+            }
+
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+        }).ConfigureAwait(false);
+    }
+
     public async Task<int> AddNodeAsync(int? parentRowId, BookmarkNode node)
     {
         var db = Db;
@@ -355,6 +542,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             // NodeIds are unique among live rows: locate the inserted root.
             rowId = tran.ExecuteScalar<int>(
                 "SELECT RowId FROM Items WHERE NodeId = ? ORDER BY RowId DESC LIMIT 1", node.Id);
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
         }).ConfigureAwait(false);
         _log.Debug("store", $"Node added under parent={parentRowId}");
         return rowId;
@@ -362,13 +550,18 @@ public sealed class BookmarkStore : IAsyncDisposable
 
     public async Task UpdateNodeAsync(int rowId, string? title, string? url, string? description, List<string>? tags)
     {
-        var node = await Db.FindAsync<ItemRow>(rowId).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"Bookmark row {rowId} not found.");
-        node.Title = title;
-        node.Url = url;
-        node.Description = string.IsNullOrWhiteSpace(description) ? null : description;
-        node.Tags = tags is { Count: > 0 } ? string.Join(TagSep, tags) : null;
-        await Db.UpdateAsync(node).ConfigureAwait(false);
+        var db = Db;
+        await db.RunInTransactionAsync(tran =>
+        {
+            var node = tran.Find<ItemRow>(rowId)
+                ?? throw new InvalidOperationException($"Bookmark row {rowId} not found.");
+            node.Title = title;
+            node.Url = url;
+            node.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+            node.Tags = tags is { Count: > 0 } ? string.Join(TagSep, tags) : null;
+            tran.Update(node);
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>Deletes many nodes by stable NodeId in ONE transaction
@@ -425,6 +618,10 @@ public sealed class BookmarkStore : IAsyncDisposable
             }
 
             deleted = doomed.Count;
+            if (deleted > 0)
+            {
+                tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+            }
         }).ConfigureAwait(false);
 
         _log.Debug("store", $"Batch deleted {deleted} row(s)");
@@ -435,58 +632,63 @@ public sealed class BookmarkStore : IAsyncDisposable
     public async Task<(int? ParentRowId, List<BookmarkNode> Subtree)> DeleteNodeAsync(int rowId)
     {
         var db = Db;
-        var target = await db.FindAsync<ItemRow>(rowId).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"Bookmark row {rowId} not found.");
-
-        var rows = await db.Table<ItemRow>().ToListAsync().ConfigureAwait(false);
-        var kids = rows.Where(r => r.ParentRowId is not null)
-            .GroupBy(r => r.ParentRowId!.Value)
-            .ToDictionary(g => g.Key, g => g.Select(r => r.RowId).ToList());
-
-        var doomed = new List<int> { rowId };
-        var queue = new Queue<int>([rowId]);
-        while (queue.Count > 0)
-        {
-            var cur = queue.Dequeue();
-            if (kids.TryGetValue(cur, out var c))
-            {
-                doomed.AddRange(c);
-                foreach (var k in c)
-                {
-                    queue.Enqueue(k);
-                }
-            }
-        }
-
-        var byId = rows.ToDictionary(r => r.RowId);
-        BookmarkNode BuildRow(int id)
-        {
-            var r = byId[id];
-            return new BookmarkNode
-            {
-                Id = r.NodeId,
-                Title = r.Title,
-                Url = r.Url,
-                Description = r.Description,
-                Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
-                Children = r.IsFolder && kids.TryGetValue(id, out var c)
-                    ? c.Select(BuildRow).ToList()
-                    : null
-            };
-        }
-
-        var subtree = new List<BookmarkNode> { BuildRow(rowId) };
-
+        int? parentRowId = null;
+        List<BookmarkNode> subtree = [];
         await db.RunInTransactionAsync(tran =>
         {
+            var target = tran.Find<ItemRow>(rowId)
+                ?? throw new InvalidOperationException($"Bookmark row {rowId} not found.");
+            parentRowId = target.ParentRowId;
+
+            var rows = tran.Query<ItemRow>("SELECT * FROM Items");
+            var kids = rows.Where(r => r.ParentRowId is not null)
+                .GroupBy(r => r.ParentRowId!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.RowId).ToList());
+
+            var doomed = new List<int> { rowId };
+            var queue = new Queue<int>([rowId]);
+            while (queue.Count > 0)
+            {
+                var cur = queue.Dequeue();
+                if (kids.TryGetValue(cur, out var c))
+                {
+                    doomed.AddRange(c);
+                    foreach (var k in c)
+                    {
+                        queue.Enqueue(k);
+                    }
+                }
+            }
+
+            var byId = rows.ToDictionary(r => r.RowId);
+            BookmarkNode BuildRow(int id)
+            {
+                var r = byId[id];
+                return new BookmarkNode
+                {
+                    Id = r.NodeId,
+                    Title = r.Title,
+                    Url = r.Url,
+                    Description = r.Description,
+                    Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
+                    Children = r.IsFolder && kids.TryGetValue(id, out var c)
+                        ? c.Select(BuildRow).ToList()
+                        : null
+                };
+            }
+
+            subtree = [BuildRow(rowId)];
+
             foreach (var id in doomed)
             {
                 tran.Execute("DELETE FROM Items WHERE RowId = ?", id);
             }
+
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+            _log.Debug("store", $"Deleted node {rowId} (+{doomed.Count - 1} descendants)");
         }).ConfigureAwait(false);
 
-        _log.Debug("store", $"Deleted node {rowId} (+{doomed.Count - 1} descendants)");
-        return (target.ParentRowId, subtree);
+        return (parentRowId, subtree);
     }
 
     public async Task RestoreSubtreeAsync(int? parentRowId, List<BookmarkNode> subtree)
@@ -502,6 +704,8 @@ public sealed class BookmarkStore : IAsyncDisposable
             {
                 InsertNode(tran, node, parentRowId, ref order);
             }
+
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
         }).ConfigureAwait(false);
     }
 
@@ -536,6 +740,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             node.ParentRowId = newParentRowId;
             node.SortOrder = order;
             tran.Update(node);
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
         }).ConfigureAwait(false);
         _log.Debug("store", $"Moved node {rowId} to parent={newParentRowId}");
     }

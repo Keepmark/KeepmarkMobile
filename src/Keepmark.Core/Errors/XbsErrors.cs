@@ -42,6 +42,11 @@ public sealed class UnsupportedSyncVersionException(string message, Exception? i
 /// <summary>Service version is older than <see cref="XbsConstants.MinApiVersion"/>.</summary>
 public sealed class UnsupportedApiVersionException(string message, Exception? inner = null) : XbsException(message, inner);
 
+/// <summary>412 — server does not honor the requested contract version
+/// (e.g. a legacy server answering a 1.2.0 probe). Never retried; the
+/// caller falls back to the legacy contract.</summary>
+public sealed class ServerPreconditionException(string message, Exception? inner = null) : XbsException(message, inner);
+
 /// <summary>Sync ID or derived key missing from local storage.</summary>
 public sealed class IncompleteSyncInfoException(string message, Exception? inner = null) : XbsException(message, inner);
 

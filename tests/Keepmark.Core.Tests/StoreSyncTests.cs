@@ -36,6 +36,7 @@ sealed class FakeApi : IXSyncApiClient
             MaxSyncSize = 1048576,
             Capabilities = V12 ? new ApiCapabilities { Revision = true, ConditionalGet = true, Delete = true } : null,
         });
+    public Task<ServiceInfoResponse> GetInfoV12Async(CancellationToken ct = default) => GetInfoAsync(ct);
     public Task<CreateSyncResponse> CreateSyncAsync(CancellationToken ct = default) =>
         Task.FromResult(new CreateSyncResponse { Id = "new-id", LastUpdated = LastUpdated, Version = Version });
     public Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default) =>
@@ -239,6 +240,94 @@ public sealed class StoreSyncTests : IAsyncLifetime
         var restored = await _store.GetByNodeIdsAsync([nodeId!.Value]);
         Assert.Single(restored);
         Assert.Equal("Renamed", restored[0].Title);
+    }
+
+    [Fact]
+    public async Task Mutations_MarkMirrorDirty_Atomically()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        Assert.Equal("0", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+
+        int rowId = await _store.AddNodeAsync(null,
+            new BookmarkNode { Title = "New", Url = "https://new.example" });
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        int row2 = await _store.AddNodeAsync(null,
+            new BookmarkNode { Title = "New", Url = "https://new.example" });
+        await _store.UpdateNodeAsync(row2, "Renamed", "https://renamed.example", "desc", ["t1"]);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        int row3 = await _store.AddNodeAsync(null,
+            new BookmarkNode { Title = "New", Url = "https://new.example" });
+        var folder = (await _store.GetChildrenAsync(null)).Single(r => r.IsFolder);
+        await _store.MoveNodeAsync(row3, folder.RowId);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        await _store.RestoreSubtreeAsync(null, [new BookmarkNode { Title = "U", Url = "https://u.example" }]);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        int row4 = await _store.AddNodeAsync(null,
+            new BookmarkNode { Title = "New", Url = "https://new.example" });
+        await _store.DeleteNodeAsync(row4);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        int row5 = await _store.AddNodeAsync(null,
+            new BookmarkNode { Title = "New", Url = "https://new.example" });
+        var nodeId = (await _store.GetNodeAsync(row5))?.NodeId;
+        await _store.DeleteNodesByNodeIdsAsync([nodeId!.Value]);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+    }
+
+    [Fact]
+    public async Task NodeIdMutations_SurviveReplaceAll_Rekey()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        var target = (await _store.GetByNodeIdsAsync([4])).Single();
+        int nodeId = target.NodeId!.Value;
+
+        // A push/pull rekeys every RowId; the NodeId stays valid.
+        await _store.ReplaceAllAsync(Sample(), "blob", "t2", "1.8.0");
+
+        await _store.UpdateNodeByNodeIdAsync(nodeId, "Renamed", target.Url, null, null);
+        var updated = (await _store.GetByNodeIdsAsync([nodeId])).Single();
+        Assert.Equal("Renamed", updated.Title);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+
+        var folder = (await _store.GetChildrenAsync(null)).Single(r => r.IsFolder);
+        await _store.MoveNodeByNodeIdAsync(nodeId, folder.NodeId);
+        var moved = (await _store.GetByNodeIdsAsync([nodeId])).Single();
+        var folderRow = (await _store.GetByNodeIdsAsync([folder.NodeId!.Value])).Single();
+        Assert.Equal(folderRow.RowId, moved.ParentRowId);
+
+        var (parentNode, subtree) = await _store.DeleteNodeByNodeIdAsync(nodeId);
+        Assert.Empty(await _store.GetByNodeIdsAsync([nodeId]));
+        Assert.Equal(folder.NodeId, parentNode);
+        await _store.RestoreSubtreeByNodeIdAsync(parentNode, subtree);
+        Assert.Single(await _store.GetByNodeIdsAsync([nodeId]));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _store.UpdateNodeByNodeIdAsync(999_999, "x", null, null, null));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _store.DeleteNodeByNodeIdAsync(999_999));
+    }
+
+    [Fact]
+    public async Task Engine_DeleteByNodeId_MarksDirtyAndPushesOnce()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        var target = (await _store.GetByNodeIdsAsync([2])).Single();
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+
+        var (parentNode, _) = await _engine.DeleteBookmarkByNodeIdAsync(target.NodeId!.Value);
+
+        Assert.NotNull(parentNode);
+        Assert.Empty(await _store.GetByNodeIdsAsync([target.NodeId.Value]));
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
     }
 
     [Fact]
