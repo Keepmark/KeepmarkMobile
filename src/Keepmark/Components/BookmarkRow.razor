@@ -32,7 +32,7 @@ else
                     }
                     @if (!string.IsNullOrEmpty(Row.Tags))
                     {
-                        <div class="xbs-row-tags">#@Row.Tags.Replace(" ", " #") </div>
+                        <div class="xbs-row-tags">#@Row.Tags.Replace("\u001F", " #") </div>
                     }
                 }
                 @if (!Row.IsFolder && !string.IsNullOrEmpty(FolderPath))

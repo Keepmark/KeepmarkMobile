@@ -65,11 +65,11 @@
 <button class="btn btn-primary" @onclick="Save">Save</button>
 @if (saved)
 {
-    <span class="text-success ms-2">Saved.</span>
+    <span class="text-success ms-2" role="status">Saved.</span>
 }
 @if (!string.IsNullOrEmpty(error))
 {
-    <div class="alert alert-danger mt-2">@error</div>
+    <div class="alert alert-danger mt-2" role="alert">@error</div>
 }
 
 @if (linkedUrl is not null)
@@ -80,7 +80,7 @@
         immediately — update your vault and other devices.</p>
     @if (!string.IsNullOrEmpty(pwError))
     {
-        <div class="alert alert-danger">@pwError</div>
+        <div class="alert alert-danger" role="alert">@pwError</div>
     }
     <div class="mb-3">
         <label class="form-label">Current password</label>
@@ -94,10 +94,20 @@
         <label class="form-label">Confirm new password</label>
         <input type="password" class="form-control" @bind="pwConfirm" autocomplete="new-password" />
     </div>
-    <button class="btn btn-warning" @onclick="ChangePassword" disabled="@pwBusy">Change password</button>
+    <button class="btn btn-warning" @onclick="() => armedPw = true" disabled="@(pwBusy || armedPw)">Change password…</button>
+    @if (armedPw)
+    {
+        <div class="alert alert-danger mt-2">
+            <strong>Change the sync password on all devices?</strong> The old password stops working immediately — update your vault and other devices.
+            <div class="mt-2 d-flex gap-2">
+                <button class="btn btn-warning" @onclick="ChangePassword" disabled="@pwBusy">Yes, change password</button>
+                <button class="btn btn-secondary" @onclick="() => armedPw = false" disabled="@pwBusy">Cancel</button>
+            </div>
+        </div>
+    }
     @if (pwDone)
     {
-        <div class="alert alert-success mt-2">Password changed. A safety backup of the previous server copy was saved — see Backup → Safety backups. Update your other devices and vault now.</div>
+        <div class="alert alert-success mt-2" role="status">Password changed. A safety backup of the previous server copy was saved — see Backup → Safety backups. Update your other devices and vault now.</div>
     }
 }
 
@@ -123,6 +133,7 @@
     private string pwError = string.Empty;
     private bool pwDone;
     private bool pwBusy;
+    private bool armedPw;
 
     protected override void OnInitialized()
     {
@@ -229,6 +240,7 @@
         {
             await Session.ChangePasswordAsync(pwCurrent, pwNew);
             pwCurrent = pwNew = pwConfirm = string.Empty;
+            armedPw = false;
             pwDone = true;
         }
         catch (Exception ex)

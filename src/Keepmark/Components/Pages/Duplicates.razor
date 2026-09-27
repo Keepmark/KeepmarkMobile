@@ -13,15 +13,15 @@
 
 @if (!ready)
 {
-    <p><em>Loading…</em></p>
+    <p role="status"><em>Loading…</em></p>
 }
 else if (groups.Count == 0)
 {
-    <div class="alert alert-success">No duplicates. Your library is clean.</div>
+    <div class="alert alert-success" role="status">No duplicates. Your library is clean.</div>
 }
 else
 {
-    <p class="text-muted"><small>@MarkedCount() marked for deletion. Swipe right on a row for full details.</small></p>
+    <p class="text-muted" role="status"><small>@MarkedCount() marked for deletion. Swipe right on a row for full details.</small></p>
 
     @foreach (var g in groups)
     {
@@ -36,21 +36,25 @@ else
                 {
                     <div class="d-flex gap-2 align-items-center flex-wrap mt-1">
                         <span><strong>Delete @markedHere?</strong></span>
-                        <button class="btn btn-sm btn-danger" disabled="@busy" @onclick="() => ExecuteGroup(g)">Yes</button>
-                        <button class="btn btn-sm btn-secondary" disabled="@busy" @onclick="() => armedGroup = null">No</button>
+                        <button class="btn btn-danger" disabled="@busy" aria-label="Delete @markedHere marked in group @g.Url" @onclick="() => ExecuteGroup(g)">Yes</button>
+                        <button class="btn btn-secondary" disabled="@busy" aria-label="Keep group @g.Url" @onclick="() => armedGroup = null">No</button>
                     </div>
                 }
                 else
                 {
-                    <button class="btn btn-sm btn-outline-danger mt-1" disabled="@(busy || markedHere == 0)" @onclick="() => armedGroup = g.Url">
+                    <button class="btn btn-outline-danger mt-1" disabled="@(busy || markedHere == 0)" @onclick="() => armedGroup = g.Url">
                         Delete @(markedHere == 0 ? "marked" : $"{markedHere} marked")
                     </button>
                 }
             </section>
         }
 
+    @if (!string.IsNullOrEmpty(deleteError))
+    {
+        <div class="alert alert-danger mt-2" role="alert">@deleteError</div>
+    }
     <div class="xbs-dupbar">
-        <span>@MarkedCount() marked</span>
+        <span role="status">@MarkedCount() marked</span>
         @if (!armedAll)
         {
             <button class="btn btn-outline-danger" disabled="@(busy || MarkedCount() == 0)" @onclick="() => armedAll = true">Delete marked…</button>
@@ -77,6 +81,7 @@ else
     private string? armedGroup;
     private bool armedAll;
     private bool busy;
+    private string deleteError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -186,6 +191,7 @@ else
         catch (Exception ex)
         {
             Session.Log.Warn("duplicates", $"Batch delete failed: {ex.GetType().Name}");
+            deleteError = ex.Message;
             return 0;
         }
     }
@@ -198,6 +204,7 @@ else
         }
 
         busy = true;
+        deleteError = string.Empty;
         var deleted = 0;
         try
         {
@@ -242,6 +249,7 @@ else
         }
 
         busy = true;
+        deleteError = string.Empty;
         var count = 0;
         try
         {

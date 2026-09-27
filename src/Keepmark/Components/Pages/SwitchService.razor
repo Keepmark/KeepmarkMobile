@@ -13,7 +13,7 @@
 
 @if (!Session.Ready)
 {
-    <p><em>Starting…</em></p>
+    <p role="status"><em>Starting…</em></p>
 }
 else if (!linked)
 {
@@ -25,7 +25,7 @@ else if (!linked)
 }
 else if (step == 4)
 {
-    <div class="alert alert-success">
+    <div class="alert alert-success" role="status">
         <h4>Switch complete</h4>
         @if (createdId is not null)
         {
@@ -119,11 +119,11 @@ else
             }
             else
             {
-                <div class="alert alert-success">
+                <div class="alert alert-success" role="status">
                     Sync <code>@ShortId(probe?.Candidate.Id)</code> opened — @probe?.RemoteCount remote item(s),
                     password verified and cleared.
                     <div class="mt-2">
-                        <button class="btn btn-outline-secondary btn-sm" @onclick="Unverify" disabled="@busy">Use a different sync…</button>
+                        <button class="btn btn-outline-secondary" @onclick="Unverify" disabled="@busy">Use a different sync…</button>
                     </div>
                 </div>
             }
@@ -167,11 +167,11 @@ else
                             Local-only bookmarks upload, remote-only download; same-URL
                             title conflicts keep the server title.
                             <div class="mt-2">
-                                <button class="btn btn-secondary btn-sm" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
+                                <button class="btn btn-secondary" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
                             </div>
                             @if (mergeStats is not null)
                             {
-                                <p class="mt-2 mb-0">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
+                                <p class="mt-2 mb-0" role="status">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
                                     @mergeStats.RemoteOnly remote will download (of @mergeStats.RemoteCount),
                                     @mergeStats.TitleConflicts title conflicts (server title kept),
                                     @mergeStats.FoldersCreated folders created,
@@ -188,17 +188,21 @@ else
             <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">Review</button>
             <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
         </div>
+        @if (slot == "new" && !string.IsNullOrEmpty(verifyError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+        }
     }
     else
     {
         @if (resumed)
         {
-            <div class="alert alert-info">
+            <div class="alert alert-info" role="status">
                 Resumed your unfinished switch — counts may have changed while you were away;
                 press Verify again if in doubt, or Start over below.
             </div>
         }
-        <div class="alert alert-info">
+        <div class="alert alert-info" role="status">
             <h4>Review</h4>
             @if (slot == "new")
             {
@@ -496,11 +500,11 @@ else
         try
         {
             await Clipboard.Default.SetTextAsync(createdId);
-            await Toast.ShowAsync("Sync ID copied — store it with the password");
+            _ = Toast.ShowAsync("Sync ID copied — store it with the password");
         }
         catch
         {
-            await Toast.ShowAsync("Copy failed — transcribe the ID manually", isError: true);
+            _ = Toast.ShowAsync("Copy failed — transcribe the ID manually", isError: true);
         }
     }
 

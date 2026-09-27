@@ -12,6 +12,27 @@ public class MainActivity : MauiAppCompatActivity
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
+
+        // Never draw under the status bar / notch / cutout: the whole notch
+        // defense in CSS (`env(safe-area-inset-*)`) depends on the WebView
+        // reporting real insets, which is not guaranteed on every WebView
+        // version. Opting out of edge-to-edge makes the window avoid system
+        // bars and the cutout by construction, so scrolled page content can
+        // never slide under the notch in any orientation. The status strip
+        // stays opaque navy via ApplyStatusBar, seamless with the app bar.
+        // No-op on API < 35 (legacy fit-behavior is already the default).
+        try
+        {
+            if (Window is not null)
+            {
+                global::AndroidX.Core.View.WindowCompat.SetDecorFitsSystemWindows(Window, true);
+            }
+        }
+        catch
+        {
+            // Cosmetic only: CSS inset math is the fallback.
+        }
+
         Platforms.Android.ShareIntake.Handle(Intent);
 
         // Status bar follows the stored theme (white icons on dark).

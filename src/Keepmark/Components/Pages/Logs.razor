@@ -8,7 +8,7 @@
 <p class="text-muted">Buffer: <strong>@entries.Count</strong> entries · recording at <strong>@minLevel</strong> (change in Settings → Log verbosity). Newest first. At Verbose level entries may include your bookmark titles/URLs — check before sharing.</p>
 
 <div class="d-flex gap-2 flex-wrap mb-2">
-    <select class="form-select" style="max-width: 12rem" @bind="level">
+    <select class="form-select xbs-log-filter-level" aria-label="Log level filter" @bind="level">
         <option value="">All levels</option>
         <option value="@Core.Logging.XbsLogLevel.Error">Error</option>
         <option value="@Core.Logging.XbsLogLevel.Warning">Warning</option>
@@ -16,10 +16,18 @@
         <option value="@Core.Logging.XbsLogLevel.Debug">Debug</option>
         <option value="@Core.Logging.XbsLogLevel.Verbose">Verbose</option>
     </select>
-    <input class="form-control" style="max-width: 14rem" placeholder="Filter text…" @bind="filter" @bind:event="oninput" />
+    <input class="form-control xbs-log-filter-text" aria-label="Filter log text" placeholder="Filter text…" @bind="filter" @bind:event="oninput" />
     <button class="btn btn-outline-secondary" @onclick="Refresh">Refresh</button>
     <button class="btn btn-outline-secondary" @onclick="Export">Export…</button>
-    <button class="btn btn-outline-danger" @onclick="Clear">Clear</button>
+    @if (!armedClear)
+    {
+        <button class="btn btn-outline-danger" @onclick="() => armedClear = true">Clear…</button>
+    }
+    else
+    {
+        <button class="btn btn-danger" @onclick="ExecuteClear">Yes, clear</button>
+        <button class="btn btn-secondary" @onclick="() => armedClear = false">Cancel</button>
+    }
 </div>
 
 @if (Shown().Count == 0)
@@ -45,6 +53,7 @@ else
     private string level = string.Empty;
     private string filter = string.Empty;
     private string minLevel = "?";
+    private bool armedClear;
     private List<Core.Logging.LogEntry> entries = [];
 
     protected override void OnInitialized()
@@ -77,10 +86,12 @@ else
         return list.ToList();
     }
 
-    private void Clear()
+    private void ExecuteClear()
     {
         Session.Log.Clear();
+        armedClear = false;
         Refresh();
+        _ = Toast.ShowAsync("Log buffer cleared");
     }
 
     private async Task Export()
@@ -99,7 +110,7 @@ else
         }
         catch
         {
-            await Toast.ShowAsync("Export cancelled", isError: false);
+            _ = Toast.ShowAsync("Export cancelled", isError: true);
         }
     }
 }

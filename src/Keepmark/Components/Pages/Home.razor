@@ -22,6 +22,7 @@ else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
 }
 else
 {
+    <h1 class="visually-hidden">Bookmarks</h1>
     <div class="mb-2 xbs-search">
         <span class="xbs-search-icon" aria-hidden="true">🔍</span>
         <input class="form-control xbs-search-input" placeholder="Search…" aria-label="Search bookmarks"
@@ -41,7 +42,7 @@ else
         <p class="text-muted" role="status">@hits.Count result(s)</p>
         @if (hitRows.Count == 0 && !searching)
         {
-            <p class="text-muted">No matches. Try fewer words, check spelling, or clear the search.</p>
+            <p class="text-muted" role="status">No matches. Try fewer words, check spelling, or clear the search.</p>
         }
         @foreach (var id in hitRows)
         {
@@ -51,18 +52,18 @@ else
     }
     else
     {
-        <div class="xbs-sortbar" role="toolbar" aria-label="Sort">
-            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" aria-label="Server order" aria-pressed="@((sortMode == "Default").ToString().ToLowerInvariant())" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
-            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" aria-label="Sort A to Z" aria-pressed="@((sortMode == "Asc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
-            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" aria-label="Sort Z to A" aria-pressed="@((sortMode == "Desc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
-        </div>
         <div class="xbs-crumbs" role="navigation" aria-label="Folders">
             <button class="xbs-crumb" @onclick="GoRoot" aria-label="Top level">⌂</button>
             @foreach (var c in crumbs.Reverse())
             {
-                <span class="xbs-crumb-sep">/</span>
+                <span class="xbs-crumb-sep" aria-hidden="true">/</span>
                 <button class="xbs-crumb" @onclick="() => JumpTo(c.RowId)">@c.Title</button>
             }
+        </div>
+        <div class="xbs-sortbar" role="toolbar" aria-label="Sort">
+            <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" aria-label="Server order" aria-pressed="@((sortMode == "Default").ToString().ToLowerInvariant())" @onclick='() => SetSort("Default")' title="Server order">⇅</button>
+            <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" aria-label="Sort A to Z" aria-pressed="@((sortMode == "Asc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Asc")' title="A to Z">A↓</button>
+            <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" aria-label="Sort Z to A" aria-pressed="@((sortMode == "Desc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Desc")' title="Z to A">A↑</button>
         </div>
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
@@ -89,7 +90,7 @@ else
         }
         @if (rows.Count == 0)
         {
-            <p class="text-muted">@(crumbs.Count == 0 ? "No bookmarks yet. Tap + below to add your first." : "This folder is empty. Tap + below to add one here.")</p>
+            <p class="text-muted" role="status">@(crumbs.Count == 0 ? "No bookmarks yet. Tap + below to add your first." : "This folder is empty. Tap + below to add one here.")</p>
         }
     }
 
@@ -97,7 +98,7 @@ else
         <span class="xbs-statusbar-main">@if (!string.IsNullOrEmpty(FriendlyStatus())){<text>● @FriendlyStatus() · </text>}Last sync: @FormatLastSync(lastSync)</span>
         @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
         {
-            <button class="btn btn-link btn-sm xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
+            <button class="btn btn-link xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
         }
         <span class="xbs-statusbar-ver">v@(AppInfo.VersionString)</span>
     </div>
@@ -124,7 +125,7 @@ else
             {
                 @if (!string.IsNullOrEmpty(menuFor.Url)) { <p class="text-break">@menuFor.Url</p> }
                 @if (!string.IsNullOrEmpty(menuFor.Description)) { <p>@menuFor.Description</p> }
-                @if (!string.IsNullOrEmpty(menuFor.Tags)) { <p class="text-muted">#@menuFor.Tags.Replace("", " #") </p> }
+                @if (!string.IsNullOrEmpty(menuFor.Tags)) { <p class="text-muted">#@menuFor.Tags.Replace("\u001F", " #") </p> }
             }
             <div class="d-grid gap-2">
                 @if (!menuFor.IsFolder)
@@ -177,6 +178,7 @@ else
     private ItemRow? menuFor;
     private bool pinnedOpen = false;
     private int? flashRowId;
+    private int? flashNodeId;
     private readonly HashSet<int> expandedRows = new();
     private Dictionary<int, string> pinPaths = new();
     private string sortMode = "Default";
@@ -319,6 +321,12 @@ else
                         expandedRows.Add(freshId);
                     }
                 }
+            }
+            // The flash target is a stable NodeId too: a sync rewrite between
+            // render and tap rekeys every RowId, so resolve it to the fresh one.
+            if (flashNodeId is not null)
+            {
+                flashRowId = byRow.Values.FirstOrDefault(r => r.NodeId == flashNodeId)?.RowId;
             }
         }
     }
@@ -738,6 +746,7 @@ else
         isSearch = false;
         await RefreshAsync();
 
+        flashNodeId = row.NodeId;
         flashRowId = row.RowId;
         StateHasChanged();
         await Task.Delay(120);
@@ -751,7 +760,7 @@ else
             try
             {
                 await Task.Delay(2400, token);
-                await InvokeAsync(() => { flashRowId = null; StateHasChanged(); });
+                await InvokeAsync(() => { flashNodeId = null; flashRowId = null; StateHasChanged(); });
             }
             catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException) { }
         });
@@ -760,6 +769,7 @@ else
     private void ClearFlash()
     {
         flashTimer?.Cancel();
+        flashNodeId = null;
         flashRowId = null;
     }
 

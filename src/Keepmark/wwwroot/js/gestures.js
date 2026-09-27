@@ -83,7 +83,7 @@ window.xbsGestures = (() => {
         if (listenersAttached) return;
         listenersAttached = true;
         document.addEventListener('pointerdown', onDown, { passive: true });
-        document.addEventListener('pointermove', onMove, { passive: true });
+        document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onUp, { passive: true });
         document.addEventListener('pointercancel', onUp, { passive: true });
         document.addEventListener('click', (e) => {
@@ -96,7 +96,7 @@ window.xbsGestures = (() => {
         ensureGoButtons();
     }
 
-    // ---- Scroll jump arrows (↓ below the FAB, ↑ under the breadcrumb) ----
+    // ---- Scroll jump arrows (single slot above the FAB, ↑/↓ reuse it) ----
     let goDown = null, goUp = null, lastY = -1, idleTimer = 0, jumpUntil = 0;
 
     function ensureGoButtons() {
@@ -119,7 +119,10 @@ window.xbsGestures = (() => {
     function modalOpen() {
         if (document.documentElement.classList.contains('xbs-locked')) return true;
         const t = document.querySelector('.navbar-toggler');
-        return !!(t && t.checked);
+        if (!t) return false;
+        if (t.checked) return true; // legacy checkbox toggler
+        const ex = t.getAttribute('aria-expanded');
+        return !!ex && ex.toLowerCase() === 'true';
     }
 
     function hideGo() {
@@ -138,12 +141,7 @@ window.xbsGestures = (() => {
             goUp.classList.remove('show');
             goDown.classList.add('show');
         } else if (y < lastY - 4 && y > 40) {
-            // Scrolling up: offer the jump to top, right under the crumbs.
-            const crumbs = document.querySelector('.xbs-crumbs');
-            if (crumbs) {
-                const r = crumbs.getBoundingClientRect();
-                goUp.style.top = `${Math.max(0, r.bottom + 8)}px`;
-            }
+            // Scrolling up: offer the jump to top (same slot as ↓).
             goDown.classList.remove('show');
             goUp.classList.add('show');
         } else if (y <= 40 || y >= max - 40) {

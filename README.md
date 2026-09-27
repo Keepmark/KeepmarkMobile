@@ -5,7 +5,7 @@
 > read it before reviewing code).
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.102 (103)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.104 (105)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
 
 `Keepmark/` is its own git repo (root `$HOME/Projects/xBrowserSync`

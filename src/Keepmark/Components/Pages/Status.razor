@@ -10,7 +10,7 @@
 
 @if (!loaded)
 {
-    <p><em>Loading…</em></p>
+    <p role="status"><em>Loading…</em></p>
 }
 else
 {
@@ -37,7 +37,7 @@ else
                 @if (maxSyncSize is not null && maxSyncSize.Value > 0)
                 {
                     <text> (@ServerPctText%)</text>
-                    <div class="progress mt-1" role="progressbar" aria-label="Service space used">
+                    <div class="progress mt-1" role="progressbar" aria-label="Service space used" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
                         <div class="progress-bar" style="width: @ServerPctText%"></div>
                     </div>
                 }
@@ -150,6 +150,12 @@ else
             ? "0"
             : Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value)
                 .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Same quota usage as a number for aria-valuenow (clamped 0–100).</summary>
+    private double ServerPctNow =>
+        serverBytes is null || maxSyncSize is null || maxSyncSize.Value <= 0
+            ? 0
+            : Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value);
 
     private static string FormatBytes(long bytes)    {
         if (bytes < 1024)

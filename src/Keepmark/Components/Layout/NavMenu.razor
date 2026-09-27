@@ -11,57 +11,66 @@
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" @onchange="OnNavToggle" />
+<button class="navbar-toggler xbs-nav-toggler" aria-label="Navigation menu" aria-expanded="@((!collapseNavMenu).ToString().ToLowerInvariant())" @onclick="ToggleNavMenu"></button>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+<div class="@NavMenuCssClass nav-scrollable">
     <nav class="nav flex-column">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseMenu">
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Explore
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <button class="nav-link nav-sync-btn" @onclick="SyncNow" disabled="@(!linked)" title="@(linked ? "Push local changes and pull remote ones now" : "Link a service first (Connect)")">
+            <button class="nav-link nav-sync-btn" @onclick="SyncAndClose" disabled="@(!linked)" title="@(linked ? "Push local changes and pull remote ones now" : "Link a service first (Connect)")">
                 <span aria-hidden="true" class="nav-sync-glyph">⟳</span> Sync now
             </button>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="connect">
+            <NavLink class="nav-link" href="connect" @onclick="CloseMenu">
                 <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Connect
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="backup">
+            <NavLink class="nav-link" href="backup" @onclick="CloseMenu">
                 <span aria-hidden="true" class="nav-sync-glyph">⤓</span> Backup
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="@SwitchCss" href="switch-service" title="@SwitchTitle" aria-disabled="@(!linked)">
-                <span aria-hidden="true" class="nav-sync-glyph">⇄</span> Switch service
-            </NavLink>
+            @if (linked)
+            {
+                <NavLink class="nav-link" href="switch-service" title="@SwitchTitle" @onclick="CloseMenu">
+                    <span aria-hidden="true" class="nav-sync-glyph">⇄</span> Switch service
+                </NavLink>
+            }
+            else
+            {
+                <span class="nav-link disabled" aria-disabled="true" title="@SwitchTitle">
+                    <span aria-hidden="true" class="nav-sync-glyph">⇄</span> Switch service
+                </span>
+            }
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="duplicates">
+            <NavLink class="nav-link" href="duplicates" @onclick="CloseMenu">
                 <span aria-hidden="true" class="nav-sync-glyph">⧉</span> Duplicates @if (dupCount > 0) { <span class="badge text-bg-warning ms-1">@dupCount</span> }
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="status">
+            <NavLink class="nav-link" href="status" @onclick="CloseMenu">
                 <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Status
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="logs">
+            <NavLink class="nav-link" href="logs" @onclick="CloseMenu">
                 <span aria-hidden="true" class="nav-sync-glyph">≣</span> Logs
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="settings">
+            <NavLink class="nav-link" href="settings" @onclick="CloseMenu">
                 <span aria-hidden="true" class="nav-sync-glyph">⚙</span> Settings
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="about">
+            <NavLink class="nav-link" href="about" @onclick="CloseMenu">
                 <span aria-hidden="true" class="nav-sync-glyph">ⓘ</span> About
             </NavLink>
         </div>
@@ -71,8 +80,9 @@
 @code {
     private int dupCount;
     private bool linked;
+    private bool collapseNavMenu = true;
 
-    private string SwitchCss => "nav-link" + (linked ? string.Empty : " disabled");
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : string.Empty;
     private string SwitchTitle => linked ? "Move to another service" : "Link a service first (Connect)";
 
     protected override async Task OnInitializedAsync()
@@ -125,13 +135,20 @@
     private void OnData() => InvokeAsync(async () => { await RefreshDupCountAsync(); await RefreshLinkedAsync(); StateHasChanged(); });
 
     // While the drawer is open the page behind must not scroll (same lock as modal sheets).
-    private async Task OnNavToggle(ChangeEventArgs e)
+    private async Task ToggleNavMenu()
     {
-        try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", e.Value is true, "nav"); } catch { }
-        if (e.Value is true)
+        collapseNavMenu = !collapseNavMenu;
+        try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", !collapseNavMenu, "nav"); } catch { }
+        if (!collapseNavMenu)
         {
             await RefreshLinkedAsync();
         }
+    }
+
+    private async Task CloseMenu()
+    {
+        collapseNavMenu = true;
+        try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", false, "nav"); } catch { }
     }
 
     public void Dispose()
@@ -141,6 +158,12 @@
         {
             Session.Engine.DataChanged -= OnData;
         }
+    }
+
+    private async Task SyncAndClose()
+    {
+        await SyncNow();
+        await CloseMenu();
     }
 
     private async Task SyncNow()
@@ -153,13 +176,15 @@
         try
         {
             await Session.Engine.ForceSyncAsync();
-            await Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
+            // Paint first: the toast must never gate the status update.
+            StateHasChanged();
+            _ = Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
                 ? $"Sync complete {DateTime.Now:HH:mm:ss}"
                 : $"Sync finished: {Session.Engine.Status}");
         }
         catch (Exception ex)
         {
-            await Toast.ShowAsync(ex.Message, isError: true);
+            _ = Toast.ShowAsync(ex.Message, isError: true);
         }
     }
 }

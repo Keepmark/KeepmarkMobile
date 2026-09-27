@@ -21,7 +21,7 @@
             }
             <div class="mb-2">
                 <label class="form-label" for="xbs-f-title">Title</label>
-                <input id="xbs-f-title" class="form-control" @bind="title" autofocus
+                <input id="xbs-f-title" class="form-control" @ref="titleInput" @bind="title" autofocus
                        aria-invalid="@((fieldError == "title").ToString().ToLowerInvariant())" aria-describedby="@(fieldError is null ? null : "xbs-form-error")" />
             </div>
             @if (!EffectiveIsFolder)
@@ -45,16 +45,6 @@
                 <button type="button" id="xbs-f-folder" class="form-control text-start" aria-expanded="@showTree.ToString().ToLowerInvariant()" @onclick="OpenTree">
                     @(SelectedFolderPath() ?? "⌂ Top level")
                 </button>
-                @if (showTree)
-                {
-                    <div class="xbs-tree-full" @onclick:stopPropagation="true">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h4 class="mb-0">Choose folder</h4>
-                        </div>
-                        <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnHighlight"
-                                      ExcludeSubtreeRoot="Existing?.RowId" OnConfirm="() => showTree = false" OnCancel="CancelTree" />
-                    </div>
-                }
             </div>
             @if (!string.IsNullOrEmpty(error))
             {
@@ -75,6 +65,16 @@
                 <button class="btn btn-secondary" @onclick="RequestCancel">Cancel</button>
             </div>
         </div>
+        @if (showTree)
+        {
+            <div class="xbs-tree-full" role="dialog" aria-modal="true" aria-label="Choose folder" @onclick:stopPropagation="true">
+                <div class="d-flex justify-content-between align-items-center mb-2 xbs-tree-head">
+                    <h4 class="mb-0">Choose folder</h4>
+                </div>
+                <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnHighlight"
+                              ExcludeSubtreeRoot="Existing?.RowId" OnConfirm="() => showTree = false" OnCancel="CancelTree" />
+            </div>
+        }
     </div>
 }
 
@@ -98,6 +98,7 @@
     private string error = string.Empty;
     private string? fieldError;
     private bool confirmDiscard;
+    private ElementReference titleInput;
 
     // Snapshot of the opened values: backdrop/Cancel only asks when dirty,
     // and parent re-renders (sync ticks) never wipe what is being typed.
@@ -154,6 +155,14 @@
     }
 
     private bool EffectiveIsFolder => IsEdit ? Existing!.IsFolder : NewIsFolder;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Visible)
+        {
+            try { await titleInput.FocusAsync(); } catch { }
+        }
+    }
 
     protected override void OnParametersSet()
     {

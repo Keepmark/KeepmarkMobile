@@ -9,7 +9,7 @@
 
 @if (!Session.Ready)
 {
-    <p><em>Starting…</em></p>
+    <p role="status"><em>Starting…</em></p>
 }
 else
 {
@@ -25,7 +25,7 @@ else
         <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">Export encrypted backup</button>
         @if (!string.IsNullOrEmpty(bkpMessage))
         {
-            <div class="alert mt-2 @(bkpError ? "alert-danger" : "alert-success")">@bkpMessage</div>
+            <div class="alert mt-2 @(bkpError ? "alert-danger" : "alert-success")" role="@(bkpError ? "alert" : "status")">@bkpMessage</div>
         }
     </div>
 
@@ -34,7 +34,7 @@ else
         <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
         @if (!string.IsNullOrEmpty(impMessage))
         {
-            <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")">@impMessage</div>
+            <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")" role="@(impError ? "alert" : "status")">@impMessage</div>
         }
         @if (impPath is not null)
         {
@@ -77,10 +77,10 @@ else
             otherwise plaintext; kept in the app folder).
             Restore one to undo a take-remote, upload, import, password change, move or duplicates cleanup —
             or delete it to free space. Newest first, oldest auto-pruned beyond five.</p>
-        <button class="btn btn-outline-secondary btn-sm mb-2" @onclick="RefreshSafety" disabled="@busy">Refresh list</button>
+        <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">Refresh list</button>
         @if (!string.IsNullOrEmpty(safetyMessage))
         {
-            <div class="alert mt-2 @(safetyError ? "alert-danger" : "alert-success")">@safetyMessage</div>
+            <div class="alert mt-2 @(safetyError ? "alert-danger" : "alert-success")" role="@(safetyError ? "alert" : "status")">@safetyMessage</div>
         }
         @if (safetyList.Count == 0)
         {
@@ -129,8 +129,8 @@ else
                     else
                     {
                         <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-outline-primary btn-sm" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">Restore…</button>
-                            <button class="btn btn-outline-danger btn-sm" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">Delete</button>
+                            <button class="btn btn-outline-primary" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">Restore…</button>
+                            <button class="btn btn-outline-danger" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">Delete</button>
                         </div>
                     }
                 </div>
@@ -437,6 +437,11 @@ else
         }
         finally
         {
+            // Export passwords never linger. impPassword is excluded on
+            // purpose: it is entered at "Read backup" and reused at
+            // "Yes, restore" (ExecuteImport clears it when the flow ends).
+            bkpPassword = string.Empty;
+            bkpConfirm = string.Empty;
             busy = false;
         }
     }

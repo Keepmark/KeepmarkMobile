@@ -9,7 +9,7 @@
 
 @if (!Session.Ready)
 {
-    <p><em>Starting…</em></p>
+    <p role="status"><em>Starting…</em></p>
 }
 else if (linked)
 {
@@ -41,7 +41,7 @@ else if (linked)
     }
     @if (!string.IsNullOrEmpty(message))
     {
-        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")">@message</div>
+        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
     }
 }
 else
@@ -66,7 +66,7 @@ else
         }
         @if (serviceInfo is not null)
         {
-            <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
+            <p class="mt-2" role="status">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
         }
     </div>
 
@@ -179,14 +179,24 @@ else
                     </div>
                     @if (mergeStats is not null)
                     {
-                        <p class="mt-2 mb-1">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
+                        <p class="mt-2 mb-1" role="status">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
                             @mergeStats.RemoteOnly remote will download (of @mergeStats.RemoteCount),
                             @mergeStats.TitleConflicts title conflicts (server title kept),
                             @mergeStats.FoldersCreated folders created,
                             @mergeStats.SeparatorsAdopted separators kept from both sides.</p>
-                        <div class="mt-2">
-                            <button class="btn btn-danger" @onclick="ApplyMerge" disabled="@busy">Yes, merge both sides</button>
-                        </div>
+                        @if (!armedMerge)
+                        {
+                            <div class="mt-2">
+                                <button class="btn btn-danger" @onclick="() => armedMerge = true" disabled="@busy">Merge both sides…</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mt-2 d-flex gap-2">
+                                <button class="btn btn-danger" @onclick="ApplyMerge" disabled="@busy">Yes, merge both sides</button>
+                                <button class="btn btn-secondary" @onclick="() => armedMerge = false" disabled="@busy">Cancel</button>
+                            </div>
+                        }
                     }
                 </div>
             }
@@ -195,9 +205,19 @@ else
                 <div class="alert alert-danger mb-2">
                     <strong>Overwrites the @reconcile.RemoteCount remote item(s) with your @reconcile.LocalCount local.</strong>
                     A plaintext safety backup of the server copy is saved first.
-                    <div class="mt-2">
-                        <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload local</button>
-                    </div>
+                    @if (!armedLocal)
+                    {
+                        <div class="mt-2">
+                            <button class="btn btn-danger" @onclick="() => armedLocal = true" disabled="@busy">Upload local…</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload local</button>
+                            <button class="btn btn-secondary" @onclick="() => armedLocal = false" disabled="@busy">Cancel</button>
+                        </div>
+                    }
                 </div>
             }
             else
@@ -209,9 +229,19 @@ else
                         <text>Your @reconcile.LocalCount local item(s) will be deleted.</text>
                     }
                     A plaintext safety backup is saved first.
-                    <div class="mt-2">
-                        <button class="btn btn-danger" @onclick="ApplyRemote" disabled="@busy">Yes, download remote</button>
-                    </div>
+                    @if (!armedRemote)
+                    {
+                        <div class="mt-2">
+                            <button class="btn btn-danger" @onclick="() => armedRemote = true" disabled="@busy">Download remote…</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-danger" @onclick="ApplyRemote" disabled="@busy">Yes, download remote</button>
+                            <button class="btn btn-secondary" @onclick="() => armedRemote = false" disabled="@busy">Cancel</button>
+                        </div>
+                    }
                 </div>
             }
             @if (!string.IsNullOrEmpty(applyError))
@@ -223,7 +253,7 @@ else
 
     @if (!string.IsNullOrEmpty(message))
     {
-        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")">@message</div>
+        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
     }
 }
 
@@ -250,6 +280,9 @@ else
     private int localCount;
     private string? armed;
     private bool armedUnlink;
+    private bool armedMerge;
+    private bool armedLocal;
+    private bool armedRemote;
     /// <summary>Reconcile direction choice: "download" replaces local with the
     /// remote copy, "upload" overwrites the remote with local, "merge" unions
     /// both sides. Preselected to the only sensible side when one of them is
@@ -262,6 +295,9 @@ else
         mergeStats = null;
         mergeStatsFor = null;
         applyError = string.Empty;
+        armedMerge = false;
+        armedLocal = false;
+        armedRemote = false;
     }
 
     protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
@@ -343,6 +379,9 @@ else
             mergeStats = null;
             mergeStatsFor = null;
             applyError = string.Empty;
+            armedMerge = false;
+            armedLocal = false;
+            armedRemote = false;
             if (reconcile is { LocalCount: 0, RemoteCount: 0 })
             {
                 await Session.ApplyRemoteAsync(reconcile);
@@ -397,6 +436,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
+            armedRemote = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of your previous local tree saved — see Backup → Safety backups.");
         }, err => applyError = err, "connect-apply");
@@ -411,6 +451,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
+            armedLocal = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "push", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of the previous server copy saved — see Backup → Safety backups.");
         }, err => applyError = err, "connect-apply");
@@ -440,6 +481,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
+            armedMerge = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backups of both sides saved — see Backup → Safety backups.");
         }, err => applyError = err, "connect-apply");
