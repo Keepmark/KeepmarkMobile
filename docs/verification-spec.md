@@ -58,7 +58,7 @@ only as method arguments, never stored, never logged.
 |---|---|
 | R4.1 | Whole-blob only (API has no deltas). `Mode` Auto (poll + push-on-edit) / Manual (explicit only). Statuses: Idle/Syncing/Offline/Conflict/Error/NoCredentials + `DataChanged`/`StatusChanged` events; UI preserves scroll/query across events. |
 | R4.2 | v1.2 capability probed via `/info` capabilities per service URL, cached; legacy → timestamp path. Conditional GET (304) skips download when hash known. Revision CAS on push when revision stored; 409 on races, never overwrite. |
-| R4.3 | **[KNOWN GAP]** The probe (`IsV12Async`, `SyncEngine.cs:170-190`) calls `GetInfoAsync`, which sends the LEGACY header — the server strips `capabilities` on the legacy contract, so the probe can never succeed and the v1.2 path is dead code. REQUIRED fix: probe with `Accept-Version: 1.2.0` (new `GetInfoV12Async`), treat 412/absence as legacy. Verifier: against a v1.2 server, conditional GET and revision CAS must be observed in logs; today they never trigger. |
+| R4.3 | v1.2 capability probed on the 1.2.0 contract (`GetInfoV12Async` — the legacy contract strips capabilities, so probing there could never succeed), cached per service URL; 412 / missing capabilities = legacy. A service older than MinApiVersion throws instead of being silently used. Verifier: against a v1.2 server, conditional GET and revision CAS must be observed in logs. |
 | R4.4 | Pull MUST refuse when the mirror is dirty (unpushed edits): status Conflict + `DataOutOfSyncException`, never silent discard. |
 | R4.5 | `ForceSyncAsync` matrix: remote≠local + dirty → Conflict (no auto-merge); remote≠local + clean → pull; equal + dirty → push; equal + clean → stamp `LastSyncAt`. Offline → Offline status, no throw to UI. |
 | R4.6 | Version gates: service < MinApiVersion refused at check; remote sync format > SyncClientVersion refused on pull/compare. |
@@ -81,13 +81,37 @@ Each flow states preconditions, mutations in order, and the REQUIRED user-visibl
 |---|---|---|
 | R6.1 | Create empty (`CreateNewSyncAsync`) | Safety-backup local → POST → derive → store creds → replace mirror EMPTY. UI arms with explicit confirm. Message states the backup + where to find it (R7). |
 | R6.2 | Create with upload (`CreateNewSyncWithUploadAsync`) | POST → derive → store creds → upload mirror. Nothing local deleted. Returns new ID for display/copy. |
-| R6.3 | Link existing, pull (`ProbeLinkAsync` + `ApplyRemoteAsync`) | Password verified by decrypting remote BEFORE any overwrite (wrong → `InvalidCredentials`, zero mutations). Safety-backup local side. `0/0` items → auto-apply; else explicit Download/Upload choice with counts. |
+| R6.3 | Link existing, pull (`ProbeLinkAsync` + `ApplyRemoteAsync`) | Password verified by decrypting remote BEFORE any overwrite (wrong → `InvalidCredentials`, zero mutations). Safety-backup local side. `0/0` items → auto-apply; else explicit Download/Upload/Merge choice with counts. |
 | R6.4 | Link existing, push (`ApplyLocalAsync`) | Same verify-first; safety-backup remote side; PUT on remote base (409 honest). |
-| R6.5 | Switch service (wizard: new / existing-pull / existing-push) | Nothing syncs before explicit confirm; safety-backup of the scrapped side first; password verified by decrypt before mutation; wizard never deletes local data; draft survives navigation (no secrets in draft), cleared on complete/start-over. |
+| R6.4b | Link existing, merge (`GetMergePreviewAsync` + `ApplyMergeAsync`, `connect-merge`) | Same verify-first. Preview is a dry-run of the same pure union (`BookmarkMerge`): local-only upload / remote-only download / title-conflict (server wins) / folders-created / separators counts. Preview is locked: changing direction or re-verifying invalidates it. Apply snapshots BOTH sides first (fail closed), then writes the union locally and pushes (409 honest, both snapshots intact). Merge never deletes. |
+| R6.5 | Switch service (wizard: new / existing-pull / existing-push / existing-merge) | Nothing syncs before explicit confirm; safety-backup of the scrapped side first (merge: both sides, `switch-merge`); password verified by decrypt before mutation; wizard never deletes local data; draft survives navigation (no secrets in draft), cleared on complete/start-over. |
 | R6.6 | Unlink | Clears credentials ONLY; local items stay; sync stops. Requires explicit confirm. |
 | R6.7 | Backup export/import/preview | Envelope R2.5; import = preview (count) → two-step confirm → safety-backup local → dirty mirror (auto-push/conflict, never pull-over). 50 MB stream cap, tmp cleanup. |
 | R6.8 | Change password (`ChangePasswordAsync`) | Guards: current required, new required; current derived key MUST equal stored (else `InvalidCredentials`, zero mutations/downloads/queue). Then: safety-backup remote side → store new derived key → `PushAsync` (revision CAS/409 as usual) → rotate safety master (R7.3, best-effort). Old password stops working everywhere. |
 | R6.9 | Duplicates bulk delete (`DeleteBookmarksAsync`) | Safety backup (local, `duplicates-cleanup`) BEFORE delete; one transaction + one push; result toast names the backup location. Last-copy-locked plan (never wipe a group). |
+
+### Merge rules (normative — port of KeepmarkApp `src/shared/merge.ts`)
+
+`BookmarkMerge.Merge(local, remote)` is pure (no I/O, inputs never mutated).
+The same function serves preview and apply, so preview counts MUST equal
+the applied result. Rules:
+
+1. Remote is the shared truth: its nodes, ids and metadata are kept as-is.
+2. Local bookmarks whose `NormalizeUrl` URL is absent remotely are adopted
+   with fresh ids (`maxRemoteId+1…`) into the folder matched by full title
+   path, or into a newly created folder.
+3. Same URL, different title → remote title wins, counted as `TitleConflicts`.
+4. Separators (`xbs:separator`) are unioned from both sides, never matched.
+5. Deletes are NOT merged (no tombstones in the protocol): items deleted on
+   one side while the other was offline reappear after a merge.
+6. `NormalizeUrl`: lowercase host, default ports + fragments dropped,
+   tracking params (`utm_*`, `fbclid`, `gclid`, `msclkid`, `mc_cid/mc_eid`,
+   `igshid`) removed; path + query stay case-sensitive. Unparsable input:
+   trim + lowercase, fragment and trailing slash dropped.
+7. `remoteOnly` is computed against the remote as received (not the merged
+   tree); `localOnly` counts adopted local bookmarks at all levels.
+8. Corrupt shape (bookmark carrying children): bookmarks kept, children
+   flattened into the same folder instead of dropped.
 
 ## 7. Safety backups (summary — full spec in `README.md` § Safety backups)
 
@@ -103,12 +127,13 @@ Each flow states preconditions, mutations in order, and the REQUIRED user-visibl
 
 | R | Requirement |
 |---|---|
-| R8.1 | Validation catalog (exact strings): "Current password is required.", "A new password is required.", "The new password must be different from the current one.", "New passwords do not match.", "Use a password of at least 8 characters.", "Passwords do not match — retype the confirmation.", "Enter both the sync ID and its password.", "Sync ID is required for an existing sync.", "Choose the sync direction above." (reconcile), "Verify the existing sync first.", "Re-check the target service first." |
-| R8.2 | Destructive confirms: unlink (1), delete server-side n/a (no client), create-empty (armed), import (two-step), switch (Review + Switch now), bulk delete (armed), safety restore/delete (armed inline). |
+| R8.1 | Validation catalog (exact strings): "Current password is required.", "A new password is required.", "The new password must be different from the current one.", "New passwords do not match.", "Use a password of at least 8 characters.", "Passwords do not match — retype the confirmation.", "Enter both the sync ID and its password.", "Sync ID is required for an existing sync.", "Choose the sync direction above." (reconcile), "Verify the existing sync first.", "Re-check the target service first.", "Preview the merge first — counts must match the verified sync." (switch), "Preview the merge first — counts must match the linked sync." (connect) |
+| R8.2 | Destructive confirms: unlink (1), delete server-side n/a (no client), create-empty (armed), import (two-step), switch (Review + Switch now), merge (Preview + explicit merge confirm, preview-locked), bulk delete (armed), safety restore/delete (armed inline). |
 | R8.3 | Secrets hygiene: password fields cleared on success AND failure (keep-new convenience only where stated); password never in logs, toasts, or backup filenames. |
-| R8.4 | Gating matrix: Switch-service menu + page require an existing link (disabled + guard page); Sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty); danger buttons outline-first/solid-confirm. |
+| R8.4 | Gating matrix: Switch-service menu + page require an existing link (disabled + guard page); Sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty; merge disabled unless both sides hold items); danger buttons outline-first/solid-confirm. |
 | R8.5 | Status page: mode/state/last-sync/service (+version) / local DB bytes / server copy bytes + max + % + bar (one `/info` probe per visit, offline = "unknown") / content stats / app + sync-format + API versions. |
 | R8.6 | About page declares v1.1 + v1.2 extended contract (with fallback) + encryption + independence + GPLv3. Bug-report mail includes app/API versions. |
+| R8.7 | Error evidence belongs to the step that produced it: wizard pages (Connect, Switch service) render one error box per action cluster (check / verify-link / apply-review) adjacent to its button, with `role="alert"`, instead of a single shared box. Multi-outcome successes restate WHAT ran (mode + direction + target) via the pure `MoveResult.Describe` helper (unit-pinned), never a bare "Done". |
 
 ## 9. Logging (`Logging.cs`, `InMemoryLogger`, Logs page)
 
@@ -127,9 +152,29 @@ R9.1 levels Error→Verbose, persisted verbosity, 200-entry viewer. R9.2 NEVER l
 | `BackupGuardTests.cs` | R2.5 limits |
 | `RetryPolicyTests.cs` | R3.3 backoff/idempotence |
 | `StoreSyncTests.cs` | R4–R5 mirror/meta/engine flows |
+| `BookmarkMergeTests.cs` | merge union rules, id freshness, folder paths, empty sides, tracking-param identity, corrupt flatten, `NormalizeUrl`, `MoveResult` 4 outcomes |
 | `SafetyBackupTests.cs` | naming, describe, prune-5, legacy parse, index round-trip/damage, fingerprint, wrap trim |
 | `VersionCompareTests.cs` | R1.11 |
-| Manual/device | R8 UI flows, R4.2 live v1.2 (blocked by KNOWN GAP), R7.4 restore against real server, uninstall/reinstall data-loss behavior |
+| Manual/device — every view below MUST be exercised, none skipped | See per-view checklist. |
+
+### Manual/device checklist (no view left unreviewed)
+
+Each page in `src/Keepmark/Components/Pages/` maps to its requirements.
+A future QA pass MUST walk every row; closing a view without its checks
+fails the review.
+
+| View | Checks |
+|---|---|
+| `Connect.razor` (R6.1–R6.4b, R8.1–R8.4, R8.7) | Check service ok/offline (error box by the button). Link existing: wrong password → `InvalidCredentials`, zero mutations; `0/0` → auto-apply. Direction pull/push/merge each applied once: success restates mode+direction+target (`MoveResult`), safety row appears. Merge: preview counts = applied result; change direction → preview invalidated, apply refuses; merge radio disabled when either side is empty. Create new + create-with-upload: new ID shown + Copy. Unlink: confirm armed, creds cleared, local kept. Each step's error appears in ITS box (`role="alert"`), never a shared one. |
+| `SwitchService.razor` (R6.5, R8.1–R8.4, R8.7) | Unlinked → guard page. Step 1 check error by the button. Step 2 new-mode passwords mismatch/short → verify-box error (no navigation); existing-mode verify wrong password → zero mutations. All 3 directions reviewed in step 3 with counts; merge requires fresh preview. Execute → step 4 success names outcome + safety location; draft cleared (navigate away/back → wizard reset). Start over resets everything incl. errors. |
+| `Backup.razor` (R6.7, R7) | Export → file created, envelope `{App:"xBrowserSyncNg",Format:1}`. Preview with wrong password vs damaged file → distinct errors. Import → two-step confirm, safety row first, count matches. Safety list shows all `connect-merge`/`switch-merge` rows (both sides). Restore local → pre-restore row; restore remote unlinked → refused; delete → file + index row gone. |
+| `Duplicates.razor` (R6.9) | Groups listed; last copy locked (never deletable); per-group + global delete armed; ONE safety row per cleanup; ONE push (no sync storm — check logs); toast names backup location. |
+| `Status.razor` (R8.5) | Mode/state/last-sync/service + version, DB bytes, server bytes + max + % + bar (one `/info` per visit; offline = "unknown"), content stats, app + sync-format + API versions. No `.ToString("0.#")` leaks into percents. |
+| `Settings.razor` (R6.8) | Change password: empty current/new, new == current, wrong current → exact R8.1 strings, zero mutations; success → old password dead everywhere, safety row `change-password`, master re-wrapped. Theme/mode/verbosity persist. |
+| `Home.razor` (R4.1, R4.4, R4.5) | Tap opens, ⋮ menu actions, swipe expand/collapse, pinned section, breadcrumb, folder-first sort, share-receive prefill, folder picker Select/Cancel. Edit in Auto → background push; conflicting remote → Conflict status, never silent merge/discard. Scroll/query preserved across `DataChanged`. Single delete → 6 s undo, no safety file. |
+| `Logs.razor` (R9) | 200-entry viewer, level filter, share export. No bodies/passwords/keys/full sync IDs in any row (spot-check after a sync + a merge). |
+| `About.razor` (R8.6) | Declares v1.1 + v1.2 extended contract with fallback, encryption, independence, GPLv3. Bug-report mail carries app + API versions. |
+| Cross-view | R4.2 live v1.2 against a v1.2 server (conditional GET 304 + revision CAS in logs). R7.4 restore against real server. Uninstall/reinstall data-loss behavior. |
 
 ## 12. Static checks (reviewer-run, must all pass)
 

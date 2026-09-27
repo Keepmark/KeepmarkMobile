@@ -35,6 +35,10 @@ else if (linked)
             </div>
         </div>
     }
+    @if (!string.IsNullOrEmpty(unlinkError))
+    {
+        <div class="alert alert-danger mt-3" role="alert">@unlinkError</div>
+    }
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")">@message</div>
@@ -56,6 +60,10 @@ else
         <input class="form-control" @bind="serviceUrl" inputmode="url" />
         <div class="form-text">Address of the xBrowserSync service to use. Check verifies it answers with a compatible API version.</div>
         <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">Check service</button>
+        @if (!string.IsNullOrEmpty(checkError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@checkError</div>
+        }
         @if (serviceInfo is not null)
         {
             <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
@@ -72,6 +80,10 @@ else
         <div class="mt-2">
             <button class="btn btn-primary me-2" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
         </div>
+        @if (!string.IsNullOrEmpty(linkError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@linkError</div>
+        }
     </div>
 
     <div class="mb-3">
@@ -120,7 +132,7 @@ else
                 <div class="form-check">
                     <input class="form-check-input" type="radio" name="syncDirection" id="dir-download"
                            checked="@(direction == "download")" disabled="@(busy || reconcile.RemoteCount == 0)"
-                           @onchange='() => direction = "download"' />
+                           @onchange='() => SetDirection("download")' />
                     <label class="form-check-label" for="dir-download">
                         Download remote — replace local
                         @if (reconcile.RemoteCount == 0)
@@ -132,7 +144,7 @@ else
                 <div class="form-check">
                     <input class="form-check-input" type="radio" name="syncDirection" id="dir-upload"
                            checked="@(direction == "upload")" disabled="@(busy || reconcile.LocalCount == 0)"
-                           @onchange='() => direction = "upload"' />
+                           @onchange='() => SetDirection("upload")' />
                     <label class="form-check-label" for="dir-upload">
                         Upload local — overwrite remote
                         @if (reconcile.LocalCount == 0)
@@ -141,8 +153,54 @@ else
                         }
                     </label>
                 </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="syncDirection" id="dir-merge"
+                           checked="@(direction == "merge")"
+                           disabled="@(busy || reconcile.LocalCount == 0 || reconcile.RemoteCount == 0)"
+                           @onchange='() => SetDirection("merge")' />
+                    <label class="form-check-label" for="dir-merge">
+                        Merge both sides — union (never deletes)
+                        @if (reconcile.LocalCount == 0 || reconcile.RemoteCount == 0)
+                        {
+                            <text>(needs items on both sides)</text>
+                        }
+                    </label>
+                </div>
             </div>
-            @if (direction == "download")
+            @if (direction == "merge")
+            {
+                <div class="alert alert-info mb-2">
+                    <strong>Union of both sides — nothing is deleted.</strong>
+                    Local-only bookmarks upload, remote-only download; same-URL
+                    title conflicts keep the server title; items deleted on one
+                    side while the other was offline reappear.
+                    <div class="mt-2">
+                        <button class="btn btn-secondary" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
+                    </div>
+                    @if (mergeStats is not null)
+                    {
+                        <p class="mt-2 mb-1">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
+                            @mergeStats.RemoteOnly remote will download (of @mergeStats.RemoteCount),
+                            @mergeStats.TitleConflicts title conflicts (server title kept),
+                            @mergeStats.FoldersCreated folders created,
+                            @mergeStats.SeparatorsAdopted separators kept from both sides.</p>
+                        <div class="mt-2">
+                            <button class="btn btn-danger" @onclick="ApplyMerge" disabled="@busy">Yes, merge both sides</button>
+                        </div>
+                    }
+                </div>
+            }
+            else if (direction == "upload")
+            {
+                <div class="alert alert-danger mb-2">
+                    <strong>Overwrites the @reconcile.RemoteCount remote item(s) with your @reconcile.LocalCount local.</strong>
+                    A plaintext safety backup of the server copy is saved first.
+                    <div class="mt-2">
+                        <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload local</button>
+                    </div>
+                </div>
+            }
+            else
             {
                 <div class="alert alert-danger mb-2">
                     <strong>Takes the @reconcile.RemoteCount remote item(s).</strong>
@@ -156,15 +214,9 @@ else
                     </div>
                 </div>
             }
-            else
+            @if (!string.IsNullOrEmpty(applyError))
             {
-                <div class="alert alert-danger mb-2">
-                    <strong>Overwrites the @reconcile.RemoteCount remote item(s) with your @reconcile.LocalCount local.</strong>
-                    A plaintext safety backup of the server copy is saved first.
-                    <div class="mt-2">
-                        <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload local</button>
-                    </div>
-                </div>
+                <div class="alert alert-danger mt-2" role="alert">@applyError</div>
             }
         </div>
     }
@@ -184,6 +236,12 @@ else
     private bool busy;
     private string message = string.Empty;
     private bool isError;
+    private string checkError = string.Empty;
+    private string linkError = string.Empty;
+    private string applyError = string.Empty;
+    private string unlinkError = string.Empty;
+    private Core.Sync.MergeStats? mergeStats;
+    private Services.ReconcileInfo? mergeStatsFor;
     private Core.Api.ServiceInfoResponse? serviceInfo;
     private Services.ReconcileInfo? reconcile;
     private bool linked;
@@ -193,9 +251,18 @@ else
     private string? armed;
     private bool armedUnlink;
     /// <summary>Reconcile direction choice: "download" replaces local with the
-    /// remote copy, "upload" overwrites the remote with local. Preselected to
-    /// the only sensible side when one of them is empty.</summary>
+    /// remote copy, "upload" overwrites the remote with local, "merge" unions
+    /// both sides. Preselected to the only sensible side when one of them is
+    /// empty. Changing direction invalidates the merge preview.</summary>
     private string direction = "download";
+
+    private void SetDirection(string value)
+    {
+        direction = value;
+        mergeStats = null;
+        mergeStatsFor = null;
+        applyError = string.Empty;
+    }
 
     protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
 
@@ -229,14 +296,14 @@ else
 
     private async Task ExecuteUnlink()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             await Creds.ClearAsync();
             armedUnlink = false;
             await RefreshStateAsync();
             Session.Log.Info("connect", "Device unlinked");
             Ok("Device unlinked. Local bookmarks kept; link again to resume syncing.");
-        });
+        }, err => unlinkError = err, "connect-unlink");
     }
 
     private static void RequireMatchingPasswords(string first, string second)
@@ -254,17 +321,17 @@ else
 
     private async Task CheckService()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             serviceInfo = await Session.CheckServiceAsync(serviceUrl.Trim());
             AppSettings.ServiceUrl = serviceUrl.Trim();
             Ok($"Service is valid: {serviceInfo.Status}, API v{serviceInfo.Version}.");
-        });
+        }, err => checkError = err, "connect-check");
     }
 
     private async Task LinkExisting()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
             {
@@ -273,6 +340,9 @@ else
 
             reconcile = await Session.ProbeLinkAsync(serviceUrl.Trim(), syncId.Trim(), password);
             AppSettings.ServiceUrl = serviceUrl.Trim();
+            mergeStats = null;
+            mergeStatsFor = null;
+            applyError = string.Empty;
             if (reconcile is { LocalCount: 0, RemoteCount: 0 })
             {
                 await Session.ApplyRemoteAsync(reconcile);
@@ -286,12 +356,12 @@ else
                 direction = reconcile.RemoteCount == 0 ? "upload" : "download";
                 Ok("Credentials valid. Choose the sync direction above.");
             }
-        });
+        }, err => linkError = err, "connect-link");
     }
 
     private async Task CreateNew()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             RequireMatchingPasswords(newPassword, confirmPassword);
             await Session.CreateNewSyncAsync(serviceUrl.Trim(), newPassword);
@@ -301,12 +371,12 @@ else
             newPassword = string.Empty;
             await RefreshStateAsync();
             Ok("New empty sync created and linked. Safety backup of the previous local data saved — see Backup → Safety backups.");
-        });
+        }, err => linkError = err, "connect-create");
     }
 
     private async Task CreateWithUpload()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             RequireMatchingPasswords(newPassword, confirmPassword);
             await Session.CreateNewSyncWithUploadAsync(serviceUrl.Trim(), newPassword);
@@ -315,36 +385,75 @@ else
             newPassword = string.Empty;
             await RefreshStateAsync();
             Ok("New sync created and your local bookmarks were uploaded into it.");
-        });
+        }, err => linkError = err, "connect-create");
     }
 
     private async Task ApplyRemote()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
-            await Session.ApplyRemoteAsync(reconcile!);
+            var target = reconcile!;
+            await Session.ApplyRemoteAsync(target);
             reconcile = null;
+            mergeStats = null;
+            mergeStatsFor = null;
             await RefreshStateAsync();
-            Ok("Remote version downloaded. Safety backup of your previous local tree saved — see Backup → Safety backups.");
-        });
+            Ok($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of your previous local tree saved — see Backup → Safety backups.");
+        }, err => applyError = err, "connect-apply");
     }
 
     private async Task ApplyLocal()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
-            await Session.ApplyLocalAsync(reconcile!);
+            var target = reconcile!;
+            await Session.ApplyLocalAsync(target);
             reconcile = null;
+            mergeStats = null;
+            mergeStatsFor = null;
             await RefreshStateAsync();
-            Ok("Local version uploaded. Safety backup of the previous server copy saved — see Backup → Safety backups.");
-        });
+            Ok($"{Core.Sync.MoveResult.Describe("existing", "push", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of the previous server copy saved — see Backup → Safety backups.");
+        }, err => applyError = err, "connect-apply");
     }
 
-    private async Task RunAsync(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
+    private async Task PreviewMerge()
+    {
+        await RunStepAsync(async () =>
+        {
+            mergeStats = await Session.GetMergePreviewAsync(reconcile!);
+            mergeStatsFor = reconcile;
+            message = string.Empty;
+        }, err => applyError = err, "connect-merge-preview");
+    }
+
+    private async Task ApplyMerge()
+    {
+        await RunStepAsync(async () =>
+        {
+            var target = reconcile!;
+            if (mergeStats is null || !ReferenceEquals(mergeStatsFor, target))
+            {
+                throw new InvalidOperationException("Preview the merge first — counts must match the linked sync.");
+            }
+
+            await Session.ApplyMergeAsync(target, Core.Safety.SafetyOperations.ConnectMerge);
+            reconcile = null;
+            mergeStats = null;
+            mergeStatsFor = null;
+            await RefreshStateAsync();
+            Ok($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backups of both sides saved — see Backup → Safety backups.");
+        }, err => applyError = err, "connect-apply");
+    }
+
+    /// <summary>One action cluster, one adjacent error box: each wizard step
+    /// reports into its own field (check/link/apply) rendered next to the
+    /// button that produced it, instead of a single shared box.</summary>
+    private async Task RunStepAsync(Func<Task> action, Action<string> setError, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
     {
         busy = true;
         isError = false;
         message = string.Empty;
+        setError(string.Empty);
         try
         {
             Session.Log.Debug("connect", $"{op}: start");
@@ -354,7 +463,7 @@ else
         catch (Exception ex)
         {
             isError = true;
-            message = ex.Message;
+            setError(ex.Message);
             Session.Log.Warn("connect", $"{op} failed: {ex.GetType().Name}");
         }
         finally

@@ -2,10 +2,10 @@
 
 > Behavioral spec for outsourced code verification:
 > [`docs/verification-spec.md`](docs/verification-spec.md) (requirements Rxx —
-> read it before reviewing code; it also records the one known gap).
+> read it before reviewing code).
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.85 (86)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.102 (103)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
 
 `Keepmark/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -97,6 +97,10 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
   pre-checks, tree validated ≤200k nodes, tmp cache cleaned).
 - `src/Keepmark.Core/Sync/SyncEngine.cs` — gated push/pull, background
   push, conflict logic, `DeleteBookmarkAsync`.
+- `src/Keepmark.Core/Sync/BookmarkMerge.cs` — pure two-way union by URL
+  (remote kept, local adopted with fresh ids, separators unioned, deletes
+  never merged) + `NormalizeUrl`; same function serves preview and apply.
+  `MoveResult.cs` — contextual wizard success text (mode + direction + target).
 - `src/Keepmark.Core/Data/BookmarkStore.cs` — SQLCipher store, FTS5,
   duplicates query, `RestoreLocalAsync`. Rows rekeyed by every push/pull
   `ReplaceAll`: UI crumbs/expansions rebase on stable `NodeId`.
@@ -185,11 +189,13 @@ encrypted except legacy/pre-link files (flagged "not encrypted" in the UI).
 |---|---|---|---|
 | Connect → take remote | local tree | current local JSON | `take-remote` |
 | Connect → upload local | server copy | current remote JSON | `upload-local` |
+| Connect → merge both sides | both sides | current local JSON + current remote JSON | `connect-merge` |
 | Connect → create empty | local tree | current local JSON | `create-empty` |
 | Import encrypted backup | local tree | current local JSON | `import-backup` |
 | Change password | server copy | current remote JSON | `change-password` |
 | Switch → take remote | local tree | current local JSON | `switch-take-remote` |
 | Switch → upload local | server copy | current remote JSON | `switch-upload` |
+| Switch → merge both sides | both sides | current local JSON + current remote JSON | `switch-merge` |
 | Duplicates bulk delete | local tree | pre-delete local JSON | `duplicates-cleanup` |
 | Safety restore (any) | current state | state being replaced | `pre-restore` |
 
@@ -258,6 +264,16 @@ instead of a file (documented, no snapshot required).
   the reason verbatim, secrets are cleared from inputs on failure.
 - Change-password and switch-existing keep their current-password /
   verify-first gates; nothing in this spec weakens them.
+- Wizard error evidence belongs to the step that produced it: Connect and
+  Switch service render one error box per action cluster
+  (check / verify-link / apply-review) adjacent to its button
+  (`role="alert"`), never a single shared box.
+- Multi-outcome successes restate WHAT ran (mode + direction + target) via
+  the pure `MoveResult.Describe` helper (unit-pinned in
+  `BookmarkMergeTests`), never a bare "Done".
+- Merge is always preview-locked: Preview shows the union counts, changing
+  direction or re-verifying invalidates the preview, and apply refuses
+  without a fresh preview for the current probe.
 
 ### 6. How to verify (third-party checklist)
 
@@ -276,6 +292,14 @@ instead of a file (documented, no snapshot required).
 8. Kill the app mid-rotation (or restore `.prev` over master) → master
    intact or verifiable, no silent lockout; index damage → list falls back
    to directory scan.
+9. Merge (Connect and Switch service): Preview counts match the applied
+   result (same pure `BookmarkMerge` function serves both); after apply,
+   TWO new rows appear (`connect-merge` / `switch-merge`, sides local +
+   remote) with the right counts; tree holds the union, nothing deleted.
+10. Merge preview-lock: preview, then change direction and back (or
+    re-verify) → apply refuses with "Preview the merge first — …".
+11. Merge wrong-password: verify with a wrong password → `InvalidCredentials`,
+    zero mutations, zero safety rows.
 
 ## License
 

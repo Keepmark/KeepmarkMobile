@@ -14,6 +14,8 @@ public static class SafetyOperations
     public const string ChangePassword = "change-password";
     public const string SwitchTakeRemote = "switch-take-remote";
     public const string SwitchUpload = "switch-upload";
+    public const string ConnectMerge = "connect-merge";
+    public const string SwitchMerge = "switch-merge";
     public const string DuplicatesCleanup = "duplicates-cleanup";
     public const string PreRestore = "pre-restore";
     public const string Legacy = "legacy";
@@ -27,6 +29,8 @@ public static class SafetyOperations
         ChangePassword => "Changed sync password — Settings",
         SwitchTakeRemote => "Took remote — Switch service",
         SwitchUpload => "Uploaded local — Switch service",
+        ConnectMerge => "Merged both sides — Connect",
+        SwitchMerge => "Merged both sides — Switch service",
         DuplicatesCleanup => "Deleted duplicates",
         PreRestore => "Before safety-backup restore",
         _ => "Older backup",

@@ -38,6 +38,10 @@ else if (step == 4)
         {
             <p>Your local tree was replaced with the remote item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local tree was saved — see Backup → Safety backups.</p>
         }
+        else if (direction == "merge")
+        {
+            <p>@Core.Sync.MoveResult.Describe("existing", "merge", targetUrl, ShortId(probe?.Candidate.Id)) Safety backups of both sides were saved — see Backup → Safety backups.</p>
+        }
         else
         {
             <p>Your @localCount local item(s) replaced the @probe?.RemoteCount remote item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten remote side was saved — see Backup → Safety backups.</p>
@@ -66,6 +70,10 @@ else
             @if (serviceInfo is not null)
             {
                 <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version)</p>
+            }
+            @if (!string.IsNullOrEmpty(checkError))
+            {
+                <div class="alert alert-danger mt-2" role="alert">@checkError</div>
             }
         </div>
     }
@@ -103,6 +111,10 @@ else
                     <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
                     <div class="form-text">Verified against the remote data first: a wrong password stops here, nothing is overwritten.</div>
                     <button class="btn btn-secondary mt-2" @onclick="VerifyExisting" disabled="@busy">Verify</button>
+                    @if (!string.IsNullOrEmpty(verifyError))
+                    {
+                        <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+                    }
                 </div>
             }
             else
@@ -121,14 +133,18 @@ else
                     <h4>Choose the link direction</h4>
                     <p>Local holds <strong>@localCount</strong> item(s); remote holds <strong>@probe.RemoteCount</strong> item(s).</p>
                     <div class="form-check">
-                        <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(!takeUpload)" disabled="@busy" @onchange="() => takeUpload = false" />
+                        <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(direction == "take")" disabled="@busy" @onchange='() => SetDirection("take")' />
                         <label class="form-check-label" for="dirDown"><strong>Take remote</strong> — download (safe default)</label>
                     </div>
                     <div class="form-check">
-                        <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@takeUpload" disabled="@(busy || localCount == 0)" @onchange="() => takeUpload = true" />
+                        <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@(direction == "upload")" disabled="@(busy || localCount == 0)" @onchange='() => SetDirection("upload")' />
                         <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — overwrite remote</label>
                     </div>
-                    @if (!takeUpload)
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="migdir" id="dirMerge" checked="@(direction == "merge")" disabled="@(busy || localCount == 0 || probe.RemoteCount == 0)" @onchange='() => SetDirection("merge")' />
+                        <label class="form-check-label" for="dirMerge"><strong>Merge both sides</strong> — union (never deletes)</label>
+                    </div>
+                    @if (direction == "take")
                     {
                         <div class="alert alert-danger mt-2 mb-0">
                             <strong>Your @localCount local item(s) will be deleted</strong> and replaced with the
@@ -136,12 +152,31 @@ else
                             is saved first, and the app re-links to this sync.
                         </div>
                     }
-                    else
+                    else if (direction == "upload")
                     {
                         <div class="alert alert-danger mt-2 mb-0">
                             <strong>The @probe.RemoteCount remote item(s) will be overwritten</strong> with your
                             @localCount local item(s). A plaintext safety backup of the server copy is saved first,
                             and the app re-links to this sync.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mt-2 mb-0">
+                            <strong>Union of both sides — nothing is deleted.</strong>
+                            Local-only bookmarks upload, remote-only download; same-URL
+                            title conflicts keep the server title.
+                            <div class="mt-2">
+                                <button class="btn btn-secondary btn-sm" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
+                            </div>
+                            @if (mergeStats is not null)
+                            {
+                                <p class="mt-2 mb-0">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
+                                    @mergeStats.RemoteOnly remote will download (of @mergeStats.RemoteCount),
+                                    @mergeStats.TitleConflicts title conflicts (server title kept),
+                                    @mergeStats.FoldersCreated folders created,
+                                    @mergeStats.SeparatorsAdopted separators kept from both sides.</p>
+                            }
                         </div>
                     }
                 </div>
@@ -169,9 +204,20 @@ else
             {
                 <p>Create a <strong>new sync</strong> on <strong>@targetUrl</strong> and upload your <strong>@localCount</strong> local item(s) into it. The app re-links to the new sync.</p>
             }
-            else if (takeUpload)
+            else if (direction == "upload")
             {
                 <p>Replace the <strong>@probe?.RemoteCount</strong> remote item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> with your <strong>@localCount</strong> local item(s). Remote backup saved first; the app re-links to that sync.</p>
+            }
+            else if (direction == "merge")
+            {
+                @if (mergeStats is not null)
+                {
+                    <p>Merge your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> remote item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>: @mergeStats.LocalOnly will upload, @mergeStats.RemoteOnly will download, @mergeStats.TitleConflicts title conflicts keep the server title. Nothing is deleted. Safety backups of both sides saved first; the app re-links to that sync.</p>
+                }
+                else
+                {
+                    <p>Merge with sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> — go back and press Preview merge first.</p>
+                }
             }
             else
             {
@@ -183,11 +229,10 @@ else
             <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Switch now</button>
             <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
         </div>
-    }
-
-    @if (!string.IsNullOrEmpty(message))
-    {
-        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")">@message</div>
+        @if (!string.IsNullOrEmpty(reviewError))
+        {
+            <div class="alert alert-danger mt-3" role="alert">@reviewError</div>
+        }
     }
 }
 
@@ -204,15 +249,18 @@ else
     private string password = string.Empty;
     private Services.ReconcileInfo? probe;
     private string? verifiedFor;
-    /// <summary>Migration direction: false = take remote (safe default),
-    /// true = upload local over the remote.</summary>
-    private bool takeUpload;
+    /// <summary>Migration direction: "take" = take remote (safe default),
+    /// "upload" = upload local over the remote, "merge" = union (never deletes).</summary>
+    private string direction = "take";
+    private Core.Sync.MergeStats? mergeStats;
+    private Services.ReconcileInfo? mergeStatsFor;
     private bool tookRemote;
     private string? createdId;
     private int localCount;
     private bool busy;
-    private string message = string.Empty;
-    private bool isError;
+    private string checkError = string.Empty;
+    private string verifyError = string.Empty;
+    private string reviewError = string.Empty;
     private bool linked;
     private bool resumed;
 
@@ -241,7 +289,7 @@ else
             targetUrl = draft.TargetUrl;
             slot = draft.Slot;
             syncId = draft.SyncId;
-            takeUpload = draft.TakeUpload;
+            direction = draft.Direction is "upload" or "merge" ? draft.Direction : "take";
             probe = draft.Probe;
             verifiedFor = draft.VerifiedFor;
             step = draft.Step is >= 2 and <= 3 ? draft.Step : 2;
@@ -251,6 +299,16 @@ else
 
     private static string ShortId(string? id) =>
         id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
+
+    /// <summary>Changing direction invalidates the merge preview (counts must
+    /// always match the verified sync + direction).</summary>
+    private void SetDirection(string value)
+    {
+        direction = value;
+        mergeStats = null;
+        mergeStatsFor = null;
+        verifyError = string.Empty;
+    }
 
     private bool CanReview() => slot == "new"
         ? newPassword.Length > 0 && confirmPassword.Length > 0
@@ -266,23 +324,24 @@ else
     {
         probe = null;
         verifiedFor = null;
+        mergeStats = null;
+        mergeStatsFor = null;
     }
 
     private async Task CheckService()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             serviceInfo = await Session.CheckServiceAsync(targetUrl.Trim());
             checkedUrl = targetUrl.Trim();
             resumed = false;
             SaveDraft();
-            Ok($"Target service is valid: {serviceInfo.Status}, API v{serviceInfo.Version}.");
-        });
+        }, err => checkError = err, "switch-check");
     }
 
     private async Task VerifyExisting()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
             {
@@ -291,25 +350,53 @@ else
 
             probe = await Session.ProbeLinkAsync(targetUrl.Trim(), syncId.Trim(), password);
             verifiedFor = $"{targetUrl.Trim()}|{syncId.Trim()}";
-            takeUpload = false;
+            direction = "take";
+            mergeStats = null;
+            mergeStatsFor = null;
             tookRemote = false;
             resumed = false;
             SaveDraft();
-            Ok("Remote sync opened. Pick a direction, then Review.");
-        });
+        }, err => verifyError = err, "switch-verify");
+    }
+
+    private async Task PreviewMerge()
+    {
+        await RunStepAsync(async () =>
+        {
+            if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
+            {
+                throw new InvalidOperationException("Verify the existing sync first.");
+            }
+
+            mergeStats = await Session.GetMergePreviewAsync(probe);
+            mergeStatsFor = probe;
+        }, err => verifyError = err, "switch-merge-preview");
     }
 
     private void GoReview()
     {
-        if (slot == "new")
+        try
         {
-            RequireMatchingPasswords(newPassword, confirmPassword);
-        }
+            if (slot == "new")
+            {
+                RequireMatchingPasswords(newPassword, confirmPassword);
+            }
+            else if (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe)))
+            {
+                throw new InvalidOperationException("Preview the merge first — counts must match the verified sync.");
+            }
 
-        message = string.Empty;
-        resumed = false;
-        step = 3;
-        SaveDraft();
+            verifyError = string.Empty;
+            reviewError = string.Empty;
+            resumed = false;
+            step = 3;
+            SaveDraft();
+        }
+        catch (Exception ex)
+        {
+            verifyError = ex.Message;
+            Session.Log.Warn("switch", $"GoReview failed: {ex.GetType().Name}");
+        }
     }
 
     /// <summary>Snapshots the wizard (without secrets) so leaving the page
@@ -317,7 +404,7 @@ else
     private void SaveDraft()
     {
         Session.PendingSwitch = new Services.SwitchDraft(
-            targetUrl.Trim(), slot, syncId.Trim(), takeUpload, probe, verifiedFor, step);
+            targetUrl.Trim(), slot, syncId.Trim(), direction, probe, verifiedFor, step);
     }
 
     private void StartOver()
@@ -331,18 +418,22 @@ else
         confirmPassword = string.Empty;
         probe = null;
         verifiedFor = null;
-        takeUpload = false;
+        mergeStats = null;
+        mergeStatsFor = null;
+        direction = "take";
         tookRemote = false;
         createdId = null;
         serviceInfo = null;
         checkedUrl = null;
         resumed = false;
-        message = string.Empty;
+        checkError = string.Empty;
+        verifyError = string.Empty;
+        reviewError = string.Empty;
     }
 
     private async Task Execute()
     {
-        await RunAsync(async () =>
+        await RunStepAsync(async () =>
         {
             if (!serviceOk)
             {
@@ -364,9 +455,18 @@ else
                     throw new InvalidOperationException("Verify the existing sync first.");
                 }
 
-                if (takeUpload)
+                if (direction == "upload")
                 {
                     await Session.ApplyLocalAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchUpload);
+                }
+                else if (direction == "merge")
+                {
+                    if (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe))
+                    {
+                        throw new InvalidOperationException("Preview the merge first — counts must match the verified sync.");
+                    }
+
+                    await Session.ApplyMergeAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchMerge);
                 }
                 else
                 {
@@ -381,8 +481,9 @@ else
             Session.PendingSwitch = null;
             Session.Log.Info("switch", createdId is not null
                 ? "Switch complete: new sync created and uploaded"
+                : direction == "merge" ? "Switch complete: merged both sides"
                 : tookRemote ? "Switch complete: took remote tree" : "Switch complete: uploaded local tree");
-        });
+        }, err => reviewError = err, "switch-execute");
     }
 
     private async Task CopyId()
@@ -417,11 +518,13 @@ else
     }
 
 
-    private async Task RunAsync(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
+    /// <summary>One action cluster, one adjacent error box: each wizard step
+    /// reports into its own field (check/verify/review) rendered next to the
+    /// button that produced it, instead of a single shared box.</summary>
+    private async Task RunStepAsync(Func<Task> action, Action<string> setError, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
     {
         busy = true;
-        isError = false;
-        message = string.Empty;
+        setError(string.Empty);
         try
         {
             Session.Log.Debug("switch", $"{op}: start");
@@ -430,8 +533,7 @@ else
         }
         catch (Exception ex)
         {
-            isError = true;
-            message = ex.Message;
+            setError(ex.Message);
             Session.Log.Warn("switch", $"{op} failed: {ex.GetType().Name}");
         }
         finally
@@ -441,11 +543,5 @@ else
             newPassword = string.Empty;
             busy = false;
         }
-    }
-
-    private void Ok(string text)
-    {
-        isError = false;
-        message = text;
     }
 }

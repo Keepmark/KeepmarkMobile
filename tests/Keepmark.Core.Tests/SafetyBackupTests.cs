@@ -25,6 +25,8 @@ public sealed class SafetyBackupTests
     [InlineData(SafetyOperations.UploadLocal, "Connect")]
     [InlineData(SafetyOperations.ChangePassword, "Settings")]
     [InlineData(SafetyOperations.DuplicatesCleanup, "duplicates")]
+    [InlineData(SafetyOperations.SwitchMerge, "Switch service")]
+    [InlineData(SafetyOperations.ConnectMerge, "Connect")]
     [InlineData(SafetyOperations.PreRestore, "restore")]
     [InlineData("whatever", "Older")]
     public void Describe_NamesOperation(string op, string fragment)

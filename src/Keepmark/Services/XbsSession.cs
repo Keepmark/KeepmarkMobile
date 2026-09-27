@@ -155,6 +155,64 @@ public sealed class XbsSession : IAsyncDisposable
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
     }
 
+    /// <summary>Merge preview (dry-run): union counts without mutating
+    /// anything. Same pure function as the confirmed flow, so the preview
+    /// always matches the merge. Wrong password fails here with zero mutations.</summary>
+    public async Task<MergeStats> GetMergePreviewAsync(ReconcileInfo info, CancellationToken ct = default)
+    {
+        var remoteRoots = DecryptTree(info);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        _ = ct;
+        return BookmarkMerge.Merge(localRoots, remoteRoots).Stats;
+    }
+
+    /// <summary>Merges the local tree with the verified remote tree (two-way
+    /// union, never deletes) and uploads the result. Both sides are
+    /// safety-backed-up first (fail closed); a 409 surfaces honestly with both
+    /// snapshots intact. Password verified by decrypt before any mutation.</summary>
+    public async Task ApplyMergeAsync(ReconcileInfo info, string operation, CancellationToken ct = default)
+    {
+        var remoteRoots = DecryptTree(info);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var merged = BookmarkMerge.Merge(localRoots, remoteRoots);
+
+        await SaveSafetyBackupAsync("local",
+            System.Text.Json.JsonSerializer.Serialize(localRoots), operation,
+            CountBackupNodes(localRoots), info.Candidate.Id).ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote",
+            System.Text.Json.JsonSerializer.Serialize(remoteRoots), operation,
+            CountBackupNodes(remoteRoots), info.Candidate.Id).ConfigureAwait(false);
+
+        var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
+        await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
+        _log.Info("session", "Link: merging local + remote trees");
+        await Store!.RestoreLocalAsync(merged.Tree).ConfigureAwait(false);
+        await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
+        await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
+    }
+
+    /// <summary>Decrypts the verified remote blob into a tree. Throws on a
+    /// newer sync format or a wrong password — always before any mutation.</summary>
+    private List<BookmarkNode> DecryptTree(ReconcileInfo info)
+    {
+        if (info.RemoteVersion is not null &&
+            Core.XbsConstants.CompareVersions(info.RemoteVersion, Core.XbsConstants.SyncClientVersion) > 0)
+        {
+            throw new UnsupportedSyncVersionException(
+                _str.Get(Str.ErrUnsupportedSyncVersion, info.RemoteVersion));
+        }
+
+        var json = string.IsNullOrEmpty(info.RemoteBlob)
+            ? "[]"
+            : _crypto.Decrypt(info.RemoteBlob, info.Candidate.DerivedKey);
+        if (string.IsNullOrEmpty(json))
+        {
+            return [];
+        }
+
+        return System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(json) ?? [];
+    }
+
     /// <summary>Fresh/empty link: upload the current local mirror to the server.</summary>
     private async Task UploadMirrorAsync(SyncCredentials candidate, CancellationToken ct)
     {
@@ -902,7 +960,7 @@ public sealed record ReconcileInfo(
 /// <see cref="XbsSession.PendingSwitch"/>). Secrets are deliberately absent:
 /// passwords are always retyped after navigation.</summary>
 public sealed record SwitchDraft(
-    string TargetUrl, string Slot, string SyncId, bool TakeUpload,
+    string TargetUrl, string Slot, string SyncId, string Direction,
     ReconcileInfo? Probe, string? VerifiedFor, int Step);
 
 public sealed record BackupEnvelope(string App, int Format, string Salt, string Blob);
