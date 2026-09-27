@@ -817,14 +817,21 @@ html.xbs-locked, body.xbs-locked {
     width: 30px;
     height: 30px;
     border-radius: 50%;
-    background: #1b6ec2;
-    color: #fff;
+    background: var(--bs-body-bg, #fff);
+    color: #1b6ec2;
+    border: 1.5px solid #1b6ec2;
     font-size: 1.1rem;
     font-weight: 700;
-    line-height: 30px;
+    line-height: 28px;
     text-align: center;
-    opacity: 0.85;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    opacity: 0.95;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* Dark theme: lighter accent for contrast on dark surface. */
+[data-bs-theme="dark"] .xbs-go > span {
+    color: #6ea8fe;
+    border-color: #6ea8fe;
 }
 
 /* ↑ and ↓ share the single .xbs-go slot above the FAB. */
