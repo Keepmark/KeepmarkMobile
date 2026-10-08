@@ -1368,6 +1368,19 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 
 .xbs-sheet-desc { font-size: 0.9rem; margin-bottom: 0.5rem; overflow-wrap: anywhere; }
 
+/* Action sheet details: clamped until swiped right (.expanded), like rows. */
+.xbs-sheet-info { touch-action: pan-y; }
+.xbs-sheet-info:not(.expanded) .xbs-sheet-desc,
+.xbs-sheet-info:not(.expanded) .xbs-row-tags {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.xbs-sheet-info:not(.expanded) .xbs-row-tags { -webkit-line-clamp: 1; }
+.xbs-sheet-info.expanded .xbs-sheet-title { display: block; -webkit-line-clamp: unset; overflow-wrap: anywhere; }
+.xbs-sheet-info.expanded .xbs-sheet-url { white-space: normal; overflow-wrap: anywhere; }
+
 .xbs-actions { display: flex; flex-direction: column; margin: 0 -0.5rem; }
 
 .xbs-action {

@@ -26,6 +26,12 @@ window.xbsGestures = (() => {
     function onDown(e) {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (!e.target.closest) return;
+        // Action sheet details: horizontal swipe toggles the full text.
+        const info = e.target.closest('[data-sheet-info]');
+        if (info) {
+            state = { id: 0, kind: 'sheet', x0: e.clientX, y0: e.clientY, pointerId: e.pointerId, timer: null };
+            return;
+        }
         const row = e.target.closest('.xbs-row');
         const dup = !row ? e.target.closest('.xbs-duprow') : null;
         const el = row || dup;
@@ -71,6 +77,10 @@ window.xbsGestures = (() => {
         if (s.swiping) {
             const dx = s.dx || 0;
             suppressUntil = Date.now() + 400; // a swipe must never trigger the row tap
+            if (s.kind === 'sheet') {
+                if (Math.abs(dx) >= SWIPE_TRIGGER_PX) call(dotNet, 'OnSheetSwipe', dx > 0 ? 1 : -1);
+                return;
+            }
             const ref = s.kind === 'dup' ? dupRef : dotNet;
             const suffix = s.kind === 'dup' ? 'DupSwipeRight' : 'RowSwipeRight';
             const suffixL = s.kind === 'dup' ? 'DupSwipeLeft' : 'RowSwipeLeft';

@@ -205,6 +205,7 @@ else
     <div class="xbs-sheet-backdrop" @onclick="() => menuFor = null">
         <div class="xbs-sheet" role="dialog" aria-modal="true" aria-label="Actions for @(menuFor.Title ?? menuFor.Url ?? "item")" @onclick:stopPropagation="true">
             <div class="xbs-sheet-handle" aria-hidden="true"></div>
+            <div class="xbs-sheet-info @(MenuExpanded ? "expanded" : string.Empty)" data-sheet-info aria-expanded="@MenuExpanded.ToString().ToLowerInvariant()">
             <div class="xbs-sheet-head">
                 <RowTile Row="menuFor" Large="true" />
                 <div class="xbs-sheet-head-text">
@@ -220,6 +221,7 @@ else
                 @if (!string.IsNullOrEmpty(menuFor.Description)) { <p class="xbs-sheet-desc">@menuFor.Description</p> }
                 @if (!string.IsNullOrEmpty(menuFor.Tags)) { <p class="xbs-row-tags">#@menuFor.Tags.Replace("\u001F", " #") </p> }
             }
+            </div>
             <div class="xbs-actions">
                 @if (!menuFor.IsFolder)
                 {
@@ -493,6 +495,19 @@ else
             StateHasChanged();
         }
 
+        return Task.CompletedTask;
+    }
+
+    // Action sheet details: clamped by default; swipe right shows the full
+    // title/URL/description/tags, swipe left clamps again (same as rows).
+    private ItemRow? menuExpandedFor;
+    private bool MenuExpanded => menuFor is not null && ReferenceEquals(menuExpandedFor, menuFor);
+
+    [JSInvokable]
+    public Task OnSheetSwipe(int dir)
+    {
+        menuExpandedFor = dir > 0 ? menuFor : null;
+        StateHasChanged();
         return Task.CompletedTask;
     }
 
