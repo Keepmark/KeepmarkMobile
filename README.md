@@ -344,7 +344,6 @@ xBrowserSync `api` + `app` (also GPLv3) by the xBrowserSync team.
 This is an independent client, not affiliated with xBrowserSync.
 
 Project home (source, releases, issues): <https://github.com/Keepmark>.
-Contact: keepmark@proton.me.
 
 ## Disclaimer
 
