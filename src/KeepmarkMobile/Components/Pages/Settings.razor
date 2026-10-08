@@ -78,10 +78,6 @@
     <p class="text-muted">Re-encrypts the sync with a new password. Your current password is verified
         first and never leaves this device. The old password stops working on all devices
         immediately — update your vault and other devices.</p>
-    @if (!string.IsNullOrEmpty(pwError))
-    {
-        <div class="alert alert-danger" role="alert">@pwError</div>
-    }
     <div class="mb-3">
         <label class="form-label">Current password</label>
         <input type="password" class="form-control" @bind="pwCurrent" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />
@@ -104,6 +100,10 @@
                 <button class="btn btn-secondary" @onclick="() => armedPw = false" disabled="@pwBusy">Cancel</button>
             </div>
         </div>
+    }
+    @if (!string.IsNullOrEmpty(pwError))
+    {
+        <div class="alert alert-danger mt-2" role="alert">@pwError</div>
     }
     @if (pwDone)
     {

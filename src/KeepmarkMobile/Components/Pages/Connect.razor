@@ -17,6 +17,10 @@ else if (linked)
         Linked to <strong>@linkedUrl</strong> (sync <code>@ShortId(linkedId)</code>).
     </div>
     <p>To move to another service use <a href="switch-service">Move service</a>, to save or restore an encrypted copy use <a href="backup">Backup</a>.</p>
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert mt-2 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
+    }
 
     <hr />
     <h2>Unlink this device</h2>
@@ -39,15 +43,16 @@ else if (linked)
     {
         <div class="alert alert-danger mt-3" role="alert">@unlinkError</div>
     }
-    @if (!string.IsNullOrEmpty(message))
-    {
-        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
-    }
 }
 else
 {
     @if (mode is null)
     {
+        @* Outcome that brought us here (e.g. "Device unlinked"), shown at the top of the choice. *@
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert alert-success" role="status">@message</div>
+        }
         <p class="xbs-connect-lead">Keep your bookmarks in sync across devices, end-to-end encrypted. How do you want to start?</p>
         <div class="xbs-choices">
             <button class="xbs-choice" @onclick='() => Choose("existing")'>
@@ -157,6 +162,10 @@ else
                         <div class="form-text">Creates an empty sync on this service and links the app to it.</div>
                     }
                 </div>
+                @if (!string.IsNullOrEmpty(linkError))
+                {
+                    <div class="alert alert-danger mt-2" role="alert">@linkError</div>
+                }
             </div>
         }
     }
@@ -290,10 +299,6 @@ else
         </div>
     }
 
-    @if (!string.IsNullOrEmpty(message))
-    {
-        <div class="alert mt-3 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
-    }
 }
 
 @code {
@@ -337,6 +342,7 @@ else
     private void Choose(string value)
     {
         mode = value;
+        isError = false;
         linkError = string.Empty;
         message = string.Empty;
     }
@@ -439,7 +445,6 @@ else
         {
             serviceInfo = await Session.CheckServiceAsync(serviceUrl.Trim());
             AppSettings.ServiceUrl = serviceUrl.Trim();
-            Ok($"Service is valid: {serviceInfo.Status}, API v{serviceInfo.Version}.");
         }, err => checkError = err, "connect-check");
     }
 
@@ -471,7 +476,6 @@ else
             {
                 // Preselect the only sensible direction when one side is empty.
                 direction = reconcile.RemoteCount == 0 ? "upload" : "download";
-                Ok("Credentials valid. Choose the sync direction below.");
             }
         }, err => linkError = err, "connect-link");
     }

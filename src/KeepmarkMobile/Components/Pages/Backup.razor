@@ -32,10 +32,6 @@ else
     <div class="mb-3">
         <h4>Import</h4>
         <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
-        @if (!string.IsNullOrEmpty(impMessage))
-        {
-            <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")" role="@(impError ? "alert" : "status")">@impMessage</div>
-        }
         @if (impPath is not null)
         {
             <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
@@ -76,6 +72,10 @@ else
                     </div>
                 }
             }
+        }
+        @if (!string.IsNullOrEmpty(impMessage))
+        {
+            <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")" role="@(impError ? "alert" : "status")">@impMessage</div>
         }
     </div>
 
