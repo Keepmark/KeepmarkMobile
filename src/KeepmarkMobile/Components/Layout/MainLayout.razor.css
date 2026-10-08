@@ -12,7 +12,7 @@ main {
     background-color: #172552;
 }
 
-@media (min-width: 641px) {
+@media (min-width: 641px) and (min-height: 560px) {
     .page {
         flex-direction: row;
     }

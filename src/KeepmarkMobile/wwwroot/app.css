@@ -1466,7 +1466,7 @@ html.xbs-locked .xbs-go-chip { visibility: hidden; }
     color: var(--km-ink-2);
 }
 
-@media (min-width: 641px) {
+@media (min-width: 641px) and (min-height: 560px) {
     /* Wide screens: the drawer is the permanent sidebar. */
     .nav-scrollable,
     .nav-scrollable:not(.collapse) {

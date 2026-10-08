@@ -2,6 +2,8 @@
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
+using Android.Views;
+using AndroidX.Core.View;
 
 namespace KeepmarkMobile;
 
@@ -33,6 +35,8 @@ public class MainActivity : MauiAppCompatActivity
             // Cosmetic only: CSS inset math is the fallback.
         }
 
+        ApplySafeAreaPadding();
+
         Platforms.Android.ShareIntake.Handle(Intent);
 
         // Status bar follows the stored theme (white icons on dark).
@@ -57,6 +61,49 @@ public class MainActivity : MauiAppCompatActivity
         Platforms.Android.ShareIntake.Flush();
         NotifyLock(s => s.OnResumed(GetSettings()));
         ApplyStatusBar();
+    }
+
+    /// <summary>
+    /// targetSdk 35+ enforces edge-to-edge (SetDecorFitsSystemWindows is
+    /// ignored), and the WebView does not reliably report env(safe-area-*):
+    /// in landscape the side navigation bar covered the drawer, and with
+    /// adjustPan the keyboard shoved the whole page under the notch. Pad the
+    /// content root by system bars + cutout + IME and consume the insets, so
+    /// the WebView always sits inside the safe area and the keyboard resizes
+    /// it instead of panning. The strips behind the bars show the navy root.
+    /// </summary>
+    private void ApplySafeAreaPadding()
+    {
+        try
+        {
+            Window?.SetSoftInputMode(SoftInput.AdjustResize);
+            var root = FindViewById(global::Android.Resource.Id.Content);
+            if (root is null)
+            {
+                return;
+            }
+
+            root.SetBackgroundColor(global::Android.Graphics.Color.ParseColor("#172552"));
+            ViewCompat.SetOnApplyWindowInsetsListener(root, new SafeAreaInsetsListener());
+            ViewCompat.RequestApplyInsets(root);
+        }
+        catch
+        {
+            // Fall back to the CSS env() inset math.
+        }
+    }
+
+    private sealed class SafeAreaInsetsListener : Java.Lang.Object, IOnApplyWindowInsetsListener
+    {
+        public WindowInsetsCompat OnApplyWindowInsets(global::Android.Views.View v, WindowInsetsCompat insets)
+        {
+            var bars = insets.GetInsets(
+                WindowInsetsCompat.Type.SystemBars()
+                | WindowInsetsCompat.Type.DisplayCutout()
+                | WindowInsetsCompat.Type.Ime());
+            v.SetPadding(bars.Left, bars.Top, bars.Right, bars.Bottom);
+            return WindowInsetsCompat.Consumed!;
+        }
     }
 
     private static void ApplyStatusBar()

@@ -76,7 +76,7 @@
     flex-shrink: 0;
 }
 
-@media (min-width: 641px) {
+@media (min-width: 641px) and (min-height: 560px) {
     .navbar-toggler {
         display: none;
     }
