@@ -1,7 +1,7 @@
 # Keepmark — Regole di design, stili e comportamento
 
 Documento normativo per chi estende l'app. Le regole qui descritte sono
-ricavate dal codice esistente (`src/Keepmark`, `wwwroot/app.css`) e vanno
+ricavate dal codice esistente (`src/KeepmarkMobile`, `wwwroot/app.css`) e vanno
 seguite per ogni nuova funzionalità. Eccezioni solo con motivazione esplicita.
 
 ---

@@ -1,0 +1,376 @@
+@page "/status"
+@inject KeepmarkMobile.Services.XbsSession Session
+@inject KeepmarkMobile.Services.XbsSettings AppSettings
+@inject KeepmarkMobile.Services.SecureCredentialStore Creds
+@implements IDisposable
+
+<PageTitle>Status</PageTitle>
+
+<h1>Status</h1>
+
+@if (!loaded)
+{
+    <p role="status"><em>Loading…</em></p>
+}
+else
+{
+    @if (status == Core.Sync.SyncStatus.Syncing)
+    {
+        <div class="alert alert-info" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Sync in progress… values below refresh when it finishes.</div>
+    }
+
+    @if (!string.IsNullOrEmpty(conflictResult))
+    {
+        <div class="alert alert-success" role="status">@conflictResult</div>
+    }
+
+    @if (status == Core.Sync.SyncStatus.Conflict)
+    {
+        <div class="alert alert-warning" role="alert">
+            <h4>Sync conflict</h4>
+            <p>The server has newer changes. Your local changes could not be pushed.</p>
+            <div class="d-grid gap-2 mt-2">
+                <button class="btn btn-outline-primary" @onclick="ShowConflictDetails" disabled="@busy">Show details & resolve…</button>
+            </div>
+        </div>
+    }
+
+    <h3>Synchronization</h3>
+    <ul>
+        <li>Mode: @AppSettings.Mode</li>
+        <li>State: @status</li>
+        <li>Last sync: @(lastSync?.ToString("u") ?? "never")</li>
+        <li>Service: @(serviceUrl ?? "not linked")</li>
+        <li>Service version: @(serviceVersion ?? (serviceUrl is null ? "—" : "unknown (offline?)"))</li>
+    </ul>
+
+    @if (showConflictDetails && conflictPreview is not null)
+    {
+        <div class="card mt-3 border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">Conflict resolution</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Server copy updated <strong>@FormatRelative(conflictPreview.RemoteLastUpdated)</strong> · Local has <strong>@conflictPreview.LocalCount</strong> items · Server has <strong>@conflictPreview.RemoteCount</strong> items</p>
+
+                <dl class="row mb-3">
+                    <dt class="col-sm-6">Local only → will upload</dt><dd class="col-sm-6">@conflictPreview.LocalOnly</dd>
+                    <dt class="col-sm-6">Server only → will download</dt><dd class="col-sm-6">@conflictPreview.RemoteOnly</dd>
+                    <dt class="col-sm-6">Title conflicts (server wins)</dt><dd class="col-sm-6">@conflictPreview.TitleConflicts</dd>
+                    <dt class="col-sm-6">Folders created</dt><dd class="col-sm-6">@conflictPreview.FoldersCreated</dd>
+                    <dt class="col-sm-6">Separators kept from both</dt><dd class="col-sm-6">@conflictPreview.SeparatorsAdopted</dd>
+                </dl>
+
+                @if (armedDirection is null)
+                {
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Pull)" disabled="@busy">
+                            Download — replace local with the server copy (@conflictPreview.RemoteCount items)…
+                        </button>
+                        <button class="btn btn-outline-primary" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Push)" disabled="@busy">
+                            Upload — replace the server copy with local (@conflictPreview.LocalCount items)…
+                        </button>
+                        <button class="btn btn-outline-warning" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Merge)" disabled="@busy">
+                            Merge — keep both sides, nothing deleted…
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-secondary" role="alert">
+                        <p class="mb-2">@ConfirmText(armedDirection.Value)</p>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-danger" @onclick="() => ResolveConflict(armedDirection.Value)" disabled="@busy">@ConfirmLabel(armedDirection.Value)</button>
+                            <button class="btn btn-secondary" @onclick="() => armedDirection = null" disabled="@busy">Cancel</button>
+                        </div>
+                    </div>
+                }
+
+                @if (busy)
+                {
+                    <div class="text-center mt-2">
+                        <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Resolving…</span></div>
+                        <span class="ms-2">Resolving conflict…</span>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(conflictError))
+                {
+                    <div class="alert alert-danger mt-2" role="alert">@conflictError</div>
+                }
+
+                <div class="text-end mt-2">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => { showConflictDetails = false; armedDirection = null; }" disabled="@busy">Cancel</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <h3>Storage</h3>
+    <ul>
+        <li>Local database: @FormatBytes(dbSize)</li>
+        <li>Server copy (last sync): @(serverBytes is null ? "never synced" : FormatBytes(serverBytes.Value))
+            @if (serverBytes is not null)
+            {
+                <text> of @(maxSyncSize is null ? "unknown max (offline?)" : FormatBytes(maxSyncSize.Value))</text>
+                @if (maxSyncSize is not null && maxSyncSize.Value > 0)
+                {
+                    <text> (@ServerPctText%)</text>
+                    <div class="progress mt-1" role="progressbar" aria-label="Service space used" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="width: @ServerPctText%"></div>
+                    </div>
+                }
+            }
+            <small class="text-muted"> — exact bytes your sync occupies on the service</small></li>
+        <li>Pending edits: @pending
+            @if (pending > 0)
+            {
+                <small class="text-muted"> — server figure predates them</small>
+            }
+        </li>
+    </ul>
+
+    <h3>Content</h3>
+    <ul>
+        <li>Folders: @stats?.Folders · Bookmarks: @stats?.Bookmarks · Separators: @stats?.Separators</li>
+        <li>Distinct tags: @stats?.DistinctTags · Max depth: @stats?.MaxDepth · Duplicate URLs: @stats?.DuplicateUrls
+            @if ((stats?.DuplicateUrls ?? 0) > 0)
+            {
+                <text> <a href="duplicates">Resolve →</a></text>
+            }
+        </li>
+    </ul>
+
+    <h3>App</h3>
+    <ul>
+        <li>Version: @AppInfo.VersionString (build @AppInfo.BuildString)</li>
+        <li>Sync format: @Core.XbsConstants.SyncClientVersion · API: @Core.XbsConstants.ApiVersion</li>
+    </ul>
+}
+
+@code {
+    private bool loaded;
+    private Core.Sync.SyncStatus status;
+    private DateTimeOffset? lastSync;
+    private long dbSize;
+    private long? serverBytes;
+    private long? maxSyncSize;
+    private int pending;
+    private string? serviceUrl;
+    private string? serviceVersion;
+    private Core.Data.ContentStats? stats;
+
+    // Conflict resolution state
+    private bool showConflictDetails;
+    private Core.Sync.MergeStats? conflictPreview;
+    private bool busy;
+    private string? conflictError;
+    private string? conflictResult;
+    /// <summary>Armed destructive choice (R8.2): first tap arms, the inline
+    /// confirm button runs it.</summary>
+    private Core.Sync.ConflictResolutionDirection? armedDirection;
+
+    private void Arm(Core.Sync.ConflictResolutionDirection d)
+    {
+        armedDirection = d;
+        conflictError = null;
+    }
+
+    private static string ConfirmText(Core.Sync.ConflictResolutionDirection d) => d switch
+    {
+        Core.Sync.ConflictResolutionDirection.Pull => "Replace your local bookmarks with the server copy? Your local bookmarks are saved to Backup → Safety backups first.",
+        Core.Sync.ConflictResolutionDirection.Push => "Replace the server copy with your local bookmarks? The server copy is saved to Backup → Safety backups first.",
+        _ => "Merge both sides into one tree (nothing is deleted) and upload it? Both sides are saved to Backup → Safety backups first.",
+    };
+
+    private static string ConfirmLabel(Core.Sync.ConflictResolutionDirection d) => d switch
+    {
+        Core.Sync.ConflictResolutionDirection.Pull => "Yes, download",
+        Core.Sync.ConflictResolutionDirection.Push => "Yes, upload",
+        _ => "Yes, merge",
+    };
+
+    private static string ResultText(Core.Sync.ConflictResolutionDirection d) => d switch
+    {
+        Core.Sync.ConflictResolutionDirection.Pull => "Conflict resolved: downloaded the server copy. Your previous local bookmarks are in Backup → Safety backups.",
+        Core.Sync.ConflictResolutionDirection.Push => "Conflict resolved: uploaded your local bookmarks. The previous server copy is in Backup → Safety backups.",
+        _ => "Conflict resolved: merged both sides (nothing deleted). Both previous sides are in Backup → Safety backups.",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        serviceUrl = (await Creds.GetAsync())?.ServiceUrl;
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnEngine;
+            Session.Engine.DataChanged += OnEngineData;
+        }
+
+        await LoadAsync();
+        await LoadServiceAsync();
+        loaded = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        if (Session is { Store: not null, Engine: not null })
+        {
+            status = Session.Engine.Status;
+            lastSync = Session.Engine.LastSyncAt;
+            pending = Session.Engine.PendingEdits;
+            dbSize = Session.Store.GetFileSize();
+            // The service stores exactly this blob: base64 ASCII, so chars == bytes.
+            // It reflects the last sync (see Pending edits above).
+            var (_, blob, _, _) = await Session.Store.LoadMirrorAsync();
+            serverBytes = blob is null ? null : (long?)blob.Length;
+            stats = await Session.Store.GetStatsAsync();
+
+            // If in conflict, load merge preview for the resolution UI
+            if (status == Core.Sync.SyncStatus.Conflict && !showConflictDetails)
+            {
+                await LoadConflictPreviewAsync();
+            }
+        }
+    }
+
+    private async Task LoadConflictPreviewAsync()
+    {
+        if (Session.Engine is null) return;
+        try
+        {
+            conflictPreview = await Session.Engine.GetConflictMergePreviewAsync();
+        }
+        catch (Exception ex)
+        {
+            conflictError = ex.Message;
+        }
+    }
+
+    private async Task ShowConflictDetails()
+    {
+        showConflictDetails = true;
+        if (conflictPreview is null)
+        {
+            await LoadConflictPreviewAsync();
+        }
+    }
+
+    private async Task ResolveConflict(Core.Sync.ConflictResolutionDirection direction)
+    {
+        if (Session.Engine is null) return;
+        busy = true;
+        conflictError = null;
+        conflictResult = null;
+        Session.Log.Info("status", $"Resolve conflict: {direction}");
+        try
+        {
+            switch (direction)
+            {
+                case Core.Sync.ConflictResolutionDirection.Pull:
+                    await Session.Engine.ResolveConflictPullAsync();
+                    break;
+                case Core.Sync.ConflictResolutionDirection.Push:
+                    await Session.Engine.ResolveConflictPushAsync();
+                    break;
+                case Core.Sync.ConflictResolutionDirection.Merge:
+                    await Session.Engine.ResolveConflictMergeAsync();
+                    break;
+            }
+            showConflictDetails = false;
+            conflictPreview = null;
+            armedDirection = null;
+            conflictResult = ResultText(direction);
+            await LoadAsync(); // Refresh status
+        }
+        catch (Exception ex)
+        {
+            conflictError = ex.Message;
+            armedDirection = null;
+            Session.Log.Error("status", $"Conflict resolution failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string FormatRelative(string? isoUtc)
+    {
+        if (string.IsNullOrEmpty(isoUtc) || !DateTimeOffset.TryParse(isoUtc, out var dto))
+            return "unknown time";
+        var diff = DateTimeOffset.UtcNow - dto;
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes} min ago";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours} h ago";
+        return $"{(int)diff.TotalDays} d ago";
+    }
+
+    /// <summary>Service quota + version, fetched once per visit (not on every
+    /// sync event). An offline service leaves max/version unknown.</summary>
+    private async Task LoadServiceAsync()
+    {
+        if (string.IsNullOrEmpty(serviceUrl))
+        {
+            return;
+        }
+
+        try
+        {
+            var info = await Session.CheckServiceAsync(serviceUrl);
+            maxSyncSize = info.MaxSyncSize;
+            serviceVersion = info.Version;
+        }
+        catch
+        {
+            maxSyncSize = null;
+            serviceVersion = null;
+        }
+    }
+
+    private void OnEngine(Core.Sync.SyncStatus _) => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+    private void OnEngineData() => InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+
+    /// <summary>Server quota usage as "14.9" (InvariantCulture, clamped).
+    /// Computed in code, not in markup: explicit Razor `@(...)` expressions
+    /// end at the first `)`, so a trailing `.ToString(...)` would leak into
+    /// the rendered text (seen live as `14,89….ToString("0.#")`).</summary>
+    private string ServerPctText =>
+        serverBytes is null || maxSyncSize is null || maxSyncSize.Value <= 0
+            ? "0"
+            : Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value)
+                .ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Same quota usage as a number for aria-valuenow (clamped 0–100).</summary>
+    private double ServerPctNow =>
+        serverBytes is null || maxSyncSize is null || maxSyncSize.Value <= 0
+            ? 0
+            : Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value);
+
+    private static string FormatBytes(long bytes)    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        if (bytes < 1024L * 1024)
+        {
+            return $"{bytes / 1024.0:0.#} KB";
+        }
+
+        return $"{bytes / (1024.0 * 1024):0.##} MB";
+    }
+
+    public void Dispose()
+    {
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnEngine;
+            Session.Engine.DataChanged -= OnEngineData;
+        }
+    }
+}

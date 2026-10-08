@@ -10,7 +10,7 @@ Quick reminders (details in README):
 - Own git repo (`KeepmarkMobile/`, branch `master`); the parent dir is not a repo.
 - Builds need `ANDROID_HOME`, `JAVA_HOME=$HOME/jdk-21` first on `PATH`.
 - Every user-facing change bumps `ApplicationDisplayVersion`/`ApplicationVersion`
-  in `src/Keepmark/Keepmark.csproj` (+ `?v=` in `wwwroot/index.html` for CSS/JS),
+  in `src/KeepmarkMobile/KeepmarkMobile.csproj` (+ `?v=` in `wwwroot/index.html` for CSS/JS),
   commit as `v1.0.N (M): description`, push. Docs-only changes don't bump.
 - Never touch `src/Keepmark.Core/Crypto/` without running both interop checks.
 - `SyncEngine`: every `_gate.WaitAsync()` releases in `finally`; never silently

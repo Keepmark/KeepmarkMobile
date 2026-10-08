@@ -1,0 +1,551 @@
+@page "/switch-service"
+@page "/migrate"
+@inject KeepmarkMobile.Services.XbsSession Session
+@inject KeepmarkMobile.Services.XbsSettings AppSettings
+@inject KeepmarkMobile.Services.ToastState Toast
+@inject KeepmarkMobile.Services.SecureCredentialStore Creds
+@inject NavigationManager Nav
+
+<PageTitle>Move service</PageTitle>
+
+<h1>Move to another service</h1>
+<p class="text-muted">Move your current local bookmarks to a different xBrowserSync service, into a new or an existing sync. Your local data is never deleted by this wizard.</p>
+
+@if (!Session.Ready)
+{
+    <p role="status"><em>Starting…</em></p>
+}
+else if (!linked)
+{
+    <div class="alert alert-info">
+        <strong>No service linked yet.</strong>
+        Switch moves an existing connection to another service —
+        <a href="connect">connect a service first</a>, then come back here.
+    </div>
+}
+else if (step == 4)
+{
+    <div class="alert alert-success" role="status">
+        <h4>Move complete</h4>
+        @if (createdId is not null)
+        {
+            <p>New sync created on <strong>@targetUrl</strong> with your @localCount item(s).</p>
+            <p>Your new sync ID (save it together with the password — both are needed to open the sync elsewhere):</p>
+            <p><code>@createdId</code></p>
+            <button class="btn btn-secondary" @onclick="CopyId">Copy sync ID</button>
+        }
+        else if (tookRemote)
+        {
+            <p>Your local tree was replaced with the server item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local bookmarks was saved — see Backup → Safety backups.</p>
+        }
+        else if (direction == "merge")
+        {
+            <p>@Core.Sync.MoveResult.Describe("existing", "merge", targetUrl, ShortId(probe?.Candidate.Id)) Safety backups of both sides were saved — see Backup → Safety backups.</p>
+        }
+        else
+        {
+            <p>Your @localCount local item(s) replaced the @probe?.RemoteCount server item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten server copy was saved — see Backup → Safety backups.</p>
+        }
+    </div>
+    <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/")'>Back to Explore</button>
+}
+else
+{
+    <ol class="mb-3 text-muted">
+        <li><strong class="@(step == 1 ? "text-body" : string.Empty)">Target service</strong></li>
+        <li><strong class="@(step == 2 ? "text-body" : string.Empty)">Target sync</strong></li>
+        <li><strong class="@(step == 3 ? "text-body" : string.Empty)">Review &amp; move</strong></li>
+    </ol>
+
+    @if (step == 1)
+    {
+        <div class="mb-3">
+            <label class="form-label">Target service URL</label>
+            <input class="form-control" @bind="targetUrl" inputmode="url" />
+            <div class="form-text">The service that will receive your bookmarks. Check verifies it answers with a compatible API version. Your current link (if any) keeps working untouched until the move completes.</div>
+            <div class="mt-2 d-flex gap-2">
+                <button class="btn btn-secondary" @onclick="CheckService" disabled="@busy">Check service</button>
+                <button class="btn btn-primary" @onclick="() => step = 2" disabled="@(busy || !serviceOk)">Continue</button>
+            </div>
+            @if (serviceInfo is not null)
+            {
+                <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version)</p>
+            }
+            @if (!string.IsNullOrEmpty(checkError))
+            {
+                <div class="alert alert-danger mt-2" role="alert">@checkError</div>
+            }
+        </div>
+    }
+    else if (step == 2)
+    {
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="slot" id="slotNew" checked="@(slot == "new")" @onchange='() => slot = "new"' />
+                <label class="form-check-label" for="slotNew"><strong>New sync</strong> — create it and upload my @localCount item(s).</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="slot" id="slotExisting" checked="@(slot == "existing")" @onchange='() => slot = "existing"' />
+                <label class="form-check-label" for="slotExisting"><strong>Existing sync</strong> — link it and choose the direction below.</label>
+            </div>
+        </div>
+
+        @if (slot == "new")
+        {
+            <div class="mb-3">
+                <label class="form-label">New password</label>
+                <input type="password" class="form-control" @bind="newPassword" autocomplete="new-password" />
+                <label class="form-label mt-2">Confirm password</label>
+                <input type="password" class="form-control" @bind="confirmPassword" autocomplete="new-password" />
+                <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered.</div>
+            </div>
+        }
+        else
+        {
+            @if (!VerifiedExisting)
+            {
+                <div class="mb-3">
+                    <label class="form-label">Sync ID on the target service</label>
+                    <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+                    <label class="form-label mt-2">Password</label>
+                    <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
+                    <div class="form-text">Verified against the server copy first: a wrong password stops here, nothing is overwritten.</div>
+                    <button class="btn btn-secondary mt-2" @onclick="VerifyExisting" disabled="@busy">Verify</button>
+                    @if (!string.IsNullOrEmpty(verifyError))
+                    {
+                        <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-success" role="status">
+                    Sync <code>@ShortId(probe?.Candidate.Id)</code> opened — @probe?.RemoteCount server item(s),
+                    password verified and cleared.
+                    <div class="mt-2">
+                        <button class="btn btn-outline-secondary" @onclick="Unverify" disabled="@busy">Use a different sync…</button>
+                    </div>
+                </div>
+            }
+            @if (VerifiedExisting)
+            {
+                <div class="alert alert-warning mt-2">
+                    <h4>Choose sync direction</h4>
+                    <p>Local holds <strong>@localCount</strong> item(s); server holds <strong>@probe.RemoteCount</strong> item(s).</p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(direction == "take")" disabled="@busy" @onchange='() => SetDirection("take")' />
+                        <label class="form-check-label" for="dirDown"><strong>Download</strong> — replace the bookmarks on this device with the server copy (safe default)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@(direction == "upload")" disabled="@(busy || localCount == 0)" @onchange='() => SetDirection("upload")' />
+                        <label class="form-check-label" for="dirUp"><strong>Upload</strong> — replace the server copy with the bookmarks on this device</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="migdir" id="dirMerge" checked="@(direction == "merge")" disabled="@(busy || localCount == 0 || probe.RemoteCount == 0)" @onchange='() => SetDirection("merge")' />
+                        <label class="form-check-label" for="dirMerge"><strong>Merge</strong> — keep everything from both sides (nothing is deleted)</label>
+                    </div>
+                    @if (direction == "take")
+                    {
+                        <div class="alert alert-danger mt-2 mb-0">
+                            <strong>Your @localCount local item(s) will be deleted</strong> and replaced with the
+                            @probe.RemoteCount server item(s). A plaintext safety backup of your current local tree
+                            is saved first, and the app re-links to this sync.
+                        </div>
+                    }
+                    else if (direction == "upload")
+                    {
+                        <div class="alert alert-danger mt-2 mb-0">
+                            <strong>The @probe.RemoteCount server item(s) will be overwritten</strong> with your
+                            @localCount local item(s). A plaintext safety backup of the server copy is saved first,
+                            and the app re-links to this sync.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info mt-2 mb-0">
+                            <strong>Merge keeps everything from both sides — nothing is deleted.</strong>
+                            Local-only bookmarks upload, server-only ones download; same-URL
+                            title conflicts keep the server title.
+                            <div class="mt-2">
+                                <button class="btn btn-secondary" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
+                            </div>
+                            @if (mergeStats is not null)
+                            {
+                                <p class="mt-2 mb-0" role="status">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
+                                    @mergeStats.RemoteOnly remote will download (of @mergeStats.RemoteCount),
+                                    @mergeStats.TitleConflicts title conflicts (server title kept),
+                                    @mergeStats.FoldersCreated folders created,
+                                    @mergeStats.SeparatorsAdopted separators kept from both sides.</p>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-secondary" @onclick="() => step = 1" disabled="@busy">Back</button>
+            <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">Review</button>
+            <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
+        </div>
+        @if (slot == "new" && !string.IsNullOrEmpty(verifyError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+        }
+    }
+    else
+    {
+        @if (resumed)
+        {
+            <div class="alert alert-info" role="status">
+                Resumed your unfinished switch — counts may have changed while you were away;
+                press Verify again if in doubt, or Start over below.
+            </div>
+        }
+        <div class="alert alert-info" role="status">
+            <h4>Review</h4>
+            @if (slot == "new")
+            {
+                <p>Create a <strong>new sync</strong> on <strong>@targetUrl</strong> and upload your <strong>@localCount</strong> local item(s) into it. The app re-links to the new sync.</p>
+            }
+            else if (direction == "upload")
+            {
+                <p>Replace the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> with your <strong>@localCount</strong> local item(s). Server copy backed up first; the app re-links to that sync.</p>
+            }
+            else if (direction == "merge")
+            {
+                @if (mergeStats is not null)
+                {
+                    <p>Merge your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>: @mergeStats.LocalOnly will upload, @mergeStats.RemoteOnly will download, @mergeStats.TitleConflicts title conflicts keep the server title. Nothing is deleted. Safety backups of both sides saved first; the app re-links to that sync.</p>
+                }
+                else
+                {
+                    <p>Merge with sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> — go back and press Preview merge first.</p>
+                }
+            }
+            else
+            {
+                <p>Replace your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>. Local bookmarks backed up first; the app re-links to that sync.</p>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-secondary" @onclick="() => step = 2" disabled="@busy">Back</button>
+            <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Move now</button>
+            <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
+        </div>
+        @if (!string.IsNullOrEmpty(reviewError))
+        {
+            <div class="alert alert-danger mt-3" role="alert">@reviewError</div>
+        }
+    }
+}
+
+
+@code {
+    private int step = 1;
+    private string targetUrl = Core.XbsConstants.DefaultServiceUrl;
+    private Core.Api.ServiceInfoResponse? serviceInfo;
+    private string? checkedUrl;
+    private string slot = "new";
+    private string newPassword = string.Empty;
+    private string confirmPassword = string.Empty;
+    private string syncId = string.Empty;
+    private string password = string.Empty;
+    private Services.ReconcileInfo? probe;
+    private string? verifiedFor;
+    /// <summary>Migration direction: "take" = take remote (safe default),
+    /// "upload" = upload local over the remote, "merge" = union (never deletes).</summary>
+    private string direction = "take";
+    private Core.Sync.MergeStats? mergeStats;
+    private Services.ReconcileInfo? mergeStatsFor;
+    private bool tookRemote;
+    private string? createdId;
+    private int localCount;
+    private bool busy;
+    private string checkError = string.Empty;
+    private string verifyError = string.Empty;
+    private string reviewError = string.Empty;
+    private bool linked;
+    private bool resumed;
+
+    private bool serviceOk =>
+        serviceInfo is not null && checkedUrl == targetUrl.Trim();
+
+    protected override async Task OnInitializedAsync()
+    {
+        for (int i = 0; i < 100 && !Session.Ready; i++)
+        {
+            await Task.Delay(100);
+        }
+
+        if (Session.Store is not null)
+        {
+            var stats = await Session.Store.GetStatsAsync();
+            localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+        }
+
+        linked = await Creds.GetAsync() is not null;
+
+        // Resume an unfinished wizard (user went to inspect the bookmarks
+        // mid-review): secrets were never stored, the probe survives.
+        if (Session.PendingSwitch is { } draft)
+        {
+            targetUrl = draft.TargetUrl;
+            slot = draft.Slot;
+            syncId = draft.SyncId;
+            direction = draft.Direction is "upload" or "merge" ? draft.Direction : "take";
+            probe = draft.Probe;
+            verifiedFor = draft.VerifiedFor;
+            step = draft.Step is >= 2 and <= 3 ? draft.Step : 2;
+            resumed = probe is not null;
+        }
+    }
+
+    private static string ShortId(string? id) =>
+        id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
+
+    /// <summary>Changing direction invalidates the merge preview (counts must
+    /// always match the verified sync + direction).</summary>
+    private void SetDirection(string value)
+    {
+        direction = value;
+        mergeStats = null;
+        mergeStatsFor = null;
+        verifyError = string.Empty;
+    }
+
+    private bool CanReview() => slot == "new"
+        ? newPassword.Length > 0 && confirmPassword.Length > 0
+        : probe is not null && verifiedFor == $"{targetUrl.Trim()}|{syncId.Trim()}";
+
+    /// <summary>An existing sync stays verified only for the exact ID it was
+    /// verified with: editing the ID (or URL) brings the credential inputs
+    /// back automatically.</summary>
+    private bool VerifiedExisting =>
+        probe is not null && verifiedFor == $"{targetUrl.Trim()}|{syncId.Trim()}";
+
+    private void Unverify()
+    {
+        probe = null;
+        verifiedFor = null;
+        mergeStats = null;
+        mergeStatsFor = null;
+    }
+
+    private async Task CheckService()
+    {
+        await RunStepAsync(async () =>
+        {
+            serviceInfo = await Session.CheckServiceAsync(targetUrl.Trim());
+            checkedUrl = targetUrl.Trim();
+            resumed = false;
+            SaveDraft();
+        }, err => checkError = err, "switch-check");
+    }
+
+    private async Task VerifyExisting()
+    {
+        await RunStepAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
+            {
+                throw new InvalidOperationException("Enter both the sync ID and its password.");
+            }
+
+            probe = await Session.ProbeLinkAsync(targetUrl.Trim(), syncId.Trim(), password);
+            verifiedFor = $"{targetUrl.Trim()}|{syncId.Trim()}";
+            direction = "take";
+            mergeStats = null;
+            mergeStatsFor = null;
+            tookRemote = false;
+            resumed = false;
+            SaveDraft();
+        }, err => verifyError = err, "switch-verify");
+    }
+
+    private async Task PreviewMerge()
+    {
+        await RunStepAsync(async () =>
+        {
+            if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
+            {
+                throw new InvalidOperationException("Verify the existing sync first.");
+            }
+
+            mergeStats = await Session.GetMergePreviewAsync(probe);
+            mergeStatsFor = probe;
+        }, err => verifyError = err, "switch-merge-preview");
+    }
+
+    private void GoReview()
+    {
+        try
+        {
+            if (slot == "new")
+            {
+                RequireMatchingPasswords(newPassword, confirmPassword);
+            }
+            else if (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe)))
+            {
+                throw new InvalidOperationException("Preview the merge first — counts must match the verified sync.");
+            }
+
+            verifyError = string.Empty;
+            reviewError = string.Empty;
+            resumed = false;
+            step = 3;
+            SaveDraft();
+        }
+        catch (Exception ex)
+        {
+            verifyError = ex.Message;
+            Session.Log.Warn("switch", $"GoReview failed: {ex.GetType().Name}");
+        }
+    }
+
+    /// <summary>Snapshots the wizard (without secrets) so leaving the page
+    /// to inspect the bookmarks doesn't lose the review.</summary>
+    private void SaveDraft()
+    {
+        Session.PendingSwitch = new Services.SwitchDraft(
+            targetUrl.Trim(), slot, syncId.Trim(), direction, probe, verifiedFor, step);
+    }
+
+    private void StartOver()
+    {
+        Session.PendingSwitch = null;
+        step = 1;
+        slot = "new";
+        syncId = string.Empty;
+        password = string.Empty;
+        newPassword = string.Empty;
+        confirmPassword = string.Empty;
+        probe = null;
+        verifiedFor = null;
+        mergeStats = null;
+        mergeStatsFor = null;
+        direction = "take";
+        tookRemote = false;
+        createdId = null;
+        serviceInfo = null;
+        checkedUrl = null;
+        resumed = false;
+        checkError = string.Empty;
+        verifyError = string.Empty;
+        reviewError = string.Empty;
+    }
+
+    private async Task Execute()
+    {
+        await RunStepAsync(async () =>
+        {
+            if (!serviceOk)
+            {
+                throw new InvalidOperationException("Re-check the target service first.");
+            }
+
+            tookRemote = false;
+            createdId = null;
+
+            if (slot == "new")
+            {
+                RequireMatchingPasswords(newPassword, confirmPassword);
+                createdId = await Session.CreateNewSyncWithUploadAsync(targetUrl.Trim(), newPassword);
+            }
+            else
+            {
+                if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
+                {
+                    throw new InvalidOperationException("Verify the existing sync first.");
+                }
+
+                if (direction == "upload")
+                {
+                    await Session.ApplyLocalAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchUpload);
+                }
+                else if (direction == "merge")
+                {
+                    if (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe))
+                    {
+                        throw new InvalidOperationException("Preview the merge first — counts must match the verified sync.");
+                    }
+
+                    await Session.ApplyMergeAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchMerge);
+                }
+                else
+                {
+                    await Session.ApplyRemoteAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchTakeRemote);
+                    tookRemote = true;
+                }
+            }
+
+            AppSettings.ServiceUrl = targetUrl.Trim();
+            newPassword = string.Empty;
+            step = 4;
+            Session.PendingSwitch = null;
+            Session.Log.Info("switch", createdId is not null
+                ? "Move complete: new sync created and uploaded"
+                : direction == "merge" ? "Move complete: merged both sides"
+                : tookRemote ? "Move complete: downloaded the server copy" : "Move complete: uploaded local bookmarks");
+        }, err => reviewError = err, "switch-execute");
+    }
+
+    private async Task CopyId()
+    {
+        if (createdId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Clipboard.Default.SetTextAsync(createdId);
+            _ = Toast.ShowAsync("Sync ID copied — store it with the password");
+        }
+        catch
+        {
+            _ = Toast.ShowAsync("Copy failed — transcribe the ID manually", isError: true);
+        }
+    }
+
+    private static void RequireMatchingPasswords(string first, string second)
+    {
+        if (first.Length < 8)
+        {
+            throw new InvalidOperationException("Use a password of at least 8 characters.");
+        }
+
+        if (!string.Equals(first, second, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Passwords do not match.");
+        }
+    }
+
+
+    /// <summary>One action cluster, one adjacent error box: each wizard step
+    /// reports into its own field (check/verify/review) rendered next to the
+    /// button that produced it, instead of a single shared box.</summary>
+    private async Task RunStepAsync(Func<Task> action, Action<string> setError, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
+    {
+        busy = true;
+        setError(string.Empty);
+        try
+        {
+            Session.Log.Debug("switch", $"{op}: start");
+            await action();
+            Session.Log.Debug("switch", $"{op}: ok");
+        }
+        catch (Exception ex)
+        {
+            setError(ex.Message);
+            Session.Log.Warn("switch", $"{op} failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            password = string.Empty;
+            confirmPassword = string.Empty;
+            newPassword = string.Empty;
+            busy = false;
+        }
+    }
+}

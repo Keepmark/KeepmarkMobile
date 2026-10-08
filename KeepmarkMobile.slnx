@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Keepmark.Core/Keepmark.Core.csproj" />
+    <Project Path="src/KeepmarkMobile/KeepmarkMobile.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Keepmark.Core.Tests/Keepmark.Core.Tests.csproj" />
+  </Folder>
+</Solution>

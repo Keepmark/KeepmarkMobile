@@ -6,11 +6,11 @@
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
 xBrowserSync API **v1.1.13**. Current version: **v1.0.110 (111)**,
-app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
+app id `com.keepmark.mobile`, display name `Keepmark`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
-is NOT a git repo). Solution `Keepmark.slnx`:
-`src/Keepmark` (MAUI Blazor, `net10.0-android` only, min API 29),
+is NOT a git repo). Solution `KeepmarkMobile.slnx`:
+`src/KeepmarkMobile` (MAUI Blazor, `net10.0-android` only, min API 29),
 `src/Keepmark.Core` (net10.0, UI-free logic),
 `tests/Keepmark.Core.Tests` (xUnit).
 
@@ -27,6 +27,11 @@ is NOT a git repo). Solution `Keepmark.slnx`:
 - Top bar: single fixed bar with brand mark left + hamburger right (fixed, not
   sticky: the `.sidebar` parent is only as tall as the bar, so sticky had zero
   room and scrolled away);
+- Renamed v1.0.116: project/namespace/folder `src/Keepmark` → `src/KeepmarkMobile`
+  (`KeepmarkMobile.slnx`, `KeepmarkMobile.csproj`, root namespace `KeepmarkMobile`;
+  the library stays `Keepmark.Core`, aliased as `Core` in `GlobalUsings.cs`), app id
+  `com.keepmark.legacy.keepmark` → `com.keepmark.mobile` (= fresh install, re-link or
+  backup-import; the old app stays installed until removed by hand).
 - Renamed v1.0.76: app/namespace/folders `XBrowserSyncNg` → `Keepmark`, app id
   `com.keepmark.legacy.keepmark` (= fresh install, old app data stays in the old app —
   re-link or backup-import). Backup envelope `App` stays `"xBrowserSyncNg"`
@@ -77,15 +82,18 @@ adb disconnect; adb connect <device-ip>:<port>; adb devices
 
 ```sh
 dotnet test                                            # Core unit + interop (31 tests)
-dotnet build src/Keepmark -f net10.0-android -c Debug
-dotnet build src/Keepmark/Keepmark.csproj -t:Run -f net10.0-android -c Debug  # deploy+launch
-adb -s IP:PORT shell "dumpsys package com.keepmark.legacy.keepmark | grep -m1 versionName"
+dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
+dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug  # deploy+launch
+# add "-p:AdbTarget=-s IP:PORT" when several adb entries are listed. A Debug APK
+# installed with plain `adb install` aborts ("No assemblies found … Fast Deployment"):
+# deploy Debug only via -t:Run, or build Release for a self-contained APK.
+adb -s IP:PORT shell "dumpsys package com.keepmark.mobile | grep -m1 versionName"
 adb -s IP:PORT exec-out screencap -p > /tmp/x.png     # screenshot
 adb -s IP:PORT shell input tap 540 1200               # tap (device 1080x2412)
 ```
 
 Version bump (manual): `ApplicationDisplayVersion` 1.0.N and `ApplicationVersion`
-M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
+M in `src/KeepmarkMobile/KeepmarkMobile.csproj`; CSS/JS releases also bump
 `?v=` cache-buster in `wwwroot/index.html`. Commit message format:
 `v1.0.N (M): short description`.
 
@@ -110,11 +118,11 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
 - `src/Keepmark.Core/Data/BookmarkStore.cs` — SQLCipher store, FTS5,
   duplicates query, `RestoreLocalAsync`. Rows rekeyed by every push/pull
   `ReplaceAll`: UI crumbs/expansions rebase on stable `NodeId`.
-- `src/Keepmark/Services/XbsSession.cs` — session, backup export/import,
+- `src/KeepmarkMobile/Services/XbsSession.cs` — session, backup export/import,
   create+upload. Connect = link/create + unlink; SwitchService = move-service
   wizard (`/switch-service`, alias `/migrate`); Backup = encrypted backup
   export/import (`/backup`).
-- `src/Keepmark/Components/Pages/` — `Home` (explore, sheets, share
+- `src/KeepmarkMobile/Components/Pages/` — `Home` (explore, sheets, share
   consume, sort, status bar), `Duplicates`, `Connect` (link/create + unlink),
   `Backup` (encrypted export/import), `SwitchService` (move-service wizard),
   `Settings`, `Status`, `About`.

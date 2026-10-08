@@ -9,7 +9,7 @@ Conventions: `Rxx` = requirement IDs. "Must" = fail the review if violated.
 File paths are relative to `KeepmarkMobile/`. Commands run from `KeepmarkMobile/` with
 `ANDROID_HOME=$HOME/android-sdk`, `JAVA_HOME=$HOME/jdk-21`
 (JDK 21; system JDK is rejected): `dotnet test` (xUnit, no device),
-Android build `dotnet build src/Keepmark -f net10.0-android -c Debug`.
+Android build `dotnet build src/KeepmarkMobile -f net10.0-android -c Debug`.
 
 Global rules (verify everywhere): English-only UI strings; no telemetry;
 HTTPS-only service URLs (reject `http://` except `localhost` for dev);
@@ -74,7 +74,7 @@ only as method arguments, never stored, never logged.
 | R5.2 | Non-secrets in `Preferences` (`XbsSettings.cs`): service URL, sync mode, verbosity, app lock + timeout, theme, open mode, list sort. |
 | R5.3 | SQLCipher mirror `Meta`/`Blob`/`Items` (+FTS5): `lastUpdated`, `syncVersion`, `syncRevision`, `syncHash`, `dirty` ("1"/"0"); `Blob.bookmarks` = last encrypted blob. `ReplaceAll` clears revision/hash on legacy pulls. |
 
-## 6. Session flows (`src/Keepmark/Services/XbsSession.cs`)
+## 6. Session flows (`src/KeepmarkMobile/Services/XbsSession.cs`)
 
 Each flow states preconditions, mutations in order, and the REQUIRED user-visible outcome. Raw passwords are method args only, cleared in UI `finally`.
 
@@ -126,7 +126,7 @@ the applied result. Rules:
 | R7.4 | Restore: local-side → pre-restore snapshot + replace local (dirty → push/conflict); remote-side → requires link + re-encrypt under CURRENT key + push (409 honest); never deletes the used entry; counts match `ValidateTree`; damaged → refuse. |
 | R7.5 | Every destructive success message names the safety net + its location ("… — see Backup → Safety backups"). |
 
-## 8. UI rules (pages in `src/Keepmark/Components/Pages/`)
+## 8. UI rules (pages in `src/KeepmarkMobile/Components/Pages/`)
 
 | R | Requirement |
 |---|---|
@@ -162,7 +162,7 @@ R9.1 levels Error→Verbose, persisted verbosity, 200-entry viewer. R9.2 NEVER l
 
 ### Manual/device checklist (no view left unreviewed)
 
-Each page in `src/Keepmark/Components/Pages/` maps to its requirements.
+Each page in `src/KeepmarkMobile/Components/Pages/` maps to its requirements.
 A future QA pass MUST walk every row; closing a view without its checks
 fails the review.
 
@@ -181,7 +181,7 @@ fails the review.
 
 ## 12. Static checks (reviewer-run, must all pass)
 
-1. `grep -rn "SecureStorage.SetAsync" src/Keepmark --include=*.cs` → only derived keys + db key, never a variable named `*password*` (raw).
+1. `grep -rn "SecureStorage.SetAsync" src/KeepmarkMobile --include=*.cs` → only derived keys + db key, never a variable named `*password*` (raw).
 2. `grep -rniE "password.*log|Log.*password" src/Keepmark.Core --include=*.cs` → no hits (secrets in logs).
 3. `grep -rn "Accept-Version" src/Keepmark.Core --include=*.cs` → `1.1.13` default sites + `1.2.0` ONLY in `GetInfoV12Async`, `GetBookmarksV12Async`, `UpdateBookmarksV12Async`, conditional GET.
 4. `grep -rn "HttpMethod.Delete" src/Keepmark.Core` → no hits (no server delete in this client — by design).
@@ -242,4 +242,4 @@ fails the review.
 - [ ] `dotnet build -f net10.0-android` 0 errors
 - [ ] Device deploy: `dotnet build -t:Run` or `adb install`
 - [ ] Manual device QA: conflict → merge → safety backup visible
-- [ ] Version bump in `Keepmark.csproj` (`ApplicationDisplayVersion`, `ApplicationVersion`)
+- [ ] Version bump in `KeepmarkMobile.csproj` (`ApplicationDisplayVersion`, `ApplicationVersion`)
