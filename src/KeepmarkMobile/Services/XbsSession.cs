@@ -265,6 +265,11 @@ public sealed class XbsSession : IAsyncDisposable
             throw new IncompleteSyncInfoException("A new password is required.");
         }
 
+        if (newPassword.Length < Keepmark.Core.Crypto.BackupGuard.MinPasswordLength)
+        {
+            throw new InvalidOperationException("Use a password of at least 8 characters.");
+        }
+
         var creds = await _creds.GetAsync().ConfigureAwait(false)
             ?? throw new IncompleteSyncInfoException(_str.Get(Str.ErrIncompleteSyncInfo));
         var version = creds.Version ?? Core.XbsConstants.SyncClientVersion;

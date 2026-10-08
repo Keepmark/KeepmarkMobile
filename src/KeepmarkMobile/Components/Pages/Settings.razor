@@ -94,7 +94,7 @@
     @if (armedPw)
     {
         <div class="alert alert-danger mt-2">
-            <strong>Change the sync password on all devices?</strong> The old password stops working immediately — update your vault and other devices.
+            <strong>Change the sync password?</strong> Your other devices stop syncing until you unlink them and link again with the new password. Edits not yet synced are uploaded now. Older backup files keep their own password.
             <div class="mt-2 d-flex gap-2">
                 <button class="btn btn-warning" @onclick="ChangePassword" disabled="@pwBusy">Yes, change password</button>
                 <button class="btn btn-secondary" @onclick="() => armedPw = false" disabled="@pwBusy">Cancel</button>
@@ -216,6 +216,11 @@
             return "The new password must be different from the current one.";
         }
 
+        if (next.Length < Keepmark.Core.Crypto.BackupGuard.MinPasswordLength)
+        {
+            return "Use a password of at least 8 characters.";
+        }
+
         if (next != confirm)
         {
             return "New passwords do not match.";
@@ -231,6 +236,7 @@
         var invalid = ValidatePasswordChange(pwCurrent, pwNew, pwConfirm);
         if (invalid is not null)
         {
+            armedPw = false;
             pwError = invalid;
             return;
         }
@@ -247,7 +253,9 @@
         {
             // Never leave the current password or its confirmation in memory;
             // the new password stays so only the proof has to be retyped.
+            // Disarm so the fields are editable again.
             pwCurrent = pwConfirm = string.Empty;
+            armedPw = false;
             pwError = ex.Message;
         }
         finally
