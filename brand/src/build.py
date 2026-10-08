@@ -2,8 +2,7 @@
 
 Single source of truth for every icon/logo raster in the Android app and the
 browser extension. The bookmark+keyhole mark is pure geometry (below); the
-"Keepmark" wordmark is traced once from the brand sheet (trace_wordmark.py ->
-wordmark.svg). Everything is rendered with rsvg-convert.
+"Keepmark" wordmark is vector outlines in wordmark.svg. Everything is rendered with rsvg-convert.
 
     python3 brand/src/build.py            # brand/svg + brand/png + 01..10 sheet crops
     python3 brand/src/build.py --install  # also refresh the app/extension assets
@@ -35,7 +34,7 @@ GREY = "#5F667A"  # extension "not synced" toolbar state
 # and launchers, without leaving the navy family.
 EXT_TILE = NAVY
 
-# ---- Mark geometry: 100 x 174 units, measured from the sheet's standalone icon.
+# ---- Mark geometry: 100 x 174 units, measured from the original standalone icon.
 MW, MH = 100.0, 174.0
 
 
