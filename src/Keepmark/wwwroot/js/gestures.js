@@ -96,24 +96,97 @@ window.xbsGestures = (() => {
         ensureGoButtons();
     }
 
-    // ---- Scroll jump arrows (single slot above the FAB, ↑/↓ reuse it) ----
-    let goDown = null, goUp = null, lastY = -1, idleTimer = 0, jumpUntil = 0;
+    // ---- Scroll jump (single button above the FAB + fast-scroll thumb) ----
+    // One opaque button whose direction follows the scroll: ↓ after a screen
+    // of scrolling down, ↑ after a screen up. The direction only flips after
+    // a 48px reverse run (no flicker on micro-scrolls). A 3px ring shows the
+    // position in the list. Long-press opens a Top/Bottom chooser. Lists over
+    // 8 screens also get a draggable thumb on the right edge after a fling,
+    // with the initial of the row under the viewport center.
+    const GO_REVERSE_PX = 48;
+    const GO_IDLE_MS = 2500;
+    const GO_LABEL_MS = 1200;
+    const GO_RING_C = 2 * Math.PI * 19.5;
+    const THUMB_MIN_SCREENS = 8;
+    const THUMB_FLING_PX_MS = 2.5;
+    const THUMB_IDLE_MS = 1500;
+
+    let go = null, goRing = null, goChip = null, goMenu = null, thumb = null, bubble = null;
+    let goDir = null, run = 0, rev = 0, lastY = -1, lastT = 0, idleTimer = 0, chipTimer = 0, jumping = false, settleTimer = 0;
+    let holding = false, pressTimer = 0, pressFired = false, chipShown = false;
+    let thumbDrag = null, thumbTimer = 0;
+
+    const ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6.5 11.5L12 6l5.5 5.5"/></svg>';
+    const ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v13M6.5 12.5L12 18l5.5-5.5"/></svg>';
+    const EDGE_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12M12 20V9M7 14l5-5 5 5"/></svg>';
+    const EDGE_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19h12M12 4v11M7 10l5 5 5-5"/></svg>';
+
+    function reducedMotion() {
+        try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+    }
+
+    function scrollMax() { return document.documentElement.scrollHeight - window.innerHeight; }
 
     function ensureGoButtons() {
-        if (goDown) return;
-        const mk = (id, label, dir) => {
-            const b = document.createElement('button');
-            b.id = id;
-            b.type = 'button';
-            b.className = 'xbs-go';
-            b.setAttribute('aria-label', label);
-            b.innerHTML = `<span aria-hidden="true">${dir === 'down' ? '↓' : '↑'}</span>`;
-            b.addEventListener('click', () => jump(dir));
-            document.body.appendChild(b);
-            return b;
-        };
-        goDown = mk('xbs-go-down', 'Go to bottom', 'down');
-        goUp = mk('xbs-go-up', 'Go to top', 'up');
+        if (go) return;
+        go = document.createElement('button');
+        go.id = 'xbs-go';
+        go.type = 'button';
+        go.className = 'xbs-go';
+        go.innerHTML =
+            `<svg class="xbs-go-ring" viewBox="0 0 44 44" aria-hidden="true">` +
+            `<circle class="xbs-go-track" cx="22" cy="22" r="19.5"/>` +
+            `<circle class="xbs-go-fill" cx="22" cy="22" r="19.5" stroke-dasharray="0 ${GO_RING_C.toFixed(1)}"/></svg>` +
+            `<span class="xbs-go-face"></span>`;
+        goRing = go.querySelector('.xbs-go-fill');
+        go.addEventListener('pointerdown', onGoDown);
+        go.addEventListener('pointerup', onGoRelease);
+        go.addEventListener('pointercancel', onGoRelease);
+        go.addEventListener('pointerleave', onGoRelease);
+        go.addEventListener('contextmenu', (e) => e.preventDefault());
+        go.addEventListener('click', () => {
+            if (pressFired) { pressFired = false; return; }
+            jump(goDir === 'down' ? 'down' : 'up');
+        });
+        document.body.appendChild(go);
+
+        goChip = document.createElement('span');
+        goChip.className = 'xbs-go-chip';
+        goChip.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(goChip);
+
+        goMenu = document.createElement('div');
+        goMenu.className = 'xbs-go-menu';
+        goMenu.setAttribute('role', 'menu');
+        goMenu.setAttribute('aria-label', 'Jump to');
+        goMenu.innerHTML =
+            `<div class="xbs-go-menu-card">` +
+            `<button type="button" role="menuitem" data-dir="up">${EDGE_UP}<span>Top</span></button>` +
+            `<button type="button" role="menuitem" data-dir="down">${EDGE_DOWN}<span>Bottom</span></button></div>`;
+        goMenu.addEventListener('click', (e) => {
+            const b = e.target.closest && e.target.closest('button[data-dir]');
+            closeMenu();
+            if (b) jump(b.dataset.dir);
+        });
+        goMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+        document.body.appendChild(goMenu);
+
+        thumb = document.createElement('div');
+        thumb.className = 'xbs-thumb';
+        thumb.setAttribute('aria-hidden', 'true');
+        thumb.innerHTML = '<span class="xbs-thumb-bar"></span>';
+        thumb.addEventListener('pointerdown', onThumbDown);
+        thumb.addEventListener('pointermove', onThumbMove);
+        thumb.addEventListener('pointerup', onThumbUp);
+        thumb.addEventListener('pointercancel', onThumbUp);
+        document.body.appendChild(thumb);
+
+        bubble = document.createElement('div');
+        bubble.className = 'xbs-thumb-bubble';
+        bubble.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(bubble);
+        lastY = window.scrollY;
+        lastT = performance.now();
     }
 
     function modalOpen() {
@@ -125,42 +198,234 @@ window.xbsGestures = (() => {
         return !!ex && ex.toLowerCase() === 'true';
     }
 
+    function setDir(dir) {
+        if (goDir === dir) return;
+        goDir = dir;
+        go.querySelector('.xbs-go-face').innerHTML = dir === 'down' ? ARROW_DOWN : ARROW_UP;
+        go.setAttribute('aria-label', dir === 'down' ? 'Scroll to bottom' : 'Scroll to top');
+        goChip.textContent = dir === 'down' ? 'Bottom' : 'Top';
+    }
+
+    function showGo() {
+        if (go.classList.contains('show')) return;
+        go.classList.add('show');
+        if (!chipShown) {
+            // Name the button once per session, the first time it appears.
+            chipShown = true;
+            goChip.classList.add('show');
+            clearTimeout(chipTimer);
+            chipTimer = setTimeout(() => goChip.classList.remove('show'), GO_LABEL_MS);
+        }
+    }
+
     function hideGo() {
-        if (goDown) goDown.classList.remove('show');
-        if (goUp) goUp.classList.remove('show');
+        if (!go || holding) return;
+        go.classList.remove('show');
+        goChip.classList.remove('show');
+    }
+
+    function updateRing(y, max) {
+        const p = max > 0 ? Math.max(0, Math.min(1, y / max)) : 0;
+        goRing.setAttribute('stroke-dasharray', `${(GO_RING_C * p).toFixed(1)} ${GO_RING_C.toFixed(1)}`);
+    }
+
+    function armIdle() {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(hideGo, GO_IDLE_MS);
     }
 
     function onScroll() {
-        if (!goDown || Date.now() < jumpUntil || modalOpen()) { hideGo(); lastY = window.scrollY; return; }
+        if (!go) return;
         const y = window.scrollY;
-        const max = document.documentElement.scrollHeight - window.innerHeight;
-        clearTimeout(idleTimer);
-        if (max < 120 || lastY < 0) { lastY = y; return; }
-        if (y > lastY + 4 && y < max - 40) {
-            // Scrolling down: offer the jump to bottom.
-            goUp.classList.remove('show');
-            goDown.classList.add('show');
-        } else if (y < lastY - 4 && y > 40) {
-            // Scrolling up: offer the jump to top (same slot as ↓).
-            goDown.classList.remove('show');
-            goUp.classList.add('show');
-        } else if (y <= 40 || y >= max - 40) {
+        const now = performance.now();
+        const max = scrollMax();
+        if (jumping) {
+            // Programmatic glide: wait until it settles before reacting again.
+            armSettle();
+            lastY = y; lastT = now; run = 0; rev = 0;
+            return;
+        }
+        if (modalOpen()) {
+            hideGo(); closeMenu(); hideThumb(true);
+            lastY = y; lastT = now; run = 0; rev = 0;
+            return;
+        }
+        if (thumbDrag) { lastY = y; lastT = now; return; }
+        // Lists shorter than 2 screens never get the button.
+        if (document.documentElement.scrollHeight < window.innerHeight * 2 || lastY < 0) {
+            hideGo(); hideThumb(true);
+            lastY = y; lastT = now; run = 0; rev = 0;
+            return;
+        }
+        const dy = y - lastY;
+        const dt = Math.max(1, now - lastT);
+        // run > 0 = consecutive distance down, < 0 = up. A reverse move is
+        // banked in rev and only replaces the run past GO_REVERSE_PX.
+        if (dy !== 0) {
+            if (run === 0 || Math.sign(dy) === Math.sign(run)) { run += dy; rev = 0; }
+            else { rev += dy; if (Math.abs(rev) > GO_REVERSE_PX) { run = rev; rev = 0; } }
+        }
+        const visible = go.classList.contains('show');
+        if (run >= window.innerHeight || (visible && run > 0)) { setDir('down'); if (y < max - 40) showGo(); }
+        else if (run <= -window.innerHeight || (visible && run < 0)) { setDir('up'); if (y > 40) showGo(); }
+        // At the top it always rests; at the bottom ↓ has nothing left to do.
+        if (y <= 40 || (goDir === 'down' && y >= max - 40)) {
+            holding = false;
             hideGo();
         }
+        updateRing(y, max);
+        if (go.classList.contains('show')) armIdle();
+
+        // Fast-scroll thumb: long lists only, revealed by a fling.
+        if (max > window.innerHeight * THUMB_MIN_SCREENS) {
+            if (Math.abs(dy) / dt > THUMB_FLING_PX_MS) thumb.classList.add('show');
+            if (thumb.classList.contains('show')) { placeThumb(y, max); armThumbIdle(); }
+        } else {
+            hideThumb(true);
+        }
         lastY = y;
-        idleTimer = setTimeout(hideGo, 2000);
+        lastT = now;
     }
 
     function jump(dir) {
+        holding = false;
         hideGo();
-        // Don't let the programmatic glide re-trigger the arrows.
-        jumpUntil = Date.now() + 900;
-        lastY = -1;
-        try {
-            window.scrollTo({ top: dir === 'down' ? document.documentElement.scrollHeight : 0, behavior: 'smooth' });
-        } catch {
-            window.scrollTo(0, dir === 'down' ? document.documentElement.scrollHeight : 0);
+        hideThumb(true);
+        // Don't let the programmatic glide re-trigger the button.
+        jumping = true;
+        armSettle();
+        run = 0;
+        rev = 0;
+        const max = scrollMax();
+        const top = dir === 'down' ? max : 0;
+        const smooth = !reducedMotion();
+        // Long lists: teleport to two screens from the edge, glide the rest
+        // (a smooth scroll over the whole list takes seconds).
+        const near = window.innerHeight * 2;
+        if (smooth && Math.abs(top - window.scrollY) > near * 1.5) {
+            window.scrollTo(0, dir === 'down' ? max - near : near);
         }
+        try {
+            window.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
+        } catch {
+            window.scrollTo(0, top);
+        }
+        // Land the eye: flash the first/last row once the glide settles.
+        setTimeout(() => {
+            const rows = document.querySelectorAll('.xbs-row:not(.xbs-row-sep) .xbs-row-inner');
+            const el = rows.length ? rows[dir === 'down' ? rows.length - 1 : 0] : null;
+            if (!el) return;
+            el.classList.add('xbs-flash-once');
+            setTimeout(() => el.classList.remove('xbs-flash-once'), 800);
+        }, reducedMotion() ? 50 : 650);
+    }
+
+    function armSettle() {
+        clearTimeout(settleTimer);
+        settleTimer = setTimeout(() => { jumping = false; lastY = window.scrollY; }, 250);
+    }
+
+    // Long-press on the button: Top/Bottom chooser.
+    function onGoDown(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        holding = true;
+        pressFired = false;
+        clearTimeout(idleTimer);
+        clearTimeout(pressTimer);
+        pressTimer = setTimeout(() => {
+            pressFired = true;
+            try { if (navigator.vibrate) navigator.vibrate(20); } catch { /* noop */ }
+            openMenu();
+        }, LONG_PRESS_MS);
+    }
+
+    function onGoRelease() {
+        clearTimeout(pressTimer);
+        if (!holding) return;
+        holding = false;
+        if (!goMenu.classList.contains('show')) armIdle();
+    }
+
+    function openMenu() {
+        holding = true;
+        go.classList.remove('show');
+        goChip.classList.remove('show');
+        goMenu.classList.add('show');
+        const first = goMenu.querySelector(`button[data-dir="${goDir === 'down' ? 'down' : 'up'}"]`);
+        if (first) try { first.focus({ preventScroll: true }); } catch { /* noop */ }
+    }
+
+    function closeMenu() {
+        if (!goMenu || !goMenu.classList.contains('show')) return;
+        goMenu.classList.remove('show');
+        holding = false;
+    }
+
+    // Fast-scroll thumb: drag maps 1:1 onto the document height.
+    function thumbTrack() {
+        const top = 72;
+        const bottom = window.innerHeight - 160;
+        return { top, span: Math.max(1, bottom - top - 48) };
+    }
+
+    function placeThumb(y, max) {
+        const t = thumbTrack();
+        const p = max > 0 ? Math.max(0, Math.min(1, y / max)) : 0;
+        thumb.style.transform = `translateY(${(t.top + t.span * p).toFixed(0)}px)`;
+        bubble.style.transform = `translateY(${(t.top + t.span * p - 6).toFixed(0)}px)`;
+    }
+
+    function armThumbIdle() {
+        clearTimeout(thumbTimer);
+        thumbTimer = setTimeout(() => hideThumb(false), THUMB_IDLE_MS);
+    }
+
+    function hideThumb(force) {
+        if (!thumb || (thumbDrag && !force)) return;
+        thumb.classList.remove('show', 'drag');
+        bubble.classList.remove('show');
+    }
+
+    function rowInitial() {
+        const el = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+        const row = el && el.closest ? el.closest('.xbs-row') : null;
+        const title = row ? row.querySelector('.xbs-row-title') : null;
+        const m = title ? (title.textContent || '').match(/[\p{L}\p{N}]/u) : null;
+        return m ? m[0].toUpperCase() : '';
+    }
+
+    function onThumbDown(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        try { thumb.setPointerCapture(e.pointerId); } catch { /* noop */ }
+        thumbDrag = { id: e.pointerId };
+        clearTimeout(thumbTimer);
+        thumb.classList.add('drag');
+        hideGo();
+        onThumbMove(e);
+    }
+
+    function onThumbMove(e) {
+        if (!thumbDrag || e.pointerId !== thumbDrag.id) return;
+        const t = thumbTrack();
+        const p = Math.max(0, Math.min(1, (e.clientY - t.top - 24) / t.span));
+        const max = scrollMax();
+        window.scrollTo(0, p * max);
+        placeThumb(p * max, max);
+        const ch = rowInitial();
+        bubble.textContent = ch;
+        bubble.classList.toggle('show', !!ch);
+    }
+
+    function onThumbUp(e) {
+        if (!thumbDrag || e.pointerId !== thumbDrag.id) return;
+        thumbDrag = null;
+        thumb.classList.remove('drag');
+        bubble.classList.remove('show');
+        lastY = window.scrollY;
+        run = 0;
+        rev = 0;
+        armThumbIdle();
     }
 
     return {

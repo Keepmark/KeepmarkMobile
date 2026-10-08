@@ -783,20 +783,21 @@ html.xbs-locked, body.xbs-locked {
     background: rgba(227, 184, 8, 0.08);
 }
 
-/* Scroll jump arrows: 30px visual (half the FAB), 44px hit area,
-   same 0.85 transparency as the FAB.
-   Single slot bottom-right, stacked above the FAB (FAB is 60px at
-   bottom 4.5rem): +72px = 60px FAB + 12px gap. Horizontally centered
-   on the FAB axis (+8px = (60-44)/2). The FAB stays visible and
-   tappable; ↑ and ↓ reuse this slot (never shown together), so nothing
-   ever covers the sort bar. Transient — auto-hide 2s after scrolling. */
+/* Scroll jump button: 44px opaque disc inside a 56px hit area, with a
+   3px ring that shows the position in the list. Single slot above the
+   FAB (60px at bottom 4.5rem), centered on its axis: right +2px =
+   (60-56)/2; bottom +70px = 60px FAB + 16px gap - 6px hit padding.
+   Direction (↑/↓), the one-time "Top"/"Bottom" chip, the long-press
+   chooser and the fast-scroll thumb are driven by gestures.js. */
 .xbs-go {
+    --xbs-go-accent: var(--km-accent, #4a5fc1);
+    --xbs-go-track: rgba(74, 95, 193, 0.18);
     position: fixed;
-    right: max(calc(1rem + 8px), calc(env(safe-area-inset-right, 0px) + 8px));
-    bottom: calc(max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem)) + 72px);
+    right: calc(max(1rem, env(safe-area-inset-right, 0px)) + 2px);
+    bottom: calc(max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem)) + 70px);
     z-index: 1080;
-    width: 44px;
-    height: 44px;
+    width: 56px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -804,37 +805,204 @@ html.xbs-locked, body.xbs-locked {
     border: none;
     padding: 0;
     opacity: 0;
+    transform: translateY(8px);
     pointer-events: none;
-    transition: opacity 0.25s ease-out;
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    touch-action: manipulation;
 }
 
 .xbs-go.show {
     opacity: 1;
+    transform: none;
     pointer-events: auto;
 }
 
-.xbs-go > span {
-    width: 30px;
-    height: 30px;
+.xbs-go-face {
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     background: var(--bs-body-bg, #fff);
-    color: #1b6ec2;
-    border: 1.5px solid #1b6ec2;
-    font-size: 1.1rem;
-    font-weight: 700;
+    color: var(--bs-body-color, #141b38);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 10px rgba(20, 27, 56, 0.22);
+}
+
+.xbs-go:active .xbs-go-face { transform: scale(0.94); }
+
+.xbs-go-face svg,
+.xbs-go-menu svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.xbs-go-ring {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    width: 44px;
+    height: 44px;
+    transform: rotate(-90deg);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.xbs-go-ring circle { fill: none; stroke-width: 3; }
+.xbs-go-track { stroke: var(--xbs-go-track); }
+.xbs-go-fill { stroke: var(--xbs-go-accent); stroke-linecap: round; transition: stroke-dasharray 0.12s linear; }
+
+.xbs-go-chip {
+    position: fixed;
+    right: calc(max(1rem, env(safe-area-inset-right, 0px)) + 2px + 56px);
+    bottom: calc(max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem)) + 70px + 14px);
+    z-index: 1080;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 14px;
+    background: var(--km-navy, #172552);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
     line-height: 28px;
-    text-align: center;
-    opacity: 0.95;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transform: translateX(6px);
+    pointer-events: none;
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
 }
 
-/* Dark theme: lighter accent for contrast on dark surface. */
-[data-bs-theme="dark"] .xbs-go > span {
-    color: #6ea8fe;
-    border-color: #6ea8fe;
+.xbs-go-chip.show { opacity: 1; transform: none; }
+
+/* Long-press chooser: light scrim + card anchored where the button was. */
+.xbs-go-menu {
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+    background: rgba(14, 18, 38, 0.18);
+    display: none;
+    touch-action: none;
 }
 
-/* ↑ and ↓ share the single .xbs-go slot above the FAB. */
+.xbs-go-menu.show { display: block; }
+
+.xbs-go-menu-card {
+    position: absolute;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: calc(max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem)) + 76px);
+    width: 9rem;
+    padding: 4px;
+    border-radius: 16px;
+    background: var(--bs-body-bg, #fff);
+    box-shadow: 0 6px 20px rgba(20, 27, 56, 0.28);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.xbs-go-menu-card button {
+    height: 48px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--bs-body-color, #141b38);
+    font: inherit;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+}
+
+.xbs-go-menu-card button:focus-visible,
+.xbs-go-menu-card button:active {
+    background: rgba(74, 95, 193, 0.14);
+    outline: none;
+}
+
+/* Fast-scroll thumb (lists > 8 screens): 28px-wide hit strip on the
+   right edge, 12px bar; vertical position set by gestures.js. */
+.xbs-thumb {
+    position: fixed;
+    top: 0;
+    right: env(safe-area-inset-right, 0px);
+    z-index: 1070;
+    width: 28px;
+    height: 48px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    touch-action: none;
+    transition: opacity 0.2s ease-out;
+}
+
+.xbs-thumb.show { opacity: 1; pointer-events: auto; }
+
+.xbs-thumb-bar {
+    width: 8px;
+    height: 44px;
+    border-radius: 4px 0 0 4px;
+    background: var(--km-accent, #4a5fc1);
+    transition: width 0.12s ease-out;
+}
+
+.xbs-thumb.drag .xbs-thumb-bar { width: 12px; }
+
+.xbs-thumb-bubble {
+    position: fixed;
+    top: 0;
+    right: calc(env(safe-area-inset-right, 0px) + 36px);
+    z-index: 1070;
+    width: 60px;
+    height: 60px;
+    border-radius: 30px 30px 6px 30px;
+    background: var(--km-navy, #172552);
+    color: #fff;
+    font-size: 1.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.xbs-thumb-bubble.show { opacity: 1; }
+
+/* After a jump the landing row flashes once. */
+.xbs-row-inner.xbs-flash-once { animation: xbs-flash 0.7s ease-in-out 1; }
+
+[data-bs-theme="dark"] .xbs-go {
+    --xbs-go-accent: #8c9bf0;
+    --xbs-go-track: rgba(140, 155, 240, 0.22);
+}
+
+[data-bs-theme="dark"] .xbs-go-face,
+[data-bs-theme="dark"] .xbs-go-menu-card {
+    background: #252d57;
+    color: #e8eaf4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+[data-bs-theme="dark"] .xbs-go-menu-card button { color: #e8eaf4; }
+[data-bs-theme="dark"] .xbs-thumb-bar { background: #8c9bf0; }
+[data-bs-theme="dark"] .xbs-go-chip,
+[data-bs-theme="dark"] .xbs-thumb-bubble { background: #3d4fb0; }
+
+@media (prefers-reduced-motion: reduce) {
+    .xbs-go, .xbs-go-chip, .xbs-thumb, .xbs-go-fill, .xbs-thumb-bar { transition: none; }
+    .xbs-go, .xbs-go-chip { transform: none; }
+    .xbs-row-inner.xbs-flash-once { animation: none; }
+}
 
 /* Logs viewer page. */
 .xbs-log-filter-level { max-width: 12rem; }
