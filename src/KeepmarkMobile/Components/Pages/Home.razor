@@ -23,15 +23,81 @@ else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
 else
 {
     <h1 class="visually-hidden">Bookmarks</h1>
-    <div class="xbs-search">
-        <svg class="km-ico xbs-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg>
-        <input class="form-control xbs-search-input" placeholder="Search bookmarks" aria-label="Search bookmarks"
-               @oninput="OnSearchInput" value="@query" />
-        @if (!string.IsNullOrEmpty(query))
+    <header class="xbs-pagebar @(searchOpen ? "searching" : string.Empty)">
+        @if (searchOpen)
         {
-            <button class="xbs-search-clear" @onclick="ClearSearch" aria-label="Clear search"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg></button>
+            <button class="xbs-barbtn" @onclick="CloseSearch" aria-label="Close search"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
+            <div class="xbs-barsearch">
+                <input id="xbs-q" class="xbs-barsearch-input" type="search" enterkeyhint="search" placeholder="Search bookmarks" aria-label="Search bookmarks"
+                       @oninput="OnSearchInput" value="@query" />
+                @if (!string.IsNullOrEmpty(query))
+                {
+                    <button class="xbs-barbtn sm" @onclick="ClearSearchAndFocus" aria-label="Clear search"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg></button>
+                }
+            </div>
         }
-    </div>
+        else
+        {
+            @if (crumbs.Count > 0)
+            {
+                <button class="xbs-barbtn" @onclick="GoUp" aria-label="Back to @ParentName"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
+            }
+            else
+            {
+                <img src="img/mark.png" alt="" class="xbs-bar-mark" />
+            }
+            <button class="xbs-barpath" @onclick="TogglePathMenu" disabled="@(crumbs.Count == 0)" aria-label="Folder path: @PathLabel" aria-expanded="@pathMenuOpen.ToString().ToLowerInvariant()">
+                @if (crumbs.Count > 0)
+                {
+                    <span class="xbs-barpath-up"><span class="xbs-barpath-uptext">@ParentPath</span><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" /></svg></span>
+                }
+                <span class="xbs-barpath-name">@CurrentName</span>
+            </button>
+            <button class="xbs-barbtn" @onclick="OpenSearch" aria-label="Search bookmarks"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg></button>
+            <button class="xbs-barbtn" @onclick="ToggleSortMenu" aria-label="Sort: @SortLabel" aria-expanded="@sortMenuOpen.ToString().ToLowerInvariant()">
+                <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M4 16l3 3 3-3M14 7h6M14 12h4M14 17h2" /></svg>
+                @if (sortMode != "Default") { <span class="xbs-barbtn-dot" aria-hidden="true"></span> }
+            </button>
+        }
+    </header>
+
+    @if (pathMenuOpen && !searchOpen)
+    {
+        <div class="xbs-pop-scrim" @onclick="ClosePops" aria-hidden="true"></div>
+        <div class="xbs-pop left" role="menu" aria-label="Folder path">
+            <button class="xbs-pop-item" role="menuitem" @onclick="() => { ClosePops(); return GoRoot(); }">
+                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg><span>All bookmarks</span>
+            </button>
+            @{ var depth = 0; }
+            @foreach (var c in crumbs.Reverse())
+            {
+                depth++;
+                var isCurrent = depth == crumbs.Count;
+                var pad = $"padding-left: {0.75 + depth * 0.875}rem";
+                <button class="xbs-pop-item @(isCurrent ? "current" : string.Empty)" role="menuitem" style="@pad" aria-current="@(isCurrent ? "location" : null)"
+                        @onclick="() => { ClosePops(); return JumpTo(c.RowId); }">
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span>@c.Title</span>
+                </button>
+            }
+        </div>
+    }
+
+    @if (sortMenuOpen && !searchOpen)
+    {
+        <div class="xbs-pop-scrim" @onclick="ClosePops" aria-hidden="true"></div>
+        <div class="xbs-pop right" role="menu" aria-label="Sort">
+            <div class="xbs-pop-head">Sort this list</div>
+            @foreach (var (mode, label) in SortModes)
+            {
+                <button class="xbs-pop-item @(sortMode == mode ? "current" : string.Empty)" role="menuitemradio" aria-checked="@((sortMode == mode).ToString().ToLowerInvariant())"
+                        @onclick="() => { ClosePops(); return SetSort(mode); }">
+                    <span>@label</span>
+                    @if (sortMode == mode) { <svg class="km-ico sm xbs-pop-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
+                </button>
+            }
+            <p class="xbs-pop-note">A–Z and Z–A keep folders on top. Sorting never changes the synced order.</p>
+        </div>
+    }
 
     @if (searching)
     {
@@ -57,27 +123,6 @@ else
     }
     else
     {
-        <div class="xbs-crumbs" role="navigation" aria-label="Folders">
-            <button class="xbs-crumb xbs-crumb-home @(crumbs.Count == 0 ? "current" : string.Empty)" @onclick="GoRoot" aria-label="Top level">
-                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg>
-                @if (crumbs.Count == 0) { <span>All bookmarks</span> }
-            </button>
-            @{ var crumbIndex = 0; }
-            @foreach (var c in crumbs.Reverse())
-            {
-                crumbIndex++;
-                var isLast = crumbIndex == crumbs.Count;
-                <svg class="km-ico sm xbs-crumb-sep" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-                <button class="xbs-crumb @(isLast ? "current" : string.Empty)" @onclick="() => JumpTo(c.RowId)">@c.Title</button>
-            }
-        </div>
-        <div class="xbs-sortbar">
-            <div class="xbs-seg" role="toolbar" aria-label="Sort">
-                <button class="xbs-sort @(sortMode == "Default" ? "active" : string.Empty)" aria-label="Server order" aria-pressed="@((sortMode == "Default").ToString().ToLowerInvariant())" @onclick='() => SetSort("Default")' title="Server order">Original</button>
-                <button class="xbs-sort @(sortMode == "Asc" ? "active" : string.Empty)" aria-label="Sort A to Z" aria-pressed="@((sortMode == "Asc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Asc")' title="A to Z">A–Z</button>
-                <button class="xbs-sort @(sortMode == "Desc" ? "active" : string.Empty)" aria-label="Sort Z to A" aria-pressed="@((sortMode == "Desc").ToString().ToLowerInvariant())" @onclick='() => SetSort("Desc")' title="Z to A">Z–A</button>
-            </div>
-        </div>
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
             <div class="xbs-pinned-box">
@@ -296,6 +341,12 @@ else
             await JS.InvokeVoidAsync("xbsGestures.init", dotNet);
         }
 
+        if (focusSearch)
+        {
+            focusSearch = false;
+            try { await JS.InvokeVoidAsync("xbsGestures.focus", "#xbs-q"); } catch { }
+        }
+
         if (ready && sheetFor is null && Session.Engine is not null && SharedImport.Peek() is not null)
         {
             if (OpenSharedIfPending())
@@ -475,6 +526,7 @@ else
             crumbs.Push(row);
             query = string.Empty;
             isSearch = false;
+            searchOpen = false;
             Session.Log.Info("ui", "Opened folder");
             Session.Log.Verbose("ui", $"Folder: {row.Title}");
             await RefreshAsync();
@@ -768,6 +820,7 @@ else
         crumbs.Clear();
         query = string.Empty;
         isSearch = false;
+        searchOpen = false;
         await RefreshAsync();
     }
 
@@ -781,6 +834,7 @@ else
 
         query = string.Empty;
         isSearch = false;
+        searchOpen = false;
         await RefreshAsync();
     }
 
@@ -800,6 +854,7 @@ else
 
         query = string.Empty;
         isSearch = false;
+        searchOpen = false;
         await RefreshAsync();
 
         flashNodeId = row.NodeId;
@@ -869,6 +924,85 @@ else
         sortMode = mode;
         AppSettings.ListSort = mode;
         await RefreshAsync();
+    }
+
+    // ---- Compact page bar: path menu, sort menu, search mode. ----
+    private bool searchOpen;
+    private bool pathMenuOpen;
+    private bool sortMenuOpen;
+    private bool focusSearch;
+
+    private static readonly (string Mode, string Label)[] SortModes =
+        [("Default", "Original order"), ("Asc", "A to Z"), ("Desc", "Z to A")];
+
+    private string SortLabel => SortModes.FirstOrDefault(m => m.Mode == sortMode).Label ?? "Original order";
+
+    private string CurrentName => crumbs.Count == 0 ? "All bookmarks" : crumbs.Peek().Title ?? "Folder";
+
+    private string ParentName => crumbs.Count < 2 ? "All bookmarks" : crumbs.ElementAt(1).Title ?? "Folder";
+
+    /// <summary>Ancestors above the current folder, nearest last; long chains keep only the two nearest.</summary>
+    private string ParentPath
+    {
+        get
+        {
+            var names = new List<string> { "All bookmarks" };
+            names.AddRange(crumbs.Reverse().SkipLast(1).Select(c => c.Title ?? "Folder"));
+            return names.Count > 2 ? "… › " + string.Join(" › ", names.TakeLast(2)) : string.Join(" › ", names);
+        }
+    }
+
+    private string PathLabel => string.Join(", ", new[] { "All bookmarks" }.Concat(crumbs.Reverse().Select(c => c.Title ?? "Folder")));
+
+    private void ClosePops()
+    {
+        pathMenuOpen = false;
+        sortMenuOpen = false;
+    }
+
+    private void TogglePathMenu()
+    {
+        var open = !pathMenuOpen;
+        ClosePops();
+        pathMenuOpen = open && crumbs.Count > 0;
+    }
+
+    private void ToggleSortMenu()
+    {
+        var open = !sortMenuOpen;
+        ClosePops();
+        sortMenuOpen = open;
+    }
+
+    private async Task GoUp()
+    {
+        if (crumbs.Count <= 1)
+        {
+            await GoRoot();
+        }
+        else
+        {
+            await JumpTo(crumbs.ElementAt(1).RowId);
+        }
+    }
+
+    private void OpenSearch()
+    {
+        ClosePops();
+        searchOpen = true;
+        focusSearch = true;
+    }
+
+    private void CloseSearch()
+    {
+        ClearSearch();
+        searchOpen = false;
+    }
+
+    private async Task ClearSearchAndFocus()
+    {
+        ClearSearch();
+        try { await JS.InvokeVoidAsync("xbsGestures.focus", "#xbs-q"); } catch { }
     }
 
     private void ClearSearch()

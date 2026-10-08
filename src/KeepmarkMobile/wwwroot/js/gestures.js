@@ -430,6 +430,32 @@ window.xbsGestures = (() => {
         armThumbIdle();
     }
 
+    // Soft keyboard up (a text field has focus): floating bottom controls
+    // step aside so they never cover the field or the rows above the keyboard.
+    function isTextField(el) {
+        if (!el) return false;
+        if (el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+        return el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|range|color|file)$/i.test(el.type || '');
+    }
+    document.addEventListener('focusin', e => {
+        document.documentElement.classList.toggle('xbs-typing', isTextField(e.target));
+    });
+    document.addEventListener('focusout', () => {
+        setTimeout(() => {
+            document.documentElement.classList.toggle('xbs-typing', isTextField(document.activeElement));
+        }, 0);
+    });
+    // Back key hides the keyboard but keeps focus: the window grows back
+    // (adjustResize), so bring the controls back; a tap on the field re-hides.
+    let lastH = window.innerHeight;
+    window.addEventListener('resize', () => {
+        if (window.innerHeight - lastH > 120) document.documentElement.classList.remove('xbs-typing');
+        lastH = window.innerHeight;
+    });
+    document.addEventListener('click', e => {
+        if (isTextField(e.target)) document.documentElement.classList.add('xbs-typing');
+    });
+
     return {
         init(ref) {
             // Home instances come and go with navigation (and the old one
@@ -450,6 +476,10 @@ window.xbsGestures = (() => {
             const any = Object.keys(locks).some(k => locks[k]);
             document.documentElement.classList.toggle('xbs-locked', any);
             if (document.body) document.body.classList.toggle('xbs-locked', any);
+        },
+        focus(selector) {
+            const el = document.querySelector(selector);
+            if (el && el.focus) el.focus();
         },
         scrollToRow(rowId) {
             const el = document.querySelector(`.xbs-row[data-rowid="${rowId}"]`);

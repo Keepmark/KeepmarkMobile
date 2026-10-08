@@ -660,143 +660,189 @@ html.xbs-locked, body.xbs-locked {
 
 .xbs-hint { color: var(--km-ink-2); padding: 0.5rem; }
 
-/* ---- Search: rounded field, sticky under the top bar. ---- */
-.xbs-search {
-    position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px));
-    z-index: 950;
-    background: var(--km-ground);
-    padding: 0.5rem 0 0.375rem;
-}
-
-.xbs-search-icon {
-    position: absolute;
-    left: 1rem;
-    top: calc(0.5rem + 26px);
-    transform: translateY(-50%);
-    color: var(--km-ink-2);
-    pointer-events: none;
-}
-
-.xbs-search-input {
-    height: 52px;
-    border-radius: 26px;
-    border-color: transparent;
-    background: var(--km-surface-2);
-    padding-left: 3rem;
-    padding-right: 3rem;
-    font-size: 1rem;
-}
-
-.xbs-search-input:focus { background: var(--km-surface); }
-.xbs-search-input::placeholder { color: var(--km-ink-2); }
-
-.xbs-search-clear {
-    position: absolute;
-    right: 0.25rem;
-    top: calc(0.5rem + 26px);
-    transform: translateY(-50%);
-    width: 44px;
-    height: 44px;
-    border: 0;
-    border-radius: 22px;
-    background: transparent;
-    color: var(--km-ink-2);
+/* ---- Compact page bar (v1.0.124): one navy bar over the app bar with
+   back, folder path, search and sort. Search opens inside the bar; path and
+   sort are popover menus. Leaves the hamburger (fixed, 48px) uncovered. ---- */
+.xbs-pagebar {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: env(safe-area-inset-left, 0px);
+    right: calc(max(0.5rem, env(safe-area-inset-right, 0px)) + 48px);
+    height: 3rem;
+    z-index: 1059;
     display: flex;
     align-items: center;
-    justify-content: center;
-}
-
-/* ---- Breadcrumb chips (sticky under search, horizontally scrollable). ---- */
-.xbs-crumbs {
-    position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px) + 4.125rem - 1px);
-    z-index: 900;
-    background: var(--km-ground);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    overflow-x: auto;
-    padding: 0.125rem 0 0.375rem;
-    scrollbar-width: none;
-}
-
-.xbs-crumbs::-webkit-scrollbar { display: none; }
-
-.xbs-crumb {
-    flex-shrink: 0;
-    height: 40px;
-    min-width: 44px;
-    max-width: 180px;
-    padding: 0 0.875rem;
-    border: 1px solid var(--km-line-strong);
-    border-radius: 20px;
-    background: var(--km-surface);
-    /* Never trust the UA button color: with color-scheme auto it follows the
-       OS theme and goes white-on-white in light mode. */
-    color: var(--km-ink);
-    font-size: 0.875rem;
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-}
-
-.xbs-crumb.current {
-    background: var(--km-tint);
-    border-color: transparent;
-    color: var(--km-tint-ink);
-    font-weight: 600;
-}
-
-.xbs-crumb-home.current {
+    padding-left: 0.25rem;
     background: var(--km-navy);
     color: #fff;
 }
 
-[data-bs-theme="dark"] .xbs-crumb-home.current { background: var(--km-tint); color: var(--km-tint-ink); }
-
-.xbs-crumb-sep { color: var(--km-ink-2); width: 16px; height: 16px; }
-
-/* ---- Sort: one segmented control. ---- */
-.xbs-sortbar {
-    position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px) + 4.125rem + 3rem - 2px);
-    z-index: 890;
-    background: var(--km-ground);
-    display: flex;
-    justify-content: flex-end;
-    padding: 0 0 0.5rem;
-}
-
-.xbs-seg {
-    display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    border-radius: 22px;
-    background: var(--km-surface-2);
-}
-
-.xbs-sort {
-    height: 38px;
-    padding: 0 0.875rem;
+.xbs-barbtn {
+    position: relative;
+    flex: none;
+    width: 48px;
+    height: 48px;
     border: 0;
-    border-radius: 19px;
+    border-radius: 24px;
+    padding: 0;
     background: transparent;
-    /* Same UA-button-color trap as .xbs-crumb: force theme text color. */
-    color: var(--km-ink-2);
-    font-size: 0.8125rem;
-    font-weight: 600;
+    color: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.xbs-sort.active {
+.xbs-barbtn.sm { width: 40px; height: 40px; }
+.xbs-barbtn:active, .xbs-barbtn[aria-expanded="true"] { background: rgba(255, 255, 255, 0.12); }
+
+.xbs-barbtn-dot {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: #8c9bf0;
+    box-shadow: 0 0 0 2px var(--km-navy);
+}
+
+.xbs-bar-mark { height: 26px; width: auto; flex: none; margin: 0 0.5rem 0 0.75rem; }
+
+.xbs-barpath {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: inherit;
+    padding: 0 0.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    text-align: left;
+}
+
+.xbs-barpath:disabled { opacity: 1; }
+.xbs-barpath:not(:disabled):active { background: rgba(255, 255, 255, 0.08); }
+
+.xbs-barpath-up {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    max-width: 100%;
+    font-size: 0.75rem;
+    line-height: 1.1;
+    color: #c3cae6;
+}
+
+.xbs-barpath-uptext { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xbs-barpath-up .km-ico { width: 14px; height: 14px; }
+
+.xbs-barpath-name {
+    max-width: 100%;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.xbs-barsearch {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    border-radius: 19px;
+    background: rgba(255, 255, 255, 0.14);
+    padding: 0 0 0 0.875rem;
+    margin-right: 0.25rem;
+}
+
+.xbs-barsearch-input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: 1rem;
+    outline: none;
+    padding: 0;
+}
+
+.xbs-barsearch-input::placeholder { color: #c3cae6; }
+.xbs-barsearch-input::-webkit-search-cancel-button { display: none; }
+
+/* Popover menus anchored under the bar. */
+.xbs-pop-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+    background: rgba(8, 11, 24, 0.35);
+    touch-action: none;
+}
+
+.xbs-pop {
+    position: fixed;
+    top: calc(3rem + env(safe-area-inset-top, 0px) + 4px);
+    z-index: 1091;
+    width: min(300px, calc(100vw - 1rem));
+    max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px) - 1rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.375rem 0;
+    border-radius: 16px;
+    border: 1px solid var(--km-line-strong);
     background: var(--km-surface);
     color: var(--km-ink);
-    box-shadow: 0 1px 3px rgba(20, 27, 56, 0.14);
+    box-shadow: var(--km-shadow-float);
+}
+
+.xbs-pop.left { left: calc(env(safe-area-inset-left, 0px) + 0.5rem); }
+.xbs-pop.right { right: calc(max(0.5rem, env(safe-area-inset-right, 0px)) + 48px); }
+
+[data-bs-theme="dark"] .xbs-pop { background: var(--km-surface-2); border-color: #4a5590; }
+
+.xbs-pop-head {
+    padding: 0.5rem 1rem 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--km-ink-2);
+}
+
+.xbs-pop-item {
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: 0;
+    background: transparent;
+    color: var(--km-ink);
+    padding: 0 1rem 0 0.75rem;
+    font-size: 0.9375rem;
+    text-align: left;
+}
+
+.xbs-pop-item > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xbs-pop-item > .km-ico { color: var(--km-ink-2); }
+.xbs-pop-item:active { background: var(--km-surface-2); }
+.xbs-pop-item.current { font-weight: 700; }
+.xbs-pop-item.current > .km-ico { color: var(--km-accent); }
+.xbs-pop.right .xbs-pop-item { padding-left: 1rem; }
+
+.xbs-pop-note {
+    margin: 0.25rem 1rem 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--km-line);
+    font-size: 0.8125rem;
+    color: var(--km-ink-2);
 }
 
 /* ---- Grouped list: one rounded surface, hairline dividers. ---- */
@@ -1070,7 +1116,38 @@ body.xbs-scrolled .xbs-fab-label { max-width: 0; opacity: 0; }
 html.xbs-locked .xbs-fab,
 html.xbs-locked .xbs-statusbar,
 html.xbs-locked .xbs-go,
-html.xbs-locked .xbs-go-chip { visibility: hidden; }
+html.xbs-locked .xbs-go-chip,
+html.xbs-typing .xbs-fab,
+html.xbs-typing .xbs-statusbar,
+html.xbs-typing .xbs-go,
+html.xbs-typing .xbs-go-chip { visibility: hidden; }
+
+/* Phone landscape (short viewport): content column centred, FAB icon-only,
+   no status pill (status lives in the drawer head). */
+@media (orientation: landscape) and (max-height: 559px) {
+    .xbs-list, .xbs-pinned-box, .xbs-section, .xbs-hint { max-width: 760px; margin-left: auto; margin-right: auto; }
+    .xbs-list { margin-bottom: 0.75rem; }
+    .xbs-statusbar { display: none; }
+    .xbs-fab { padding: 0 1rem; gap: 0; }
+    .xbs-fab-label { max-width: 0; opacity: 0; }
+}
+
+/* Wide screens (sidebar layout): the page bar sits in the content column. */
+@media (min-width: 641px) and (min-height: 560px) {
+    .xbs-pagebar {
+        position: sticky;
+        top: 0;
+        margin: calc(-3rem - env(safe-area-inset-top, 0px)) -1.5rem 0.5rem -2rem;
+        right: auto;
+        left: auto;
+    }
+}
+
+/* Sheets never stretch across a wide/landscape screen. */
+@media (min-width: 641px) {
+    .xbs-sheet-backdrop { justify-content: center; }
+    .xbs-sheet { max-width: 600px; }
+}
 
 /* Scroll-jump button: disc right edge aligned with the FAB, 16px above it. */
 .xbs-go {
