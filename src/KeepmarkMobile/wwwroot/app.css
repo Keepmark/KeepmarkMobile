@@ -1790,3 +1790,19 @@ html.xbs-locked .xbs-go-chip { visibility: hidden; }
     color: var(--km-accent);
     font-weight: 600;
 }
+
+/* Verified credential summary (Connect → link existing). */
+.xbs-verified {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--km-green) 12%, var(--km-surface));
+    color: var(--km-ink);
+}
+
+.xbs-verified > .km-ico { color: var(--km-green); stroke-width: 2.25; }
+.xbs-verified-text { display: flex; flex-direction: column; min-width: 0; }
+.xbs-verified-text span { font-size: 0.875rem; color: var(--km-ink-2); }

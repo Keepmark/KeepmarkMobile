@@ -39,12 +39,20 @@ else
         @if (impPath is not null)
         {
             <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
-            <label class="form-label">Backup password</label>
-            <input type="password" class="form-control" @bind="impPassword" autocomplete="current-password" />
-            <div class="form-text">Reading the file verifies the password first — a wrong password stops here.</div>
-            <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-secondary" @onclick="PreviewImport" disabled="@busy">Read backup</button>
-            </div>
+            @if (impCount is null)
+            {
+                <label class="form-label">Backup password</label>
+                <input type="password" class="form-control" @bind="impPassword" autocomplete="current-password" />
+                <div class="form-text">Reading the file verifies the password first — a wrong password stops here.</div>
+                <div class="mt-2 d-flex gap-2">
+                    <button class="btn btn-secondary" @onclick="PreviewImport" disabled="@busy">Read backup</button>
+                </div>
+            }
+            else
+            {
+                @* Read with this password: restore uses the same one, so it is no longer editable. *@
+                <p class="text-muted mb-1">Password verified. Choose the file again to use a different backup or password.</p>
+            }
             @if (impCount is not null)
             {
                 @if (!armedImp)

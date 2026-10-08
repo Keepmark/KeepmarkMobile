@@ -70,9 +70,12 @@ else
         <div class="xbs-service-row">
             <span class="xbs-service-label">Service</span>
             <span class="xbs-service-host">@ServiceHost</span>
-            <button class="xbs-link-btn" @onclick="() => showService = !showService" aria-expanded="@ServiceOpen.ToString().ToLowerInvariant()">@(ServiceOpen ? "Hide" : "Change")</button>
+            @if (reconcile is null)
+            {
+                <button class="xbs-link-btn" @onclick="() => showService = !showService" aria-expanded="@ServiceOpen.ToString().ToLowerInvariant()">@(ServiceOpen ? "Hide" : "Change")</button>
+            }
         </div>
-        @if (ServiceOpen)
+        @if (ServiceOpen && reconcile is null)
         {
             <div class="mb-3">
                 <label class="form-label">Service URL</label>
@@ -89,14 +92,27 @@ else
                 }
             </div>
         }
-        @if (mode == "existing")
+        @if (mode == "existing" && reconcile is not null)
+        {
+            @* Verified: the apply step uses exactly these credentials, so the
+               inputs are gone (editing them would not change the target). *@
+            <div class="xbs-verified" role="status">
+                <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                <div class="xbs-verified-text">
+                    <strong>Sync <code>@ShortId(reconcile.Candidate.Id)</code> opened</strong>
+                    <span>@reconcile.RemoteCount item(s) on the server · @reconcile.LocalCount on this device</span>
+                </div>
+            </div>
+            <button class="btn btn-outline-secondary w-100 mb-3" @onclick="UseDifferentSync" disabled="@busy">Use a different sync…</button>
+        }
+        else if (mode == "existing")
         {
             <div class="mb-3">
                 <label class="form-label">Sync ID</label>
                 <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
                 <label class="form-label mt-2">Password</label>
                 <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-                <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing is changed until you pick a direction below.</div>
+                <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing changes until you pick a direction in the next step.</div>
                 <div class="mt-3 d-grid">
                     <button class="btn btn-primary" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
                 </div>
@@ -325,6 +341,19 @@ else
         message = string.Empty;
     }
 
+    /// <summary>Drop the verified candidate and go back to the ID/password form.</summary>
+    private void UseDifferentSync()
+    {
+        reconcile = null;
+        mergeStats = null;
+        mergeStatsFor = null;
+        armedMerge = false;
+        armedLocal = false;
+        armedRemote = false;
+        applyError = string.Empty;
+        message = string.Empty;
+    }
+
     private void Back()
     {
         mode = null;
@@ -442,7 +471,7 @@ else
             {
                 // Preselect the only sensible direction when one side is empty.
                 direction = reconcile.RemoteCount == 0 ? "upload" : "download";
-                Ok("Credentials valid. Choose the sync direction above.");
+                Ok("Credentials valid. Choose the sync direction below.");
             }
         }, err => linkError = err, "connect-link");
     }

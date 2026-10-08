@@ -84,15 +84,15 @@
     }
     <div class="mb-3">
         <label class="form-label">Current password</label>
-        <input type="password" class="form-control" @bind="pwCurrent" autocomplete="current-password" />
+        <input type="password" class="form-control" @bind="pwCurrent" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />
     </div>
     <div class="mb-3">
         <label class="form-label">New password</label>
-        <input type="password" class="form-control" @bind="pwNew" autocomplete="new-password" />
+        <input type="password" class="form-control" @bind="pwNew" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
     </div>
     <div class="mb-3">
         <label class="form-label">Confirm new password</label>
-        <input type="password" class="form-control" @bind="pwConfirm" autocomplete="new-password" />
+        <input type="password" class="form-control" @bind="pwConfirm" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
     </div>
     <button class="btn btn-warning" @onclick="() => armedPw = true" disabled="@(pwBusy || armedPw)">Change password…</button>
     @if (armedPw)
