@@ -61,9 +61,10 @@ only as method arguments, never stored, never logged.
 | R4.3 | v1.2 capability probed on the 1.2.0 contract (`GetInfoV12Async` — the legacy contract strips capabilities, so probing there could never succeed), cached per service URL; 412 / missing capabilities = legacy. A service older than MinApiVersion throws instead of being silently used. Verifier: against a v1.2 server, conditional GET and revision CAS must be observed in logs. |
 | R4.4 | Pull MUST refuse when the mirror is dirty (unpushed edits): status Conflict + `DataOutOfSyncException`, never silent discard. |
 | R4.5 | `ForceSyncAsync` matrix: remote≠local + dirty → Conflict (no auto-merge); remote≠local + clean → pull; equal + dirty → push; equal + clean → stamp `LastSyncAt`. Offline → Offline status, no throw to UI. |
-| R4.6 | Version gates: service < MinApiVersion refused at check; remote sync format > SyncClientVersion refused on pull/compare. |
-| R4.7 | `Normalize` on push: empty description/tags → null, descriptions truncated to 300 chars (byte-compatible with the original client). |
-| R4.8 | Bulk delete by stable NodeId = ONE transaction + ONE push (no sync storms). Single delete returns the subtree for 6 s undo. |
+| R4.6 | **Conflict resolution**: when status is Conflict, engine exposes `ResolveConflictPullAsync`, `ResolveConflictPushAsync`, `ResolveConflictMergeAsync`, and `GetConflictMergePreviewAsync`. UI MUST present 3 choices (Pull/Push/Merge) with preview counts from `GetConflictMergePreviewAsync`. Safety backup of destroyed side(s) taken BEFORE resolution (R7.1). Pull replaces local with remote; Push overwrites remote with local; Merge unions both sides (never deletes). |
+| R4.7 | Version gates: service < MinApiVersion refused at check; remote sync format > SyncClientVersion refused on pull/compare. |
+| R4.8 | `Normalize` on push: empty description/tags → null, descriptions truncated to 300 chars (byte-compatible with the original client). |
+| R4.9 | Bulk delete by stable NodeId = ONE transaction + ONE push (no sync storms). Single delete returns the subtree for 6 s undo.
 
 ## 5. Credentials & local store
 
@@ -87,8 +88,10 @@ Each flow states preconditions, mutations in order, and the REQUIRED user-visibl
 | R6.5 | Switch service (wizard: new / existing-pull / existing-push / existing-merge) | Nothing syncs before explicit confirm; safety-backup of the scrapped side first (merge: both sides, `switch-merge`); password verified by decrypt before mutation; wizard never deletes local data; draft survives navigation (no secrets in draft), cleared on complete/start-over. |
 | R6.6 | Unlink | Clears credentials ONLY; local items stay; sync stops. Requires explicit confirm. |
 | R6.7 | Backup export/import/preview | Envelope R2.5; import = preview (count) → two-step confirm → safety-backup local → dirty mirror (auto-push/conflict, never pull-over). 50 MB stream cap, tmp cleanup. |
-| R6.8 | Change password (`ChangePasswordAsync`) | Guards: current required, new required; current derived key MUST equal stored (else `InvalidCredentials`, zero mutations/downloads/queue). Then: safety-backup remote side → store new derived key → `PushAsync` (revision CAS/409 as usual) → rotate safety master (R7.3, best-effort). Old password stops working everywhere. |
+| R6.8 | Change password (`ChangePasswordAsync`) | Guards: current required, new required; current derived key MUST equal stored (else `InvalidCredentials`, zero mutations/downloads/queue). Then, in ONE engine gate hold (`SyncEngine.ChangeKeyAsync`): download the server copy (remote moved since the last sync → `DataOutOfSync`, zero mutations) → safety-backup of the REAL server copy → push re-encrypted under the new key on that remote base → store the new derived key ONLY after the PUT landed (a failed push keeps the old password working) → rotate safety master (R7.3, best-effort). Old password stops working everywhere. |
 | R6.9 | Duplicates bulk delete (`DeleteBookmarksAsync`) | Safety backup (local, `duplicates-cleanup`) BEFORE delete; one transaction + one push; result toast names the backup location. Last-copy-locked plan (never wipe a group). |
+|---|---|---|
+| R6.10 | Conflict resolution (`ResolveConflictPullAsync` / `ResolveConflictPushAsync` / `ResolveConflictMergeAsync`) | Precondition: status = Conflict + linked sync. Preview: `GetConflictMergePreviewAsync` → counts + samples (localOnly/remoteOnly/titleConflicts/foldersCreated/separatorsAdopted + RemoteLastUpdated). UI presents 3 choices: Pull (take remote, backup local → `conflict-pull`), Push (upload local, backup remote → `conflict-push`), Merge (union both, backup both → `conflict-merge`). Safety backup of destroyed side(s) taken FIRST (fail closed). On success: conflict state cleared, status refreshed. |
 
 ### Merge rules (normative — port of KeepmarkApp `src/shared/merge.ts`)
 
@@ -184,3 +187,59 @@ fails the review.
 4. `grep -rn "HttpMethod.Delete" src/Keepmark.Core` → no hits (no server delete in this client — by design).
 5. `grep -rn "TODO\|FIXME\|HACK" src/ | tests/` → triage list, none load-bearing.
 6. `dotnet test` green + both-direction crypto vectors green + `dotnet build … -f net10.0-android` 0 errors before any commit.
+
+## 13. Development requirements (prevent regression)
+
+### 13.1 Concurrency & gate discipline
+
+- **Every `await _gate.WaitAsync()` MUST have a matching `_gate.Release()` in a `finally` block.** No exceptions. The `SyncQueue` runner wraps `runJob` in try/finally but individual engine methods that acquire the gate directly must release it.
+- **Conflict resolution methods** (`ResolveConflictPullAsync`, `ResolveConflictPushAsync`, `ResolveConflictMergeAsync`) MUST:
+  1. Set `_resolvingConflict = true` at start of `try`
+  2. Reset `_resolvingConflict = false` in `finally` (after `_gate.Release()`)
+  3. Never call other public sync methods that might re-acquire the gate (avoid deadlock)
+- **`ForceSyncAsync` and `PushInBackgroundAsync`** MUST check `_resolvingConflict` **after** acquiring `_gate` and return early if true. This prevents false Conflict status during resolution.
+- **Background timers** (poll, native debounce) MUST NOT fire sync logic while `_resolvingConflict` is true.
+
+### 13.1b Push-base rule (review 2026-10-08)
+
+- Every PUT that follows an explicit GET (conflict pull/push/merge, link
+  upload/merge, switch, password change) uses the `lastUpdated` /
+  `meta.revision` of THAT GET (`PushBase`), never the base stored in the
+  mirror — the stored base is exactly what caused the conflict, and after a
+  previous link it belongs to another sync.
+- Link flows switch credentials only after the server accepted the write
+  (`LinkUploadAsync`) or the remote tree decrypted and replaced the mirror
+  (`LinkAdoptRemoteAsync`); a 409 / wrong password leaves the previous link
+  intact.
+- Conflict resolutions run inside `RunConflictResolutionAsync`: one gate
+  hold, `_resolvingConflict` + timer suspension undone in a single `finally`
+  even when the gate wait times out.
+- Destructive conflict choices are armed (tap → inline confirm) and the
+  success text names Backup → Safety backups (R7.5, R8.2).
+- Regression suite: `ConflictResolutionTests.cs` (fake server enforces real
+  base semantics: stale timestamp/revision → 409).
+
+### 13.2 Merge retry discipline
+
+- **Merge push MUST retry on 409** (DataOutOfSyncException) with re-fetch + re-merge (max 3 attempts). Single push attempt is insufficient when remote can change during merge.
+- Re-merge uses the **same pure `BookmarkMerge.Merge` function** as preview, so counts always match.
+
+### 13.3 State capture completeness
+
+- **All conflict entry points** must capture conflict state: push (409), pull (if local dirty), auto-sync (both dirty). The conflict state must include: local tree, remoteLastUpdated, encrypted local blob, local count.
+- **Preview API** (`GetConflictMergePreviewAsync`) MUST re-fetch remote at call time, not return cached state.
+
+### 13.4 Test coverage requirements
+
+- **Concurrency tests**: race between auto-sync and conflict resolution (Pull/Push/Merge)
+- **Merge retry test**: simulate 409 on push, verify re-merge + retry succeeds
+- **Gate release test**: every engine method acquiring `_gate` verified to release in `finally`
+- **Flag test**: `_resolvingConflict` prevents ForceSyncAsync/background push during resolution
+
+### 13.5 Release checklist (Keepmark Android)
+
+- [ ] `dotnet test` green (131+ Core tests)
+- [ ] `dotnet build -f net10.0-android` 0 errors
+- [ ] Device deploy: `dotnet build -t:Run` or `adb install`
+- [ ] Manual device QA: conflict → merge → safety backup visible
+- [ ] Version bump in `Keepmark.csproj` (`ApplicationDisplayVersion`, `ApplicationVersion`)

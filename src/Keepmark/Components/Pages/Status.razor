@@ -18,6 +18,23 @@ else
     {
         <div class="alert alert-info" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Sync in progress… values below refresh when it finishes.</div>
     }
+
+    @if (!string.IsNullOrEmpty(conflictResult))
+    {
+        <div class="alert alert-success" role="status">@conflictResult</div>
+    }
+
+    @if (status == Core.Sync.SyncStatus.Conflict)
+    {
+        <div class="alert alert-warning" role="alert">
+            <h4>⚠️ Sync conflict</h4>
+            <p>The server has newer changes. Your local changes could not be pushed.</p>
+            <div class="d-grid gap-2 mt-2">
+                <button class="btn btn-outline-primary" @onclick="ShowConflictDetails" disabled="@busy">Show details & resolve…</button>
+            </div>
+        </div>
+    }
+
     <h3>Synchronization</h3>
     <ul>
         <li>Mode: @AppSettings.Mode</li>
@@ -26,6 +43,68 @@ else
         <li>Service: @(serviceUrl ?? "not linked")</li>
         <li>Service version: @(serviceVersion ?? (serviceUrl is null ? "—" : "unknown (offline?)"))</li>
     </ul>
+
+    @if (showConflictDetails && conflictPreview is not null)
+    {
+        <div class="card mt-3 border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">Conflict resolution</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Remote updated <strong>@FormatRelative(conflictPreview.RemoteLastUpdated)</strong> · Local has <strong>@conflictPreview.LocalCount</strong> items · Remote has <strong>@conflictPreview.RemoteCount</strong> items</p>
+
+                <dl class="row mb-3">
+                    <dt class="col-sm-6">Local only → will upload</dt><dd class="col-sm-6">@conflictPreview.LocalOnly</dd>
+                    <dt class="col-sm-6">Remote only → will download</dt><dd class="col-sm-6">@conflictPreview.RemoteOnly</dd>
+                    <dt class="col-sm-6">Title conflicts (server wins)</dt><dd class="col-sm-6">@conflictPreview.TitleConflicts</dd>
+                    <dt class="col-sm-6">Folders created</dt><dd class="col-sm-6">@conflictPreview.FoldersCreated</dd>
+                    <dt class="col-sm-6">Separators kept from both</dt><dd class="col-sm-6">@conflictPreview.SeparatorsAdopted</dd>
+                </dl>
+
+                @if (armedDirection is null)
+                {
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Pull)" disabled="@busy">
+                            📥 Take remote — replace local with server (@conflictPreview.RemoteCount items)…
+                        </button>
+                        <button class="btn btn-outline-primary" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Push)" disabled="@busy">
+                            📤 Upload local — overwrite server with local (@conflictPreview.LocalCount items)…
+                        </button>
+                        <button class="btn btn-outline-warning text-dark" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Merge)" disabled="@busy">
+                            🔀 Merge both sides — union, nothing deleted…
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-secondary" role="alert">
+                        <p class="mb-2">@ConfirmText(armedDirection.Value)</p>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-danger" @onclick="() => ResolveConflict(armedDirection.Value)" disabled="@busy">@ConfirmLabel(armedDirection.Value)</button>
+                            <button class="btn btn-secondary" @onclick="() => armedDirection = null" disabled="@busy">Cancel</button>
+                        </div>
+                    </div>
+                }
+
+                @if (busy)
+                {
+                    <div class="text-center mt-2">
+                        <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Resolving…</span></div>
+                        <span class="ms-2">Resolving conflict…</span>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(conflictError))
+                {
+                    <div class="alert alert-danger mt-2" role="alert">@conflictError</div>
+                }
+
+                <div class="text-end mt-2">
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => { showConflictDetails = false; armedDirection = null; }" disabled="@busy">Cancel</button>
+                </div>
+            </div>
+        </div>
+    }
 
     <h3>Storage</h3>
     <ul>
@@ -81,6 +160,43 @@ else
     private string? serviceVersion;
     private Core.Data.ContentStats? stats;
 
+    // Conflict resolution state
+    private bool showConflictDetails;
+    private Core.Sync.MergeStats? conflictPreview;
+    private bool busy;
+    private string? conflictError;
+    private string? conflictResult;
+    /// <summary>Armed destructive choice (R8.2): first tap arms, the inline
+    /// confirm button runs it.</summary>
+    private Core.Sync.ConflictResolutionDirection? armedDirection;
+
+    private void Arm(Core.Sync.ConflictResolutionDirection d)
+    {
+        armedDirection = d;
+        conflictError = null;
+    }
+
+    private static string ConfirmText(Core.Sync.ConflictResolutionDirection d) => d switch
+    {
+        Core.Sync.ConflictResolutionDirection.Pull => "Replace your local bookmarks with the server copy? Your local tree is saved to Backup → Safety backups first.",
+        Core.Sync.ConflictResolutionDirection.Push => "Overwrite the server copy with your local bookmarks? The server copy is saved to Backup → Safety backups first.",
+        _ => "Merge both sides into one tree (nothing is deleted) and upload it? Both sides are saved to Backup → Safety backups first.",
+    };
+
+    private static string ConfirmLabel(Core.Sync.ConflictResolutionDirection d) => d switch
+    {
+        Core.Sync.ConflictResolutionDirection.Pull => "Yes, take remote",
+        Core.Sync.ConflictResolutionDirection.Push => "Yes, upload local",
+        _ => "Yes, merge",
+    };
+
+    private static string ResultText(Core.Sync.ConflictResolutionDirection d) => d switch
+    {
+        Core.Sync.ConflictResolutionDirection.Pull => "Conflict resolved: took the server copy. Your previous local tree is in Backup → Safety backups.",
+        Core.Sync.ConflictResolutionDirection.Push => "Conflict resolved: uploaded your local tree. The previous server copy is in Backup → Safety backups.",
+        _ => "Conflict resolved: merged both sides (nothing deleted). Both previous sides are in Backup → Safety backups.",
+    };
+
     protected override async Task OnInitializedAsync()
     {
         for (int i = 0; i < 100 && !Session.Ready; i++)
@@ -113,7 +229,85 @@ else
             var (_, blob, _, _) = await Session.Store.LoadMirrorAsync();
             serverBytes = blob is null ? null : (long?)blob.Length;
             stats = await Session.Store.GetStatsAsync();
+
+            // If in conflict, load merge preview for the resolution UI
+            if (status == Core.Sync.SyncStatus.Conflict && !showConflictDetails)
+            {
+                await LoadConflictPreviewAsync();
+            }
         }
+    }
+
+    private async Task LoadConflictPreviewAsync()
+    {
+        if (Session.Engine is null) return;
+        try
+        {
+            conflictPreview = await Session.Engine.GetConflictMergePreviewAsync();
+        }
+        catch (Exception ex)
+        {
+            conflictError = ex.Message;
+        }
+    }
+
+    private async Task ShowConflictDetails()
+    {
+        showConflictDetails = true;
+        if (conflictPreview is null)
+        {
+            await LoadConflictPreviewAsync();
+        }
+    }
+
+    private async Task ResolveConflict(Core.Sync.ConflictResolutionDirection direction)
+    {
+        if (Session.Engine is null) return;
+        busy = true;
+        conflictError = null;
+        conflictResult = null;
+        Session.Log.Info("status", $"Resolve conflict: {direction}");
+        try
+        {
+            switch (direction)
+            {
+                case Core.Sync.ConflictResolutionDirection.Pull:
+                    await Session.Engine.ResolveConflictPullAsync();
+                    break;
+                case Core.Sync.ConflictResolutionDirection.Push:
+                    await Session.Engine.ResolveConflictPushAsync();
+                    break;
+                case Core.Sync.ConflictResolutionDirection.Merge:
+                    await Session.Engine.ResolveConflictMergeAsync();
+                    break;
+            }
+            showConflictDetails = false;
+            conflictPreview = null;
+            armedDirection = null;
+            conflictResult = ResultText(direction);
+            await LoadAsync(); // Refresh status
+        }
+        catch (Exception ex)
+        {
+            conflictError = ex.Message;
+            armedDirection = null;
+            Session.Log.Error("status", $"Conflict resolution failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static string FormatRelative(string? isoUtc)
+    {
+        if (string.IsNullOrEmpty(isoUtc) || !DateTimeOffset.TryParse(isoUtc, out var dto))
+            return "unknown time";
+        var diff = DateTimeOffset.UtcNow - dto;
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes} min ago";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours} h ago";
+        return $"{(int)diff.TotalDays} d ago";
     }
 
     /// <summary>Service quota + version, fetched once per visit (not on every

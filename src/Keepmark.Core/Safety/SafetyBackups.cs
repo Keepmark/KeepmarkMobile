@@ -18,6 +18,10 @@ public static class SafetyOperations
     public const string SwitchMerge = "switch-merge";
     public const string DuplicatesCleanup = "duplicates-cleanup";
     public const string PreRestore = "pre-restore";
+    // Conflict resolution operations
+    public const string ConflictPull = "conflict-pull";
+    public const string ConflictPush = "conflict-push";
+    public const string ConflictMerge = "conflict-merge";
     public const string Legacy = "legacy";
 
     public static string Describe(string operation) => operation switch
@@ -33,6 +37,9 @@ public static class SafetyOperations
         SwitchMerge => "Merged both sides — Switch service",
         DuplicatesCleanup => "Deleted duplicates",
         PreRestore => "Before safety-backup restore",
+        ConflictPull => "Conflict resolved: took remote",
+        ConflictPush => "Conflict resolved: uploaded local",
+        ConflictMerge => "Conflict resolved: merged both sides",
         _ => "Older backup",
     };
 }

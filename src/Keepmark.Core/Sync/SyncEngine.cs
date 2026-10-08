@@ -6,6 +6,7 @@ using Keepmark.Core.Errors;
 using Keepmark.Core.I18n;
 using Keepmark.Core.Logging;
 using Keepmark.Core.Models;
+using Keepmark.Core.Safety;
 
 namespace Keepmark.Core.Sync;
 
@@ -23,6 +24,14 @@ public enum SyncStatus
     Conflict,
     Error,
     NoCredentials
+}
+
+/// <summary>Direction for resolving a sync conflict.</summary>
+public enum ConflictResolutionDirection
+{
+    Pull,   // Take remote, overwrite local
+    Push,   // Upload local, overwrite remote
+    Merge   // Union both sides
 }
 
 /// <summary>Credentials + derived key, supplied by the platform layer (KeyStore/SecureStorage).</summary>
@@ -46,7 +55,10 @@ public sealed class SyncEngine(
     BookmarkStore store,
     ICredentialStore creds,
     IXbsLocalizer str,
-    IXbsLogger log)
+    IXbsLogger log,
+    Func<string, string, string, int, string?, Task>? saveSafetyBackup = null,
+    Action? suspendAutoSync = null,
+    Action? resumeAutoSync = null)
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -59,6 +71,20 @@ public sealed class SyncEngine(
     /// Probed via /info capabilities; legacy servers stay on the 1.1 contract.</summary>
     private readonly Dictionary<string, bool> _v12 = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Optional callback for safety backups (provided by XbsSession).</summary>
+    private readonly Func<string, string, string, int, string?, Task>? _saveSafetyBackup = saveSafetyBackup;
+
+    /// <summary>Callback to suspend auto-sync timer during conflict resolution.</summary>
+    private readonly Action? _suspendAutoSync = suspendAutoSync;
+
+    /// <summary>Callback to resume auto-sync timer after conflict resolution.</summary>
+    private readonly Action? _resumeAutoSync = resumeAutoSync;
+
+    /// <summary>True while a conflict resolution (pull/push/merge) is in progress.
+    /// Prevents ForceSyncAsync from detecting a false conflict during resolution.
+    /// Volatile to ensure visibility across threads without locks.</summary>
+    private volatile bool _resolvingConflict;
+
     public SyncMode Mode { get; set; } = SyncMode.Auto;
     public SyncStatus Status { get; private set; } = SyncStatus.Idle;
     public DateTimeOffset? LastSyncAt { get; private set; }
@@ -68,9 +94,36 @@ public sealed class SyncEngine(
     public event Action? DataChanged;
     public event Action<SyncStatus>? StatusChanged;
 
+    /// <summary>Explicit push base: the remote state just read by the caller
+    /// (conflict resolution, link upload, password change). Pushing on the
+    /// stored mirror base there would always 409.</summary>
+    private sealed record PushBase(string LastUpdated, long? Revision);
+
+    /// <summary>Acquires the engine gate with a deadlock guard. Callers release
+    /// it exactly once, in their own finally.</summary>
+    private async Task AcquireGateAsync(string op, TimeSpan timeout, CancellationToken ct)
+    {
+        using var gateCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        gateCts.CancelAfter(timeout);
+        try
+        {
+            await _gate.WaitAsync(gateCts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            log.Error("sync", $"{op}: gate wait timed out after {(int)timeout.TotalSeconds}s");
+            throw new ServiceOfflineException($"Another sync operation is still running ({op}). Try again in a moment.");
+        }
+    }
+
+    /// <summary>Decrypted tree JSON → nodes. An empty blob (fresh sync created
+    /// without an upload) is an empty tree, never a parse error.</summary>
+    private static List<BookmarkNode> ParseTree(string json) =>
+        string.IsNullOrWhiteSpace(json) ? [] : JsonSerializer.Deserialize<List<BookmarkNode>>(json, Json) ?? [];
+
     public async Task<bool> PullAsync(CancellationToken ct = default)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await AcquireGateAsync("Pull", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
             return await PullCoreAsync(ct).ConfigureAwait(false);
@@ -129,7 +182,7 @@ public sealed class SyncEngine(
                 }
             }
 
-            var full = await api.GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
+            var full = await GetFullAsync(c, ct).ConfigureAwait(false);
             return await ApplyPulledAsync(full, c, ct).ConfigureAwait(false);
         }
         catch (DataOutOfSyncException)
@@ -147,8 +200,7 @@ public sealed class SyncEngine(
     private async Task<bool> ApplyPulledAsync(GetBookmarksResponse full, SyncCredentials c, CancellationToken ct)
     {
         ThrowIfVersionUnsupported(full.Version);
-        var json = crypto.Decrypt(full.Bookmarks ?? string.Empty, c.DerivedKey);
-        var roots = JsonSerializer.Deserialize<List<BookmarkNode>>(json, Json) ?? [];
+        var roots = ParseTree(crypto.Decrypt(full.Bookmarks ?? string.Empty, c.DerivedKey));
         // Meta persists only when the server speaks v1.2; otherwise stale
         // revision/hash is cleared so the next push cannot reuse it.
         await store.ReplaceAllAsync(roots, full.Bookmarks ?? string.Empty, full.LastUpdated!, full.Version,
@@ -165,6 +217,25 @@ public sealed class SyncEngine(
         DataChanged?.Invoke();
         log.Info("sync", $"Pull: updated to lastUpdated={full.LastUpdated}");
         return true;
+    }
+
+    /// <summary>Full download on the best contract: v1.2 (meta flows, so the
+    /// next push can use revision CAS) when the service speaks it, else legacy.</summary>
+    private async Task<GetBookmarksResponse> GetFullAsync(SyncCredentials c, CancellationToken ct)
+    {
+        var api = apiFor(c.ServiceUrl);
+        return await IsV12Async(c.ServiceUrl, ct).ConfigureAwait(false)
+            ? await api.GetBookmarksV12Async(c.Id, ct).ConfigureAwait(false)
+            : await api.GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Downloads + decrypts the remote tree (version-gated).</summary>
+    private async Task<(GetBookmarksResponse Res, List<BookmarkNode> Tree)> FetchRemoteTreeAsync(
+        SyncCredentials c, CancellationToken ct)
+    {
+        var res = await GetFullAsync(c, ct).ConfigureAwait(false);
+        ThrowIfVersionUnsupported(res.Version);
+        return (res, ParseTree(crypto.Decrypt(res.Bookmarks ?? string.Empty, c.DerivedKey)));
     }
 
     /// <summary>Capability probe, cached per service URL. Probed on the 1.2.0
@@ -233,7 +304,7 @@ public sealed class SyncEngine(
     public async Task PushAsync(bool updateVersion = false, CancellationToken ct = default)
     {
         log.Debug("sync", "Push: start");
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await AcquireGateAsync("Push", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
             await PushCoreAsync(updateVersion, ct).ConfigureAwait(false);
@@ -244,9 +315,13 @@ public sealed class SyncEngine(
         }
     }
 
-    private async Task PushCoreAsync(bool updateVersion, CancellationToken ct)
+    private async Task PushCoreAsync(
+        bool updateVersion, CancellationToken ct, PushBase? baseOverride = null, string? keyOverride = null)
     {
-        var c = await RequireCredsAsync().ConfigureAwait(false);
+        var stored = await RequireCredsAsync().ConfigureAwait(false);
+        // keyOverride: password change re-encrypts under the NEW key; the
+        // stored credentials rotate only after the server accepted it.
+        var c = keyOverride is null ? stored : stored with { DerivedKey = keyOverride };
         SetStatus(SyncStatus.Syncing);
         List<BookmarkNode> roots = [];
         string blob = string.Empty;
@@ -257,6 +332,11 @@ public sealed class SyncEngine(
             (loaded, _, lastUpdated, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
             roots = loaded;
             var dirty = await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false);
+            if (baseOverride is not null)
+            {
+                lastUpdated = baseOverride.LastUpdated;
+            }
+
             if (lastUpdated is null)
             {
                 throw new IncompleteSyncInfoException(str.Get(Str.ErrIncompleteSyncInfo));
@@ -268,7 +348,9 @@ public sealed class SyncEngine(
 
             var api = apiFor(c.ServiceUrl);
             UpdateBookmarksResponse res;
-            var revRaw = await store.GetMetaAsync(BookmarkStore.MetaRevision).ConfigureAwait(false);
+            var revRaw = baseOverride is not null
+                ? baseOverride.Revision?.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : await store.GetMetaAsync(BookmarkStore.MetaRevision).ConfigureAwait(false);
             if (await IsV12Async(c.ServiceUrl, ct).ConfigureAwait(false)
                 && long.TryParse(revRaw, out var baseRevision))
             {
@@ -348,74 +430,114 @@ public sealed class SyncEngine(
     }
 
     /// <summary>Auto tick: pull if remote is newer, else push if local is dirty.</summary>
-    public Task ExecuteAutoSyncAsync(CancellationToken ct = default)
+    public async Task ExecuteAutoSyncAsync(CancellationToken ct = default)
     {
         if (Mode != SyncMode.Auto)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return ForceSyncAsync(ct);
+        // Acquire the gate first, then check the flag while holding it.
+        try
+        {
+            await AcquireGateAsync("Auto-sync", TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+        }
+        catch (ServiceOfflineException)
+        {
+            log.Warn("sync", "Auto-sync skipped: another sync operation is running");
+            return;
+        }
+
+        try
+        {
+            if (_resolvingConflict)
+            {
+                log.Warn("sync", "Auto-sync aborted: conflict resolution in progress");
+                return;
+            }
+
+            await ForceSyncInternalAsync(ct, isAutoSync: true).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     /// <summary>Manual "Sync now": same as the auto tick but runs in any mode.</summary>
     public async Task ForceSyncAsync(CancellationToken ct = default)
     {
-        log.Debug("sync", "ForceSync: start");
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await AcquireGateAsync("Sync now", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
-            var c = await creds.GetAsync().ConfigureAwait(false);
-            if (c is null)
-            {
-                SetStatus(SyncStatus.NoCredentials);
-                return;
-            }
-
-            var api = apiFor(c.ServiceUrl);
-            string? remote;
-            try
-            {
-                remote = (await api.GetLastUpdatedAsync(c.Id, ct).ConfigureAwait(false)).LastUpdated;
-            }
-            catch (ServiceOfflineException)
-            {
-                SetStatus(SyncStatus.Offline);
-                return;
-            }
-
-            var local = await store.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
-            var dirty = await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1";
-
-            if (remote != local)
-            {
-                if (dirty)
-                {
-                    // Both sides moved: never auto-merge, surface the conflict.
-                    SetStatus(SyncStatus.Conflict);
-                    log.Warn("sync", "Auto: remote and local both changed -> conflict");
-                    return;
-                }
-
-                log.Debug("sync", "ForceSync: pulling remote");
-                await PullCoreAsync(ct).ConfigureAwait(false);
-            }
-            else if (dirty)
-            {
-                log.Debug("sync", "ForceSync: pushing local");
-                await PushCoreAsync(updateVersion: false, ct: ct).ConfigureAwait(false);
-            }
-            else
-            {
-                // Successful check, nothing to do: still stamp the check time.
-                log.Debug("sync", "ForceSync: already in sync");
-                LastSyncAt = DateTimeOffset.UtcNow;
-                SetStatus(SyncStatus.Idle);
-            }
+            await ForceSyncInternalAsync(ct, isAutoSync: false).ConfigureAwait(false);
         }
         finally
         {
             _gate.Release();
+        }
+    }
+
+    /// <summary>Internal sync logic shared by auto and manual sync. The caller
+    /// holds <c>_gate</c> and releases it; this method never does.</summary>
+    private async Task ForceSyncInternalAsync(CancellationToken ct, bool isAutoSync)
+    {
+        log.Debug("sync", isAutoSync ? "Auto-sync: start" : "Manual sync: start");
+
+        // Check flag WHILE holding the gate (race window between check and gate).
+        if (_resolvingConflict)
+        {
+            log.Warn("sync", "ForceSync aborted: conflict resolution in progress");
+            if (isAutoSync) return;
+            throw new InvalidOperationException("Conflict resolution in progress. Please wait for it to complete.");
+        }
+
+        var c = await creds.GetAsync().ConfigureAwait(false);
+        if (c is null)
+        {
+            SetStatus(SyncStatus.NoCredentials);
+            return;
+        }
+
+        var api = apiFor(c.ServiceUrl);
+        string? remote;
+        try
+        {
+            remote = (await api.GetLastUpdatedAsync(c.Id, ct).ConfigureAwait(false)).LastUpdated;
+        }
+        catch (ServiceOfflineException)
+        {
+            SetStatus(SyncStatus.Offline);
+            return;
+        }
+
+        var local = await store.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
+        var dirty = await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1";
+
+        if (remote != local)
+        {
+            if (dirty)
+            {
+                // Both sides moved: never auto-merge, surface the conflict.
+                SetStatus(SyncStatus.Conflict);
+                log.Warn("sync", "Auto: remote and local both changed -> conflict");
+                return;
+            }
+
+            log.Debug("sync", "ForceSync: pulling remote");
+            await PullCoreAsync(ct).ConfigureAwait(false);
+        }
+        else if (dirty)
+        {
+            log.Debug("sync", "ForceSync: pushing local");
+            await PushCoreAsync(updateVersion: false, ct: ct).ConfigureAwait(false);
+        }
+        else
+        {
+            // Successful check, nothing to do: still stamp the check time.
+            log.Debug("sync", "ForceSync: already in sync");
+            LastSyncAt = DateTimeOffset.UtcNow;
+            SetStatus(SyncStatus.Idle);
         }
     }
 
@@ -439,6 +561,12 @@ public sealed class SyncEngine(
 
     private async Task PushInBackgroundAsync()
     {
+        // Skip background push if conflict resolution is in progress.
+        if (_resolvingConflict)
+        {
+            log.Debug("sync", "Background push skipped: conflict resolution in progress");
+            return;
+        }
         try
         {
             await PushAsync().ConfigureAwait(false);
@@ -670,9 +798,16 @@ public sealed class SyncEngine(
         }
 
         var full = await api.GetBookmarksAsync(candidate.Id, ct).ConfigureAwait(false);
+        if (string.IsNullOrEmpty(full.Version) && !string.IsNullOrEmpty(full.Bookmarks))
+        {
+            // R2.3: version-less legacy syncs use the old crypto — decrypting
+            // would only surface as a misleading "wrong password".
+            throw new UnsupportedSyncVersionException(
+                "Legacy sync without a version. Open it once in the original xBrowserSync client to upgrade it, then reconnect here.");
+        }
+
         ThrowIfVersionUnsupported(full.Version);
-        var json = crypto.Decrypt(full.Bookmarks ?? string.Empty, candidate.DerivedKey);
-        var roots = JsonSerializer.Deserialize<List<BookmarkNode>>(json, Json) ?? [];
+        var roots = ParseTree(crypto.Decrypt(full.Bookmarks ?? string.Empty, candidate.DerivedKey));
         int remote = CountNodes(roots);
         _ = localLast;
         return (local, remote, full.LastUpdated, full.Version, full.Bookmarks ?? string.Empty, localBlob ?? string.Empty);
@@ -737,6 +872,229 @@ public sealed class SyncEngine(
         }
 
         return n;
+    }
+
+    /// <summary>Shared envelope for the three conflict resolutions (spec §13.1):
+    /// flag + timer suspension first, gate held for the whole resolution,
+    /// everything undone in ONE finally — even when the gate wait times out.</summary>
+    private async Task RunConflictResolutionAsync(
+        string name, Func<SyncCredentials, Task> body, CancellationToken ct)
+    {
+        _resolvingConflict = true;
+        _suspendAutoSync?.Invoke();
+        var acquired = false;
+        try
+        {
+            await AcquireGateAsync(name, TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+            acquired = true;
+            var c = await RequireCredsAsync().ConfigureAwait(false);
+            SetStatus(SyncStatus.Syncing);
+            log.Info("sync", $"Conflict resolution: {name} start");
+            await body(c).ConfigureAwait(false);
+            log.Info("sync", $"Conflict resolved via {name}");
+        }
+        catch (Exception ex)
+        {
+            SetStatus(ex switch
+            {
+                DataOutOfSyncException => SyncStatus.Conflict,
+                ServiceOfflineException => SyncStatus.Offline,
+                _ => SyncStatus.Error,
+            });
+            log.Warn("sync", $"Conflict {name} failed: {ex.GetType().Name}");
+            throw;
+        }
+        finally
+        {
+            if (acquired)
+            {
+                _gate.Release();
+            }
+
+            _resolvingConflict = false;
+            _resumeAutoSync?.Invoke();
+        }
+    }
+
+    /// <summary>Fail-closed snapshot through the session callback. Without a
+    /// callback (unit tests) nothing is written; production always wires it.</summary>
+    private Task SnapshotAsync(string side, List<BookmarkNode> tree, string operation, string syncId) =>
+        _saveSafetyBackup is null
+            ? Task.CompletedTask
+            : _saveSafetyBackup(side, JsonSerializer.Serialize(tree, Json), operation, CountNodes(tree), syncId);
+
+    /// <summary>Resolves a conflict by taking the remote tree (pull). The local
+    /// side is snapshotted first, then the dirty mirror is replaced explicitly
+    /// (the normal pull refuses a dirty mirror by design).</summary>
+    public Task ResolveConflictPullAsync(CancellationToken ct = default) =>
+        RunConflictResolutionAsync("pull", async c =>
+        {
+            var (localRoots, _, _, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+            await SnapshotAsync("local", localRoots, SafetyOperations.ConflictPull, c.Id).ConfigureAwait(false);
+            var full = await GetFullAsync(c, ct).ConfigureAwait(false);
+            await ApplyPulledAsync(full, c, ct).ConfigureAwait(false);
+        }, ct);
+
+    /// <summary>Resolves a conflict by uploading the local tree (push), based
+    /// on the remote state just downloaded for the snapshot — never on the
+    /// stale mirror base that caused the conflict.</summary>
+    public Task ResolveConflictPushAsync(CancellationToken ct = default) =>
+        RunConflictResolutionAsync("push", async c =>
+        {
+            var (res, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
+            await SnapshotAsync("remote", remoteRoots, SafetyOperations.ConflictPush, c.Id).ConfigureAwait(false);
+            await PushCoreAsync(false, ct, new PushBase(res.LastUpdated!, res.Meta?.Revision)).ConfigureAwait(false);
+        }, ct);
+
+    /// <summary>Resolves a conflict by merging both trees (union, never
+    /// deletes). Both sides are snapshotted before the first mutation; a 409
+    /// (remote moved again) re-fetches and re-merges from the ORIGINAL local
+    /// tree, up to 3 attempts (spec §13.2).</summary>
+    public Task ResolveConflictMergeAsync(CancellationToken ct = default) =>
+        RunConflictResolutionAsync("merge", async c =>
+        {
+            var (localRoots, _, _, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+            const int maxAttempts = 3;
+            for (int attempt = 1; ; attempt++)
+            {
+                var (res, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
+                if (attempt == 1)
+                {
+                    await SnapshotAsync("local", localRoots, SafetyOperations.ConflictMerge, c.Id).ConfigureAwait(false);
+                    await SnapshotAsync("remote", remoteRoots, SafetyOperations.ConflictMerge, c.Id).ConfigureAwait(false);
+                }
+
+                var merged = BookmarkMerge.Merge(localRoots, remoteRoots);
+                await store.RestoreLocalAsync(merged.Tree).ConfigureAwait(false);
+                try
+                {
+                    await PushCoreAsync(false, ct, new PushBase(res.LastUpdated!, res.Meta?.Revision)).ConfigureAwait(false);
+                    log.Info("sync", $"Conflict merge: pushed on attempt {attempt}");
+                    return;
+                }
+                catch (DataOutOfSyncException) when (attempt < maxAttempts)
+                {
+                    log.Warn("sync", $"Conflict merge: 409 on attempt {attempt}/{maxAttempts}, re-merging");
+                }
+            }
+        }, ct);
+
+    /// <summary>Gets a merge preview for the conflict resolution UI. Always
+    /// re-fetches the remote (spec §13.3), never cached state.</summary>
+    public async Task<MergeStats> GetConflictMergePreviewAsync(CancellationToken ct = default)
+    {
+        var c = await RequireCredsAsync().ConfigureAwait(false);
+        var (res, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
+        var (localRoots, _, _, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+        var stats = BookmarkMerge.Merge(localRoots, remoteRoots).Stats;
+        return stats with { RemoteLastUpdated = res.LastUpdated };
+    }
+
+    /// <summary>Link flow "take remote": downloads the candidate's tree and
+    /// replaces the local mirror (dirty or not — the caller snapshotted it and
+    /// the user chose this explicitly), then switches the stored credentials.
+    /// One gate hold: no background push can interleave the switch.</summary>
+    public async Task LinkAdoptRemoteAsync(SyncCredentials candidate, CancellationToken ct = default)
+    {
+        await AcquireGateAsync("Link (take remote)", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+        try
+        {
+            SetStatus(SyncStatus.Syncing);
+            var full = await GetFullAsync(candidate, ct).ConfigureAwait(false);
+            // Decrypts (wrong password throws) before the mirror is replaced;
+            // credentials switch last.
+            await ApplyPulledAsync(full, candidate, ct).ConfigureAwait(false);
+            await creds.SetAsync(candidate with { Version = full.Version ?? candidate.Version }).ConfigureAwait(false);
+        }
+        catch (XbsException ex)
+        {
+            SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
+            throw;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Link flow "upload": PUTs <paramref name="roots"/> onto the
+    /// candidate sync based on <paramref name="remoteLastUpdated"/> (the base
+    /// read at probe/create time — never the previous link's mirror base).
+    /// Mirror + credentials switch only after the server accepted the write,
+    /// so a 409 leaves the previous link fully intact.</summary>
+    public async Task LinkUploadAsync(
+        SyncCredentials candidate, List<BookmarkNode> roots, string remoteLastUpdated, CancellationToken ct = default)
+    {
+        await AcquireGateAsync("Link (upload)", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+        try
+        {
+            SetStatus(SyncStatus.Syncing);
+            Normalize(roots);
+            var blob = crypto.Encrypt(JsonSerializer.Serialize(roots, Json), candidate.DerivedKey);
+            var res = await apiFor(candidate.ServiceUrl)
+                .UpdateBookmarksAsync(candidate.Id, blob, remoteLastUpdated, ct: ct).ConfigureAwait(false);
+            await store.ReplaceAllAsync(roots, blob, res.LastUpdated!, candidate.Version,
+                res.Meta?.Revision, res.Meta?.Hash).ConfigureAwait(false);
+            await creds.SetAsync(candidate).ConfigureAwait(false);
+            Interlocked.Exchange(ref _pendingEdits, 0);
+            LastSyncAt = DateTimeOffset.UtcNow;
+            SetStatus(SyncStatus.Idle);
+            DataChanged?.Invoke();
+            log.Info("sync", $"Link upload: {CountNodes(roots)} nodes");
+        }
+        catch (XbsException ex)
+        {
+            SetStatus(ex switch
+            {
+                DataOutOfSyncException => SyncStatus.Conflict,
+                ServiceOfflineException => SyncStatus.Offline,
+                _ => SyncStatus.Error,
+            });
+            throw;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Password change: re-encrypts the mirror under
+    /// <paramref name="newDerivedKey"/> and pushes it on the remote base. The
+    /// remote must be exactly what this device last synced (else 409: sync
+    /// first — never overwrite unseen remote changes). The server copy is
+    /// snapshotted first; the stored key rotates ONLY after the PUT landed, so
+    /// a failed push leaves the old password fully working.</summary>
+    public async Task ChangeKeyAsync(string newDerivedKey, string safetyOperation, CancellationToken ct = default)
+    {
+        await AcquireGateAsync("Change password", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+        try
+        {
+            var c = await RequireCredsAsync().ConfigureAwait(false);
+            var (res, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
+            var local = await store.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
+            if (res.LastUpdated != local)
+            {
+                SetStatus(SyncStatus.Conflict);
+                throw new DataOutOfSyncException(
+                    "The server copy changed since your last sync. Sync (or resolve the conflict) before changing the password.");
+            }
+
+            await SnapshotAsync("remote", remoteRoots, safetyOperation, c.Id).ConfigureAwait(false);
+            await PushCoreAsync(false, ct, new PushBase(res.LastUpdated!, res.Meta?.Revision), newDerivedKey)
+                .ConfigureAwait(false);
+            await creds.SetAsync(c with { DerivedKey = newDerivedKey }).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Current server copy as a tree (for "remote" safety snapshots).</summary>
+    public async Task<List<BookmarkNode>> GetRemoteTreeAsync(CancellationToken ct = default)
+    {
+        var c = await RequireCredsAsync().ConfigureAwait(false);
+        return (await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false)).Tree;
     }
 
     private async Task<SyncCredentials> RequireCredsAsync()

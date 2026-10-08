@@ -95,7 +95,22 @@ else
     }
 
     <div class="xbs-statusbar" role="status">
-        <span class="xbs-statusbar-main">@if (!string.IsNullOrEmpty(FriendlyStatus())){<text>● @FriendlyStatus() · </text>}Last sync: @FormatLastSync(lastSync)</span>
+        <span class="xbs-statusbar-main">
+            @if (!string.IsNullOrEmpty(FriendlyStatus()))
+            {
+                <text>● </text>
+                @if (engineStatus == Core.Sync.SyncStatus.Conflict)
+                {
+                    <a href="status" class="text-warning text-decoration-none" @onclick="@(() => Nav.NavigateTo("/status"))" style="cursor: pointer;">@FriendlyStatus()</a>
+                }
+                else
+                {
+                    <text>@FriendlyStatus()</text>
+                }
+                <text> · </text>
+            }
+            Last sync: @FormatLastSync(lastSync)
+        </span>
         @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
         {
             <button class="btn btn-link xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
@@ -210,6 +225,26 @@ else
         SharedImport.Arrived += OnSharedArrived;
         OpenSharedIfPending();
     }
+
+    private void OnStatus(Core.Sync.SyncStatus s)
+    {
+        engineStatus = s;
+        if (Session.Engine is not null)
+        {
+            lastSync = Session.Engine.LastSyncAt;
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string FriendlyStatus() => engineStatus switch
+    {
+        Core.Sync.SyncStatus.Syncing => "Syncing…",
+        Core.Sync.SyncStatus.Offline => "Offline — will retry",
+        Core.Sync.SyncStatus.Conflict => "Conflict — see Status",
+        Core.Sync.SyncStatus.Error => "Sync error",
+        _ => string.Empty
+    };
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -330,26 +365,6 @@ else
             }
         }
     }
-
-    private void OnStatus(Core.Sync.SyncStatus s)
-    {
-        engineStatus = s;
-        if (Session.Engine is not null)
-        {
-            lastSync = Session.Engine.LastSyncAt;
-        }
-
-        InvokeAsync(StateHasChanged);
-    }
-
-    private string FriendlyStatus() => engineStatus switch
-    {
-        Core.Sync.SyncStatus.Syncing => "Syncing…",
-        Core.Sync.SyncStatus.Offline => "Offline — will retry",
-        Core.Sync.SyncStatus.Conflict => "Conflict — see Status",
-        Core.Sync.SyncStatus.Error => "Sync error",
-        _ => string.Empty
-    };
 
     private static string FormatLastSync(DateTimeOffset? value)
     {

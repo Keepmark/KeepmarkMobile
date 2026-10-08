@@ -16,6 +16,13 @@ sealed class FakeApi : IXSyncApiClient
     public string Version { get; set; } = "1.8.0";
     public string Blob { get; set; } = string.Empty;
     public bool FailConflict { get; set; }
+    /// <summary>Real-server semantics: a timestamp base that differs from the
+    /// current lastUpdated loses with 409 (Node + KeepmarkApi behave so).</summary>
+    public bool EnforceTimestampBase { get; set; }
+    /// <summary>Number of upcoming PUTs that lose with 409 because another
+    /// device "pushed" in between (remote moves on each loss).</summary>
+    public int ConflictsBeforeSuccess { get; set; }
+    public bool Offline { get; set; }
     public int PushCount { get; private set; }
     public string? LastPushed { get; private set; }
     public bool V12 { get; set; }
@@ -47,6 +54,8 @@ sealed class FakeApi : IXSyncApiClient
             LastUpdated = LastUpdated,
             Meta = V12 ? new SyncMeta { Revision = Revision, Hash = Hash } : null,
         });
+    public Task<GetBookmarksResponse> GetBookmarksV12Async(string syncId, CancellationToken ct = default) =>
+        GetBookmarksAsync(syncId, ct);
     public Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(string syncId, string knownHash, CancellationToken ct = default)
     {
         ConditionalHits++;
@@ -67,14 +76,27 @@ sealed class FakeApi : IXSyncApiClient
     public Task<UpdateBookmarksResponse> UpdateBookmarksAsync(
         string syncId, string encryptedBookmarks, string lastUpdated, bool updateVersion = false, CancellationToken ct = default)
     {
-        if (FailConflict && !ApplyThenConflict)
+        if (Offline)
         {
+            throw new ServiceOfflineException("offline");
+        }
+
+        if ((FailConflict && !ApplyThenConflict) || (EnforceTimestampBase && lastUpdated.Length > 0 && lastUpdated != LastUpdated))
+        {
+            throw new DataOutOfSyncException("conflict");
+        }
+
+        if (ConflictsBeforeSuccess > 0)
+        {
+            ConflictsBeforeSuccess--;
+            LastUpdated = $"2024-05-0{ConflictsBeforeSuccess + 1}T00:00:00.000Z";
+            Revision++;
             throw new DataOutOfSyncException("conflict");
         }
 
         PushCount++;
         LastPushed = encryptedBookmarks;
-        LastUpdated = "2024-02-02T00:00:00.000Z";
+        LastUpdated = $"2024-02-02T00:00:{PushCount:00}.000Z";
         Blob = ConflictSwapBlob ?? encryptedBookmarks;
         if (ApplyThenConflict)
         {
@@ -93,9 +115,17 @@ sealed class FakeApi : IXSyncApiClient
             throw new DataOutOfSyncException("conflict");
         }
 
+        if (ConflictsBeforeSuccess > 0)
+        {
+            ConflictsBeforeSuccess--;
+            LastUpdated = $"2024-05-0{ConflictsBeforeSuccess + 1}T00:00:00.000Z";
+            Revision++;
+            throw new DataOutOfSyncException("conflict");
+        }
+
         PushCount++;
         LastPushed = encryptedBookmarks;
-        LastUpdated = "2024-02-02T00:00:00.000Z";
+        LastUpdated = $"2024-02-02T00:00:{PushCount:00}.000Z";
         Blob = ConflictSwapBlob ?? encryptedBookmarks;
         if (ApplyThenConflict)
         {

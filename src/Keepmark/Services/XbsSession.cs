@@ -22,7 +22,7 @@ public sealed class XbsSession : IAsyncDisposable
     private readonly IXbsLocalizer _str;
     private readonly InMemoryLogger _log = new();
     private readonly XCryptoService _crypto;
-    private readonly Dictionary<string, XSyncApiClient> _apiClients = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, XSyncApiClient> _apiClients = new();
     /// <summary>Serializes the whole safety subsystem (master rotation, backup
     /// writes, index rewrites) so a rotation can never interleave a write.</summary>
     private readonly SemaphoreSlim _safetyGate = new(1, 1);
@@ -52,7 +52,10 @@ public sealed class XbsSession : IAsyncDisposable
         await store.InitializeAsync().ConfigureAwait(false);
         Store = store;
 
-        var engine = new SyncEngine(ApiFor, _crypto, store, _creds, _str, _log)
+        var engine = new SyncEngine(ApiFor, _crypto, store, _creds, _str, _log,
+            saveSafetyBackup: SaveSafetyBackupAsync,
+            suspendAutoSync: SuspendAutoSync,
+            resumeAutoSync: ResumeAutoSync)
         {
             Mode = _settings.Mode
         };
@@ -81,13 +84,8 @@ public sealed class XbsSession : IAsyncDisposable
 
     public XSyncApiClient ApiFor(string serviceUrl)
     {
-        if (!_apiClients.TryGetValue(serviceUrl, out var client))
-        {
-            client = XSyncApiClient.ForService(serviceUrl, _str, _log);
-            _apiClients[serviceUrl] = client;
-        }
-
-        return client;
+        // Called from the poll timer and the UI concurrently.
+        return _apiClients.GetOrAdd(serviceUrl, url => XSyncApiClient.ForService(url, _str, _log));
     }
 
     public async Task<ServiceInfoResponse> CheckServiceAsync(string serviceUrl, CancellationToken ct = default)
@@ -121,11 +119,13 @@ public sealed class XbsSession : IAsyncDisposable
         // Safety backup of the discarded local side (live tree as plaintext JSON).
         var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
         await SaveSafetyBackupAsync("local",
-            System.Text.Json.JsonSerializer.Serialize(localRoots), operation, info.LocalCount).ConfigureAwait(false);
+            System.Text.Json.JsonSerializer.Serialize(localRoots), operation,
+            CountBackupNodes(localRoots), info.Candidate.Id).ConfigureAwait(false);
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
-        await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: taking remote tree");
-        await Engine!.PullAsync(ct).ConfigureAwait(false);
+        // Replaces the mirror even when dirty (the user chose take-remote and
+        // the local side is snapshotted), then switches credentials.
+        await Engine!.LinkAdoptRemoteAsync(info.Candidate, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
     }
 
@@ -147,11 +147,13 @@ public sealed class XbsSession : IAsyncDisposable
             }
         }
 
-        await SaveSafetyBackupAsync("remote", remoteJson, operation, info.RemoteCount).ConfigureAwait(false);
+        await SaveSafetyBackupAsync("remote", remoteJson, operation, info.RemoteCount, info.Candidate.Id).ConfigureAwait(false);
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
-        await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: uploading local tree");
-        await UploadMirrorAsync(info.Candidate, ct).ConfigureAwait(false);
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        // Base = the remote lastUpdated read at probe time (R6.4), never the
+        // previous link's mirror base; a 409 leaves the old link intact.
+        await Engine!.LinkUploadAsync(info.Candidate, roots, info.RemoteLastUpdated ?? string.Empty, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
     }
 
@@ -184,10 +186,10 @@ public sealed class XbsSession : IAsyncDisposable
             CountBackupNodes(remoteRoots), info.Candidate.Id).ConfigureAwait(false);
 
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
-        await _creds.SetAsync(info.Candidate).ConfigureAwait(false);
         _log.Info("session", "Link: merging local + remote trees");
-        await Store!.RestoreLocalAsync(merged.Tree).ConfigureAwait(false);
-        await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
+        // Upload the union on the probed remote base; the mirror and the
+        // credentials switch only after the server accepted it.
+        await Engine!.LinkUploadAsync(info.Candidate, merged.Tree, info.RemoteLastUpdated ?? string.Empty, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
     }
 
@@ -211,53 +213,6 @@ public sealed class XbsSession : IAsyncDisposable
         }
 
         return System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(json) ?? [];
-    }
-
-    /// <summary>Fresh/empty link: upload the current local mirror to the server.</summary>
-    private async Task UploadMirrorAsync(SyncCredentials candidate, CancellationToken ct)
-    {
-        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        var api = ApiFor(candidate.ServiceUrl);
-        NormalizeForUpload(roots);
-        var json = System.Text.Json.JsonSerializer.Serialize(roots);
-        var blob = _crypto.Encrypt(json, candidate.DerivedKey);
-        // lastUpdated "" forces no precondition on first upload of a fresh/empty sync slot.
-        var res = await api.UpdateBookmarksAsync(candidate.Id, blob, await CurrentLastUpdatedAsync().ConfigureAwait(false) ?? string.Empty, ct: ct)
-            .ConfigureAwait(false);
-        await Store.ReplaceAllAsync(roots, blob, res.LastUpdated!, candidate.Version,
-            res.Meta?.Revision, res.Meta?.Hash).ConfigureAwait(false);
-    }
-
-    /// <summary>Same shape as the engine push: no empty descriptions/tags,
-    /// descriptions truncated like the original client.</summary>
-    private static void NormalizeForUpload(List<BookmarkNode> roots)
-    {
-        var stack = new Stack<BookmarkNode>(roots);
-        while (stack.Count > 0)
-        {
-            var n = stack.Pop();
-            if (string.IsNullOrWhiteSpace(n.Description))
-            {
-                n.Description = null;
-            }
-            else if (n.Description.Length > Core.XbsConstants.DescriptionMaxLength)
-            {
-                n.Description = n.Description[..Core.XbsConstants.DescriptionMaxLength];
-            }
-
-            if (n.Tags is { Count: 0 })
-            {
-                n.Tags = null;
-            }
-
-            if (n.Children is not null)
-            {
-                foreach (var c in n.Children)
-                {
-                    stack.Push(c);
-                }
-            }
-        }
     }
 
     public async Task CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
@@ -284,8 +239,9 @@ public sealed class XbsSession : IAsyncDisposable
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
         var candidate = new SyncCredentials(created.Id!, serviceUrl, derived, created.Version);
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
-        await _creds.SetAsync(candidate).ConfigureAwait(false);
-        await UploadMirrorAsync(candidate, ct).ConfigureAwait(false);
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        // Fresh sync: its own creation timestamp is the only valid base.
+        await Engine!.LinkUploadAsync(candidate, roots, created.LastUpdated!, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
         _log.Info("session", "Created new sync and uploaded local tree");
@@ -318,14 +274,12 @@ public sealed class XbsSession : IAsyncDisposable
             throw new InvalidCredentialsException("Current password is incorrect.");
         }
 
-        // Safety backup of the server copy we are about to overwrite (live tree as plaintext JSON).
-        var (treeRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
-        await SaveSafetyBackupAsync("remote", System.Text.Json.JsonSerializer.Serialize(treeRoots),
-            SafetyOperations.ChangePassword, CountBackupNodes(treeRoots)).ConfigureAwait(false);
+        // Snapshot of the real server copy, re-encrypted push on the remote
+        // base, and only then the stored key rotates (a failed push leaves
+        // the old password working everywhere).
         var newDerived = _crypto.DeriveKey(newPassword, creds.Id, version);
-        await _creds.SetAsync(creds with { DerivedKey = newDerived }).ConfigureAwait(false);
+        await Engine!.ChangeKeyAsync(newDerived, SafetyOperations.ChangePassword, ct).ConfigureAwait(false);
         _log.Info("session", "Password changed, blob re-encrypted");
-        await Engine!.PushAsync(ct: ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(currentDerived, newDerived).ConfigureAwait(false);
     }
 
@@ -337,9 +291,6 @@ public sealed class XbsSession : IAsyncDisposable
             Engine.Mode = _settings.Mode;
         }
     }
-
-    private async Task<string?> CurrentLastUpdatedAsync() =>
-        await Store!.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
 
     /// <summary>Encrypted local backup (password chosen by the user) + import.
     /// Same verified envelope as sync crypto: PBKDF2-SHA256/250k with a random
@@ -532,8 +483,10 @@ public sealed class XbsSession : IAsyncDisposable
         await AtomicWriteTextAsync(path, payload).ConfigureAwait(false);
         var entries = await ReadSafetyIndexAsync(dir).ConfigureAwait(false);
         entries.RemoveAll(e => e.FileName == name);
+        // Sync IDs are bearer tokens: the manifest only ever stores the
+        // truncated form (R7.2), whatever the caller passed.
         entries.Add(new SafetyBackupEntry(name, now, operation, side, items,
-            new FileInfo(path).Length, syncId, enc));
+            new FileInfo(path).Length, ShortSyncId(syncId), enc));
         MergeLegacySafetyBackups(dir, entries);
         // Decide the prune set first, update the index, and only then delete
         // files: a crash can leave an orphan payload, never an index row
@@ -744,9 +697,10 @@ public sealed class XbsSession : IAsyncDisposable
 
         var creds = await _creds.GetAsync().ConfigureAwait(false)
             ?? throw new InvalidOperationException("Link the sync this backup belongs to first.");
-        var (currentRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        // Pre-restore snapshot of the REAL server copy (R7.4), not the mirror.
+        var currentRoots = await Engine!.GetRemoteTreeAsync(ct).ConfigureAwait(false);
         await SaveSafetyBackupAsync("remote", System.Text.Json.JsonSerializer.Serialize(currentRoots),
-            SafetyOperations.PreRestore, CountBackupNodes(currentRoots), ShortSyncId(creds.Id)).ConfigureAwait(false);
+            SafetyOperations.PreRestore, CountBackupNodes(currentRoots), creds.Id).ConfigureAwait(false);
         // Replace the local tree (dirty) and push: the engine re-encrypts
         // under the current link key with revision CAS. On 409 the mirror
         // still holds the restored tree as dirty, so the next sync surfaces
@@ -910,7 +864,7 @@ public sealed class XbsSession : IAsyncDisposable
                 {
                     try
                     {
-                        if (Engine is not null)
+                        if (Engine is not null && !_autoSyncSuspended)
                         {
                             await Engine.ExecuteAutoSyncAsync().ConfigureAwait(false);
                         }
@@ -926,6 +880,24 @@ public sealed class XbsSession : IAsyncDisposable
             }
         });
     }
+
+    /// <summary>Suspends the auto-sync background timer.
+    /// Called when conflict resolution starts to prevent interference.</summary>
+    public void SuspendAutoSync()
+    {
+        _autoSyncSuspended = true;
+        _log.Info("session", "Auto-sync suspended for conflict resolution");
+    }
+
+    /// <summary>Resumes the auto-sync background timer.
+    /// Called when conflict resolution completes (success or failure).</summary>
+    public void ResumeAutoSync()
+    {
+        _autoSyncSuspended = false;
+        _log.Info("session", "Auto-sync resumed after conflict resolution");
+    }
+
+    private bool _autoSyncSuspended;
 
     public async ValueTask DisposeAsync()
     {

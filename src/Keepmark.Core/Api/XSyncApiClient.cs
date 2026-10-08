@@ -104,6 +104,8 @@ public interface IXSyncApiClient
     Task<ServiceInfoResponse> GetInfoV12Async(CancellationToken ct = default);
     Task<CreateSyncResponse> CreateSyncAsync(CancellationToken ct = default);
     Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default);
+    /// <summary>v1.2 full GET: same shape plus the <c>meta</c> envelope (revision/hash).</summary>
+    Task<GetBookmarksResponse> GetBookmarksV12Async(string syncId, CancellationToken ct = default);
     /// <summary>v1.2 conditional GET: null when the server answers 304.</summary>
     Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(string syncId, string knownHash, CancellationToken ct = default);
     Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default);
@@ -168,6 +170,10 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
     public Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default) =>
         SendAsync<GetBookmarksResponse>(HttpMethod.Get, $"bookmarks/{syncId}", null,
             static r => r.LastUpdated is not null, ct, syncId);
+
+    public Task<GetBookmarksResponse> GetBookmarksV12Async(string syncId, CancellationToken ct = default) =>
+        SendAsync<GetBookmarksResponse>(HttpMethod.Get, $"bookmarks/{syncId}", null,
+            static r => r.LastUpdated is not null, ct, syncId, XbsConstants.ApiVersion12);
 
     public Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default) =>
         SendAsync<LastUpdatedResponse>(HttpMethod.Get, $"bookmarks/{syncId}/lastUpdated", null,

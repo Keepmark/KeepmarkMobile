@@ -31,7 +31,9 @@ public sealed record MergeStats(
     int SeparatorsAdopted,
     /// <summary>Bookmarks seen locally / remotely (preview denominators).</summary>
     int LocalCount,
-    int RemoteCount);
+    int RemoteCount,
+    /// <summary>Remote lastUpdated timestamp (for display in conflict UI).</summary>
+    string? RemoteLastUpdated = null);
 
 public sealed record MergeResult(List<BookmarkNode> Tree, MergeStats Stats);
 

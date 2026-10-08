@@ -5,7 +5,7 @@
 > read it before reviewing code).
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.105 (106)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.106 (107)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
 
 `Keepmark/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -175,6 +175,33 @@ M in `src/Keepmark/Keepmark.csproj`; CSS/JS releases also bump
 3. Deploy `-t:Run`, verify `versionName`, screenshot.
 4. Deploy restarts the app → device shows lock screen if auto-lock on; unlock manually.
 
+## Development requirements (prevent regression)
+
+### Concurrency & gate discipline
+
+- **Every `await _gate.WaitAsync()` MUST have a matching `_gate.Release()` in a `finally` block.** No exceptions.
+- **Conflict resolution methods** (`ResolveConflictPullAsync`, `ResolveConflictPushAsync`, `ResolveConflictMergeAsync`) MUST:
+  1. Set `_resolvingConflict = true` at start of `try`
+  2. Reset `_resolvingConflict = false` in `finally` (after `_gate.Release()`)
+- **`ForceSyncAsync` and `PushInBackgroundAsync`** MUST check `_resolvingConflict` after acquiring `_gate` and return early if true.
+- **Background timers** MUST NOT fire sync logic while `_resolvingConflict` is true.
+
+### Merge retry discipline
+
+- **Merge push MUST retry on 409** with re-fetch + re-merge (max 3 attempts).
+
+### State capture completeness
+
+- **All conflict entry points** must capture conflict state for UI resolution.
+- **Preview API** MUST re-fetch remote at call time.
+
+### Test coverage requirements
+
+- **Concurrency tests**: race between auto-sync and conflict resolution
+- **Merge retry test**: simulate 409 on push, verify re-merge + retry
+- **Gate release test**: every method acquiring `_gate` releases in `finally`
+- **Flag test**: `_resolvingConflict` prevents auto-sync during resolution
+
 ## Safety backups (behavioral spec — verifiable by a third party)
 
 Every destructive operation snapshots the side it is about to destroy
@@ -198,6 +225,9 @@ encrypted except legacy/pre-link files (flagged "not encrypted" in the UI).
 | Switch → merge both sides | both sides | current local JSON + current remote JSON | `switch-merge` |
 | Duplicates bulk delete | local tree | pre-delete local JSON | `duplicates-cleanup` |
 | Safety restore (any) | current state | state being replaced | `pre-restore` |
+| Conflict → take remote | local tree | current local JSON | `conflict-pull` |
+| Conflict → upload local | server copy | current remote JSON | `conflict-push` |
+| Conflict → merge both sides | both sides | current local JSON + current remote JSON | `conflict-merge` |
 
 Rule: no snapshot → the operation must not run (fail closed, error surfaced).
 Exception: single-bookmark delete on Home keeps its 6-second in-memory undo
