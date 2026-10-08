@@ -6,7 +6,7 @@ against each numbered requirement. Where the code is known to violate a
 requirement, it is marked **[KNOWN GAP]** instead of being silently adjusted.
 
 Conventions: `Rxx` = requirement IDs. "Must" = fail the review if violated.
-File paths are relative to `Keepmark/`. Commands run from `Keepmark/` with
+File paths are relative to `KeepmarkMobile/`. Commands run from `KeepmarkMobile/` with
 `ANDROID_HOME=$HOME/android-sdk`, `JAVA_HOME=$HOME/jdk-21`
 (JDK 21; system JDK is rejected): `dotnet test` (xUnit, no device),
 Android build `dotnet build src/Keepmark -f net10.0-android -c Debug`.

@@ -7,7 +7,7 @@ Edit that file, not this one. Repo-wide layout is in `../AGENTS.md` (loaded via
 
 Quick reminders (details in README):
 
-- Own git repo (`Keepmark/`, branch `master`); the parent dir is not a repo.
+- Own git repo (`KeepmarkMobile/`, branch `master`); the parent dir is not a repo.
 - Builds need `ANDROID_HOME`, `JAVA_HOME=$HOME/jdk-21` first on `PATH`.
 - Every user-facing change bumps `ApplicationDisplayVersion`/`ApplicationVersion`
   in `src/Keepmark/Keepmark.csproj` (+ `?v=` in `wwwroot/index.html` for CSS/JS),
