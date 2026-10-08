@@ -275,7 +275,7 @@ else
         Core.Sync.SyncStatus.Syncing => "syncing",
         Core.Sync.SyncStatus.Offline or Core.Sync.SyncStatus.Error => "warn",
         Core.Sync.SyncStatus.Conflict => "conflict",
-        _ => "ok"
+        _ => lastSync is null ? "off" : "ok"
     };
 
     private string FriendlyStatus() => engineStatus switch
