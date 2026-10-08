@@ -29,9 +29,10 @@ EXT = os.path.join(ROOT, "KeepmarkApp")
 
 NAVY, NAVY_TOP, NAVY_DEEP, INK, WHITE = "#172552", "#1E2D63", "#111A40", "#111111", "#FFFFFF"
 GREY = "#5F667A"  # extension "not synced" toolbar state
-# Extension tile: lighter periwinkle so the icon reads on dark browser
-# toolbars too (navy #172552 disappears on Firefox/Chrome dark themes).
-EXT_TILE = "#4A5FC1"
+# Icon tile (extension icons + Android launcher background): a touch
+# lighter than brand navy so the icon still reads on dark browser toolbars
+# and launchers, without leaving the navy family.
+EXT_TILE = "#243878"
 
 # ---- Mark geometry: 100 x 174 units, measured from the sheet's standalone icon.
 MW, MH = 100.0, 174.0
@@ -191,7 +192,7 @@ def build():
         "icon-circle.svg": tile_svg(512, "circle", NAVY, WHITE, 0.58),
         "icon-square.svg": tile_svg(512, "square", NAVY, WHITE, 0.62),
         "android-adaptive-foreground.svg": adaptive_fg_svg(),
-        "android-adaptive-background.svg": svg(108, 108, '<rect width="108" height="108" fill="url(#g)"/>', grad("g")),
+        "android-adaptive-background.svg": svg(108, 108, f'<rect width="108" height="108" fill="{EXT_TILE}"/>'),
         "android-monochrome.svg": adaptive_fg_svg(WHITE),
         "android-notification.svg": notification_svg(),
     }
