@@ -29,6 +29,9 @@ EXT = os.path.join(ROOT, "KeepmarkApp")
 
 NAVY, NAVY_TOP, NAVY_DEEP, INK, WHITE = "#172552", "#1E2D63", "#111A40", "#111111", "#FFFFFF"
 GREY = "#5F667A"  # extension "not synced" toolbar state
+# Extension tile: lighter periwinkle so the icon reads on dark browser
+# toolbars too (navy #172552 disappears on Firefox/Chrome dark themes).
+EXT_TILE = "#4A5FC1"
 
 # ---- Mark geometry: 100 x 174 units, measured from the sheet's standalone icon.
 MW, MH = 100.0, 174.0
@@ -249,14 +252,14 @@ def install(sources):
             mw, x, y, ks, rx = {16: (8, 4, 1, 1.8, 3.5), 32: (16, 8, 2, 1.3, 7)}[px]
             tile = f'<rect width="{px}" height="{px}" rx="{rx}" fill="{bg}"/>'
             return svg(px, px, tile + place_mark(x, y, mw * MH / MW, WHITE, ks))
-        render(small(16, NAVY), os.path.join(ext, "icon16.png"), w=16)
-        render(small(32, NAVY), os.path.join(ext, "icon32.png"), w=32)
-        render(small(16, NAVY), os.path.join(ext, "synced16.png"), w=16)
-        render(small(32, NAVY), os.path.join(ext, "synced32.png"), w=32)
+        render(small(16, EXT_TILE), os.path.join(ext, "icon16.png"), w=16)
+        render(small(32, EXT_TILE), os.path.join(ext, "icon32.png"), w=32)
+        render(small(16, EXT_TILE), os.path.join(ext, "synced16.png"), w=16)
+        render(small(32, EXT_TILE), os.path.join(ext, "synced32.png"), w=32)
         render(small(16, GREY), os.path.join(ext, "notsynced16.png"), w=16)
         render(small(32, GREY), os.path.join(ext, "notsynced32.png"), w=32)
-        render(tile_svg(48, "rounded", NAVY, WHITE, 0.66, key_scale=1.1), os.path.join(ext, "icon48.png"), w=48)
-        render(sources["icon-rounded.svg"], os.path.join(ext, "icon128.png"), w=128)
+        render(tile_svg(48, "rounded", EXT_TILE, WHITE, 0.66, key_scale=1.1, gradient=False), os.path.join(ext, "icon48.png"), w=48)
+        render(tile_svg(128, "rounded", EXT_TILE, WHITE, 0.62, gradient=False), os.path.join(ext, "icon128.png"), w=128)
         render(sources["mark-white.svg"], os.path.join(ext, "brand-mark.png"), h=72)  # 18px tall @4x
 
 
