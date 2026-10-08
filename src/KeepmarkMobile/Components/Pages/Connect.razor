@@ -46,81 +46,104 @@ else if (linked)
 }
 else
 {
-    <div class="alert alert-info">
-        <h4>How your bookmarks get here</h4>
-        <ul class="mb-1">
-            <li><strong>Open an existing sync</strong> below — with an empty library this simply downloads everything from the server.</li>
-            <li><strong>Create a new sync</strong> — start empty, or upload bookmarks you already have.</li>
-            <li><strong>Restore an encrypted backup file</strong> — in the <a href="backup">Backup</a> section, no connection needed.</li>
-        </ul>
-        <small>Sync exchanges the whole collection at once (never single items). If both sides change independently, the app reports a conflict instead of merging silently — and every overwrite is safety-backed-up first.</small>
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Service URL</label>
-        <input class="form-control" @bind="serviceUrl" inputmode="url" />
-        <div class="form-text">Address of the xBrowserSync service to use. Check verifies it answers with a compatible API version.</div>
-        <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">Check service</button>
-        @if (!string.IsNullOrEmpty(checkError))
-        {
-            <div class="alert alert-danger mt-2" role="alert">@checkError</div>
-        }
-        @if (serviceInfo is not null)
-        {
-            <p class="mt-2" role="status">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
-        }
-    </div>
-
-    <div class="mb-3">
-        <h4>Open an existing sync</h4>
-        <label class="form-label">Sync ID</label>
-        <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
-        <label class="form-label mt-2">Password</label>
-        <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-        <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing is changed until you pick a direction below.</div>
-        <div class="mt-2">
-            <button class="btn btn-primary me-2" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
+    @if (mode is null)
+    {
+        <p class="xbs-connect-lead">Keep your bookmarks in sync across devices, end-to-end encrypted. How do you want to start?</p>
+        <div class="xbs-choices">
+            <button class="xbs-choice" @onclick='() => Choose("existing")'>
+                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
+                <span class="xbs-choice-text"><strong>Link an existing sync</strong><span>You already sync on another device: enter its sync ID and password.</span></span>
+                <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+            </button>
+            <button class="xbs-choice" @onclick='() => Choose("new")'>
+                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></span>
+                <span class="xbs-choice-text"><strong>Create a new sync</strong><span>@(localCount > 0 ? $"First device: pick a password and upload your {localCount} bookmark(s)." : "First device: pick a password and start fresh.")</span></span>
+                <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+            </button>
         </div>
-        @if (!string.IsNullOrEmpty(linkError))
-        {
-            <div class="alert alert-danger mt-2" role="alert">@linkError</div>
-        }
-    </div>
-
-    <div class="mb-3">
-        <h4>Create a new sync</h4>
-        <label class="form-label">New password</label>
-        <input type="password" class="form-control" @bind="newPassword" autocomplete="new-password" />
-        <label class="form-label mt-2">Confirm password</label>
-        <input type="password" class="form-control" @bind="confirmPassword" autocomplete="new-password" />
-        <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered — lose it and the sync is unreadable.</div>
-        <div class="mt-2 d-grid gap-2">
-            @if (localCount > 0)
-            {
-                <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@busy">Create and upload my @localCount item(s)</button>
-                <div class="form-text">Creates the sync on this service and uploads your current local bookmarks into it. Nothing local is deleted.</div>
-                @if (armed != "createEmpty")
-                {
-                    <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@busy">Create empty instead…</button>
-                }
-                else
-                {
-                    <div class="alert alert-danger">
-                        <strong>Replace your @localCount local item(s) with an empty sync?</strong>
-                        A plaintext safety backup is saved first, but this discards what you see now.
-                        <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-danger" @onclick="CreateNew" disabled="@busy">Yes, create empty</button>
-                            <button class="btn btn-secondary" @onclick="Disarm" disabled="@busy">Cancel</button>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@busy">Create new sync</button>
-                <div class="form-text">Creates an empty sync on this service and links the app to it.</div>
-            }
+        <p class="xbs-hint mt-3">Have an encrypted backup file? <a href="backup">Restore it from Backup</a> — no connection needed.</p>
+    }
+    else
+    {
+        <button class="xbs-back" @onclick="Back" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back</button>
+        <h2 class="xbs-step-title">@(mode == "existing" ? "Link an existing sync" : "Create a new sync")</h2>
+        <div class="xbs-service-row">
+            <span class="xbs-service-label">Service</span>
+            <span class="xbs-service-host">@ServiceHost</span>
+            <button class="xbs-link-btn" @onclick="() => showService = !showService" aria-expanded="@ServiceOpen.ToString().ToLowerInvariant()">@(ServiceOpen ? "Hide" : "Change")</button>
         </div>
-    </div>
+        @if (ServiceOpen)
+        {
+            <div class="mb-3">
+                <label class="form-label">Service URL</label>
+                <input class="form-control" @bind="serviceUrl" inputmode="url" />
+                <div class="form-text">Address of the xBrowserSync service to use. Check verifies it answers with a compatible API version.</div>
+                <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">Check service</button>
+                @if (!string.IsNullOrEmpty(checkError))
+                {
+                    <div class="alert alert-danger mt-2" role="alert">@checkError</div>
+                }
+                @if (serviceInfo is not null)
+                {
+                    <p class="mt-2" role="status">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
+                }
+            </div>
+        }
+        @if (mode == "existing")
+        {
+            <div class="mb-3">
+                <label class="form-label">Sync ID</label>
+                <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+                <label class="form-label mt-2">Password</label>
+                <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
+                <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing is changed until you pick a direction below.</div>
+                <div class="mt-3 d-grid">
+                    <button class="btn btn-primary" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
+                </div>
+                @if (!string.IsNullOrEmpty(linkError))
+                {
+                    <div class="alert alert-danger mt-2" role="alert">@linkError</div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="mb-3">
+                <label class="form-label">New password</label>
+                <input type="password" class="form-control" @bind="newPassword" autocomplete="new-password" />
+                <label class="form-label mt-2">Confirm password</label>
+                <input type="password" class="form-control" @bind="confirmPassword" autocomplete="new-password" />
+                <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered — lose it and the sync is unreadable.</div>
+                <div class="mt-2 d-grid gap-2">
+                    @if (localCount > 0)
+                    {
+                        <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@busy">Create and upload my @localCount item(s)</button>
+                        <div class="form-text">Creates the sync on this service and uploads your current local bookmarks into it. Nothing local is deleted.</div>
+                        @if (armed != "createEmpty")
+                        {
+                            <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@busy">Create empty instead…</button>
+                        }
+                        else
+                        {
+                            <div class="alert alert-danger">
+                                <strong>Replace your @localCount local item(s) with an empty sync?</strong>
+                                A plaintext safety backup is saved first, but this discards what you see now.
+                                <div class="mt-2 d-flex gap-2">
+                                    <button class="btn btn-danger" @onclick="CreateNew" disabled="@busy">Yes, create empty</button>
+                                    <button class="btn btn-secondary" @onclick="Disarm" disabled="@busy">Cancel</button>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@busy">Create new sync</button>
+                        <div class="form-text">Creates an empty sync on this service and links the app to it.</div>
+                    }
+                </div>
+            </div>
+        }
+    }
 
     @if (reconcile is not null)
     {
@@ -288,6 +311,32 @@ else
     /// both sides. Preselected to the only sensible side when one of them is
     /// empty. Changing direction invalidates the merge preview.</summary>
     private string direction = "download";
+
+    /// <summary>First-run choice: null = pick, "existing" = link, "new" = create.</summary>
+    private string? mode;
+    private bool showService;
+    private bool ServiceOpen => showService || !string.IsNullOrEmpty(checkError);
+    private string ServiceHost => Uri.TryCreate(serviceUrl, UriKind.Absolute, out var u) ? u.Host : serviceUrl;
+
+    private void Choose(string value)
+    {
+        mode = value;
+        linkError = string.Empty;
+        message = string.Empty;
+    }
+
+    private void Back()
+    {
+        mode = null;
+        reconcile = null;
+        armed = null;
+        linkError = string.Empty;
+        applyError = string.Empty;
+        message = string.Empty;
+        password = string.Empty;
+        newPassword = string.Empty;
+        confirmPassword = string.Empty;
+    }
 
     private void SetDirection(string value)
     {
