@@ -9,9 +9,10 @@ wordmark.svg). Everything is rendered with rsvg-convert.
     python3 brand/src/build.py --install  # also refresh the app/extension assets
 
 Colors
-    navy       #172552  brand primary (flat fills, small sizes, splash/bars)
-    navy-top   #1E2D63  gradient start (large icons only)
-    navy-deep  #111A40  gradient end
+    navy       #243878  brand primary (flat fills, small sizes, splash, icon tiles)
+    navy-top   #2B4288  gradient start (large icons only)
+    navy-deep  #1C2D6A  gradient end
+    (the app's in-UI top bar keeps the darker #172552 as --km-navy)
     ink        #111111  monochrome black
 """
 import os
@@ -27,12 +28,12 @@ KEEPMARK = os.path.dirname(BRAND)
 ROOT = os.path.dirname(KEEPMARK)
 EXT = os.path.join(ROOT, "KeepmarkApp")
 
-NAVY, NAVY_TOP, NAVY_DEEP, INK, WHITE = "#172552", "#1E2D63", "#111A40", "#111111", "#FFFFFF"
+NAVY, NAVY_TOP, NAVY_DEEP, INK, WHITE = "#243878", "#2B4288", "#1C2D6A", "#111111", "#FFFFFF"
 GREY = "#5F667A"  # extension "not synced" toolbar state
 # Icon tile (extension icons + Android launcher background): a touch
 # lighter than brand navy so the icon still reads on dark browser toolbars
 # and launchers, without leaving the navy family.
-EXT_TILE = "#243878"
+EXT_TILE = NAVY
 
 # ---- Mark geometry: 100 x 174 units, measured from the sheet's standalone icon.
 MW, MH = 100.0, 174.0
