@@ -47,7 +47,7 @@ only as method arguments, never stored, never logged.
 | R | Requirement |
 |---|---|
 | R3.1 | Endpoints used: `GET info`, `POST bookmarks {version}`, `GET bookmarks/{id}`, `GET …/lastUpdated`, `GET …/version`, `PUT bookmarks/{id}` (timestamp or `baseRevision` CAS), conditional `GET` with `If-None-Match: "<hash>"` → `304` = null. NO server-side sync DELETE exists in this client. |
-| R3.2 | `Accept-Version` per request: `1.1.13` default; `1.2.0` only for `UpdateBookmarksV12Async` and conditional GET. |
+| R3.2 | `Accept-Version` per request: `1.1.13` default; `1.2.0` only for `GetInfoV12Async` (capability probe), `GetBookmarksV12Async` (full GET with `meta`, used only after a positive probe), `UpdateBookmarksV12Async` and conditional GET. |
 | R3.3 | Timeouts: 12 s default, 3 s probes; timeout/`HttpRequestException` → `ServiceOfflineException`. Retries with backoff ONLY for idempotent reads (never on create/PUT — see `WithRetryAsync(idempotent:)`); `Retry-After` honored. |
 | R3.4 | HTTP→error mapping: 401 SyncNotFound, 404 InvalidService, 405 NotAcceptingNewSyncs, 406 DailyNewSyncLimit, 409 DataOutOfSync, 413 SyncTooLarge, 429 Throttled (+Retry-After secs), 5xx/other ServiceOffline. `code`/`message` shape preserved for display. |
 | R3.5 | Bodies never logged; sync IDs truncated via `LogSanitizer` (`abcd…xy`); timings + byte counts at Info ok. |
@@ -183,7 +183,7 @@ fails the review.
 
 1. `grep -rn "SecureStorage.SetAsync" src/Keepmark --include=*.cs` → only derived keys + db key, never a variable named `*password*` (raw).
 2. `grep -rniE "password.*log|Log.*password" src/Keepmark.Core --include=*.cs` → no hits (secrets in logs).
-3. `grep -rn "Accept-Version" src/Keepmark.Core --include=*.cs` → `1.1.13` default sites + `1.2.0` ONLY in `UpdateBookmarksV12Async`/conditional GET (+ the R4.3 fix site).
+3. `grep -rn "Accept-Version" src/Keepmark.Core --include=*.cs` → `1.1.13` default sites + `1.2.0` ONLY in `GetInfoV12Async`, `GetBookmarksV12Async`, `UpdateBookmarksV12Async`, conditional GET.
 4. `grep -rn "HttpMethod.Delete" src/Keepmark.Core` → no hits (no server delete in this client — by design).
 5. `grep -rn "TODO\|FIXME\|HACK" src/ | tests/` → triage list, none load-bearing.
 6. `dotnet test` green + both-direction crypto vectors green + `dotnet build … -f net10.0-android` 0 errors before any commit.
