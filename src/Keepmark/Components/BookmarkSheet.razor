@@ -4,7 +4,8 @@
 {
     <div class="xbs-sheet-backdrop" @onclick="RequestCancel">
         <div class="xbs-sheet" role="dialog" aria-modal="true" aria-labelledby="xbs-sheet-title" @onclick:stopPropagation="true">
-            <h3 id="xbs-sheet-title">@(IsEdit ? "Edit bookmark" : NewIsFolder ? "New folder" : "New bookmark")</h3>
+            <div class="xbs-sheet-handle" aria-hidden="true"></div>
+            <h2 id="xbs-sheet-title" class="xbs-sheet-title mb-3">@(IsEdit ? (EffectiveIsFolder ? "Edit folder" : "Edit bookmark") : NewIsFolder ? "New folder" : "New bookmark")</h2>
             @if (!IsEdit)
             {
                 <div class="mb-2">
@@ -42,8 +43,10 @@
             }
             <div class="mb-3">
                 <label class="form-label" for="xbs-f-folder">Folder</label>
-                <button type="button" id="xbs-f-folder" class="form-control text-start" aria-expanded="@showTree.ToString().ToLowerInvariant()" @onclick="OpenTree">
-                    @(SelectedFolderPath() ?? "⌂ Top level")
+                <button type="button" id="xbs-f-folder" class="form-control xbs-folder-btn" aria-expanded="@showTree.ToString().ToLowerInvariant()" @onclick="OpenTree">
+                    <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
+                    <span class="xbs-folder-btn-text">@(SelectedFolderPath() ?? "Top level")</span>
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                 </button>
             </div>
             @if (!string.IsNullOrEmpty(error))
@@ -60,9 +63,9 @@
                     </div>
                 </div>
             }
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary flex-fill" @onclick="Save">Save</button>
+            <div class="xbs-sheet-actions">
                 <button class="btn btn-secondary" @onclick="RequestCancel">Cancel</button>
+                <button class="btn btn-primary" @onclick="Save">Save</button>
             </div>
         </div>
         @if (showTree)

@@ -17,12 +17,9 @@ else
          aria-label="@RowLabel"
          @onkeydown="OnKey">
         <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
-            @if (!Row.IsFolder)
-            {
-                <span class="xbs-ribbon @RibbonClass" aria-hidden="true"></span>
-            }
+            <RowTile Row="Row" />
             <div class="xbs-row-text">
-                <div class="xbs-row-title">@TitlePrefix@if (Pinned) { <span aria-hidden="true">📌</span><span class="visually-hidden">(pinned)</span> } @PlainTitle</div>
+                <div class="xbs-row-title">@if (Pinned) { <svg class="km-ico xbs-pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg><span class="visually-hidden">(pinned)</span> }@PlainTitle</div>
                 <div class="xbs-row-sub">@Sub</div>
                 @if (Expanded && !Row.IsFolder)
                 {
@@ -37,11 +34,11 @@ else
                 }
                 @if (!Row.IsFolder && !string.IsNullOrEmpty(FolderPath))
                 {
-                    <div class="xbs-row-path"><span aria-hidden="true">📁</span> @FolderPath</div>
+                    <div class="xbs-row-path"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>@FolderPath</div>
                 }
             </div>
             <button type="button" class="xbs-row-chev" @onclick="OnMenu" @onclick:stopPropagation="true"
-                    @onkeydown:stopPropagation="true" aria-label="Actions for @PlainTitle">⋮</button>
+                    @onkeydown:stopPropagation="true" aria-label="Actions for @PlainTitle"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="18.5" r="1.6" /></svg></button>
         </div>
     </div>
 }
@@ -58,10 +55,29 @@ else
     private bool IsSeparator => !Row.IsFolder && Row.Url == Core.XbsConstants.SeparatorUrl;
     private string? RowExpanded => Row.IsFolder ? null : Expanded.ToString().ToLowerInvariant();
     private string RowLabel => (Row.IsFolder ? "Open folder " : "Open bookmark ") + PlainTitle;
-    private string RibbonClass => Row.IsFolder ? "folder" : IsSeparator ? "sep" : "mark";
-    private string PlainTitle => Row.IsFolder ? (Row.Title ?? "Folder") : (Row.Title ?? Row.Url ?? "(no title)");
-    private MarkupString TitlePrefix => new(Row.IsFolder ? "<span aria-hidden=\"true\">📁</span> " : string.Empty);
-    private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Row.Url ?? string.Empty;
+    private string PlainTitle => Row.IsFolder
+        ? (string.IsNullOrWhiteSpace(Row.Title) ? "Folder" : Row.Title)
+        : (string.IsNullOrWhiteSpace(Row.Title) ? ShortUrl(Row.Url) is { Length: > 0 } u ? u : "(no title)" : Row.Title);
+    private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Expanded ? Row.Url ?? string.Empty : ShortUrl(Row.Url);
+
+    // Collapsed rows show the URL without scheme/www (the full URL is in the
+    // expanded row and in the actions sheet).
+    private static string ShortUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url))
+        {
+            return string.Empty;
+        }
+
+        var s = url;
+        foreach (var p in new[] { "https://", "http://" })
+        {
+            if (s.StartsWith(p, StringComparison.OrdinalIgnoreCase)) { s = s[p.Length..]; break; }
+        }
+
+        if (s.StartsWith("www.", StringComparison.OrdinalIgnoreCase)) { s = s[4..]; }
+        return s.TrimEnd('/');
+    }
 
     private Task OnMenu() => OnAction.InvokeAsync((Row, RowAction.Menu));
 

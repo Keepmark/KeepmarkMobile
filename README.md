@@ -5,7 +5,7 @@
 > read it before reviewing code).
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.107 (108)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.110 (111)**,
 app id `com.keepmark.legacy.keepmark`, display name `Keepmark`.
 
 `Keepmark/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -41,6 +41,12 @@ is NOT a git repo). Solution `Keepmark.slnx`:
   and went white-on-white in light mode.
   brand truncates, `padding-right: 4.5rem` reserves hamburger space
   (regression seen v1.0.63: title overlapped ☰).
+- v1.0.110 redesign ("Navy ledger", canvas in the Keepmark Redesign artifact):
+  tokens in `app.css` (`--km-*`, light + dark, Bootstrap vars mapped onto
+  them), bundled Figtree (`wwwroot/fonts`, OFL), grouped row lists with
+  `RowTile` (folder glyph / host-hashed initial), segmented sort, floating
+  status pill + extended "Add" FAB that collapses on scroll (`xbs-scrolled`),
+  icon action sheet, side drawer with sync card under the fixed top bar.
 - Security: SQLCipher store, KeyStore creds, no telemetry, HTTPS-only,
   app lock off by default with mandatory device-PIN confirmation on enable.
 - Duplicates cleanup: **one copy of each link must always survive**

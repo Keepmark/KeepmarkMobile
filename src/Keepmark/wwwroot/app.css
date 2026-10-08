@@ -1,18 +1,165 @@
+/* Figtree (SIL OFL 1.1, fonts/OFL.txt), bundled: no network at startup. */
+@font-face {
+    font-family: 'Figtree';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('fonts/figtree-latin.woff2') format('woff2');
+}
+
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
     overflow-x: clip;
     max-width: 100vw;
     color-scheme: light dark;
 }
 
-/* ---- Keepmark brand tokens (logo navy + white, verdone accent). ---- */
-:root {
+/* ---- Keepmark design tokens ("Navy ledger"). Brand navy for bars and
+   identity, one periwinkle accent for actions, cool paper ground. Bootstrap
+   variables are mapped onto them so every page follows the same palette. */
+:root,
+[data-bs-theme="light"] {
     --km-navy: #172552;
     --km-navy-deep: #0e1430;
-    --km-accent: #4a5fc1;
-    --km-danger: #b32121;
-    --km-gold: #b58900;
+    --km-accent: #3d4fb0;
+    --km-accent-hover: #2b3a8c;
+    --km-on-accent: #ffffff;
+    --km-tint: #e3e7fa;
+    --km-tint-ink: #2b3a8c;
+    --km-ground: #f5f6fa;
+    --km-surface: #ffffff;
+    --km-surface-2: #e6e9f3;
+    --km-ink: #141b38;
+    --km-ink-2: #4a5170;
+    --km-line: #dde1ec;
+    --km-line-strong: #cdd2e1;
+    --km-danger: #a12626;
+    --km-gold: #9a6a0a;
     --km-green: #1f6f5c;
+    --km-ok-dot: #1f8a6e;
+    --km-shadow: 0 1px 2px rgba(20, 27, 56, 0.06);
+    --km-shadow-float: 0 2px 8px rgba(20, 27, 56, 0.14);
+
+    --bs-body-bg: var(--km-ground);
+    --bs-body-color: var(--km-ink);
+    --bs-secondary-color: var(--km-ink-2);
+    --bs-border-color: var(--km-line-strong);
+    --bs-link-color: var(--km-accent);
+    --bs-link-hover-color: var(--km-accent-hover);
+    --bs-link-color-rgb: 61, 79, 176;
+    --bs-primary: var(--km-accent);
+    --bs-primary-rgb: 61, 79, 176;
+    --bs-font-sans-serif: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --bs-border-radius: 0.75rem;
+}
+
+[data-bs-theme="dark"] {
+    --km-accent: #8c9bf0;
+    --km-accent-hover: #a9b5ff;
+    --km-on-accent: #0e1226;
+    --km-tint: #252d57;
+    --km-tint-ink: #c9d0ff;
+    --km-ground: #0e1226;
+    --km-surface: #161b33;
+    --km-surface-2: #1f2542;
+    --km-ink: #e8eaf4;
+    --km-ink-2: #a3a9c4;
+    --km-line: #2a3152;
+    --km-line-strong: #39427a;
+    --km-danger: #ff8a80;
+    --km-gold: #e3b808;
+    --km-green: #4cc9a4;
+    --km-ok-dot: #4cc9a4;
+    --km-shadow: none;
+    --km-shadow-float: 0 4px 12px rgba(0, 0, 0, 0.45);
+
+    --bs-body-bg: var(--km-ground);
+    --bs-body-color: var(--km-ink);
+    --bs-secondary-color: var(--km-ink-2);
+    --bs-border-color: var(--km-line-strong);
+    --bs-link-color: var(--km-accent);
+    --bs-link-hover-color: var(--km-accent-hover);
+    --bs-link-color-rgb: 140, 155, 240;
+    --bs-primary: var(--km-accent);
+    --bs-primary-rgb: 140, 155, 240;
+}
+
+body { background: var(--km-ground); }
+
+/* Inline icons (SVG, stroke = currentColor). */
+.km-ico {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: none;
+}
+
+.km-ico.sm { width: 18px; height: 18px; }
+
+/* Bootstrap components on brand: pill-ish buttons, taller fields. */
+.btn {
+    border-radius: 0.75rem;
+    font-weight: 600;
+    min-height: 44px;
+}
+
+.btn-primary {
+    --bs-btn-bg: var(--km-accent);
+    --bs-btn-border-color: var(--km-accent);
+    --bs-btn-color: var(--km-on-accent);
+    --bs-btn-hover-bg: var(--km-accent-hover);
+    --bs-btn-hover-border-color: var(--km-accent-hover);
+    --bs-btn-hover-color: var(--km-on-accent);
+    --bs-btn-active-bg: var(--km-accent-hover);
+    --bs-btn-active-border-color: var(--km-accent-hover);
+    --bs-btn-active-color: var(--km-on-accent);
+    --bs-btn-disabled-bg: var(--km-accent);
+    --bs-btn-disabled-border-color: var(--km-accent);
+    --bs-btn-disabled-color: var(--km-on-accent);
+}
+
+.btn-secondary {
+    --bs-btn-bg: var(--km-surface);
+    --bs-btn-border-color: var(--km-line-strong);
+    --bs-btn-color: var(--km-ink);
+    --bs-btn-hover-bg: var(--km-surface-2);
+    --bs-btn-hover-border-color: var(--km-line-strong);
+    --bs-btn-hover-color: var(--km-ink);
+    --bs-btn-active-bg: var(--km-surface-2);
+    --bs-btn-active-border-color: var(--km-line-strong);
+    --bs-btn-active-color: var(--km-ink);
+    --bs-btn-disabled-bg: var(--km-surface);
+    --bs-btn-disabled-border-color: var(--km-line);
+    --bs-btn-disabled-color: var(--km-ink-2);
+}
+
+.form-control, .form-select {
+    min-height: 48px;
+    border-radius: 0.75rem;
+    border-width: 1.5px;
+    background-color: var(--km-surface);
+    color: var(--km-ink);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--km-accent);
+}
+
+.form-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--km-ink-2);
+    margin-bottom: 0.3rem;
+}
+
+.card {
+    --bs-card-bg: var(--km-surface);
+    --bs-card-border-color: var(--km-line);
+    --bs-card-border-radius: 1rem;
 }
 
 .page, main, article.content {
@@ -30,17 +177,11 @@ html, body {
 }
 
 a, .btn-link {
-    color: #006bb7;
+    color: var(--km-accent);
 }
 
-.btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+.btn:focus-visible, .form-control:focus, .form-select:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.3);
 }
 
 .content {
@@ -109,28 +250,14 @@ h1:focus {
     text-align: start;
 }
 
-.status-bar-safe-area {
-    display: flex;
-    position: sticky;
-    top: 0;
-    height: env(safe-area-inset-top, 0px);
-    background-color: var(--bs-body-bg, #f7f7f7);
-    width: 100%;
-    z-index: 1050;
-}
+/* The fixed navy top bar already covers the system status area (its
+   padding-top is the inset): an in-flow spacer would only add a blank band. */
+.status-bar-safe-area { display: none; }
 
 .content {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
     padding-left: max(1rem, env(safe-area-inset-left, 0px));
     padding-right: max(1rem, env(safe-area-inset-right, 0px));
-}
-
-/* Slide-over navigation drawer: below the status bar, above the nav bar. */
-.nav-scrollable {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
-    padding-left: max(0px, env(safe-area-inset-left, 0px));
-    overflow-y: auto;
-    overscroll-behavior: contain;
 }
 
 /* Drawer toggler: 44px minimum touch target. */
@@ -140,17 +267,6 @@ h1:focus {
     .flex-column, .navbar-brand {
         padding-left: env(safe-area-inset-left);
     }
-}
-
-/* ---- Bookmark rows: uniform cards, full-width grid, swipe support ---- */
-
-.xbs-row {
-    position: relative;
-    overflow: hidden;
-    touch-action: pan-y;
-    user-select: none;
-    -webkit-user-select: none;
-    margin-bottom: 0.5rem;
 }
 
 .xbs-row-underlay {
@@ -173,7 +289,7 @@ h1:focus {
 }
 
 .xbs-under-left { background-color: #1f6f5c; }
-.xbs-under-right { background-color: #1b6ec2; }
+.xbs-under-right { background-color: var(--km-accent); }
 .xbs-under-right .danger { background-color: #b32121; border-radius: 0.375rem; }
 
 .xbs-under-right button, .xbs-under-left button {
@@ -183,31 +299,6 @@ h1:focus {
     border-radius: 0.375rem;
     padding: 0.4rem 0.6rem;
     min-height: 44px;
-}
-
-.xbs-row-inner {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 48px;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.65rem 0.5rem 0.65rem 0.75rem;
-    background: var(--bs-body-bg, #fff);
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 0.5rem;
-    transition: transform 0.18s ease-out, background-color 0.12s;
-    will-change: transform;
-}
-
-.xbs-row[role="button"] { cursor: pointer; }
-.xbs-row[role="button"]:focus-visible { outline: 2px solid #1b6ec2; outline-offset: 2px; }
-
-.xbs-row-sep .xbs-row-inner {
-    grid-template-columns: 1fr;
-    background: transparent;
-    border-style: dashed;
-    opacity: 0.7;
 }
 
 /* Folder tree expander: fixed gutter so folder icons align with/without children. */
@@ -240,7 +331,7 @@ h1:focus {
 /* Tree row owns the selection highlight so expander + label share one box. */
 .xbs-tree-row { border-radius: 0.375rem; }
 
-.xbs-tree-row.selected { background: rgba(27, 110, 194, 0.15); }
+.xbs-tree-row.selected { background: var(--km-tint); }
 
 .xbs-tree-row.selected .xbs-tree-node {
     background: transparent;
@@ -249,132 +340,7 @@ h1:focus {
 
 /* Linear per-depth indent: each nesting level adds the same offset. */
 .xbs-tree-kids { margin-left: 1.5rem; }
-
-.xbs-row-inner.xbs-tapped { background-color: rgba(27, 110, 194, 0.12); }
-
-/* Corner bookmark ribbon: thin overlay, no layout space taken. */
-.xbs-ribbon {
-    position: absolute;
-    top: -1px;
-    left: 10px;
-    width: 10px;
-    height: 16px;
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
-    opacity: 0.85;
-    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.55));
-}
-
-.xbs-ribbon.mark { background: linear-gradient(180deg, #5aa3e0 0%, #1b6ec2 100%); }
-.xbs-ribbon.folder { background: linear-gradient(180deg, #35a37e 0%, #1f6f5c 100%); }
-.xbs-ribbon.sep { background: linear-gradient(180deg, #ced4da 0%, #adb5bd 100%); }
-
-.xbs-pin { color: #b58900; font-size: 0.9em; }
 .xbs-pinred { font-size: 0.85em; }
-
-.xbs-row-text {
-    min-width: 0;
-    overflow: hidden;
-    padding-left: 14px; /* clears the corner ribbon */
-}
-
-.xbs-row-title {
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.xbs-row-sub {
-    font-size: 0.85rem;
-    color: var(--bs-secondary-color, #6c757d);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.xbs-row-path {
-    font-size: 0.75rem;
-    color: var(--bs-secondary-color, #6c757d);
-    opacity: 0.85;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.xbs-row-chev {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--bs-secondary-color, #6c757d);
-    font-size: 1.2rem;
-    width: 48px;
-    min-height: 44px;
-    border: none;
-    background: transparent;
-}
-
-/* Collapsible pinned section */
-.xbs-pinned-box {
-    border: 2px solid #b58900;
-    border-radius: 0.75rem;
-    background: rgba(181, 137, 0, 0.07);
-    padding: 0.25rem 0.5rem 0.5rem;
-    margin: 0.5rem 0 0.75rem;
-}
-
-.xbs-pinned-head {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    min-height: 48px;
-    background: transparent;
-    border: none;
-    font-weight: 700;
-    padding: 0.25rem 0;
-    color: #7a5c00;
-}
-
-.xbs-pinned-head .chev {
-    display: inline-block;
-    width: 2rem;
-    color: #7a5c00;
-}
-
-.xbs-pinned-list .xbs-row:last-child { margin-bottom: 0.25rem; }
-
-/* Location flash: highlights the row we jumped to. */
-@keyframes xbs-flash {
-    0%, 100% { box-shadow: none; }
-    25%, 75% { box-shadow: 0 0 0 3px #1b6ec2; }
-}
-
-.xbs-row-inner.xbs-flash { animation: xbs-flash 0.7s ease-in-out 3; }
-
-/* Bottom sheet editor */
-.xbs-sheet-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    z-index: 1100;
-    display: flex;
-    align-items: flex-end;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* Swallowing gestures: touches on the backdrop must never scroll the list behind. */
-    touch-action: none;
-    overscroll-behavior: contain;
-}
-
-.xbs-sheet {
-    width: 100%;
-    max-height: 88dvh;
-    overflow-y: auto;
-    background: var(--bs-body-bg, #fff);
-    border-radius: 1rem 1rem 0 0;
-    padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
-    /* The sheet itself scrolls; it never chains to the page. */
-    touch-action: pan-y;
-    overscroll-behavior: contain;
-}
 
 /* Scroll lock while a modal sheet is open (toggled from xbsGestures.lockScroll). */
 html.xbs-locked, body.xbs-locked {
@@ -382,118 +348,9 @@ html.xbs-locked, body.xbs-locked {
     overscroll-behavior: none;
 }
 
-/* Undo bar: sits above the fixed status bar. */
-.xbs-undo {
-    position: fixed;
-    left: 1rem;
-    right: 1rem;
-    bottom: max(3.75rem, calc(env(safe-area-inset-bottom, 0px) + 3.75rem));
-    z-index: 1090;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #212529;
-    color: #fff;
-    border-radius: 0.5rem;
-    padding: 0.6rem 0.8rem;
-}
-
-/* Breadcrumb bar: horizontally scrollable, 48px touch targets.
-   Sticks right under the sticky search (solution A stack): a hair of
-   overlap beats any gap showing rows through. */
-.xbs-crumbs {
-    position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px) + 3.2rem);
-    z-index: 900;
-    background: var(--bs-body-bg, #fff);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    overflow-x: auto;
-    padding: 0.25rem 0 0.5rem;
-    margin-bottom: 0.25rem;
-    scrollbar-width: none;
-}
-
-.xbs-crumbs::-webkit-scrollbar { display: none; }
-
-.xbs-crumb {
-    flex-shrink: 0;
-    min-height: 48px;
-    min-width: 48px;
-    max-width: 180px;
-    padding: 0 0.75rem;
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 1.5rem;
-    background: var(--bs-body-bg, #fff);
-    /* Never trust the UA button color: with color-scheme auto it follows the
-       OS theme and goes white-on-white in light mode. */
-    color: var(--bs-body-color, #212529);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.xbs-crumb-sep {
-    flex-shrink: 0;
-    color: var(--bs-secondary-color, #6c757d);
-}
-
-/* Global toast: theme-aware card with status icon, floats above the FAB. */
-.xbs-toast {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(92vw, 480px);
-    bottom: max(9rem, calc(env(safe-area-inset-bottom, 0px) + 9rem));
-    z-index: 1200;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    background: var(--bs-body-bg, #fff);
-    color: var(--bs-body-color, #212529);
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-left: 5px solid #1b6ec2;
-    border-radius: 0.75rem;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    pointer-events: none;
-    animation: xbs-toast-in 0.25s ease-out;
-}
-
-.xbs-toast.ok .xbs-toast-icon {
-    color: #1f6f5c;
-    font-size: 1.3rem;
-    font-weight: 700;
-}
-
-.xbs-toast.error { border-left-color: #b32121; }
-
-.xbs-toast.error .xbs-toast-icon {
-    color: #b32121;
-    font-size: 1.3rem;
-    font-weight: 700;
-}
-
 @keyframes xbs-toast-in {
     from { opacity: 0; transform: translate(-50%, 12px); }
     to { opacity: 1; transform: translate(-50%, 0); }
-}
-
-/* Add button */
-.xbs-fab {
-    position: fixed;
-    right: max(1rem, env(safe-area-inset-right, 0px));
-    bottom: max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem));
-    z-index: 1080;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    font-size: 1.8rem;
-    line-height: 1;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    opacity: 0.85;
 }
 
 /* App lock overlay */
@@ -518,135 +375,9 @@ html.xbs-locked, body.xbs-locked {
     max-width: 340px;
 }
 
-/* Bottom status bar: fixed, slim, always visible. */
-.xbs-statusbar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1070;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-height: 44px;
-    padding: 0.25rem 0.75rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
-    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
-    background: var(--bs-body-bg, #fff);
-    border-top: 1px solid var(--bs-border-color, #dee2e6);
-    font-size: 0.8rem;
-    color: var(--bs-secondary-color, #6c757d);
-}
-
-.xbs-statusbar-main {
-    flex: 1 1 auto;
-    min-width: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.xbs-statusbar-sync { flex-shrink: 0; padding: 0 0.25rem; }
-.xbs-statusbar-ver { flex-shrink: 0; font-size: 0.65rem; opacity: 0.8; }
-
-/* Top indeterminate sync loader + visible syncing pill. */
-.xbs-toploader {
-    position: fixed;
-    top: env(safe-area-inset-top, 0px);
-    left: 0;
-    right: 0;
-    height: 3px;
-    z-index: 1300;
-    background: linear-gradient(90deg, transparent, #1b6ec2, transparent);
-    background-size: 40% 100%;
-    background-repeat: no-repeat;
-    animation: xbs-load-slide 1.1s linear infinite;
-}
-
 @keyframes xbs-load-slide {
     from { background-position: -40% 0; }
     to { background-position: 140% 0; }
-}
-
-.xbs-syncing-pill {
-    position: fixed;
-    top: max(3rem, calc(env(safe-area-inset-top, 0px) + 3rem));
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1300;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background: #212529;
-    color: #fff;
-    border-radius: 2rem;
-    padding: 0.5rem 1rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    pointer-events: none;
-    white-space: nowrap;
-}
-
-/* Search bar with lens. Sticky under the top bar (solution A): the crumbs
-   stick below it, so search + navigation stay put while rows scroll. */
-.xbs-search {
-    position: relative;
-    position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px) + 0.15rem);
-    z-index: 950;
-    background: var(--bs-body-bg, #fff);
-    padding: 0.25rem 0 0.5rem;
-}
-.xbs-search-icon {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    opacity: 0.7;
-}
-.xbs-search-input { padding-left: 2.5rem; padding-right: 2.5rem; }
-.xbs-search-clear {
-    position: absolute;
-    right: 0.35rem;
-    top: 50%;
-    transform: translateY(-50%);
-    min-width: 44px;
-    min-height: 44px;
-    border: none;
-    background: transparent;
-    font-size: 1.1rem;
-    color: var(--bs-secondary-color, #6c757d);
-}
-
-/* Sort bar under the breadcrumb: sticky at the bottom of the Home sticky
-   stack (search 950 > crumbs 900 > sort 890), with full body background so
-   scrolled rows never show through. */
-.xbs-sortbar {
-    position: sticky;
-    top: calc(3rem + env(safe-area-inset-top, 0px) + 3.2rem + 3.6rem);
-    z-index: 890;
-    background: var(--bs-body-bg, #fff);
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-    padding: 0.25rem 0 0.5rem;
-}
-
-.xbs-sort {
-    min-width: 48px;
-    min-height: 44px;
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 0.5rem;
-    background: var(--bs-body-bg, #fff);
-    /* Same UA-button-color trap as .xbs-crumb: force theme text color. */
-    color: var(--bs-body-color, #212529);
-    font-weight: 600;
-}
-
-.xbs-sort.active {
-    background: #1b6ec2;
-    border-color: #1b6ec2;
-    color: #fff;
 }
 
 /* Expanded row: full wrapped details (swipe right to expand). */
@@ -663,25 +394,6 @@ html.xbs-locked, body.xbs-locked {
     white-space: normal;
     overflow-wrap: anywhere;
 }
-
-.xbs-row-tags {
-    margin-top: 0.25rem;
-    font-size: 0.8rem;
-    color: #1b6ec2;
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
-
-/* Branded app bar under the status spacer. */
-.xbs-appbar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0 0.25rem;
-}
-
-.xbs-appbar img { height: 28px; width: auto; }
-.xbs-appbar span { font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; }
 
 /* Folder tree picker inside the edit sheet. */
 .xbs-tree-box {
@@ -706,7 +418,7 @@ html.xbs-locked, body.xbs-locked {
 }
 
 .xbs-tree-node.selected {
-    background: rgba(27, 110, 194, 0.15);
+    background: var(--km-tint);
     font-weight: 700;
 }
 
@@ -759,61 +471,6 @@ html.xbs-locked, body.xbs-locked {
     background: var(--bs-body-bg, #fff);
 }
 
-/* ---- Dark theme: Bootstrap handles its own components via data-bs-theme;
-   here only our hardcoded-light customs. ---- */
-[data-bs-theme="dark"] a,
-[data-bs-theme="dark"] .btn-link {
-    color: #6ea8fe;
-}
-
-[data-bs-theme="dark"] .xbs-row-tags {
-    color: #6ea8fe;
-}
-
-[data-bs-theme="dark"] .xbs-pinned-head,
-[data-bs-theme="dark"] .xbs-pinned-head .chev {
-    color: #e3b808;
-}
-
-[data-bs-theme="dark"] .xbs-pin {
-    color: #e3b808;
-}
-
-[data-bs-theme="dark"] .xbs-pinned-box {
-    background: rgba(227, 184, 8, 0.08);
-}
-
-/* Scroll jump button: 44px opaque disc inside a 56px hit area, with a
-   3px ring that shows the position in the list. Single slot above the
-   FAB (60px at bottom 4.5rem), centered on its axis: right +2px =
-   (60-56)/2; bottom +70px = 60px FAB + 16px gap - 6px hit padding.
-   Direction (↑/↓), the one-time "Top"/"Bottom" chip, the long-press
-   chooser and the fast-scroll thumb are driven by gestures.js. */
-.xbs-go {
-    --xbs-go-accent: var(--km-accent, #4a5fc1);
-    --xbs-go-track: rgba(74, 95, 193, 0.18);
-    position: fixed;
-    right: calc(max(1rem, env(safe-area-inset-right, 0px)) + 2px);
-    bottom: calc(max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem)) + 70px);
-    z-index: 1080;
-    width: 56px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    padding: 0;
-    opacity: 0;
-    transform: translateY(8px);
-    pointer-events: none;
-    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    user-select: none;
-    touch-action: manipulation;
-}
-
 .xbs-go.show {
     opacity: 1;
     transform: none;
@@ -860,25 +517,6 @@ html.xbs-locked, body.xbs-locked {
 .xbs-go-track { stroke: var(--xbs-go-track); }
 .xbs-go-fill { stroke: var(--xbs-go-accent); stroke-linecap: round; transition: stroke-dasharray 0.12s linear; }
 
-.xbs-go-chip {
-    position: fixed;
-    right: calc(max(1rem, env(safe-area-inset-right, 0px)) + 2px + 56px);
-    bottom: calc(max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem)) + 70px + 14px);
-    z-index: 1080;
-    height: 28px;
-    padding: 0 10px;
-    border-radius: 14px;
-    background: var(--km-navy, #172552);
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 28px;
-    opacity: 0;
-    transform: translateX(6px);
-    pointer-events: none;
-    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
-}
-
 .xbs-go-chip.show { opacity: 1; transform: none; }
 
 /* Long-press chooser: light scrim + card anchored where the button was. */
@@ -892,20 +530,6 @@ html.xbs-locked, body.xbs-locked {
 }
 
 .xbs-go-menu.show { display: block; }
-
-.xbs-go-menu-card {
-    position: absolute;
-    right: max(1rem, env(safe-area-inset-right, 0px));
-    bottom: calc(max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem)) + 76px);
-    width: 9rem;
-    padding: 4px;
-    border-radius: 16px;
-    background: var(--bs-body-bg, #fff);
-    box-shadow: 0 6px 20px rgba(20, 27, 56, 0.28);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
 
 .xbs-go-menu-card button {
     height: 48px;
@@ -1126,4 +750,856 @@ html.xbs-locked, body.xbs-locked {
     padding: 0.6rem 0.8rem;
     margin-top: 0.5rem;
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* ======================================================================
+   Redesign (v1.0.110): Home, rows, sheets, drawer, floating controls.
+   Bottom stack, all from one baseline B = max(1rem, safe-area + 1rem):
+   FAB (56px) and status pill sit on B; the scroll-jump button sits 16px
+   above the FAB; undo bar and toast float above that.
+   ====================================================================== */
+:root { --km-b: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 1rem)); }
+
+.content { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px)); }
+
+.xbs-section {
+    margin: 0.875rem 0.5rem 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--km-ink-2);
+}
+
+.xbs-hint { color: var(--km-ink-2); padding: 0.5rem; }
+
+/* ---- Search: rounded field, sticky under the top bar. ---- */
+.xbs-search {
+    position: sticky;
+    top: calc(3rem + env(safe-area-inset-top, 0px));
+    z-index: 950;
+    background: var(--km-ground);
+    padding: 0.5rem 0 0.375rem;
+}
+
+.xbs-search-icon {
+    position: absolute;
+    left: 1rem;
+    top: calc(0.5rem + 26px);
+    transform: translateY(-50%);
+    color: var(--km-ink-2);
+    pointer-events: none;
+}
+
+.xbs-search-input {
+    height: 52px;
+    border-radius: 26px;
+    border-color: transparent;
+    background: var(--km-surface-2);
+    padding-left: 3rem;
+    padding-right: 3rem;
+    font-size: 1rem;
+}
+
+.xbs-search-input:focus { background: var(--km-surface); }
+.xbs-search-input::placeholder { color: var(--km-ink-2); }
+
+.xbs-search-clear {
+    position: absolute;
+    right: 0.25rem;
+    top: calc(0.5rem + 26px);
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 22px;
+    background: transparent;
+    color: var(--km-ink-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---- Breadcrumb chips (sticky under search, horizontally scrollable). ---- */
+.xbs-crumbs {
+    position: sticky;
+    top: calc(3rem + env(safe-area-inset-top, 0px) + 4.125rem - 1px);
+    z-index: 900;
+    background: var(--km-ground);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding: 0.125rem 0 0.375rem;
+    scrollbar-width: none;
+}
+
+.xbs-crumbs::-webkit-scrollbar { display: none; }
+
+.xbs-crumb {
+    flex-shrink: 0;
+    height: 40px;
+    min-width: 44px;
+    max-width: 180px;
+    padding: 0 0.875rem;
+    border: 1px solid var(--km-line-strong);
+    border-radius: 20px;
+    background: var(--km-surface);
+    /* Never trust the UA button color: with color-scheme auto it follows the
+       OS theme and goes white-on-white in light mode. */
+    color: var(--km-ink);
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+}
+
+.xbs-crumb.current {
+    background: var(--km-tint);
+    border-color: transparent;
+    color: var(--km-tint-ink);
+    font-weight: 600;
+}
+
+.xbs-crumb-home.current {
+    background: var(--km-navy);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .xbs-crumb-home.current { background: var(--km-tint); color: var(--km-tint-ink); }
+
+.xbs-crumb-sep { color: var(--km-ink-2); width: 16px; height: 16px; }
+
+/* ---- Sort: one segmented control. ---- */
+.xbs-sortbar {
+    position: sticky;
+    top: calc(3rem + env(safe-area-inset-top, 0px) + 4.125rem + 3rem - 2px);
+    z-index: 890;
+    background: var(--km-ground);
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 0 0.5rem;
+}
+
+.xbs-seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 22px;
+    background: var(--km-surface-2);
+}
+
+.xbs-sort {
+    height: 38px;
+    padding: 0 0.875rem;
+    border: 0;
+    border-radius: 19px;
+    background: transparent;
+    /* Same UA-button-color trap as .xbs-crumb: force theme text color. */
+    color: var(--km-ink-2);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.xbs-sort.active {
+    background: var(--km-surface);
+    color: var(--km-ink);
+    box-shadow: 0 1px 3px rgba(20, 27, 56, 0.14);
+}
+
+/* ---- Grouped list: one rounded surface, hairline dividers. ---- */
+.xbs-list {
+    background: var(--km-surface);
+    border-radius: 20px;
+    box-shadow: var(--km-shadow);
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.xbs-row {
+    position: relative;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.xbs-list > .xbs-row + .xbs-row::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 70px;
+    right: 0;
+    height: 1px;
+    background: var(--km-line);
+    z-index: 1;
+}
+
+.xbs-row-inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 48px;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 64px;
+    padding: 10px 0 10px 16px;
+    background: var(--km-surface);
+    transition: transform 0.18s ease-out, background-color 0.12s;
+}
+
+.xbs-row[role="button"] { cursor: pointer; }
+.xbs-row[role="button"]:active .xbs-row-inner { background: var(--km-surface-2); }
+.xbs-row[role="button"]:focus-visible { outline: 2px solid var(--km-accent); outline-offset: -2px; border-radius: 12px; }
+
+.xbs-row-sep .xbs-row-inner {
+    grid-template-columns: 1fr;
+    min-height: 40px;
+    padding-right: 16px;
+    background: transparent;
+    opacity: 0.7;
+}
+
+.xbs-row-sep .xbs-row-title {
+    font-weight: 500;
+    color: var(--km-ink-2);
+    border-top: 1px dashed var(--km-line-strong);
+    padding-top: 0.25rem;
+}
+
+.xbs-tile {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 17px;
+    line-height: 1;
+    flex: none;
+}
+
+.xbs-tile.folder { background: var(--km-tint); color: var(--km-accent); }
+.xbs-tile.lg { width: 48px; height: 48px; border-radius: 14px; font-size: 20px; }
+
+.xbs-row-text { min-width: 0; overflow: hidden; }
+
+.xbs-row-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.xbs-pin-ico { width: 15px; height: 15px; color: var(--km-gold); vertical-align: -2px; margin-right: 4px; }
+
+.xbs-row-sub {
+    margin-top: 2px;
+    font-size: 0.8125rem;
+    color: var(--km-ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.xbs-row-path {
+    margin-top: 2px;
+    font-size: 0.75rem;
+    color: var(--km-ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.xbs-row-path .km-ico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
+
+.xbs-row-chev {
+    width: 48px;
+    height: 48px;
+    border: 0;
+    border-radius: 24px;
+    background: transparent;
+    color: var(--km-ink-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.xbs-row-chev svg { width: 22px; height: 22px; fill: currentColor; }
+.xbs-row-chev:active { background: var(--km-surface-2); }
+
+.xbs-row-tags {
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--km-accent);
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+@keyframes xbs-flash {
+    0%, 100% { box-shadow: inset 0 0 0 0 transparent; }
+    25%, 75% { box-shadow: inset 0 0 0 3px var(--km-accent); }
+}
+
+.xbs-row-inner.xbs-flash { animation: xbs-flash 0.7s ease-in-out 3; }
+
+/* ---- Pinned: collapsible section header + grouped list. ---- */
+.xbs-pinned-box { margin: 0.25rem 0 0.5rem; }
+
+.xbs-pinned-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 48px;
+    padding: 0 0.5rem;
+    border: 0;
+    background: transparent;
+    color: var(--km-ink-2);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.xbs-pinned-head .xbs-pin { color: var(--km-gold); }
+
+.xbs-count {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    background: var(--km-surface-2);
+    color: var(--km-ink);
+    font-size: 0.75rem;
+    letter-spacing: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.xbs-pinned-head .chev { margin-left: auto; transition: transform 0.15s; }
+.xbs-pinned-head .chev.open { transform: rotate(90deg); }
+
+/* ---- Floating bottom controls. ---- */
+.xbs-statusbar {
+    position: fixed;
+    left: max(1rem, env(safe-area-inset-left, 0px));
+    bottom: calc(var(--km-b) + 8px);
+    z-index: 1070;
+    max-width: calc(100vw - 2rem - 8.5rem);
+    height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 0.875rem 0 0.75rem;
+    border-radius: 20px;
+    background: var(--km-surface);
+    box-shadow: var(--km-shadow-float);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--km-ink);
+}
+
+.xbs-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    flex: none;
+    background: var(--km-ok-dot);
+}
+
+.syncing > .xbs-status-dot { background: var(--km-accent); animation: xbs-pulse 1s ease-in-out infinite; }
+.warn > .xbs-status-dot { background: var(--km-gold); }
+.conflict > .xbs-status-dot { background: var(--km-danger); }
+.off > .xbs-status-dot { background: #8a90a8; }
+
+@keyframes xbs-pulse { 50% { opacity: 0.35; } }
+
+.xbs-statusbar-main {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.xbs-status-link { color: var(--km-danger); font-weight: 600; text-decoration: none; }
+
+.xbs-statusbar-sync {
+    flex-shrink: 0;
+    height: 40px;
+    margin-right: -0.5rem;
+    padding: 0 0.5rem;
+    border: 0;
+    background: transparent;
+    color: var(--km-accent);
+    font-weight: 600;
+}
+
+.xbs-fab {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: var(--km-b);
+    z-index: 1080;
+    height: 56px;
+    min-width: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0 1.25rem 0 1rem;
+    border: 0;
+    border-radius: 18px;
+    background: var(--km-accent);
+    color: var(--km-on-accent);
+    font-size: 1rem;
+    font-weight: 600;
+    box-shadow: 0 6px 16px rgba(20, 27, 56, 0.3);
+    transition: padding 0.2s ease-out;
+}
+
+.xbs-fab:active { background: var(--km-accent-hover); }
+
+.xbs-fab-label {
+    max-width: 4rem;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 0.2s ease-out, opacity 0.2s;
+}
+
+/* Scrolled away from the top: collapse to a square + (gestures.js). */
+body.xbs-scrolled .xbs-fab { padding: 0 1rem; gap: 0; }
+body.xbs-scrolled .xbs-fab-label { max-width: 0; opacity: 0; }
+
+/* Drawer or a modal sheet open: floating controls step aside. */
+html.xbs-locked .xbs-fab,
+html.xbs-locked .xbs-statusbar,
+html.xbs-locked .xbs-go,
+html.xbs-locked .xbs-go-chip { visibility: hidden; }
+
+/* Scroll-jump button: disc right edge aligned with the FAB, 16px above it. */
+.xbs-go {
+    position: fixed;
+    right: calc(max(1rem, env(safe-area-inset-right, 0px)) - 6px);
+    bottom: calc(var(--km-b) + 66px);
+    z-index: 1080;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    padding: 0;
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    touch-action: manipulation;
+    --xbs-go-accent: var(--km-accent);
+    --xbs-go-track: var(--km-tint);
+}
+
+.xbs-go-chip {
+    position: fixed;
+    right: calc(max(1rem, env(safe-area-inset-right, 0px)) + 50px);
+    bottom: calc(var(--km-b) + 80px);
+    z-index: 1080;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 14px;
+    background: var(--km-navy);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 28px;
+    opacity: 0;
+    transform: translateX(6px);
+    pointer-events: none;
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
+.xbs-go-menu-card {
+    position: absolute;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--km-b) + 72px);
+    width: 9rem;
+    padding: 4px;
+    border-radius: 16px;
+    background: var(--km-surface);
+    box-shadow: 0 6px 20px rgba(20, 27, 56, 0.28);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.xbs-go-face { background: var(--km-surface); color: var(--km-ink); }
+
+.xbs-undo {
+    position: fixed;
+    left: max(1rem, env(safe-area-inset-left, 0px));
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: calc(var(--km-b) + 68px);
+    z-index: 1090;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.375rem 0.375rem 0.375rem 1rem;
+    border-radius: 14px;
+    background: var(--km-navy);
+    color: #fff;
+    box-shadow: var(--km-shadow-float);
+}
+
+.xbs-undo-btn {
+    height: 36px;
+    padding: 0 1rem;
+    border: 0;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    font-weight: 600;
+}
+
+.xbs-toast {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92vw, 480px);
+    bottom: calc(var(--km-b) + 8rem);
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    background: var(--km-surface);
+    color: var(--km-ink);
+    box-shadow: 0 8px 24px rgba(14, 18, 38, 0.3);
+    font-weight: 600;
+    pointer-events: none;
+    animation: xbs-toast-in 0.25s ease-out;
+}
+
+.xbs-toast-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.xbs-toast.ok .xbs-toast-icon { background: rgba(31, 138, 110, 0.16); color: var(--km-green); }
+.xbs-toast.error .xbs-toast-icon { background: rgba(161, 38, 38, 0.14); color: var(--km-danger); }
+
+.xbs-toploader {
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    height: 3px;
+    z-index: 1300;
+    background: linear-gradient(90deg, transparent, #8c9bf0, transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: xbs-load-slide 1.1s linear infinite;
+}
+
+.xbs-syncing-pill {
+    position: fixed;
+    top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3.5rem));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1300;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    background: var(--km-navy);
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    box-shadow: var(--km-shadow-float);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+/* ---- Bottom sheets (actions + editor). ---- */
+.xbs-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 18, 38, 0.5);
+    z-index: 1100;
+    display: flex;
+    align-items: flex-end;
+    /* Swallowing gestures: touches on the backdrop must never scroll the list behind. */
+    touch-action: none;
+    overscroll-behavior: contain;
+}
+
+.xbs-sheet {
+    width: 100%;
+    max-height: 88dvh;
+    overflow-y: auto;
+    background: var(--km-surface);
+    color: var(--km-ink);
+    border-radius: 28px 28px 0 0;
+    padding: 0.5rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -8px 30px rgba(14, 18, 38, 0.25);
+    /* The sheet itself scrolls; it never chains to the page. */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+}
+
+.xbs-sheet-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--km-line-strong);
+    margin: 0.25rem auto 0.875rem;
+}
+
+.xbs-sheet-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 0.75rem;
+}
+
+.xbs-sheet-head-text { min-width: 0; flex: 1; }
+
+.xbs-sheet-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.xbs-sheet-url {
+    font-size: 0.8125rem;
+    color: var(--km-ink-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.xbs-sheet-desc { font-size: 0.9rem; margin-bottom: 0.5rem; overflow-wrap: anywhere; }
+
+.xbs-actions { display: flex; flex-direction: column; margin: 0 -0.5rem; }
+
+.xbs-action {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 0.75rem;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--km-ink);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-align: left;
+}
+
+.xbs-action .km-ico { color: var(--km-ink-2); }
+.xbs-action:active { background: var(--km-surface-2); }
+.xbs-action.danger, .xbs-action.danger .km-ico { color: var(--km-danger); }
+
+.xbs-sheet .form-control, .xbs-sheet .form-select { min-height: 52px; border-radius: 14px; }
+.xbs-sheet textarea.form-control { min-height: 4.5rem; }
+
+.xbs-folder-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+}
+
+.xbs-folder-btn > .km-ico:first-child { color: var(--km-accent); }
+.xbs-folder-btn > .km-ico:last-child { color: var(--km-ink-2); margin-left: auto; }
+.xbs-folder-btn-text { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.xbs-sheet-actions { display: flex; gap: 0.625rem; margin-top: 0.5rem; }
+.xbs-sheet-actions .btn { flex: 1; min-height: 48px; border-radius: 24px; }
+
+/* ---- Navigation drawer: side sheet below the top bar + scrim. ---- */
+.nav-scrollable { display: none; }
+
+.nav-scrollable:not(.collapse) {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: calc(3rem + env(safe-area-inset-top, 0px));
+    left: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
+    width: min(320px, 86vw);
+    z-index: 1055;
+    background: var(--km-surface);
+    color: var(--km-ink);
+    border-radius: 0 0 28px 0;
+    overflow-y: auto;
+    padding-left: env(safe-area-inset-left, 0px);
+    box-shadow: 8px 0 24px rgba(14, 18, 38, 0.25);
+    /* The drawer scrolls internally; the page behind stays frozen. */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    animation: xbs-drawer-in 0.2s ease-out;
+}
+
+@keyframes xbs-drawer-in { from { transform: translateX(-24px); opacity: 0.4; } }
+
+.xbs-drawer-scrim {
+    position: fixed;
+    top: calc(3rem + env(safe-area-inset-top, 0px));
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1054;
+    background: rgba(14, 18, 38, 0.5);
+    touch-action: none;
+}
+
+.xbs-drawer-head {
+    background: var(--km-navy);
+    color: #fff;
+    padding: 0.75rem 1.25rem 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    flex-shrink: 0;
+}
+
+.xbs-drawer-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.xbs-drawer-sync {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.625rem;
+}
+
+.xbs-drawer-svc { min-width: 0; }
+.xbs-drawer-host { font-size: 0.75rem; color: #c3cae6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xbs-drawer-id { font-family: ui-monospace, 'JetBrains Mono', monospace; font-size: 0.75rem; color: #e8eaf4; }
+
+.xbs-drawer-syncbtn {
+    flex-shrink: 0;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0 0.875rem;
+    border: 0;
+    border-radius: 20px;
+    background: #fff;
+    color: var(--km-navy);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.xbs-drawer-syncbtn:disabled { opacity: 0.5; }
+
+.xbs-drawer-nav { display: flex; flex-direction: column; padding: 0.25rem 0.625rem; }
+
+.xbs-nav-group {
+    padding: 0.875rem 1rem 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--km-ink-2);
+}
+
+.xbs-nav {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 52px;
+    padding: 0 1rem;
+    border-radius: 26px;
+    color: var(--km-ink);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.xbs-nav .km-ico { color: var(--km-ink-2); }
+.xbs-nav:active { background: var(--km-surface-2); color: var(--km-ink); }
+.xbs-nav.active { background: var(--km-tint); color: var(--km-tint-ink); font-weight: 600; }
+.xbs-nav.active .km-ico { color: var(--km-tint-ink); }
+.xbs-nav.disabled { opacity: 0.45; }
+.xbs-nav-label { flex: 1; }
+
+.xbs-nav-badge {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 12px;
+    background: #f6e3c4;
+    color: #6b4a08;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+[data-bs-theme="dark"] .xbs-nav-badge { background: #4a3a10; color: #f3d27a; }
+
+.xbs-drawer-foot {
+    margin-top: auto;
+    padding: 1rem 1.625rem;
+    font-size: 0.75rem;
+    color: var(--km-ink-2);
+}
+
+@media (min-width: 641px) {
+    /* Wide screens: the drawer is the permanent sidebar. */
+    .nav-scrollable,
+    .nav-scrollable:not(.collapse) {
+        display: flex;
+        flex-direction: column;
+        position: static;
+        width: auto;
+        height: calc(100vh - 3rem);
+        border-radius: 0;
+        box-shadow: none;
+        animation: none;
+        background: var(--km-surface);
+        overflow-y: auto;
+    }
+
+    .xbs-drawer-scrim { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-scrollable:not(.collapse) { animation: none; }
+    .xbs-fab, .xbs-fab-label { transition: none; }
+    .syncing > .xbs-status-dot { animation: none; }
 }

@@ -1,0 +1,72 @@
+@using Keepmark.Core.Data
+
+@* Leading tile of a bookmark row: tinted folder glyph for folders, a
+   colored initial for bookmarks (color hashed from the host, so the same
+   site keeps the same color everywhere). Decorative: the row label names it. *@
+@if (Row.IsFolder)
+{
+    <span class="xbs-tile folder @SizeClass" aria-hidden="true">
+        <svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
+    </span>
+}
+else
+{
+    <span class="xbs-tile @SizeClass" style="background:@Color" aria-hidden="true">@Initial</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
+    [Parameter] public bool Large { get; set; }
+
+    // White text passes 4.5:1 on every swatch.
+    private static readonly string[] Palette =
+    [
+        "#3d4fb0", "#1f6f5c", "#8a4b12", "#5a3e99", "#9f2b2b", "#2f5e8f", "#2f6e3a", "#7a3a6e", "#4a5170", "#172552"
+    ];
+
+    private string SizeClass => Large ? "lg" : string.Empty;
+
+    private string Host
+    {
+        get
+        {
+            if (Uri.TryCreate(Row.Url, UriKind.Absolute, out var u) && !string.IsNullOrEmpty(u.Host))
+            {
+                return u.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? u.Host[4..] : u.Host;
+            }
+
+            return Row.Url ?? Row.Title ?? string.Empty;
+        }
+    }
+
+    private string Initial
+    {
+        get
+        {
+            foreach (var ch in (Row.Title ?? string.Empty) + Host)
+            {
+                if (char.IsLetterOrDigit(ch))
+                {
+                    return char.ToUpperInvariant(ch).ToString();
+                }
+            }
+
+            return "•";
+        }
+    }
+
+    private string Color
+    {
+        get
+        {
+            // Stable across runs (string.GetHashCode is randomized per process).
+            uint h = 2166136261;
+            foreach (var ch in Host.ToLowerInvariant())
+            {
+                h = (h ^ ch) * 16777619;
+            }
+
+            return Palette[h % (uint)Palette.Length];
+        }
+    }
+}

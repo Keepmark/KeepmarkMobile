@@ -237,6 +237,8 @@ window.xbsGestures = (() => {
     function onScroll() {
         if (!go) return;
         const y = window.scrollY;
+        // Extended "Add" FAB near the top, compact + once the list scrolls.
+        document.body.classList.toggle('xbs-scrolled', y > 160);
         const now = performance.now();
         const max = scrollMax();
         if (jumping) {
