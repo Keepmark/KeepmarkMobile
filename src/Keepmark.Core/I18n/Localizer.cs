@@ -35,7 +35,7 @@ public sealed class EnglishLocalizer : IXbsLocalizer
         [Str.ErrInvalidService] = "This does not look like a valid xBrowserSync service. Check the service URL.",
         [Str.ErrNotAcceptingNewSyncs] = "This service is not accepting new syncs right now. You can still connect an existing sync ID.",
         [Str.ErrDailyNewSyncLimit] = "Daily new-sync limit reached on this service. Try again tomorrow.",
-        [Str.ErrDataOutOfSync] = "The server copy changed since your last sync. Pull the latest version before uploading.",
+        [Str.ErrDataOutOfSync] = "The server copy changed since your last sync. Download the latest version before uploading.",
         [Str.ErrSyncTooLarge] = "Sync data exceeds the service size limit. Remove some bookmarks and retry.",
         [Str.ErrThrottled] = "Too many requests. The service asked us to slow down — retry in a few minutes.",
         [Str.ErrServiceOffline] = "Cannot reach the service. Check your connection and the service URL.",

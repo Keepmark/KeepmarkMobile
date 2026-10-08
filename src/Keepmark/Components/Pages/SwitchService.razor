@@ -6,9 +6,9 @@
 @inject Keepmark.Services.SecureCredentialStore Creds
 @inject NavigationManager Nav
 
-<PageTitle>Switch service</PageTitle>
+<PageTitle>Move service</PageTitle>
 
-<h1>Switch to another service</h1>
+<h1>Move to another service</h1>
 <p class="text-muted">Move your current local bookmarks to a different xBrowserSync service, into a new or an existing sync. Your local data is never deleted by this wizard.</p>
 
 @if (!Session.Ready)
@@ -26,7 +26,7 @@ else if (!linked)
 else if (step == 4)
 {
     <div class="alert alert-success" role="status">
-        <h4>Switch complete</h4>
+        <h4>Move complete</h4>
         @if (createdId is not null)
         {
             <p>New sync created on <strong>@targetUrl</strong> with your @localCount item(s).</p>
@@ -36,7 +36,7 @@ else if (step == 4)
         }
         else if (tookRemote)
         {
-            <p>Your local tree was replaced with the remote item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local tree was saved — see Backup → Safety backups.</p>
+            <p>Your local tree was replaced with the server item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local bookmarks was saved — see Backup → Safety backups.</p>
         }
         else if (direction == "merge")
         {
@@ -44,7 +44,7 @@ else if (step == 4)
         }
         else
         {
-            <p>Your @localCount local item(s) replaced the @probe?.RemoteCount remote item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten remote side was saved — see Backup → Safety backups.</p>
+            <p>Your @localCount local item(s) replaced the @probe?.RemoteCount server item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten server copy was saved — see Backup → Safety backups.</p>
         }
     </div>
     <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/")'>Back to Explore</button>
@@ -54,7 +54,7 @@ else
     <ol class="mb-3 text-muted">
         <li><strong class="@(step == 1 ? "text-body" : string.Empty)">Target service</strong></li>
         <li><strong class="@(step == 2 ? "text-body" : string.Empty)">Target sync</strong></li>
-        <li><strong class="@(step == 3 ? "text-body" : string.Empty)">Review &amp; switch</strong></li>
+        <li><strong class="@(step == 3 ? "text-body" : string.Empty)">Review &amp; move</strong></li>
     </ol>
 
     @if (step == 1)
@@ -62,7 +62,7 @@ else
         <div class="mb-3">
             <label class="form-label">Target service URL</label>
             <input class="form-control" @bind="targetUrl" inputmode="url" />
-            <div class="form-text">The service that will receive your bookmarks. Check verifies it answers with a compatible API version. Your current link (if any) keeps working untouched until the migration completes.</div>
+            <div class="form-text">The service that will receive your bookmarks. Check verifies it answers with a compatible API version. Your current link (if any) keeps working untouched until the move completes.</div>
             <div class="mt-2 d-flex gap-2">
                 <button class="btn btn-secondary" @onclick="CheckService" disabled="@busy">Check service</button>
                 <button class="btn btn-primary" @onclick="() => step = 2" disabled="@(busy || !serviceOk)">Continue</button>
@@ -82,11 +82,11 @@ else
         <div class="mb-3">
             <div class="form-check">
                 <input class="form-check-input" type="radio" name="slot" id="slotNew" checked="@(slot == "new")" @onchange='() => slot = "new"' />
-                <label class="form-check-label" for="slotNew"><strong>New sync here</strong> — create it and upload my @localCount item(s).</label>
+                <label class="form-check-label" for="slotNew"><strong>New sync</strong> — create it and upload my @localCount item(s).</label>
             </div>
             <div class="form-check">
                 <input class="form-check-input" type="radio" name="slot" id="slotExisting" checked="@(slot == "existing")" @onchange='() => slot = "existing"' />
-                <label class="form-check-label" for="slotExisting"><strong>Existing sync here</strong> — link it and choose the direction below.</label>
+                <label class="form-check-label" for="slotExisting"><strong>Existing sync</strong> — link it and choose the direction below.</label>
             </div>
         </div>
 
@@ -109,7 +109,7 @@ else
                     <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
                     <label class="form-label mt-2">Password</label>
                     <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-                    <div class="form-text">Verified against the remote data first: a wrong password stops here, nothing is overwritten.</div>
+                    <div class="form-text">Verified against the server copy first: a wrong password stops here, nothing is overwritten.</div>
                     <button class="btn btn-secondary mt-2" @onclick="VerifyExisting" disabled="@busy">Verify</button>
                     @if (!string.IsNullOrEmpty(verifyError))
                     {
@@ -120,7 +120,7 @@ else
             else
             {
                 <div class="alert alert-success" role="status">
-                    Sync <code>@ShortId(probe?.Candidate.Id)</code> opened — @probe?.RemoteCount remote item(s),
+                    Sync <code>@ShortId(probe?.Candidate.Id)</code> opened — @probe?.RemoteCount server item(s),
                     password verified and cleared.
                     <div class="mt-2">
                         <button class="btn btn-outline-secondary" @onclick="Unverify" disabled="@busy">Use a different sync…</button>
@@ -130,32 +130,32 @@ else
             @if (VerifiedExisting)
             {
                 <div class="alert alert-warning mt-2">
-                    <h4>Choose the link direction</h4>
-                    <p>Local holds <strong>@localCount</strong> item(s); remote holds <strong>@probe.RemoteCount</strong> item(s).</p>
+                    <h4>Choose sync direction</h4>
+                    <p>Local holds <strong>@localCount</strong> item(s); server holds <strong>@probe.RemoteCount</strong> item(s).</p>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(direction == "take")" disabled="@busy" @onchange='() => SetDirection("take")' />
-                        <label class="form-check-label" for="dirDown"><strong>Take remote</strong> — download (safe default)</label>
+                        <label class="form-check-label" for="dirDown"><strong>Download</strong> — replace the bookmarks on this device with the server copy (safe default)</label>
                     </div>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@(direction == "upload")" disabled="@(busy || localCount == 0)" @onchange='() => SetDirection("upload")' />
-                        <label class="form-check-label" for="dirUp"><strong>Upload mine</strong> — overwrite remote</label>
+                        <label class="form-check-label" for="dirUp"><strong>Upload</strong> — replace the server copy with the bookmarks on this device</label>
                     </div>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="migdir" id="dirMerge" checked="@(direction == "merge")" disabled="@(busy || localCount == 0 || probe.RemoteCount == 0)" @onchange='() => SetDirection("merge")' />
-                        <label class="form-check-label" for="dirMerge"><strong>Merge both sides</strong> — union (never deletes)</label>
+                        <label class="form-check-label" for="dirMerge"><strong>Merge</strong> — keep everything from both sides (nothing is deleted)</label>
                     </div>
                     @if (direction == "take")
                     {
                         <div class="alert alert-danger mt-2 mb-0">
                             <strong>Your @localCount local item(s) will be deleted</strong> and replaced with the
-                            @probe.RemoteCount remote item(s). A plaintext safety backup of your current local tree
+                            @probe.RemoteCount server item(s). A plaintext safety backup of your current local tree
                             is saved first, and the app re-links to this sync.
                         </div>
                     }
                     else if (direction == "upload")
                     {
                         <div class="alert alert-danger mt-2 mb-0">
-                            <strong>The @probe.RemoteCount remote item(s) will be overwritten</strong> with your
+                            <strong>The @probe.RemoteCount server item(s) will be overwritten</strong> with your
                             @localCount local item(s). A plaintext safety backup of the server copy is saved first,
                             and the app re-links to this sync.
                         </div>
@@ -163,8 +163,8 @@ else
                     else
                     {
                         <div class="alert alert-info mt-2 mb-0">
-                            <strong>Union of both sides — nothing is deleted.</strong>
-                            Local-only bookmarks upload, remote-only download; same-URL
+                            <strong>Merge keeps everything from both sides — nothing is deleted.</strong>
+                            Local-only bookmarks upload, server-only ones download; same-URL
                             title conflicts keep the server title.
                             <div class="mt-2">
                                 <button class="btn btn-secondary" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
@@ -210,13 +210,13 @@ else
             }
             else if (direction == "upload")
             {
-                <p>Replace the <strong>@probe?.RemoteCount</strong> remote item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> with your <strong>@localCount</strong> local item(s). Remote backup saved first; the app re-links to that sync.</p>
+                <p>Replace the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> with your <strong>@localCount</strong> local item(s). Server copy backed up first; the app re-links to that sync.</p>
             }
             else if (direction == "merge")
             {
                 @if (mergeStats is not null)
                 {
-                    <p>Merge your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> remote item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>: @mergeStats.LocalOnly will upload, @mergeStats.RemoteOnly will download, @mergeStats.TitleConflicts title conflicts keep the server title. Nothing is deleted. Safety backups of both sides saved first; the app re-links to that sync.</p>
+                    <p>Merge your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>: @mergeStats.LocalOnly will upload, @mergeStats.RemoteOnly will download, @mergeStats.TitleConflicts title conflicts keep the server title. Nothing is deleted. Safety backups of both sides saved first; the app re-links to that sync.</p>
                 }
                 else
                 {
@@ -225,12 +225,12 @@ else
             }
             else
             {
-                <p>Replace your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> remote item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>. Local backup saved first; the app re-links to that sync.</p>
+                <p>Replace your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>. Local bookmarks backed up first; the app re-links to that sync.</p>
             }
         </div>
         <div class="d-flex gap-2">
             <button class="btn btn-secondary" @onclick="() => step = 2" disabled="@busy">Back</button>
-            <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Switch now</button>
+            <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Move now</button>
             <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
         </div>
         @if (!string.IsNullOrEmpty(reviewError))
@@ -484,9 +484,9 @@ else
             step = 4;
             Session.PendingSwitch = null;
             Session.Log.Info("switch", createdId is not null
-                ? "Switch complete: new sync created and uploaded"
-                : direction == "merge" ? "Switch complete: merged both sides"
-                : tookRemote ? "Switch complete: took remote tree" : "Switch complete: uploaded local tree");
+                ? "Move complete: new sync created and uploaded"
+                : direction == "merge" ? "Move complete: merged both sides"
+                : tookRemote ? "Move complete: downloaded the server copy" : "Move complete: uploaded local bookmarks");
         }, err => reviewError = err, "switch-execute");
     }
 
@@ -517,7 +517,7 @@ else
 
         if (!string.Equals(first, second, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("Passwords do not match — retype the confirmation.");
+            throw new InvalidOperationException("Passwords do not match.");
         }
     }
 

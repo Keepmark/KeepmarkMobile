@@ -9,7 +9,7 @@
 <PageTitle>Duplicates</PageTitle>
 
 <h1>Duplicate bookmarks</h1>
-<p class="text-muted">Same URL saved more than once. Mark copies with ✕ to delete them — one copy of each link always stays. Tap a title to open it.</p>
+<p class="text-muted">Same URL saved more than once. Mark copies with ✕ to delete them — one copy of each URL always stays. Tap a title to open it.</p>
 
 @if (!ready)
 {
@@ -61,7 +61,7 @@ else
         }
         else
         {
-            <span><strong>Delete @MarkedCount()?</strong> One copy of each link stays.</span>
+            <span><strong>Delete @MarkedCount()?</strong> One copy of each URL stays.</span>
             <div class="d-flex gap-2">
                 <button class="btn btn-danger" disabled="@busy" @onclick="ExecuteAll">Yes, delete</button>
                 <button class="btn btn-secondary" disabled="@busy" @onclick="() => armedAll = false">Cancel</button>

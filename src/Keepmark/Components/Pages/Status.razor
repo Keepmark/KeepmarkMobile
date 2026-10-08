@@ -27,7 +27,7 @@ else
     @if (status == Core.Sync.SyncStatus.Conflict)
     {
         <div class="alert alert-warning" role="alert">
-            <h4>⚠️ Sync conflict</h4>
+            <h4>Sync conflict</h4>
             <p>The server has newer changes. Your local changes could not be pushed.</p>
             <div class="d-grid gap-2 mt-2">
                 <button class="btn btn-outline-primary" @onclick="ShowConflictDetails" disabled="@busy">Show details & resolve…</button>
@@ -51,11 +51,11 @@ else
                 <h4 class="mb-0">Conflict resolution</h4>
             </div>
             <div class="card-body">
-                <p class="text-muted">Remote updated <strong>@FormatRelative(conflictPreview.RemoteLastUpdated)</strong> · Local has <strong>@conflictPreview.LocalCount</strong> items · Remote has <strong>@conflictPreview.RemoteCount</strong> items</p>
+                <p class="text-muted">Server copy updated <strong>@FormatRelative(conflictPreview.RemoteLastUpdated)</strong> · Local has <strong>@conflictPreview.LocalCount</strong> items · Server has <strong>@conflictPreview.RemoteCount</strong> items</p>
 
                 <dl class="row mb-3">
                     <dt class="col-sm-6">Local only → will upload</dt><dd class="col-sm-6">@conflictPreview.LocalOnly</dd>
-                    <dt class="col-sm-6">Remote only → will download</dt><dd class="col-sm-6">@conflictPreview.RemoteOnly</dd>
+                    <dt class="col-sm-6">Server only → will download</dt><dd class="col-sm-6">@conflictPreview.RemoteOnly</dd>
                     <dt class="col-sm-6">Title conflicts (server wins)</dt><dd class="col-sm-6">@conflictPreview.TitleConflicts</dd>
                     <dt class="col-sm-6">Folders created</dt><dd class="col-sm-6">@conflictPreview.FoldersCreated</dd>
                     <dt class="col-sm-6">Separators kept from both</dt><dd class="col-sm-6">@conflictPreview.SeparatorsAdopted</dd>
@@ -65,13 +65,13 @@ else
                 {
                     <div class="d-grid gap-2">
                         <button class="btn btn-outline-success" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Pull)" disabled="@busy">
-                            📥 Take remote — replace local with server (@conflictPreview.RemoteCount items)…
+                            Download — replace local with the server copy (@conflictPreview.RemoteCount items)…
                         </button>
                         <button class="btn btn-outline-primary" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Push)" disabled="@busy">
-                            📤 Upload local — overwrite server with local (@conflictPreview.LocalCount items)…
+                            Upload — replace the server copy with local (@conflictPreview.LocalCount items)…
                         </button>
                         <button class="btn btn-outline-warning" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Merge)" disabled="@busy">
-                            🔀 Merge both sides — union, nothing deleted…
+                            Merge — keep both sides, nothing deleted…
                         </button>
                     </div>
                 }
@@ -178,22 +178,22 @@ else
 
     private static string ConfirmText(Core.Sync.ConflictResolutionDirection d) => d switch
     {
-        Core.Sync.ConflictResolutionDirection.Pull => "Replace your local bookmarks with the server copy? Your local tree is saved to Backup → Safety backups first.",
-        Core.Sync.ConflictResolutionDirection.Push => "Overwrite the server copy with your local bookmarks? The server copy is saved to Backup → Safety backups first.",
+        Core.Sync.ConflictResolutionDirection.Pull => "Replace your local bookmarks with the server copy? Your local bookmarks are saved to Backup → Safety backups first.",
+        Core.Sync.ConflictResolutionDirection.Push => "Replace the server copy with your local bookmarks? The server copy is saved to Backup → Safety backups first.",
         _ => "Merge both sides into one tree (nothing is deleted) and upload it? Both sides are saved to Backup → Safety backups first.",
     };
 
     private static string ConfirmLabel(Core.Sync.ConflictResolutionDirection d) => d switch
     {
-        Core.Sync.ConflictResolutionDirection.Pull => "Yes, take remote",
-        Core.Sync.ConflictResolutionDirection.Push => "Yes, upload local",
+        Core.Sync.ConflictResolutionDirection.Pull => "Yes, download",
+        Core.Sync.ConflictResolutionDirection.Push => "Yes, upload",
         _ => "Yes, merge",
     };
 
     private static string ResultText(Core.Sync.ConflictResolutionDirection d) => d switch
     {
-        Core.Sync.ConflictResolutionDirection.Pull => "Conflict resolved: took the server copy. Your previous local tree is in Backup → Safety backups.",
-        Core.Sync.ConflictResolutionDirection.Push => "Conflict resolved: uploaded your local tree. The previous server copy is in Backup → Safety backups.",
+        Core.Sync.ConflictResolutionDirection.Pull => "Conflict resolved: downloaded the server copy. Your previous local bookmarks are in Backup → Safety backups.",
+        Core.Sync.ConflictResolutionDirection.Push => "Conflict resolved: uploaded your local bookmarks. The previous server copy is in Backup → Safety backups.",
         _ => "Conflict resolved: merged both sides (nothing deleted). Both previous sides are in Backup → Safety backups.",
     };
 

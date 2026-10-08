@@ -26,19 +26,19 @@ public static class SafetyOperations
 
     public static string Describe(string operation) => operation switch
     {
-        TakeRemote => "Replaced local with remote — Connect",
-        UploadLocal => "Overwrote server with local — Connect",
+        TakeRemote => "Downloaded server copy — Connect",
+        UploadLocal => "Uploaded local bookmarks — Connect",
         CreateEmpty => "Created empty sync — Connect",
         ImportBackup => "Imported encrypted backup",
         ChangePassword => "Changed sync password — Settings",
-        SwitchTakeRemote => "Took remote — Switch service",
-        SwitchUpload => "Uploaded local — Switch service",
+        SwitchTakeRemote => "Downloaded server copy — Move service",
+        SwitchUpload => "Uploaded local bookmarks — Move service",
         ConnectMerge => "Merged both sides — Connect",
-        SwitchMerge => "Merged both sides — Switch service",
+        SwitchMerge => "Merged both sides — Move service",
         DuplicatesCleanup => "Deleted duplicates",
         PreRestore => "Before safety-backup restore",
-        ConflictPull => "Conflict resolved: took remote",
-        ConflictPush => "Conflict resolved: uploaded local",
+        ConflictPull => "Conflict resolved: downloaded server copy",
+        ConflictPush => "Conflict resolved: uploaded local bookmarks",
         ConflictMerge => "Conflict resolved: merged both sides",
         _ => "Older backup",
     };
@@ -80,7 +80,7 @@ public static class SafetyBackupFiles
 
     public static string Describe(SafetyBackupEntry e) =>
         $"{e.CreatedAtUtc.ToLocalTime():g} · {SafetyOperations.Describe(e.Operation)} · " +
-        $"{(e.Side == "local" ? "local tree" : "server copy")} · {e.Items} items" +
+        $"{(e.Side == "local" ? "local bookmarks" : "server copy")} · {e.Items} items" +
         (e.Enc == "master" ? " · encrypted" : " · not encrypted");
 
     /// <summary>Filenames to delete: everything beyond the newest KeepCount.</summary>

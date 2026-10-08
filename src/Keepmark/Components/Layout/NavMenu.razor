@@ -35,7 +35,7 @@
                     <div class="xbs-drawer-host">No service linked</div>
                 }
             </div>
-            <button class="xbs-drawer-syncbtn" @onclick="SyncAndClose" disabled="@(!linked)" title="@(linked ? "Push local changes and pull remote ones now" : "Link a service first (Connect)")">
+            <button class="xbs-drawer-syncbtn" @onclick="SyncAndClose" disabled="@(!linked)" title="@(linked ? "Upload local changes and download server changes now" : "Link a service first (Connect)")">
                 <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5" /></svg>Sync now
             </button>
         </div>
@@ -44,17 +44,17 @@
         <div class="xbs-nav-group">Bookmarks</div>
             <NavLink class="xbs-nav" href="" Match="NavLinkMatch.All" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-3.5L7 20z" /></svg><span class="xbs-nav-label">Explore</span></NavLink>
             <NavLink class="xbs-nav" href="duplicates" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M5 15V6a1 1 0 0 1 1-1h9" /></svg><span class="xbs-nav-label">Duplicates</span>@if (dupCount > 0) { <span class="xbs-nav-badge">@dupCount</span> }</NavLink>
-            <NavLink class="xbs-nav" href="backup" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4zM4 7l2-3h12l2 3M10 11h4" /></svg><span class="xbs-nav-label">Backup &amp; restore</span></NavLink>
+            <NavLink class="xbs-nav" href="backup" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4zM4 7l2-3h12l2 3M10 11h4" /></svg><span class="xbs-nav-label">Backup</span></NavLink>
         <div class="xbs-nav-group">Sync</div>
             <NavLink class="xbs-nav" href="connect" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg><span class="xbs-nav-label">Connect</span></NavLink>
-            <NavLink class="xbs-nav" href="status" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4" /></svg><span class="xbs-nav-label">Status &amp; conflicts</span></NavLink>
+            <NavLink class="xbs-nav" href="status" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4" /></svg><span class="xbs-nav-label">Status</span></NavLink>
         @if (linked)
         {
-            <NavLink class="xbs-nav" href="switch-service" title="@SwitchTitle" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">Switch service</span></NavLink>
+            <NavLink class="xbs-nav" href="switch-service" title="@SwitchTitle" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">Move service</span></NavLink>
         }
         else
         {
-            <span class="xbs-nav disabled" aria-disabled="true" title="@SwitchTitle"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">Switch service</span></span>
+            <span class="xbs-nav disabled" aria-disabled="true" title="@SwitchTitle"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">Move service</span></span>
         }
         <div class="xbs-nav-group">App</div>
             <NavLink class="xbs-nav" href="settings" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></svg><span class="xbs-nav-label">Settings</span></NavLink>

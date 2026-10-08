@@ -16,7 +16,7 @@ else if (linked)
     <div class="alert alert-success">
         Linked to <strong>@linkedUrl</strong> (sync <code>@ShortId(linkedId)</code>).
     </div>
-    <p>To switch to another service use <a href="switch-service">Switch service</a>, to save or restore an encrypted copy use <a href="backup">Backup</a>.</p>
+    <p>To move to another service use <a href="switch-service">Move service</a>, to save or restore an encrypted copy use <a href="backup">Backup</a>.</p>
 
     <hr />
     <h2>Unlink this device</h2>
@@ -28,7 +28,7 @@ else if (linked)
     else
     {
         <div class="alert alert-danger">
-            <strong>Forget the credentials and stop syncing?</strong> Local data stays.
+            <strong>Unlink this device?</strong> Syncing stops; the bookmarks on this device stay untouched.
             <div class="mt-2 d-flex gap-2">
                 <button class="btn btn-danger" @onclick="ExecuteUnlink" disabled="@busy">Yes, unlink</button>
                 <button class="btn btn-secondary" @onclick="() => armedUnlink = false" disabled="@busy">Cancel</button>
@@ -76,7 +76,7 @@ else
         <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
         <label class="form-label mt-2">Password</label>
         <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-        <div class="form-text">The password is verified against the remote data: a wrong password cannot open the sync. Nothing is changed until you pick a direction below.</div>
+        <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing is changed until you pick a direction below.</div>
         <div class="mt-2">
             <button class="btn btn-primary me-2" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
         </div>
@@ -126,18 +126,18 @@ else
     {
         <div class="alert alert-warning">
             <h4>Choose sync direction</h4>
-            <p>Local items: <strong>@reconcile.LocalCount</strong> · Remote items: <strong>@reconcile.RemoteCount</strong>
-                (remote updated @(reconcile.RemoteLastUpdated ?? "unknown")).</p>
+            <p>Local items: <strong>@reconcile.LocalCount</strong> · Server items: <strong>@reconcile.RemoteCount</strong>
+                (server copy updated @(reconcile.RemoteLastUpdated ?? "unknown")).</p>
             <div class="mb-2">
                 <div class="form-check">
                     <input class="form-check-input" type="radio" name="syncDirection" id="dir-download"
                            checked="@(direction == "download")" disabled="@(busy || reconcile.RemoteCount == 0)"
                            @onchange='() => SetDirection("download")' />
                     <label class="form-check-label" for="dir-download">
-                        Download remote — replace local
+                        Download — replace the bookmarks on this device with the server copy
                         @if (reconcile.RemoteCount == 0)
                         {
-                            <text>(remote is empty)</text>
+                            <text>(server copy is empty)</text>
                         }
                     </label>
                 </div>
@@ -146,10 +146,10 @@ else
                            checked="@(direction == "upload")" disabled="@(busy || reconcile.LocalCount == 0)"
                            @onchange='() => SetDirection("upload")' />
                     <label class="form-check-label" for="dir-upload">
-                        Upload local — overwrite remote
+                        Upload — replace the server copy with the bookmarks on this device
                         @if (reconcile.LocalCount == 0)
                         {
-                            <text>(nothing local to lose)</text>
+                            <text>(nothing local to upload)</text>
                         }
                     </label>
                 </div>
@@ -159,7 +159,7 @@ else
                            disabled="@(busy || reconcile.LocalCount == 0 || reconcile.RemoteCount == 0)"
                            @onchange='() => SetDirection("merge")' />
                     <label class="form-check-label" for="dir-merge">
-                        Merge both sides — union (never deletes)
+                        Merge — keep everything from both sides (nothing is deleted)
                         @if (reconcile.LocalCount == 0 || reconcile.RemoteCount == 0)
                         {
                             <text>(needs items on both sides)</text>
@@ -170,8 +170,8 @@ else
             @if (direction == "merge")
             {
                 <div class="alert alert-info mb-2">
-                    <strong>Union of both sides — nothing is deleted.</strong>
-                    Local-only bookmarks upload, remote-only download; same-URL
+                    <strong>Merge keeps everything from both sides — nothing is deleted.</strong>
+                    Local-only bookmarks upload, server-only ones download; same-URL
                     title conflicts keep the server title; items deleted on one
                     side while the other was offline reappear.
                     <div class="mt-2">
@@ -187,13 +187,13 @@ else
                         @if (!armedMerge)
                         {
                             <div class="mt-2">
-                                <button class="btn btn-danger" @onclick="() => armedMerge = true" disabled="@busy">Merge both sides…</button>
+                                <button class="btn btn-danger" @onclick="() => armedMerge = true" disabled="@busy">Merge…</button>
                             </div>
                         }
                         else
                         {
                             <div class="mt-2 d-flex gap-2">
-                                <button class="btn btn-danger" @onclick="ApplyMerge" disabled="@busy">Yes, merge both sides</button>
+                                <button class="btn btn-danger" @onclick="ApplyMerge" disabled="@busy">Yes, merge</button>
                                 <button class="btn btn-secondary" @onclick="() => armedMerge = false" disabled="@busy">Cancel</button>
                             </div>
                         }
@@ -203,18 +203,18 @@ else
             else if (direction == "upload")
             {
                 <div class="alert alert-danger mb-2">
-                    <strong>Overwrites the @reconcile.RemoteCount remote item(s) with your @reconcile.LocalCount local.</strong>
+                    <strong>Replaces the @reconcile.RemoteCount server item(s) with your @reconcile.LocalCount local item(s).</strong>
                     A plaintext safety backup of the server copy is saved first.
                     @if (!armedLocal)
                     {
                         <div class="mt-2">
-                            <button class="btn btn-danger" @onclick="() => armedLocal = true" disabled="@busy">Upload local…</button>
+                            <button class="btn btn-danger" @onclick="() => armedLocal = true" disabled="@busy">Upload…</button>
                         </div>
                     }
                     else
                     {
                         <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload local</button>
+                            <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload</button>
                             <button class="btn btn-secondary" @onclick="() => armedLocal = false" disabled="@busy">Cancel</button>
                         </div>
                     }
@@ -223,7 +223,7 @@ else
             else
             {
                 <div class="alert alert-danger mb-2">
-                    <strong>Takes the @reconcile.RemoteCount remote item(s).</strong>
+                    <strong>Downloads the @reconcile.RemoteCount server item(s).</strong>
                     @if (reconcile.LocalCount > 0)
                     {
                         <text>Your @reconcile.LocalCount local item(s) will be deleted.</text>
@@ -232,13 +232,13 @@ else
                     @if (!armedRemote)
                     {
                         <div class="mt-2">
-                            <button class="btn btn-danger" @onclick="() => armedRemote = true" disabled="@busy">Download remote…</button>
+                            <button class="btn btn-danger" @onclick="() => armedRemote = true" disabled="@busy">Download…</button>
                         </div>
                     }
                     else
                     {
                         <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-danger" @onclick="ApplyRemote" disabled="@busy">Yes, download remote</button>
+                            <button class="btn btn-danger" @onclick="ApplyRemote" disabled="@busy">Yes, download</button>
                             <button class="btn btn-secondary" @onclick="() => armedRemote = false" disabled="@busy">Cancel</button>
                         </div>
                     }
@@ -351,7 +351,7 @@ else
 
         if (!string.Equals(first, second, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("Passwords do not match — retype the confirmation.");
+            throw new InvalidOperationException("Passwords do not match.");
         }
     }
 

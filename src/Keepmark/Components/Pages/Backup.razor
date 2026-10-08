@@ -73,9 +73,9 @@ else
 
     <div class="mb-3">
         <h4>Safety backups</h4>
-        <p class="text-muted">Automatic snapshots taken before every overwrite (encrypted when a sync is linked,
+        <p class="text-muted">Automatic snapshots taken before every overwrite or deletion (encrypted when a sync is linked,
             otherwise plaintext; kept in the app folder).
-            Restore one to undo a take-remote, upload, import, password change, move or duplicates cleanup —
+            Restore one to undo a download, upload, import, password change, move or duplicates cleanup —
             or delete it to free space. Newest first, oldest auto-pruned beyond five.</p>
         <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">Refresh list</button>
         @if (!string.IsNullOrEmpty(safetyMessage))
@@ -213,7 +213,7 @@ else
 
         if (!string.Equals(first, second, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("Passwords do not match — retype the confirmation.");
+            throw new InvalidOperationException("Passwords do not match.");
         }
     }
 
@@ -353,7 +353,7 @@ else
                 localCount = stats.Folders + stats.Bookmarks + stats.Separators;
             }
 
-            Ok($"Restored {restored} item(s). Safety backup of the replaced tree saved — see Safety backups below. They sync up automatically.");
+            Ok($"Restored {restored} item(s). Safety backup of the replaced bookmarks saved — see Safety backups below. They sync up automatically.");
         });
         // The import flow is over either way: never keep the password around.
         impPassword = string.Empty;
