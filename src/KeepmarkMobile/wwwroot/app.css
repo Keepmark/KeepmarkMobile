@@ -1132,6 +1132,20 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
     .xbs-fab-label { max-width: 0; opacity: 0; }
 }
 
+/* App bar edge (v1.0.126, canvas proposal D): a soft shadow always lifts
+   the navy bar off the list, and deepens once content scrolls under it.
+   On .top-row (full width), so it runs unbroken under the hamburger too;
+   the page bar overlays the same box and adds no shadow of its own. */
+@media (max-width: 640px), (max-height: 559px) {
+    .top-row {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.22);
+        transition: box-shadow 0.2s ease;
+    }
+    html.xbs-under .top-row {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.45);
+    }
+}
+
 /* Wide screens (sidebar layout): the page bar sits in the content column. */
 @media (min-width: 641px) and (min-height: 560px) {
     .xbs-pagebar {

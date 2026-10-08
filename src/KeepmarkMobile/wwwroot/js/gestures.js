@@ -89,6 +89,13 @@ window.xbsGestures = (() => {
         }
     }
 
+    // App bar edge: html.xbs-under while any content sits under the bar
+    // (every page, not only Home), so the bar shadow can deepen.
+    function onEdgeScroll() {
+        document.documentElement.classList.toggle('xbs-under', window.scrollY > 4);
+    }
+    window.addEventListener('scroll', onEdgeScroll, { passive: true });
+
     function attach() {
         if (listenersAttached) return;
         listenersAttached = true;
@@ -486,6 +493,22 @@ window.xbsGestures = (() => {
             const any = Object.keys(locks).some(k => locks[k]);
             document.documentElement.classList.toggle('xbs-locked', any);
             if (document.body) document.body.classList.toggle('xbs-locked', any);
+        },
+        back() {
+            // Android back key (MainActivity): dismiss the topmost transient
+            // layer instead of navigating. Each dismiss control carries
+            // data-back="<priority>"; highest priority wins, ties go to the
+            // last one in the DOM (rendered on top). Returns false when
+            // nothing was open, so the native side falls back to history.
+            if (goMenu && goMenu.classList.contains('show')) { closeMenu(); return true; }
+            let best = null, bestP = -1;
+            document.querySelectorAll('[data-back]').forEach(el => {
+                const p = parseInt(el.dataset.back, 10) || 0;
+                if (p >= bestP && el.getClientRects().length) { best = el; bestP = p; }
+            });
+            if (!best) return false;
+            best.click();
+            return true;
         },
         focus(selector) {
             const el = document.querySelector(selector);

@@ -26,7 +26,7 @@ else
     <header class="xbs-pagebar @(searchOpen ? "searching" : string.Empty)">
         @if (searchOpen)
         {
-            <button class="xbs-barbtn" @onclick="CloseSearch" aria-label="Close search"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
+            <button class="xbs-barbtn" data-back="10" @onclick="CloseSearch" aria-label="Close search"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
             <div class="xbs-barsearch">
                 <input id="xbs-q" class="xbs-barsearch-input" type="search" enterkeyhint="search" placeholder="Search bookmarks" aria-label="Search bookmarks"
                        @oninput="OnSearchInput" value="@query" />
@@ -63,7 +63,7 @@ else
 
     @if (pathMenuOpen && !searchOpen)
     {
-        <div class="xbs-pop-scrim" @onclick="ClosePops" aria-hidden="true"></div>
+        <div class="xbs-pop-scrim" data-back="40" @onclick="ClosePops" aria-hidden="true"></div>
         <div class="xbs-pop left" role="menu" aria-label="Folder path">
             <button class="xbs-pop-item" role="menuitem" @onclick="() => { ClosePops(); return GoRoot(); }">
                 <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg><span>All bookmarks</span>
@@ -84,7 +84,7 @@ else
 
     @if (sortMenuOpen && !searchOpen)
     {
-        <div class="xbs-pop-scrim" @onclick="ClosePops" aria-hidden="true"></div>
+        <div class="xbs-pop-scrim" data-back="40" @onclick="ClosePops" aria-hidden="true"></div>
         <div class="xbs-pop right" role="menu" aria-label="Sort">
             <div class="xbs-pop-head">Sort this list</div>
             @foreach (var (mode, label) in SortModes)
@@ -202,7 +202,7 @@ else
 
 @if (menuFor is not null)
 {
-    <div class="xbs-sheet-backdrop" @onclick="() => menuFor = null">
+    <div class="xbs-sheet-backdrop" data-back="30" @onclick="() => menuFor = null">
         <div class="xbs-sheet" role="dialog" aria-modal="true" aria-label="Actions for @(menuFor.Title ?? menuFor.Url ?? "item")" @onclick:stopPropagation="true">
             <div class="xbs-sheet-handle" aria-hidden="true"></div>
             <div class="xbs-sheet-info @(MenuExpanded ? "expanded" : string.Empty)" data-sheet-info aria-expanded="@MenuExpanded.ToString().ToLowerInvariant()">

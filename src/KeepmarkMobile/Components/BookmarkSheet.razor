@@ -2,7 +2,7 @@
 
 @if (Visible)
 {
-    <div class="xbs-sheet-backdrop" @onclick="RequestCancel">
+    <div class="xbs-sheet-backdrop" data-back="30" @onclick="RequestCancel">
         <div class="xbs-sheet" role="dialog" aria-modal="true" aria-labelledby="xbs-sheet-title" @onclick:stopPropagation="true">
             <div class="xbs-sheet-handle" aria-hidden="true"></div>
             <h2 id="xbs-sheet-title" class="xbs-sheet-title mb-3">@(IsEdit ? (EffectiveIsFolder ? "Edit folder" : "Edit bookmark") : NewIsFolder ? "New folder" : "New bookmark")</h2>
