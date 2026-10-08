@@ -70,7 +70,7 @@ else
                         <button class="btn btn-outline-primary" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Push)" disabled="@busy">
                             📤 Upload local — overwrite server with local (@conflictPreview.LocalCount items)…
                         </button>
-                        <button class="btn btn-outline-warning text-dark" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Merge)" disabled="@busy">
+                        <button class="btn btn-outline-warning" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Merge)" disabled="@busy">
                             🔀 Merge both sides — union, nothing deleted…
                         </button>
                     </div>
