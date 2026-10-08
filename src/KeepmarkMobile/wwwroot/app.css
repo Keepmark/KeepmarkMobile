@@ -1826,3 +1826,60 @@ html.xbs-locked .xbs-go-chip { visibility: hidden; }
 [data-bs-theme="dark"] .xbs-sheet .form-select { background-color: var(--km-surface); }
 
 .xbs-sheet-handle { background: var(--km-accent); opacity: 0.55; }
+
+/* ---- Sync conflict (Status): one bordered panel with the two copies and the three ways out. ---- */
+.xbs-conflict {
+    margin: 0 0 1.5rem;
+    padding: 1rem;
+    border: 1.5px solid var(--km-gold);
+    border-radius: 18px;
+    background: var(--km-surface);
+}
+.xbs-conflict-lead { color: var(--km-ink-2); margin: 0 0 1rem; }
+.xbs-conflict-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+.xbs-conflict-sides > div {
+    display: flex;
+    flex-direction: column;
+    padding: 0.75rem;
+    border-radius: 12px;
+    background: var(--km-surface-2);
+}
+.xbs-conflict-sides span { font-size: 0.8125rem; color: var(--km-ink-2); }
+.xbs-conflict-sides strong { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+.xbs-conflict-sides small { font-size: 0.8125rem; color: var(--km-ink-2); }
+.xbs-choice-text strong .badge { font-size: 0.7rem; font-weight: 700; color: #fff; vertical-align: 2px; margin-left: 0.25rem; }
+
+/* ---- Wizards: Back + step count on top, one question per screen. ---- */
+.xbs-wizard-head { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-bottom: 0.25rem; }
+.xbs-stepcount { font-size: 0.8125rem; font-weight: 600; color: var(--km-ink-2); }
+.xbs-verified-text { flex: 1; }
+.xbs-verified .xbs-link-btn { flex: none; }
+
+/* DirectionPicker: three radio cards, the chosen one tinted. */
+.xbs-options { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; display: flex; flex-direction: column; gap: 0.625rem; }
+.xbs-options-legend { float: none; width: auto; font-size: 1rem; font-weight: 700; margin: 0.25rem 0 0.25rem; }
+.xbs-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border: 1.5px solid var(--km-line-strong);
+    border-radius: 16px;
+    background: var(--km-surface);
+}
+.xbs-option input { flex: none; width: 1.25rem; height: 1.25rem; margin-top: 0.15rem; accent-color: var(--km-accent); }
+.xbs-option:has(input:checked) { border-color: var(--km-accent); background: var(--km-tint); }
+.xbs-option:has(input:disabled) { opacity: 0.55; }
+.xbs-option-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.xbs-option-text strong { font-weight: 700; }
+.xbs-option-text span { font-size: 0.875rem; color: var(--km-ink-2); line-height: 1.35; }
+
+/* Review card before an irreversible step. */
+.xbs-review {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1.5px solid var(--km-line-strong);
+    border-radius: 16px;
+    background: var(--km-surface);
+}
+.xbs-review-list { margin: 0.25rem 0 0.5rem; padding-left: 1.25rem; }

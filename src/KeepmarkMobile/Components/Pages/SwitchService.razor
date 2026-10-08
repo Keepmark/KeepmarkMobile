@@ -9,7 +9,7 @@
 <PageTitle>Move service</PageTitle>
 
 <h1>Move to another service</h1>
-<p class="text-muted">Move your current local bookmarks to a different xBrowserSync service, into a new or an existing sync. Your local data is never deleted by this wizard.</p>
+<p class="text-muted">Move your bookmarks to a different xBrowserSync service, into a new or an existing sync. Anything replaced is saved to Backup → Safety backups first.</p>
 
 @if (!Session.Ready)
 {
@@ -51,192 +51,177 @@ else if (step == 4)
 }
 else
 {
-    <ol class="mb-3 text-muted">
-        <li><strong class="@(step == 1 ? "text-body" : string.Empty)">Target service</strong></li>
-        <li><strong class="@(step == 2 ? "text-body" : string.Empty)">Target sync</strong></li>
-        <li><strong class="@(step == 3 ? "text-body" : string.Empty)">Review &amp; move</strong></li>
-    </ol>
+    @* One question per screen, one primary action at the bottom, Back at the top. *@
+    <div class="xbs-wizard-head">
+        @if (step > 1)
+        {
+            <button class="xbs-back" @onclick="GoBack" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back</button>
+        }
+        else
+        {
+            <span></span>
+        }
+        <span class="xbs-stepcount">Step @step of 3</span>
+    </div>
 
     @if (step == 1)
     {
+        <h2 class="xbs-step-title">Where to move</h2>
         <div class="mb-3">
             <label class="form-label">Target service URL</label>
-            <input class="form-control" @bind="targetUrl" inputmode="url" />
-            <div class="form-text">The service that will receive your bookmarks. Check verifies it answers with a compatible API version. Your current link (if any) keeps working untouched until the move completes.</div>
-            <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-secondary" @onclick="CheckService" disabled="@busy">Check service</button>
-                <button class="btn btn-primary" @onclick="() => step = 2" disabled="@(busy || !serviceOk)">Continue</button>
+            <input class="form-control" @bind="targetUrl" @bind:event="oninput" inputmode="url" />
+            <div class="form-text">The service that will receive your bookmarks. Your current link keeps working untouched until the move completes.</div>
+        </div>
+        @if (!serviceOk)
+        {
+            @* The next step unlocks only for the exact URL that answered: editing it brings the check back. *@
+            <div class="d-grid">
+                <button class="btn btn-primary" @onclick="CheckService" disabled="@busy">Check service</button>
             </div>
-            @if (serviceInfo is not null)
-            {
-                <p class="mt-2">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version)</p>
-            }
             @if (!string.IsNullOrEmpty(checkError))
             {
                 <div class="alert alert-danger mt-2" role="alert">@checkError</div>
             }
-        </div>
-    }
-    else if (step == 2)
-    {
-        <div class="mb-3">
-            <div class="form-check">
-                <input class="form-check-input" type="radio" name="slot" id="slotNew" checked="@(slot == "new")" @onchange='() => slot = "new"' />
-                <label class="form-check-label" for="slotNew"><strong>New sync</strong> — create it and upload my @localCount item(s).</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="radio" name="slot" id="slotExisting" checked="@(slot == "existing")" @onchange='() => slot = "existing"' />
-                <label class="form-check-label" for="slotExisting"><strong>Existing sync</strong> — link it and choose the direction below.</label>
-            </div>
-        </div>
-
-        @if (slot == "new")
-        {
-            <div class="mb-3">
-                <label class="form-label">New password</label>
-                <input type="password" class="form-control" @bind="newPassword" autocomplete="new-password" />
-                <label class="form-label mt-2">Confirm password</label>
-                <input type="password" class="form-control" @bind="confirmPassword" autocomplete="new-password" />
-                <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered.</div>
-            </div>
         }
         else
         {
-            @if (!VerifiedExisting)
-            {
-                <div class="mb-3">
-                    <label class="form-label">Sync ID on the target service</label>
-                    <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
-                    <label class="form-label mt-2">Password</label>
-                    <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-                    <div class="form-text">Verified against the server copy first: a wrong password stops here, nothing is overwritten.</div>
-                    <button class="btn btn-secondary mt-2" @onclick="VerifyExisting" disabled="@busy">Verify</button>
-                    @if (!string.IsNullOrEmpty(verifyError))
-                    {
-                        <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
-                    }
+            <div class="xbs-verified" role="status">
+                <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                <div class="xbs-verified-text">
+                    <strong>Service ready</strong>
+                    <span>@serviceInfo!.Status · API v@(serviceInfo.Version)</span>
                 </div>
-            }
-            else
-            {
-                <div class="alert alert-success" role="status">
-                    Sync <code>@ShortId(probe?.Candidate.Id)</code> opened — @probe?.RemoteCount server item(s),
-                    password verified and cleared.
-                    <div class="mt-2">
-                        <button class="btn btn-outline-secondary" @onclick="Unverify" disabled="@busy">Use a different sync…</button>
-                    </div>
-                </div>
-            }
-            @if (VerifiedExisting)
-            {
-                <div class="alert alert-warning mt-2">
-                    <h4>Choose sync direction</h4>
-                    <p>Local holds <strong>@localCount</strong> item(s); server holds <strong>@probe.RemoteCount</strong> item(s).</p>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="migdir" id="dirDown" checked="@(direction == "take")" disabled="@busy" @onchange='() => SetDirection("take")' />
-                        <label class="form-check-label" for="dirDown"><strong>Download</strong> — replace the bookmarks on this device with the server copy (safe default)</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="migdir" id="dirUp" checked="@(direction == "upload")" disabled="@(busy || localCount == 0)" @onchange='() => SetDirection("upload")' />
-                        <label class="form-check-label" for="dirUp"><strong>Upload</strong> — replace the server copy with the bookmarks on this device</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="migdir" id="dirMerge" checked="@(direction == "merge")" disabled="@(busy || localCount == 0 || probe.RemoteCount == 0)" @onchange='() => SetDirection("merge")' />
-                        <label class="form-check-label" for="dirMerge"><strong>Merge</strong> — keep everything from both sides (nothing is deleted)</label>
-                    </div>
-                    @if (direction == "take")
-                    {
-                        <div class="alert alert-danger mt-2 mb-0">
-                            <strong>Your @localCount local item(s) will be deleted</strong> and replaced with the
-                            @probe.RemoteCount server item(s). A plaintext safety backup of your current local tree
-                            is saved first, and the app re-links to this sync.
-                        </div>
-                    }
-                    else if (direction == "upload")
-                    {
-                        <div class="alert alert-danger mt-2 mb-0">
-                            <strong>The @probe.RemoteCount server item(s) will be overwritten</strong> with your
-                            @localCount local item(s). A plaintext safety backup of the server copy is saved first,
-                            and the app re-links to this sync.
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="alert alert-info mt-2 mb-0">
-                            <strong>Merge keeps everything from both sides — nothing is deleted.</strong>
-                            Local-only bookmarks upload, server-only ones download; same-URL
-                            title conflicts keep the server title.
-                            <div class="mt-2">
-                                <button class="btn btn-secondary" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
-                            </div>
-                            @if (mergeStats is not null)
-                            {
-                                <p class="mt-2 mb-0" role="status">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
-                                    @mergeStats.RemoteOnly remote will download (of @mergeStats.RemoteCount),
-                                    @mergeStats.TitleConflicts title conflicts (server title kept),
-                                    @mergeStats.FoldersCreated folders created,
-                                    @mergeStats.SeparatorsAdopted separators kept from both sides.</p>
-                            }
-                        </div>
-                    }
-                </div>
-            }
+            </div>
+            <div class="d-grid">
+                <button class="btn btn-primary" @onclick="() => step = 2" disabled="@busy">Next</button>
+            </div>
         }
-
-        <div class="d-flex gap-2">
-            <button class="btn btn-secondary" @onclick="() => step = 1" disabled="@busy">Back</button>
-            <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">Review</button>
-            <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
+    }
+    else if (step == 2 && !slotChosen)
+    {
+        <h2 class="xbs-step-title">Into which sync?</h2>
+        <div class="xbs-choices">
+            <button class="xbs-choice" @onclick='() => ChooseSlot("new")'>
+                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></span>
+                <span class="xbs-choice-text"><strong>A new sync</strong><span>Create it on @TargetHost and upload your @localCount item(s).</span></span>
+                <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+            </button>
+            <button class="xbs-choice" @onclick='() => ChooseSlot("existing")'>
+                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
+                <span class="xbs-choice-text"><strong>An existing sync</strong><span>You already sync on @TargetHost: open it with its sync ID and password.</span></span>
+                <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+            </button>
         </div>
-        @if (slot == "new" && !string.IsNullOrEmpty(verifyError))
+    }
+    else if (step == 2 && slot == "new")
+    {
+        <h2 class="xbs-step-title">New sync on @TargetHost</h2>
+        <div class="mb-3">
+            <label class="form-label">New password</label>
+            <input type="password" class="form-control" @bind="newPassword" @bind:event="oninput" autocomplete="new-password" />
+            <label class="form-label mt-2">Confirm password</label>
+            <input type="password" class="form-control" @bind="confirmPassword" @bind:event="oninput" autocomplete="new-password" />
+            <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered.</div>
+        </div>
+        <div class="d-grid">
+            <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">Review the move</button>
+        </div>
+        @if (!string.IsNullOrEmpty(verifyError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+        }
+    }
+    else if (step == 2 && !VerifiedExisting)
+    {
+        <h2 class="xbs-step-title">Existing sync on @TargetHost</h2>
+        <div class="mb-3">
+            <label class="form-label">Sync ID</label>
+            <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+            <label class="form-label mt-2">Password</label>
+            <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
+            <div class="form-text">Checked against the server copy: a wrong password stops here, nothing is overwritten.</div>
+        </div>
+        <div class="d-grid">
+            <button class="btn btn-primary" @onclick="VerifyExisting" disabled="@busy">Open sync</button>
+        </div>
+        @if (!string.IsNullOrEmpty(verifyError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+        }
+    }
+    else if (step == 2)
+    {
+        <h2 class="xbs-step-title">Existing sync on @TargetHost</h2>
+        <div class="xbs-verified" role="status">
+            <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            <div class="xbs-verified-text">
+                <strong>Sync <code>@ShortId(probe?.Candidate.Id)</code> opened</strong>
+                <span>@probe!.RemoteCount item(s) on the server · @localCount on this device</span>
+            </div>
+            <button class="xbs-link-btn" @onclick="Unverify" disabled="@busy">Change</button>
+        </div>
+        <DirectionPicker Name="migdir" Value="@PickerValue" ValueChanged="OnPickerChanged"
+                         LocalCount="localCount" RemoteCount="probe.RemoteCount" Disabled="busy" />
+        <div class="d-grid">
+            <button class="btn btn-primary" @onclick="GoReview" disabled="@busy">Review the move</button>
+        </div>
+        @if (!string.IsNullOrEmpty(verifyError))
         {
             <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
         }
     }
     else
     {
+        <h2 class="xbs-step-title">Review the move</h2>
         @if (resumed)
         {
             <div class="alert alert-info" role="status">
-                Resumed your unfinished switch — counts may have changed while you were away;
-                press Verify again if in doubt, or Start over below.
+                Resumed your unfinished move — counts may have changed while you were away. Go back and open the sync again if in doubt.
             </div>
         }
-        <div class="alert alert-info" role="status">
-            <h4>Review</h4>
+        <div class="xbs-review">
             @if (slot == "new")
             {
-                <p>Create a <strong>new sync</strong> on <strong>@targetUrl</strong> and upload your <strong>@localCount</strong> local item(s) into it. The app re-links to the new sync.</p>
+                <p>Create a <strong>new sync</strong> on <strong>@TargetHost</strong> and upload your <strong>@localCount</strong> item(s) into it.</p>
+                <p class="text-muted mb-0">Nothing is replaced. The app then syncs with the new sync; its ID is shown at the end.</p>
             }
             else if (direction == "upload")
             {
-                <p>Replace the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> with your <strong>@localCount</strong> local item(s). Server copy backed up first; the app re-links to that sync.</p>
+                <p>Keep this device's copy: replace the <strong>@probe?.RemoteCount</strong> item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong> with your <strong>@localCount</strong>.</p>
+                <p class="text-muted mb-0">The server copy is saved to Backup → Safety backups first. The app then syncs with that sync.</p>
             }
             else if (direction == "merge")
             {
+                <p>Merge your <strong>@localCount</strong> item(s) with the <strong>@probe?.RemoteCount</strong> of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
                 @if (mergeStats is not null)
                 {
-                    <p>Merge your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>: @mergeStats.LocalOnly will upload, @mergeStats.RemoteOnly will download, @mergeStats.TitleConflicts title conflicts keep the server title. Nothing is deleted. Safety backups of both sides saved first; the app re-links to that sync.</p>
+                    <ul class="xbs-review-list">
+                        <li><strong>@mergeStats.LocalOnly</strong> upload (only on this device)</li>
+                        <li><strong>@mergeStats.RemoteOnly</strong> download (only on the server)</li>
+                        @if (mergeStats.TitleConflicts > 0)
+                        {
+                            <li><strong>@mergeStats.TitleConflicts</strong> title conflict(s) keep the server title</li>
+                        }
+                    </ul>
                 }
-                else
-                {
-                    <p>Merge with sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong> — go back and press Preview merge first.</p>
-                }
+                <p class="text-muted mb-0">Nothing is deleted. Both copies are saved to Backup → Safety backups first.</p>
             }
             else
             {
-                <p>Replace your <strong>@localCount</strong> local item(s) with the <strong>@probe?.RemoteCount</strong> server item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>. Local bookmarks backed up first; the app re-links to that sync.</p>
+                <p>Keep the server copy: replace your <strong>@localCount</strong> item(s) on this device with the <strong>@probe?.RemoteCount</strong> of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
+                <p class="text-muted mb-0">Your current bookmarks are saved to Backup → Safety backups first.</p>
             }
         </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-secondary" @onclick="() => step = 2" disabled="@busy">Back</button>
-            <button class="btn btn-danger" @onclick="Execute" disabled="@busy">Move now</button>
-            <button class="btn btn-outline-secondary" @onclick="StartOver" disabled="@busy">Start over</button>
+        <div class="d-grid">
+            <button class="btn @(ReplacesSomething ? "btn-danger" : "btn-primary")" @onclick="Execute" disabled="@busy">@(busy ? "Moving…" : "Move now")</button>
         </div>
         @if (!string.IsNullOrEmpty(reviewError))
         {
-            <div class="alert alert-danger mt-3" role="alert">@reviewError</div>
+            <div class="alert alert-danger mt-2" role="alert">@reviewError</div>
         }
+        <div class="text-center mt-3">
+            <button class="xbs-link-btn" @onclick="StartOver" disabled="@busy">Start over</button>
+        </div>
     }
 }
 
@@ -247,6 +232,8 @@ else
     private Core.Api.ServiceInfoResponse? serviceInfo;
     private string? checkedUrl;
     private string slot = "new";
+    /// <summary>Step 2 first asks new vs existing; false shows that choice.</summary>
+    private bool slotChosen;
     private string newPassword = string.Empty;
     private string confirmPassword = string.Empty;
     private string syncId = string.Empty;
@@ -298,6 +285,7 @@ else
             verifiedFor = draft.VerifiedFor;
             step = draft.Step is >= 2 and <= 3 ? draft.Step : 2;
             resumed = probe is not null;
+            slotChosen = true;
         }
     }
 
@@ -369,7 +357,7 @@ else
         {
             if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
             {
-                throw new InvalidOperationException("Verify the existing sync first.");
+                throw new InvalidOperationException("Open the existing sync first.");
             }
 
             mergeStats = await Session.GetMergePreviewAsync(probe);
@@ -377,7 +365,45 @@ else
         }, err => verifyError = err, "switch-merge-preview");
     }
 
-    private void GoReview()
+    private string TargetHost =>
+        Uri.TryCreate(targetUrl.Trim(), UriKind.Absolute, out var u) ? u.Host : targetUrl.Trim();
+
+    /// <summary>The picker speaks download/upload/merge; this page keeps "take" for download.</summary>
+    private string PickerValue => direction == "take" ? "download" : direction;
+
+    private void OnPickerChanged(string value) => SetDirection(value == "download" ? "take" : value);
+
+    /// <summary>Upload and download overwrite one side: the final button is red.</summary>
+    private bool ReplacesSomething => slot == "existing" && direction != "merge";
+
+    private void ChooseSlot(string value)
+    {
+        slot = value;
+        slotChosen = true;
+        verifyError = string.Empty;
+    }
+
+    /// <summary>Back walks the screens in reverse: review → step 2 form →
+    /// new/existing choice → service.</summary>
+    private void GoBack()
+    {
+        verifyError = string.Empty;
+        reviewError = string.Empty;
+        if (step == 3)
+        {
+            step = 2;
+        }
+        else if (step == 2 && slotChosen)
+        {
+            slotChosen = false;
+        }
+        else
+        {
+            step = 1;
+        }
+    }
+
+    private async Task GoReview()
     {
         try
         {
@@ -387,7 +413,13 @@ else
             }
             else if (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe)))
             {
-                throw new InvalidOperationException("Preview the merge first — counts must match the verified sync.");
+                // Merge stays preview-locked: the review shows the dry-run
+                // counts for exactly this probe, computed here.
+                await PreviewMerge();
+                if (mergeStats is null)
+                {
+                    return;
+                }
             }
 
             verifyError = string.Empty;
@@ -416,6 +448,7 @@ else
         Session.PendingSwitch = null;
         step = 1;
         slot = "new";
+        slotChosen = false;
         syncId = string.Empty;
         password = string.Empty;
         newPassword = string.Empty;
@@ -456,7 +489,7 @@ else
             {
                 if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
                 {
-                    throw new InvalidOperationException("Verify the existing sync first.");
+                    throw new InvalidOperationException("Open the existing sync first.");
                 }
 
                 if (direction == "upload")

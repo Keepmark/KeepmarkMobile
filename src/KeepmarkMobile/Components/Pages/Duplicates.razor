@@ -36,8 +36,8 @@ else
                 {
                     <div class="d-flex gap-2 align-items-center flex-wrap mt-1">
                         <span><strong>Delete @markedHere?</strong></span>
-                        <button class="btn btn-danger" disabled="@busy" aria-label="Delete @markedHere marked in group @g.Url" @onclick="() => ExecuteGroup(g)">Yes</button>
-                        <button class="btn btn-secondary" disabled="@busy" aria-label="Keep group @g.Url" @onclick="() => armedGroup = null">No</button>
+                        <button class="btn btn-danger" disabled="@busy" aria-label="Delete @markedHere marked in group @g.Url" @onclick="() => ExecuteGroup(g)">Yes, delete</button>
+                        <button class="btn btn-secondary" disabled="@busy" aria-label="Keep group @g.Url" @onclick="() => armedGroup = null">Cancel</button>
                     </div>
                 }
                 else

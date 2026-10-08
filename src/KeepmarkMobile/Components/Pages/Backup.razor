@@ -39,9 +39,9 @@ else
             {
                 <label class="form-label">Backup password</label>
                 <input type="password" class="form-control" @bind="impPassword" autocomplete="current-password" />
-                <div class="form-text">Reading the file verifies the password first — a wrong password stops here.</div>
+                <div class="form-text">Unlocking verifies the password first — a wrong password stops here.</div>
                 <div class="mt-2 d-flex gap-2">
-                    <button class="btn btn-secondary" @onclick="PreviewImport" disabled="@busy">Read backup</button>
+                    <button class="btn btn-primary" @onclick="PreviewImport" disabled="@busy">Unlock backup</button>
                 </div>
             }
             else
@@ -284,7 +284,7 @@ else
             impFileName = safeName;
             impCount = null;
             armedImp = false;
-            Ok("File selected. Enter its password and Read backup.");
+            Ok("File selected. Enter its password and Unlock backup.");
         });
         impMessage = message;
         impError = isError;
@@ -446,7 +446,7 @@ else
         finally
         {
             // Export passwords never linger. impPassword is excluded on
-            // purpose: it is entered at "Read backup" and reused at
+            // purpose: it is entered at "Unlock backup" and reused at
             // "Yes, restore" (ExecuteImport clears it when the flow ends).
             bkpPassword = string.Empty;
             bkpConfirm = string.Empty;

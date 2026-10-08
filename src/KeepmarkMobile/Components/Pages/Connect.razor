@@ -107,8 +107,8 @@ else
                     <strong>Sync <code>@ShortId(reconcile.Candidate.Id)</code> opened</strong>
                     <span>@reconcile.RemoteCount item(s) on the server · @reconcile.LocalCount on this device</span>
                 </div>
+                <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@busy">Change</button>
             </div>
-            <button class="btn btn-outline-secondary w-100 mb-3" @onclick="UseDifferentSync" disabled="@busy">Use a different sync…</button>
         }
         else if (mode == "existing")
         {
@@ -117,9 +117,9 @@ else
                 <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
                 <label class="form-label mt-2">Password</label>
                 <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-                <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing changes until you pick a direction in the next step.</div>
+                <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing changes until you choose the sync direction in the next step.</div>
                 <div class="mt-3 d-grid">
-                    <button class="btn btn-primary" @onclick="LinkExisting" disabled="@busy">Link existing sync</button>
+                    <button class="btn btn-primary" @onclick="LinkExisting" disabled="@busy">Open sync</button>
                 </div>
                 @if (!string.IsNullOrEmpty(linkError))
                 {
@@ -172,131 +172,52 @@ else
 
     @if (reconcile is not null)
     {
-        <div class="alert alert-warning">
-            <h4>Choose sync direction</h4>
-            <p>Local items: <strong>@reconcile.LocalCount</strong> · Server items: <strong>@reconcile.RemoteCount</strong>
-                (server copy updated @(reconcile.RemoteLastUpdated ?? "unknown")).</p>
-            <div class="mb-2">
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="syncDirection" id="dir-download"
-                           checked="@(direction == "download")" disabled="@(busy || reconcile.RemoteCount == 0)"
-                           @onchange='() => SetDirection("download")' />
-                    <label class="form-check-label" for="dir-download">
-                        Download — replace the bookmarks on this device with the server copy
-                        @if (reconcile.RemoteCount == 0)
+        @* One choice, one action button; the confirm (with merge counts) replaces the button in place. *@
+        <DirectionPicker Name="syncDirection" Value="@direction" ValueChanged="SetDirection"
+                         LocalCount="reconcile.LocalCount" RemoteCount="reconcile.RemoteCount"
+                         Disabled="@(busy || armedApply)" />
+        @if (!armedApply)
+        {
+            <div class="d-grid">
+                <button class="btn btn-primary" @onclick="ArmApply" disabled="@busy">@ApplyLabel</button>
+            </div>
+        }
+        else
+        {
+            <div class="alert @(direction == "merge" ? "alert-info" : "alert-danger")" role="alert">
+                @if (direction == "merge" && mergeStats is not null)
+                {
+                    <strong>Merge both copies?</strong>
+                    <ul class="xbs-review-list">
+                        <li><strong>@mergeStats.LocalOnly</strong> upload (only on this device)</li>
+                        <li><strong>@mergeStats.RemoteOnly</strong> download (only on the server)</li>
+                        @if (mergeStats.TitleConflicts > 0)
                         {
-                            <text>(server copy is empty)</text>
+                            <li><strong>@mergeStats.TitleConflicts</strong> title conflict(s) keep the server title</li>
                         }
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="syncDirection" id="dir-upload"
-                           checked="@(direction == "upload")" disabled="@(busy || reconcile.LocalCount == 0)"
-                           @onchange='() => SetDirection("upload")' />
-                    <label class="form-check-label" for="dir-upload">
-                        Upload — replace the server copy with the bookmarks on this device
-                        @if (reconcile.LocalCount == 0)
-                        {
-                            <text>(nothing local to upload)</text>
-                        }
-                    </label>
-                </div>
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="syncDirection" id="dir-merge"
-                           checked="@(direction == "merge")"
-                           disabled="@(busy || reconcile.LocalCount == 0 || reconcile.RemoteCount == 0)"
-                           @onchange='() => SetDirection("merge")' />
-                    <label class="form-check-label" for="dir-merge">
-                        Merge — keep everything from both sides (nothing is deleted)
-                        @if (reconcile.LocalCount == 0 || reconcile.RemoteCount == 0)
-                        {
-                            <text>(needs items on both sides)</text>
-                        }
-                    </label>
+                    </ul>
+                    <span>Nothing is deleted. Both copies are saved to Backup → Safety backups first.</span>
+                }
+                else if (direction == "upload")
+                {
+                    <strong>Replace the @reconcile.RemoteCount server item(s) with your @reconcile.LocalCount?</strong>
+                    <span>The server copy is saved to Backup → Safety backups first.</span>
+                }
+                else
+                {
+                    <strong>Replace your @reconcile.LocalCount item(s) on this device with the @reconcile.RemoteCount from the server?</strong>
+                    <span>Your current bookmarks are saved to Backup → Safety backups first.</span>
+                }
+                <div class="mt-2 d-flex gap-2">
+                    <button class="btn @(direction == "merge" ? "btn-primary" : "btn-danger")" @onclick="ApplyChosen" disabled="@busy">@ConfirmLabel</button>
+                    <button class="btn btn-secondary" @onclick="() => armedApply = false" disabled="@busy">Cancel</button>
                 </div>
             </div>
-            @if (direction == "merge")
-            {
-                <div class="alert alert-info mb-2">
-                    <strong>Merge keeps everything from both sides — nothing is deleted.</strong>
-                    Local-only bookmarks upload, server-only ones download; same-URL
-                    title conflicts keep the server title; items deleted on one
-                    side while the other was offline reappear.
-                    <div class="mt-2">
-                        <button class="btn btn-secondary" @onclick="PreviewMerge" disabled="@busy">Preview merge</button>
-                    </div>
-                    @if (mergeStats is not null)
-                    {
-                        <p class="mt-2 mb-1" role="status">@mergeStats.LocalOnly local will upload (of @mergeStats.LocalCount),
-                            @mergeStats.RemoteOnly remote will download (of @mergeStats.RemoteCount),
-                            @mergeStats.TitleConflicts title conflicts (server title kept),
-                            @mergeStats.FoldersCreated folders created,
-                            @mergeStats.SeparatorsAdopted separators kept from both sides.</p>
-                        @if (!armedMerge)
-                        {
-                            <div class="mt-2">
-                                <button class="btn btn-danger" @onclick="() => armedMerge = true" disabled="@busy">Merge…</button>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="mt-2 d-flex gap-2">
-                                <button class="btn btn-danger" @onclick="ApplyMerge" disabled="@busy">Yes, merge</button>
-                                <button class="btn btn-secondary" @onclick="() => armedMerge = false" disabled="@busy">Cancel</button>
-                            </div>
-                        }
-                    }
-                </div>
-            }
-            else if (direction == "upload")
-            {
-                <div class="alert alert-danger mb-2">
-                    <strong>Replaces the @reconcile.RemoteCount server item(s) with your @reconcile.LocalCount local item(s).</strong>
-                    A plaintext safety backup of the server copy is saved first.
-                    @if (!armedLocal)
-                    {
-                        <div class="mt-2">
-                            <button class="btn btn-danger" @onclick="() => armedLocal = true" disabled="@busy">Upload…</button>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-danger" @onclick="ApplyLocal" disabled="@busy">Yes, upload</button>
-                            <button class="btn btn-secondary" @onclick="() => armedLocal = false" disabled="@busy">Cancel</button>
-                        </div>
-                    }
-                </div>
-            }
-            else
-            {
-                <div class="alert alert-danger mb-2">
-                    <strong>Downloads the @reconcile.RemoteCount server item(s).</strong>
-                    @if (reconcile.LocalCount > 0)
-                    {
-                        <text>Your @reconcile.LocalCount local item(s) will be deleted.</text>
-                    }
-                    A plaintext safety backup is saved first.
-                    @if (!armedRemote)
-                    {
-                        <div class="mt-2">
-                            <button class="btn btn-danger" @onclick="() => armedRemote = true" disabled="@busy">Download…</button>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-danger" @onclick="ApplyRemote" disabled="@busy">Yes, download</button>
-                            <button class="btn btn-secondary" @onclick="() => armedRemote = false" disabled="@busy">Cancel</button>
-                        </div>
-                    }
-                </div>
-            }
-            @if (!string.IsNullOrEmpty(applyError))
-            {
-                <div class="alert alert-danger mt-2" role="alert">@applyError</div>
-            }
-        </div>
+        }
+        @if (!string.IsNullOrEmpty(applyError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@applyError</div>
+        }
     }
 
 }
@@ -324,9 +245,8 @@ else
     private int localCount;
     private string? armed;
     private bool armedUnlink;
-    private bool armedMerge;
-    private bool armedLocal;
-    private bool armedRemote;
+    /// <summary>The single apply button was tapped: its inline confirm shows.</summary>
+    private bool armedApply;
     /// <summary>Reconcile direction choice: "download" replaces local with the
     /// remote copy, "upload" overwrites the remote with local, "merge" unions
     /// both sides. Preselected to the only sensible side when one of them is
@@ -353,9 +273,9 @@ else
         reconcile = null;
         mergeStats = null;
         mergeStatsFor = null;
-        armedMerge = false;
-        armedLocal = false;
-        armedRemote = false;
+        armedApply = false;
+        armedApply = false;
+        armedApply = false;
         applyError = string.Empty;
         message = string.Empty;
     }
@@ -379,9 +299,9 @@ else
         mergeStats = null;
         mergeStatsFor = null;
         applyError = string.Empty;
-        armedMerge = false;
-        armedLocal = false;
-        armedRemote = false;
+        armedApply = false;
+        armedApply = false;
+        armedApply = false;
     }
 
     protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
@@ -462,9 +382,9 @@ else
             mergeStats = null;
             mergeStatsFor = null;
             applyError = string.Empty;
-            armedMerge = false;
-            armedLocal = false;
-            armedRemote = false;
+            armedApply = false;
+            armedApply = false;
+            armedApply = false;
             if (reconcile is { LocalCount: 0, RemoteCount: 0 })
             {
                 await Session.ApplyRemoteAsync(reconcile);
@@ -509,6 +429,44 @@ else
         }, err => linkError = err, "connect-create");
     }
 
+    private string ApplyLabel => direction switch
+    {
+        "upload" => "Keep this device's copy…",
+        "merge" => "Merge both…",
+        _ => "Keep the server copy…",
+    };
+
+    private string ConfirmLabel => direction switch
+    {
+        "upload" => "Yes, upload",
+        "merge" => "Yes, merge",
+        _ => "Yes, download",
+    };
+
+    /// <summary>First tap arms the confirm. Merge computes its dry-run here
+    /// so the confirm shows the counts (merge stays preview-locked).</summary>
+    private async Task ArmApply()
+    {
+        applyError = string.Empty;
+        if (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, reconcile)))
+        {
+            await PreviewMerge();
+            if (mergeStats is null)
+            {
+                return;
+            }
+        }
+
+        armedApply = true;
+    }
+
+    private Task ApplyChosen() => direction switch
+    {
+        "upload" => ApplyLocal(),
+        "merge" => ApplyMerge(),
+        _ => ApplyRemote(),
+    };
+
     private async Task ApplyRemote()
     {
         await RunStepAsync(async () =>
@@ -518,7 +476,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
-            armedRemote = false;
+            armedApply = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of your previous local tree saved — see Backup → Safety backups.");
         }, err => applyError = err, "connect-apply");
@@ -533,7 +491,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
-            armedLocal = false;
+            armedApply = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "push", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of the previous server copy saved — see Backup → Safety backups.");
         }, err => applyError = err, "connect-apply");
@@ -563,7 +521,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
-            armedMerge = false;
+            armedApply = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backups of both sides saved — see Backup → Safety backups.");
         }, err => applyError = err, "connect-apply");

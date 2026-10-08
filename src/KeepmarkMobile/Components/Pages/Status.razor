@@ -26,13 +26,62 @@ else
 
     @if (status == Core.Sync.SyncStatus.Conflict)
     {
-        <div class="alert alert-warning" role="alert">
-            <h4>Sync conflict</h4>
-            <p>The server has newer changes. Your local changes could not be pushed.</p>
-            <div class="d-grid gap-2 mt-2">
-                <button class="btn btn-outline-primary" @onclick="ShowConflictDetails" disabled="@busy">Show details & resolve…</button>
-            </div>
-        </div>
+        @* One panel, top of the page: what happened, the two copies, the three
+           ways out, and the confirm/progress/error right under the choice. *@
+        <section class="xbs-conflict" aria-labelledby="conflict-title">
+            <h2 id="conflict-title" class="xbs-step-title">Sync conflict</h2>
+            <p class="xbs-conflict-lead">The server copy changed on another device while this one had unsynced edits. Syncing is paused until you choose which copy to keep.</p>
+            @if (conflictPreview is null)
+            {
+                @if (string.IsNullOrEmpty(conflictError))
+                {
+                    <p role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Comparing both copies…</p>
+                }
+                else
+                {
+                    <div class="alert alert-danger" role="alert">@conflictError</div>
+                    <button class="btn btn-primary" @onclick="RetryConflictPreview" disabled="@busy">Compare again</button>
+                }
+            }
+            else
+            {
+                <div class="xbs-conflict-sides">
+                    <div><span>This device</span><strong>@conflictPreview.LocalCount</strong><small>items</small></div>
+                    <div><span>Server</span><strong>@conflictPreview.RemoteCount</strong><small>updated @FormatRelative(conflictPreview.RemoteLastUpdated)</small></div>
+                </div>
+                @if (conflictPreview.LocalOnly + conflictPreview.RemoteOnly + conflictPreview.TitleConflicts > 0)
+                {
+                    <p class="xbs-hint">Merging would upload @conflictPreview.LocalOnly, download @conflictPreview.RemoteOnly@(conflictPreview.TitleConflicts > 0 ? $" and keep the server title for {conflictPreview.TitleConflicts} renamed item(s)" : "").</p>
+                }
+                <DirectionPicker Name="conflictDirection" Value="@choice" ValueChanged="v => { choice = v; armedDirection = null; }"
+                                 LocalCount="conflictPreview.LocalCount" RemoteCount="conflictPreview.RemoteCount"
+                                 Disabled="@(busy || armedDirection is not null)" />
+                @if (armedDirection is null)
+                {
+                    <div class="d-grid">
+                        <button class="btn btn-primary" @onclick="() => Arm(ChoiceDirection)" disabled="@busy">@ChoiceLabel</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert @(armedDirection == Core.Sync.ConflictResolutionDirection.Merge ? "alert-info" : "alert-danger")" role="alert">
+                        <p class="mb-2">@ConfirmText(armedDirection.Value)</p>
+                        <div class="d-flex gap-2">
+                            <button class="btn @(armedDirection == Core.Sync.ConflictResolutionDirection.Merge ? "btn-primary" : "btn-danger")" @onclick="() => ResolveConflict(armedDirection.Value)" disabled="@busy">@ConfirmLabel(armedDirection.Value)</button>
+                            <button class="btn btn-secondary" @onclick="() => armedDirection = null" disabled="@busy">Cancel</button>
+                        </div>
+                        @if (busy)
+                        {
+                            <p class="mt-2 mb-0" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Resolving conflict…</p>
+                        }
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(conflictError))
+                {
+                    <div class="alert alert-danger mt-2" role="alert">@conflictError</div>
+                }
+            }
+        </section>
     }
 
     <h3>Synchronization</h3>
@@ -43,68 +92,6 @@ else
         <li>Service: @(serviceUrl ?? "not linked")</li>
         <li>Service version: @(serviceVersion ?? (serviceUrl is null ? "—" : "unknown (offline?)"))</li>
     </ul>
-
-    @if (showConflictDetails && conflictPreview is not null)
-    {
-        <div class="card mt-3 border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h4 class="mb-0">Conflict resolution</h4>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">Server copy updated <strong>@FormatRelative(conflictPreview.RemoteLastUpdated)</strong> · Local has <strong>@conflictPreview.LocalCount</strong> items · Server has <strong>@conflictPreview.RemoteCount</strong> items</p>
-
-                <dl class="row mb-3">
-                    <dt class="col-sm-6">Local only → will upload</dt><dd class="col-sm-6">@conflictPreview.LocalOnly</dd>
-                    <dt class="col-sm-6">Server only → will download</dt><dd class="col-sm-6">@conflictPreview.RemoteOnly</dd>
-                    <dt class="col-sm-6">Title conflicts (server wins)</dt><dd class="col-sm-6">@conflictPreview.TitleConflicts</dd>
-                    <dt class="col-sm-6">Folders created</dt><dd class="col-sm-6">@conflictPreview.FoldersCreated</dd>
-                    <dt class="col-sm-6">Separators kept from both</dt><dd class="col-sm-6">@conflictPreview.SeparatorsAdopted</dd>
-                </dl>
-
-                @if (armedDirection is null)
-                {
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-outline-success" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Pull)" disabled="@busy">
-                            Download — replace local with the server copy (@conflictPreview.RemoteCount items)…
-                        </button>
-                        <button class="btn btn-outline-primary" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Push)" disabled="@busy">
-                            Upload — replace the server copy with local (@conflictPreview.LocalCount items)…
-                        </button>
-                        <button class="btn btn-outline-warning" @onclick="() => Arm(Core.Sync.ConflictResolutionDirection.Merge)" disabled="@busy">
-                            Merge — keep both sides, nothing deleted…
-                        </button>
-                    </div>
-                }
-                else
-                {
-                    <div class="alert alert-secondary" role="alert">
-                        <p class="mb-2">@ConfirmText(armedDirection.Value)</p>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-danger" @onclick="() => ResolveConflict(armedDirection.Value)" disabled="@busy">@ConfirmLabel(armedDirection.Value)</button>
-                            <button class="btn btn-secondary" @onclick="() => armedDirection = null" disabled="@busy">Cancel</button>
-                        </div>
-                    </div>
-                }
-
-                @if (busy)
-                {
-                    <div class="text-center mt-2">
-                        <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Resolving…</span></div>
-                        <span class="ms-2">Resolving conflict…</span>
-                    </div>
-                }
-
-                @if (!string.IsNullOrEmpty(conflictError))
-                {
-                    <div class="alert alert-danger mt-2" role="alert">@conflictError</div>
-                }
-
-                <div class="text-end mt-2">
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => { showConflictDetails = false; armedDirection = null; }" disabled="@busy">Cancel</button>
-                </div>
-            </div>
-        </div>
-    }
 
     <h3>Storage</h3>
     <ul>
@@ -161,7 +148,6 @@ else
     private Core.Data.ContentStats? stats;
 
     // Conflict resolution state
-    private bool showConflictDetails;
     private Core.Sync.MergeStats? conflictPreview;
     private bool busy;
     private string? conflictError;
@@ -169,6 +155,23 @@ else
     /// <summary>Armed destructive choice (R8.2): first tap arms, the inline
     /// confirm button runs it.</summary>
     private Core.Sync.ConflictResolutionDirection? armedDirection;
+
+    /// <summary>Picker choice (download/upload/merge); merge first because it never deletes.</summary>
+    private string choice = "merge";
+
+    private Core.Sync.ConflictResolutionDirection ChoiceDirection => choice switch
+    {
+        "download" => Core.Sync.ConflictResolutionDirection.Pull,
+        "upload" => Core.Sync.ConflictResolutionDirection.Push,
+        _ => Core.Sync.ConflictResolutionDirection.Merge,
+    };
+
+    private string ChoiceLabel => choice switch
+    {
+        "download" => "Keep the server copy…",
+        "upload" => "Keep this device's copy…",
+        _ => "Merge both…",
+    };
 
     private void Arm(Core.Sync.ConflictResolutionDirection d)
     {
@@ -178,9 +181,9 @@ else
 
     private static string ConfirmText(Core.Sync.ConflictResolutionDirection d) => d switch
     {
-        Core.Sync.ConflictResolutionDirection.Pull => "Replace your local bookmarks with the server copy? Your local bookmarks are saved to Backup → Safety backups first.",
-        Core.Sync.ConflictResolutionDirection.Push => "Replace the server copy with your local bookmarks? The server copy is saved to Backup → Safety backups first.",
-        _ => "Merge both sides into one tree (nothing is deleted) and upload it? Both sides are saved to Backup → Safety backups first.",
+        Core.Sync.ConflictResolutionDirection.Pull => "Replace the bookmarks on this device with the server copy? Its unsynced edits are lost; a copy is saved to Backup → Safety backups first.",
+        Core.Sync.ConflictResolutionDirection.Push => "Replace the server copy with the bookmarks on this device? Changes from other devices are lost; a copy is saved to Backup → Safety backups first.",
+        _ => "Merge both copies into one and sync it everywhere? Nothing is deleted, but items removed on one side while offline come back. Both copies are saved to Backup → Safety backups first.",
     };
 
     private static string ConfirmLabel(Core.Sync.ConflictResolutionDirection d) => d switch
@@ -231,7 +234,7 @@ else
             stats = await Session.Store.GetStatsAsync();
 
             // If in conflict, load merge preview for the resolution UI
-            if (status == Core.Sync.SyncStatus.Conflict && !showConflictDetails)
+            if (status == Core.Sync.SyncStatus.Conflict && conflictPreview is null)
             {
                 await LoadConflictPreviewAsync();
             }
@@ -244,6 +247,10 @@ else
         try
         {
             conflictPreview = await Session.Engine.GetConflictMergePreviewAsync();
+            // Merge needs both sides; with one side empty preselect the other.
+            choice = conflictPreview.LocalCount == 0 ? "download"
+                : conflictPreview.RemoteCount == 0 ? "upload"
+                : "merge";
         }
         catch (Exception ex)
         {
@@ -251,13 +258,10 @@ else
         }
     }
 
-    private async Task ShowConflictDetails()
+    private async Task RetryConflictPreview()
     {
-        showConflictDetails = true;
-        if (conflictPreview is null)
-        {
-            await LoadConflictPreviewAsync();
-        }
+        conflictError = null;
+        await LoadConflictPreviewAsync();
     }
 
     private async Task ResolveConflict(Core.Sync.ConflictResolutionDirection direction)
@@ -281,7 +285,6 @@ else
                     await Session.Engine.ResolveConflictMergeAsync();
                     break;
             }
-            showConflictDetails = false;
             conflictPreview = null;
             armedDirection = null;
             conflictResult = ResultText(direction);
