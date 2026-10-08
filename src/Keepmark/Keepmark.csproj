@@ -35,8 +35,8 @@
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.108</ApplicationDisplayVersion>
-        <ApplicationVersion>109</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.109</ApplicationDisplayVersion>
+        <ApplicationVersion>110</ApplicationVersion>
 
         <!-- monodroid mmaps lib/*.so straight from the APK: those entries MUST
              be STORED, never Deflated, or the app SIGABRTs on startup outside
