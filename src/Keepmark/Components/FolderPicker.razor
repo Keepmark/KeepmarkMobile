@@ -1,23 +1,26 @@
 @using Keepmark.Core.Data
 
 <div class="xbs-tree">
-    <div class="mb-2 xbs-search xbs-tree-search">
-        <svg class="km-ico xbs-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg>
-        <input class="form-control xbs-search-input" placeholder="Filter folders…" aria-label="Filter folders"
+    <div class="xbs-tree-search">
+        <svg class="km-ico xbs-tree-search-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg>
+        <input class="form-control" placeholder="Filter folders" aria-label="Filter folders"
                @oninput="OnFilter" value="@filter" />
     </div>
     <div class="xbs-tree-scroll" role="tree" aria-label="Folders">
-    <div class="xbs-tree-item">
-    <div class="d-flex align-items-center gap-1 xbs-tree-row @(Selected is null ? "selected" : string.Empty)">
-        <span class="xbs-tree-exp xbs-tree-exp-ph" aria-hidden="true"></span>
-        <button type="button" role="treeitem" aria-selected="@((Selected is null).ToString().ToLowerInvariant())" aria-level="1"
-                class="xbs-tree-node flex-fill @(Selected is null ? "selected" : string.Empty)" @onclick="() => Highlight(null)">
-            <span aria-hidden="true">⌂</span> Top level
-        </button>
-    </div>
-    </div>
+    <div class="xbs-tree-list">
     @if (string.IsNullOrWhiteSpace(filter))
     {
+        <div class="xbs-tree-item">
+            <div class="xbs-tree-row @(Selected is null ? "selected" : string.Empty)">
+                <span class="xbs-tree-exp xbs-tree-exp-ph" aria-hidden="true"></span>
+                <button type="button" role="treeitem" aria-selected="@((Selected is null).ToString().ToLowerInvariant())" aria-level="1"
+                        class="xbs-tree-node" @onclick="() => Highlight(null)">
+                    <span class="xbs-tree-ico home" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg></span>
+                    <span class="xbs-tree-label">Top level</span>
+                    @if (Selected is null) { <svg class="km-ico xbs-tree-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
+                </button>
+            </div>
+        </div>
         @foreach (var root in Roots)
         {
             @TreeNode(root, 0)
@@ -25,25 +28,28 @@
     }
     else
     {
-        <p class="text-muted" role="status">@Filtered.Count folder(s) match.</p>
+        <p class="xbs-tree-note" role="status">@Filtered.Count folder(s) match</p>
         @foreach (var f in Filtered)
         {
-            <button type="button" role="treeitem" aria-level="2" aria-selected="@((Selected == f.RowId).ToString().ToLowerInvariant())"
-                    class="xbs-tree-node @(Selected == f.RowId ? "selected" : string.Empty)"
-                    @onclick="() => Highlight(f.RowId)">
-                <span aria-hidden="true">📁</span> @(f.Title ?? "Folder")<br />
-                <small class="text-muted">@PathOf(f)</small>
-            </button>
+            <div class="xbs-tree-row @(Selected == f.RowId ? "selected" : string.Empty)">
+                <button type="button" role="treeitem" aria-level="2" aria-selected="@((Selected == f.RowId).ToString().ToLowerInvariant())"
+                        class="xbs-tree-node" @onclick="() => Highlight(f.RowId)">
+                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg></span>
+                    <span class="xbs-tree-label">@(f.Title ?? "Folder")<small>@PathOf(f)</small></span>
+                    @if (Selected == f.RowId) { <svg class="km-ico xbs-tree-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
+                </button>
+            </div>
         }
         @if (Filtered.Count == 0)
         {
-            <p class="text-muted" role="status">No folders match. Try fewer letters.</p>
+            <p class="xbs-tree-note" role="status">No folders match. Try fewer letters.</p>
         }
     }
     </div>
-    <div class="d-flex gap-2 pt-2 xbs-tree-foot">
-        <button type="button" class="btn btn-primary flex-fill" @onclick="Confirm">Select</button>
+    </div>
+    <div class="xbs-tree-foot">
         <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" @onclick="Confirm">Select</button>
     </div>
 </div>
 
@@ -176,13 +182,13 @@
         var isCollapsed = collapsed.Contains(Node.RowId);
         var isSelected = Selected == Node.RowId;
         <div class="xbs-tree-item">
-            <div class="d-flex align-items-center gap-1 xbs-tree-row @(isSelected ? "selected" : string.Empty)">
+            <div class="xbs-tree-row @(isSelected ? "selected" : string.Empty)">
                 @if (hasKids)
                 {
                     <button type="button" class="xbs-tree-exp" aria-expanded="@((!isCollapsed).ToString().ToLowerInvariant())"
                             aria-label="@ExpandLabel(isCollapsed, Node.Title)"
                             @onclick="() => Toggle(Node.RowId)" @onclick:stopPropagation="true">
-                        <span aria-hidden="true" class="xbs-expand-chev @(isCollapsed ? string.Empty : "open")">›</span>
+                        <svg class="km-ico sm xbs-expand-chev @(isCollapsed ? string.Empty : "open")" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                     </button>
                 }
                 else
@@ -191,18 +197,20 @@
                 }
                 <button type="button" role="treeitem" aria-selected="@(isSelected.ToString().ToLowerInvariant())"
                         aria-expanded="@NodeExpanded(hasKids, isCollapsed)" aria-level="@(Level + 1)"
-                        class="xbs-tree-node flex-fill @(isSelected ? "selected" : string.Empty)"
+                        class="xbs-tree-node"
                         @onclick="() => Highlight(Node.RowId)" @onclick:stopPropagation="true">
-                    <span aria-hidden="true">📁</span> @(Node.Title ?? "Folder")
+                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg></span>
+                    <span class="xbs-tree-label">@(Node.Title ?? "Folder")</span>
                     @if (hasKids)
                     {
-                        <small class="text-muted"> (@kids!.Count)</small>
+                        <span class="xbs-tree-count" aria-label="@(kids!.Count) subfolders">@kids!.Count</span>
                     }
+                    @if (isSelected) { <svg class="km-ico xbs-tree-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
                 </button>
             </div>
             @if (hasKids && !isCollapsed)
             {
-                <div class="xbs-tree-kids">
+                <div class="xbs-tree-kids" role="group">
                     @foreach (var k in kids!)
                     {
                         @TreeNode(k, Level + 1)

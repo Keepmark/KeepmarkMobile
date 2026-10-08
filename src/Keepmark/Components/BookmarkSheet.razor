@@ -71,8 +71,14 @@
         @if (showTree)
         {
             <div class="xbs-tree-full" role="dialog" aria-modal="true" aria-label="Choose folder" @onclick:stopPropagation="true">
-                <div class="d-flex justify-content-between align-items-center mb-2 xbs-tree-head">
-                    <h4 class="mb-0">Choose folder</h4>
+                <div class="xbs-tree-head">
+                    <button type="button" class="xbs-tree-close" aria-label="Cancel" @onclick="CancelTree">
+                        <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                    </button>
+                    <div class="xbs-tree-headtext">
+                        <h2 class="xbs-tree-title">Choose folder</h2>
+                        <div class="xbs-tree-sub">Save in: @(SelectedFolderPath() ?? "Top level")</div>
+                    </div>
                 </div>
                 <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnHighlight"
                               ExcludeSubtreeRoot="Existing?.RowId" OnConfirm="() => showTree = false" OnCancel="CancelTree" />
