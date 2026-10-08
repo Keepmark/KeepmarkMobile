@@ -343,6 +343,17 @@ GNU GPL v3 — see `LICENSE.md`. Interop logic derived from the official
 xBrowserSync `api` + `app` (also GPLv3) by the xBrowserSync team.
 This is an independent client, not affiliated with xBrowserSync.
 
+Project home (source, releases, issues): <https://github.com/Keepmark>.
+Contact: keepmark@proton.me.
+
+## Disclaimer
+
+Keepmark is provided "as is", without warranty of any kind, express or
+implied, including the implied warranties of merchantability and fitness for
+a particular purpose. Use it at your own risk: the authors are not liable for
+any loss of data (including bookmarks), damage or other consequences arising
+from its use. See sections 15–17 of the GPL v3. Keep your own backups.
+
 ## Compatibility
 
 - Server: any xBrowserSync API v1.1.13 service (official
