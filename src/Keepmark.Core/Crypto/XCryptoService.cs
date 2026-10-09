@@ -41,7 +41,7 @@ public sealed class XCryptoService(IXbsLocalizer str, IXbsLogger log) : ICryptoS
         if (string.IsNullOrEmpty(syncVersion))
         {
             throw new UnsupportedSyncVersionException(
-                "Legacy sync without a version. Open it once in the original xBrowserSync client to upgrade it, then reconnect here.");
+                Loc.Get(Str.ErrLegacyReconnect));
         }
 
         _log.Debug("crypto", "Deriving key (PBKDF2-SHA256, 250k)");

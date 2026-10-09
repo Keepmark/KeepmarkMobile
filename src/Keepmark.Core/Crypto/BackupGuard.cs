@@ -1,3 +1,4 @@
+using Keepmark.Core.I18n;
 using Keepmark.Core.Models;
 
 namespace Keepmark.Core.Crypto;
@@ -24,13 +25,13 @@ public static class BackupGuard
     {
         if (string.IsNullOrEmpty(password))
         {
-            throw new InvalidOperationException("Enter the backup password.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupPasswordEnter));
         }
 
         if (password.Length < MinPasswordLength)
         {
             throw new InvalidOperationException(
-                $"Use a password of at least {MinPasswordLength} characters.");
+                Loc.Get(Str.ErrPasswordLength, MinPasswordLength));
         }
     }
 
@@ -38,7 +39,7 @@ public static class BackupGuard
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            throw new InvalidOperationException("Choose a backup file first.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrChooseBackupFirst));
         }
     }
 
@@ -53,11 +54,11 @@ public static class BackupGuard
         while (queue.Count > 0)
         {
             var cur = queue.Dequeue()
-                ?? throw new InvalidOperationException("Backup file is damaged (empty entry).");
+                ?? throw new InvalidOperationException(Loc.Get(Str.ErrBackupEmptyEntry));
             if (++n > MaxNodes)
             {
                 throw new InvalidOperationException(
-                    $"Backup is too large (over {MaxNodes:N0} items).");
+                    Loc.Get(Str.ErrBackupTooManyItems, MaxNodes.ToString("N0")));
             }
 
             if (cur.Children is not null)

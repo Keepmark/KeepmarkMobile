@@ -376,7 +376,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         HttpStatusCode.MethodNotAllowed => new NotAcceptingNewSyncsException(WithServer(_str.Get(Str.ErrNotAcceptingNewSyncs), serverMessage)),
         HttpStatusCode.NotAcceptable => new DailyNewSyncLimitException(WithServer(_str.Get(Str.ErrDailyNewSyncLimit), serverMessage)),
         HttpStatusCode.Conflict => new DataOutOfSyncException(WithServer(_str.Get(Str.ErrDataOutOfSync), serverMessage)),
-        HttpStatusCode.PreconditionFailed => new ServerPreconditionException(WithServer("The service refused the requested contract version.", serverMessage)),
+        HttpStatusCode.PreconditionFailed => new ServerPreconditionException(WithServer(Loc.Get(Str.ErrPreconditionContract), serverMessage)),
         HttpStatusCode.RequestEntityTooLarge => new SyncTooLargeException(WithServer(_str.Get(Str.ErrSyncTooLarge), serverMessage)),
         HttpStatusCode.TooManyRequests => new ThrottledException(WithServer(_str.Get(Str.ErrThrottled), serverMessage))
         {

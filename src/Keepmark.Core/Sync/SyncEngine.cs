@@ -112,7 +112,7 @@ public sealed class SyncEngine(
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             log.Error("sync", $"{op}: gate wait timed out after {(int)timeout.TotalSeconds}s");
-            throw new ServiceOfflineException($"Another sync operation is still running ({op}). Try again in a moment.");
+            throw new ServiceOfflineException(Loc.Get(Str.ErrSyncBusy, op));
         }
     }
 
@@ -489,7 +489,7 @@ public sealed class SyncEngine(
         {
             log.Warn("sync", "ForceSync aborted: conflict resolution in progress");
             if (isAutoSync) return;
-            throw new InvalidOperationException("Conflict resolution in progress. Please wait for it to complete.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrConflictInProgress));
         }
 
         var c = await creds.GetAsync().ConfigureAwait(false);
@@ -803,7 +803,7 @@ public sealed class SyncEngine(
             // R2.3: version-less legacy syncs use the old crypto — decrypting
             // would only surface as a misleading "wrong password".
             throw new UnsupportedSyncVersionException(
-                "Legacy sync without a version. Open it once in the original xBrowserSync client to upgrade it, then reconnect here.");
+                Loc.Get(Str.ErrLegacyReconnect));
         }
 
         ThrowIfVersionUnsupported(full.Version);
@@ -1076,7 +1076,7 @@ public sealed class SyncEngine(
             {
                 SetStatus(SyncStatus.Conflict);
                 throw new DataOutOfSyncException(
-                    "The server copy changed since your last sync. Sync (or resolve the conflict) before changing the password.");
+                    Loc.Get(Str.ErrPasswordChangeStale));
             }
 
             await SnapshotAsync("remote", remoteRoots, safetyOperation, c.Id).ConfigureAwait(false);

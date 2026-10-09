@@ -1,3 +1,4 @@
+using Keepmark.Core.I18n;
 using SQLite;
 using Keepmark.Core.Logging;
 using Keepmark.Core.Models;
@@ -481,7 +482,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             {
                 if (ancestor == node.RowId)
                 {
-                    throw new InvalidOperationException("Cannot move a folder into itself.");
+                    throw new InvalidOperationException(Loc.Get(Str.ErrFolderIntoItself));
                 }
 
                 ancestor = tran.Find<ItemRow>(ancestor.Value)?.ParentRowId;
@@ -725,7 +726,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         {
             if (ancestor == rowId)
             {
-                throw new InvalidOperationException("Cannot move a folder into itself.");
+                throw new InvalidOperationException(Loc.Get(Str.ErrFolderIntoItself));
             }
 
             ancestor = (await db.FindAsync<ItemRow>(ancestor.Value).ConfigureAwait(false))?.ParentRowId;

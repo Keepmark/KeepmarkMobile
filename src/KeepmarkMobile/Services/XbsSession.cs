@@ -143,7 +143,7 @@ public sealed class XbsSession : IAsyncDisposable
             }
             catch (Exception ex) when (ex is XbsException or FormatException)
             {
-                throw new InvalidOperationException("The server copy cannot be decrypted — safety backup refused.", ex);
+                throw new InvalidOperationException(Loc.Get(Str.ErrSafetyUndecryptable), ex);
             }
         }
 
@@ -257,17 +257,17 @@ public sealed class XbsSession : IAsyncDisposable
     {
         if (string.IsNullOrEmpty(currentPassword))
         {
-            throw new IncompleteSyncInfoException("Current password is required.");
+            throw new IncompleteSyncInfoException(Loc.Get(Str.ValCurrentPasswordRequired));
         }
 
         if (string.IsNullOrEmpty(newPassword))
         {
-            throw new IncompleteSyncInfoException("A new password is required.");
+            throw new IncompleteSyncInfoException(Loc.Get(Str.ValNewPasswordRequired));
         }
 
         if (newPassword.Length < Keepmark.Core.Crypto.BackupGuard.MinPasswordLength)
         {
-            throw new InvalidOperationException("Use a password of at least 8 characters.");
+            throw new InvalidOperationException(Loc.Get(Str.WfPasswordTooShort));
         }
 
         var creds = await _creds.GetAsync().ConfigureAwait(false)
@@ -276,7 +276,7 @@ public sealed class XbsSession : IAsyncDisposable
         var currentDerived = _crypto.DeriveKey(currentPassword, creds.Id, version);
         if (currentDerived != creds.DerivedKey)
         {
-            throw new InvalidCredentialsException("Current password is incorrect.");
+            throw new InvalidCredentialsException(Loc.Get(Str.ErrCurrentPasswordWrong));
         }
 
         // Snapshot of the real server copy, re-encrypted push on the remote
@@ -345,13 +345,13 @@ public sealed class XbsSession : IAsyncDisposable
     {
         if (!File.Exists(path))
         {
-            throw new InvalidOperationException("Backup file not found — pick it again.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupNotFoundPickAgain));
         }
 
         if (new FileInfo(path).Length > BackupGuard.MaxBytes)
         {
             throw new InvalidOperationException(
-                $"Backup file is too large (over {BackupGuard.MaxBytes / 1024 / 1024} MB).");
+                Loc.Get(Str.ErrBackupFileTooLarge, BackupGuard.MaxBytes / 1024 / 1024));
         }
 
         string raw;
@@ -361,7 +361,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new InvalidOperationException("Backup file cannot be read.", ex);
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupUnreadable), ex);
         }
 
         BackupEnvelope? envelope;
@@ -371,13 +371,13 @@ public sealed class XbsSession : IAsyncDisposable
         }
         catch (System.Text.Json.JsonException ex)
         {
-            throw new InvalidOperationException("Not a backup file or the file is damaged.", ex);
+            throw new InvalidOperationException(Loc.Get(Str.ErrNotBackupOrDamaged), ex);
         }
 
         if (envelope is null || envelope.App != "xBrowserSyncNg" || envelope.Format != 1 ||
             string.IsNullOrEmpty(envelope.Salt) || string.IsNullOrEmpty(envelope.Blob))
         {
-            throw new InvalidOperationException("Not a backup file.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrNotBackup));
         }
 
         // Damaged file vs wrong password: base64 must parse before GCM runs,
@@ -389,7 +389,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
         catch (FormatException ex)
         {
-            throw new InvalidOperationException("Backup file is damaged.", ex);
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupDamaged), ex);
         }
 
         var derived = _crypto.DeriveKey(password, envelope.Salt, Core.XbsConstants.SyncClientVersion);
@@ -401,7 +401,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
         catch (System.Text.Json.JsonException ex)
         {
-            throw new InvalidOperationException("Backup decrypts but its content is damaged.", ex);
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupContentDamaged), ex);
         }
     }
 
@@ -668,7 +668,7 @@ public sealed class XbsSession : IAsyncDisposable
         var path = SafetyPath(fileName);
         if (!File.Exists(path))
         {
-            throw new InvalidOperationException("Backup not found — it may have been pruned.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupPruned));
         }
 
         File.Delete(path);
@@ -687,7 +687,7 @@ public sealed class XbsSession : IAsyncDisposable
     {
         var entry = (await ListSafetyBackupsAsync(ct).ConfigureAwait(false))
             .FirstOrDefault(e => e.FileName == fileName)
-            ?? throw new InvalidOperationException("Backup not found — it may have been pruned.");
+            ?? throw new InvalidOperationException(Loc.Get(Str.ErrBackupPruned));
         var roots = await OpenSafetyBackupAsync(entry, ct).ConfigureAwait(false);
         var count = BackupGuard.ValidateTree(roots);
         if (entry.Side == "local")
@@ -701,7 +701,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
 
         var creds = await _creds.GetAsync().ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Link the sync this backup belongs to first.");
+            ?? throw new InvalidOperationException(Loc.Get(Str.ErrLinkBackupSync));
         // Pre-restore snapshot of the REAL server copy (R7.4), not the mirror.
         var currentRoots = await Engine!.GetRemoteTreeAsync(ct).ConfigureAwait(false);
         await SaveSafetyBackupAsync("remote", System.Text.Json.JsonSerializer.Serialize(currentRoots),
@@ -728,7 +728,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
         catch (IOException ex)
         {
-            throw new InvalidOperationException("Backup file cannot be read.", ex);
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupUnreadable), ex);
         }
 
         if (entry.Enc == "master")
@@ -741,7 +741,7 @@ public sealed class XbsSession : IAsyncDisposable
             if (wrap is null)
             {
                 throw new InvalidCredentialsException(
-                    $"This backup is locked to another sync{(entry.SyncId is null ? "" : $" ({entry.SyncId})")} — link it (or its password) to open.");
+                    Loc.Get(Str.ErrBackupLockedTo, entry.SyncId is null ? "" : $" ({entry.SyncId})"));
             }
 
             try
@@ -751,7 +751,7 @@ public sealed class XbsSession : IAsyncDisposable
             }
             catch (Exception ex) when (ex is XbsException or FormatException)
             {
-                throw new InvalidOperationException("Backup file is damaged.", ex);
+                throw new InvalidOperationException(Loc.Get(Str.ErrBackupDamaged), ex);
             }
         }
 
@@ -761,7 +761,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
         catch (System.Text.Json.JsonException ex)
         {
-            throw new InvalidOperationException("Backup file is damaged.", ex);
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupDamaged), ex);
         }
     }
 
@@ -789,14 +789,14 @@ public sealed class XbsSession : IAsyncDisposable
             !fileName.StartsWith(SafetyBackupFiles.FilePrefix, StringComparison.Ordinal) ||
             !fileName.EndsWith(".json", StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("Unknown backup.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrUnknownBackup));
         }
 
         var dir = SafetyDir();
         var full = Path.GetFullPath(Path.Combine(dir, fileName));
         if (full != Path.Combine(dir, fileName))
         {
-            throw new InvalidOperationException("Unknown backup.");
+            throw new InvalidOperationException(Loc.Get(Str.ErrUnknownBackup));
         }
 
         return full;
@@ -832,7 +832,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
         catch (IOException ex)
         {
-            throw new InvalidOperationException("Cannot update the backup index.", ex);
+            throw new InvalidOperationException(Loc.Get(Str.ErrIndexUpdate), ex);
         }
     }
 
