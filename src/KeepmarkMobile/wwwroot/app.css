@@ -750,6 +750,136 @@ html.xbs-locked, body.xbs-locked {
     text-overflow: ellipsis;
 }
 
+/* ---- Crumb strip (v1.0.148): fixed navy row under the page bar, one chip
+   per open level, a tap jumps there. Home stays pinned left; the chips
+   scroll sideways and start scrolled to the end (current level). Shown
+   only inside a folder; the spacer keeps the list clear of it. ---- */
+.xbs-crumbbar {
+    position: fixed;
+    top: calc(3rem + env(safe-area-inset-top, 0px));
+    left: env(safe-area-inset-left, 0px);
+    right: env(safe-area-inset-right, 0px);
+    height: 44px;
+    z-index: 1059;
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem 0 0.25rem;
+    background: var(--km-navy);
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.22);
+    transition: box-shadow 0.2s ease;
+}
+
+html.xbs-under .xbs-crumbbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.xbs-crumbbar-space { height: calc(44px + 0.5rem); }
+
+.xbs-crumb-home {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 22px;
+    padding: 0;
+    background: transparent;
+    color: #c3cae6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.xbs-crumb-home .km-ico { width: 20px; height: 20px; }
+.xbs-crumb-home:active { background: rgba(255, 255, 255, 0.12); }
+
+.xbs-crumbs {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    scrollbar-width: none;
+    white-space: nowrap;
+}
+
+.xbs-crumbs::-webkit-scrollbar { display: none; }
+
+.xbs-crumbs.faded {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 36px);
+    mask-image: linear-gradient(to right, transparent, #000 36px);
+}
+
+.xbs-crumb-sep {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: #6f7aae;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.xbs-crumb {
+    flex: none;
+    height: 44px;
+    border: 0;
+    padding: 0 2px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    display: flex;
+    align-items: center;
+}
+
+.xbs-crumb > span {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #c3cae6;
+}
+
+.xbs-crumb:active > span { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.xbs-crumb[aria-current] > span { background: rgba(255, 255, 255, 0.16); color: #fff; font-weight: 700; }
+.xbs-crumb:last-child { margin-right: 0.25rem; }
+
+/* ---- Short list (v1.0.148): xbsGestures.fitBrowse adds .short when the
+   list fits in ~60% of the space, and pads the block so it sits just above
+   mid-screen under a big title. Long lists flow from the top as before. ---- */
+.xbs-bigtitle { display: none; }
+
+.xbs-browse.short {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.xbs-browse.short .xbs-bigtitle {
+    display: block;
+    padding: 0 1rem 1.25rem;
+}
+
+.xbs-bigtitle-name {
+    font-size: 2.125rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--km-ink);
+    overflow-wrap: anywhere;
+}
+
+.xbs-bigtitle-sub { margin-top: 0.375rem; font-size: 0.875rem; color: var(--km-ink-2); }
+
+/* Inside a folder the big title already names it: the bar drops its copy. */
+html.xbs-short .xbs-pagebar.in-folder .xbs-barpath-name { opacity: 0; }
+
 .xbs-barsearch {
     flex: 1;
     min-width: 0;
@@ -1155,6 +1285,18 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
         right: auto;
         left: auto;
     }
+}
+
+/* Wide screens: the crumb strip rides under the sticky page bar. */
+@media (min-width: 641px) and (min-height: 560px) {
+    .xbs-crumbbar {
+        position: sticky;
+        top: 3rem;
+        margin: -0.5rem -1.5rem 0.5rem -2rem;
+        left: auto;
+        right: auto;
+    }
+    .xbs-crumbbar-space { display: none; }
 }
 
 /* Sheets never stretch across a wide/landscape screen. */

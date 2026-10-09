@@ -23,7 +23,7 @@ else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
 else
 {
     <h1 class="visually-hidden">@L.Get(Str.NavGroupBookmarks)</h1>
-    <header class="xbs-pagebar @(searchOpen ? "searching" : string.Empty)">
+    <header class="xbs-pagebar @(searchOpen ? "searching" : string.Empty) @(crumbs.Count > 0 ? "in-folder" : string.Empty)">
         @if (searchOpen)
         {
             <button class="xbs-barbtn" data-back="10" @onclick="CloseSearch" aria-label="@L.Get(Str.HomeCloseSearch)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
@@ -46,13 +46,7 @@ else
             {
                 <img src="img/mark.png" alt="" class="xbs-bar-mark" />
             }
-            <button class="xbs-barpath" @onclick="TogglePathMenu" disabled="@(crumbs.Count == 0)" aria-label="@L.Get(Str.HomeFolderPathAria, PathLabel)" aria-expanded="@pathMenuOpen.ToString().ToLowerInvariant()">
-                @if (crumbs.Count > 0)
-                {
-                    <span class="xbs-barpath-up"><span class="xbs-barpath-uptext">@ParentPath</span><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" /></svg></span>
-                }
-                <span class="xbs-barpath-name">@CurrentName</span>
-            </button>
+            <span class="xbs-barpath"><span class="xbs-barpath-name">@CurrentName</span></span>
             <button class="xbs-barbtn" @onclick="OpenSearch" aria-label="@L.Get(Str.HomeSearchPlaceholder)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg></button>
             <button class="xbs-barbtn" @onclick="ToggleSortMenu" aria-label="@L.Get(Str.HomeSortAria, SortLabel)" aria-expanded="@sortMenuOpen.ToString().ToLowerInvariant()">
                 <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M4 16l3 3 3-3M14 7h6M14 12h4M14 17h2" /></svg>
@@ -61,25 +55,24 @@ else
         }
     </header>
 
-    @if (pathMenuOpen && !searchOpen)
+    @if (crumbs.Count > 0 && !searchOpen)
     {
-        <div class="xbs-pop-scrim" data-back="40" @onclick="ClosePops" aria-hidden="true"></div>
-        <div class="xbs-pop left" role="menu" aria-label="@L.Get(Str.HomeFolderPathMenu)">
-            <button class="xbs-pop-item" role="menuitem" @onclick="() => { ClosePops(); return GoRoot(); }">
-                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg><span>@L.Get(Str.HomeAllBookmarks)</span>
+        <div class="xbs-crumbbar">
+            <button class="xbs-crumb-home" @onclick="GoRoot" aria-label="@L.Get(Str.HomeAllBookmarks)">
+                <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5M6.5 9.5V19h11V9.5" /></svg>
             </button>
-            @{ var depth = 0; }
-            @foreach (var c in crumbs.Reverse())
-            {
-                depth++;
-                var isCurrent = depth == crumbs.Count;
-                var pad = $"padding-left: {0.75 + depth * 0.875}rem";
-                <button class="xbs-pop-item @(isCurrent ? "current" : string.Empty)" role="menuitem" style="@pad" aria-current="@(isCurrent ? "location" : null)"
-                        @onclick="() => { ClosePops(); return JumpTo(c.RowId); }">
-                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span>@c.Title</span>
-                </button>
-            }
+            <nav class="xbs-crumbs" aria-label="@L.Get(Str.HomeFolderPathMenu)">
+                @{ var depth = 0; }
+                @foreach (var c in crumbs.Reverse())
+                {
+                    depth++;
+                    var isCurrent = depth == crumbs.Count;
+                    <svg class="xbs-crumb-sep" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                    <button class="xbs-crumb" aria-current="@(isCurrent ? "location" : null)" @onclick="() => JumpTo(c.RowId)"><span>@(c.Title ?? L.Get(Str.HomeFolderWord))</span></button>
+                }
+            </nav>
         </div>
+        <div class="xbs-crumbbar-space" aria-hidden="true"></div>
     }
 
     @if (sortMenuOpen && !searchOpen)
@@ -123,6 +116,12 @@ else
     }
     else
     {
+        <div class="xbs-browse">
+        <div class="xbs-bigtitle">
+            <div class="xbs-bigtitle-name">@(crumbs.Count == 0 ? L.Get(Str.HomeAllBookmarks) : CurrentName)</div>
+            <div class="xbs-bigtitle-sub">@CountLabel</div>
+        </div>
+        <div class="xbs-browse-body">
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
             <div class="xbs-pinned-box">
@@ -157,6 +156,8 @@ else
         {
             <p class="xbs-hint" role="status">@(crumbs.Count == 0 ? L.Get(Str.HomeEmptyRoot) : L.Get(Str.HomeEmptyFolder))</p>
         }
+        </div>
+        </div>
     }
 
     <div class="xbs-statusbar @StatusClass" role="status">
@@ -347,6 +348,13 @@ else
         {
             focusSearch = false;
             try { await JS.InvokeVoidAsync("xbsGestures.focus", "#xbs-q"); } catch { }
+        }
+
+        // Short list sits just above mid-screen; the crumb strip shows its
+        // current (last) level. Both are measured in JS after every paint.
+        if (ready)
+        {
+            try { await JS.InvokeVoidAsync("xbsGestures.layoutBrowse"); } catch { }
         }
 
         if (ready && sheetFor is null && Session.Engine is not null && SharedImport.Peek() is not null)
@@ -943,7 +951,6 @@ else
 
     // ---- Compact page bar: path menu, sort menu, search mode. ----
     private bool searchOpen;
-    private bool pathMenuOpen;
     private bool sortMenuOpen;
     private bool focusSearch;
 
@@ -956,30 +963,23 @@ else
 
     private string ParentName => crumbs.Count < 2 ? L.Get(Str.HomeAllBookmarks) : crumbs.ElementAt(1).Title ?? L.Get(Str.HomeFolderWord);
 
-    /// <summary>Ancestors above the current folder, nearest last; long chains keep only the two nearest.</summary>
-    private string ParentPath
+    /// <summary>"3 folders · 1 bookmark" for the big title of a short list (this level only).</summary>
+    private string CountLabel
     {
         get
         {
-            var names = new List<string> { L.Get(Str.HomeAllBookmarks) };
-            names.AddRange(crumbs.Reverse().SkipLast(1).Select(c => c.Title ?? L.Get(Str.HomeFolderWord)));
-            return names.Count > 2 ? "… › " + string.Join(" › ", names.TakeLast(2)) : string.Join(" › ", names);
+            var folders = rows.Count(r => r.IsFolder);
+            var links = rows.Count(r => !r.IsFolder && r.Url != Core.XbsConstants.SeparatorUrl);
+            var parts = new List<string>();
+            if (folders > 0) parts.Add(Loc.Plural(Str.HomeCountFolders, folders));
+            if (links > 0 || folders == 0) parts.Add(Loc.Plural(Str.HomeCountBookmarks, links));
+            return string.Join(" · ", parts);
         }
     }
 
-    private string PathLabel => string.Join(", ", new[] { L.Get(Str.HomeAllBookmarks) }.Concat(crumbs.Reverse().Select(c => c.Title ?? L.Get(Str.HomeFolderWord))));
-
     private void ClosePops()
     {
-        pathMenuOpen = false;
         sortMenuOpen = false;
-    }
-
-    private void TogglePathMenu()
-    {
-        var open = !pathMenuOpen;
-        ClosePops();
-        pathMenuOpen = open && crumbs.Count > 0;
     }
 
     private void ToggleSortMenu()

@@ -101,6 +101,43 @@ window.xbsGestures = (() => {
     }
     window.addEventListener('scroll', onEdgeScroll, { passive: true });
 
+    // Short list (fits in ~60% of the space under the bars): the browse block
+    // gets the full height and a bottom pad, so it sits just above mid-screen
+    // with a big folder title; html.xbs-short lets the bar drop its title.
+    // Measured on the list body only, so toggling never changes the input.
+    const phoneLayout = window.matchMedia('(max-width: 640px), (max-height: 559px)');
+    function fitBrowse() {
+        const html = document.documentElement;
+        const box = document.querySelector('.xbs-browse');
+        const body = box && box.querySelector('.xbs-browse-body');
+        if (!body) { html.classList.remove('xbs-short'); return; }
+        const top = box.getBoundingClientRect().top + window.scrollY;
+        const avail = window.innerHeight - top - 16;
+        const short = phoneLayout.matches && body.offsetHeight + 96 <= avail * 0.6;
+        box.classList.toggle('short', short);
+        html.classList.toggle('xbs-short', short);
+        box.style.minHeight = short ? avail + 'px' : '';
+        box.style.paddingBottom = short ? Math.round(avail * 0.4) + 'px' : '';
+    }
+    window.addEventListener('resize', fitBrowse, { passive: true });
+
+    // Crumb strip: jump to the end (current level) whenever the path changes,
+    // and fade the left edge while earlier levels are scrolled out of view.
+    function fitCrumbs() {
+        const strip = document.querySelector('.xbs-crumbs');
+        if (!strip) return;
+        const key = strip.textContent;
+        if (strip.dataset.key !== key) {
+            strip.dataset.key = key;
+            strip.scrollLeft = strip.scrollWidth;
+        }
+        if (!strip.dataset.bound) {
+            strip.dataset.bound = '1';
+            strip.addEventListener('scroll', () => strip.classList.toggle('faded', strip.scrollLeft > 2), { passive: true });
+        }
+        strip.classList.toggle('faded', strip.scrollLeft > 2);
+    }
+
     function attach() {
         if (listenersAttached) return;
         listenersAttached = true;
@@ -533,6 +570,10 @@ window.xbsGestures = (() => {
         focus(selector) {
             const el = document.querySelector(selector);
             if (el && el.focus) el.focus();
+        },
+        layoutBrowse() {
+            fitCrumbs();
+            fitBrowse();
         },
         scrollToRow(rowId) {
             const el = document.querySelector(`.xbs-row[data-rowid="${rowId}"]`);

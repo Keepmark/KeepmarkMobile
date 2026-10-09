@@ -257,6 +257,10 @@ public static partial class Str
     public const string HomeSearching = nameof(HomeSearching);
     public const string HomeResults_one = nameof(HomeResults_one);
     public const string HomeResults_other = nameof(HomeResults_other);
+    public const string HomeCountFolders_one = nameof(HomeCountFolders_one);
+    public const string HomeCountFolders_other = nameof(HomeCountFolders_other);
+    public const string HomeCountBookmarks_one = nameof(HomeCountBookmarks_one);
+    public const string HomeCountBookmarks_other = nameof(HomeCountBookmarks_other);
     public const string HomeNoMatches = nameof(HomeNoMatches);
     public const string HomePinned = nameof(HomePinned);
     public const string HomeEmptyRoot = nameof(HomeEmptyRoot);
@@ -593,6 +597,10 @@ public static partial class Str
     public const string ConnUnlinkIntro = nameof(ConnUnlinkIntro);
     /// <summary>Base for Loc.Plural (HomeResults_one / HomeResults_other).</summary>
     public const string HomeResults = nameof(HomeResults);
+    /// <summary>Base for Loc.Plural (HomeCountFolders_one / HomeCountFolders_other).</summary>
+    public const string HomeCountFolders = nameof(HomeCountFolders);
+    /// <summary>Base for Loc.Plural (HomeCountBookmarks_one / HomeCountBookmarks_other).</summary>
+    public const string HomeCountBookmarks = nameof(HomeCountBookmarks);
     /// <summary>Base for Loc.Plural (StatusMergeWouldTitles_one / StatusMergeWouldTitles_other).</summary>
     public const string StatusMergeWouldTitles = nameof(StatusMergeWouldTitles);
     /// <summary>Base for Loc.Plural (SwANewText_one / SwANewText_other).</summary>
