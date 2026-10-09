@@ -21,6 +21,14 @@ public static class WorkflowTexts
     public const string UnlinkDone =
         "Device unlinked. Its bookmarks are untouched; link again with the sync ID and password to resume syncing.";
 
+    // Connect → new sync.
+    public const string CreatedNext =
+        "Copy the sync ID above and store it with the password: both are needed to link your other devices.";
+
+    public const string CreateEmptyImplication =
+        "This device starts empty and the empty sync is what your other devices get. " +
+        "The current bookmarks are saved to Backup → Safety backups first.";
+
     // Direction choice (Connect, Move, Conflict): picker order and confirms.
     /// <summary>Keep the server copy / Merge both / Keep this device's copy.</summary>
     public static readonly string[] DirectionOrder = ["download", "merge", "upload"];

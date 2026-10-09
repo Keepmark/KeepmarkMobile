@@ -70,6 +70,14 @@ public class WorkflowTests
     }
 
     [Fact]
+    public void CreateTextsSayWhatToKeep()
+    {
+        Assert.Contains("sync ID", WorkflowTexts.CreatedNext);
+        Assert.Contains("password", WorkflowTexts.CreatedNext);
+        Assert.Contains("Safety backups", WorkflowTexts.CreateEmptyImplication);
+    }
+
+    [Fact]
     public void MoveTextsSayWhatStaysBehind()
     {
         Assert.Contains("old sync stays on the old service", WorkflowTexts.MoveImplication);
