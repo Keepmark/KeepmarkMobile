@@ -110,10 +110,14 @@ else
     else
     {
         <div class="xbs-browse">
-        <div class="xbs-bigtitle">
-            <div class="xbs-bigtitle-name">@(crumbs.Count == 0 ? L.Get(Str.HomeAllBookmarks) : CurrentName)</div>
-            <div class="xbs-bigtitle-sub">@CountLabel</div>
-        </div>
+        @* The root shows no big title: the brand bar already says where you are. *@
+        @if (crumbs.Count > 0)
+        {
+            <div class="xbs-bigtitle">
+                <div class="xbs-bigtitle-name">@CurrentName</div>
+                <div class="xbs-bigtitle-sub">@CountLabel</div>
+            </div>
+        }
         <div class="xbs-browse-body">
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
