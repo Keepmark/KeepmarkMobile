@@ -7,22 +7,22 @@
 @inject IJSRuntime JS
 @implements IDisposable
 
-<PageTitle>Duplicates</PageTitle>
+<PageTitle>@L.Get(Str.NavDuplicates)</PageTitle>
 
-<h1>Duplicate bookmarks</h1>
-<p class="text-muted">Same URL saved more than once. Mark copies with ✕ to delete them — one copy of each URL always stays. Tap a title to open it.</p>
+<h1>@L.Get(Str.DupTitle)</h1>
+<p class="text-muted">@L.Get(Str.DupIntro)</p>
 
 @if (!ready)
 {
-    <p role="status"><em>Loading…</em></p>
+    <p role="status"><em>@L.Get(Str.CommonLoading)</em></p>
 }
 else if (groups.Count == 0)
 {
-    <div class="alert alert-success" role="status">No duplicates. Your library is clean.</div>
+    <div class="alert alert-success" role="status">@L.Get(Str.DupClean)</div>
 }
 else
 {
-    <p class="text-muted" role="status"><small>@MarkedCount() marked for deletion. Swipe right on a row for full details.</small></p>
+    <p class="text-muted" role="status"><small>@L.Get(Str.DupMarkedLine, MarkedCount())</small></p>
 
     @foreach (var g in groups)
     {
@@ -42,7 +42,7 @@ else
                 else
                 {
                     <button class="btn btn-outline-danger mt-1" disabled="@(busy || markedHere == 0)" @onclick="() => armedGroup = g.Url">
-                        Delete @(markedHere == 0 ? "marked" : $"{markedHere} marked")
+                        @(markedHere == 0 ? L.Get(Str.DupDeleteWord) + " " + L.Get(Str.DupDeleteMarkedWord) : L.Get(Str.DupDeleteN, markedHere))
                     </button>
                 }
             </section>
@@ -53,10 +53,10 @@ else
         <div class="alert alert-danger mt-2" role="alert">@deleteError</div>
     }
     <div class="xbs-dupbar">
-        <span role="status">@MarkedCount() marked</span>
+        <span role="status">@L.Get(Str.DupBarMarked, MarkedCount())</span>
         @if (!armedAll)
         {
-            <button class="btn btn-outline-danger" disabled="@(busy || MarkedCount() == 0)" @onclick="() => armedAll = true">Delete marked…</button>
+            <button class="btn btn-outline-danger" disabled="@(busy || MarkedCount() == 0)" @onclick="() => armedAll = true">@L.Get(Str.DupDeleteBtn)</button>
         }
         else
         {
@@ -144,14 +144,14 @@ else
         groupOf.TryGetValue(rowId, out var g) &&
         g.Rows.All(r => r.RowId == rowId || selected.Contains(r.RowId));
 
-    private static string MarkLabel(bool marked, bool locked) =>
-        marked ? "Unmark for deletion" : locked ? "Always kept copy" : "Mark for deletion";
+    private string MarkLabel(bool marked, bool locked) =>
+        marked ? L.Get(Str.DupUnmark) : locked ? L.Get(Str.DupAlwaysKept) : L.Get(Str.DupMark);
 
     private async Task Toggle(int rowId)
     {
         if (IsLocked(rowId))
         {
-            await Toast.ShowAsync("One copy always stays — unmark another copy first");
+            await Toast.ShowAsync(L.Get(Str.DupOneStays));
             return;
         }
 
@@ -237,7 +237,7 @@ else
         Session.Log.Info("duplicates", deleted > 0 ? $"Deleted {deleted} duplicate(s)" : "Nothing to delete");
         _ = Toast.ShowAsync(deleted > 0
             ? WorkflowTexts.DupDeleteDone(deleted)
-            : "Nothing to delete");
+            : L.Get(Str.DupNothing));
     }
 
     private async Task ExecuteAll()
@@ -293,7 +293,7 @@ else
         Session.Log.Info("duplicates", count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
         _ = Toast.ShowAsync(count > 0
             ? WorkflowTexts.DupDeleteDone(count)
-            : "Nothing to delete");
+            : L.Get(Str.DupNothing));
     }
 
     private RenderFragment DupRow(Core.Data.ItemRow r, string line1, string line2) => __builder =>
@@ -307,7 +307,7 @@ else
                     @onclick="() => Toggle(r.RowId)" @onclick:stopPropagation="true">
                 <span aria-hidden="true">@(marked ? "✕" : locked ? "🔒" : string.Empty)</span>
             </button>
-            <button type="button" class="xbs-duptext" aria-label="Open @(r.Title ?? r.Url)" @onclick="() => Open(r)">
+            <button type="button" class="xbs-duptext" aria-label="@L.Get(Str.DupOpenAria, r.Title ?? r.Url ?? string.Empty)" @onclick="() => Open(r)">
                 <span class="xbs-duptext-title">@line1</span>
                 @if (!string.IsNullOrEmpty(line2))
                 {
@@ -325,7 +325,7 @@ else
                     }
                     @if (string.IsNullOrEmpty(r.Description) && string.IsNullOrEmpty(r.Tags))
                     {
-                        <span class="xbs-duptext-sub">No details saved.</span>
+                        <span class="xbs-duptext-sub">@L.Get(Str.DupNoDetails)</span>
                     }
                 }
             </button>
