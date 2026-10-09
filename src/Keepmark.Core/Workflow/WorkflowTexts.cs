@@ -13,6 +13,12 @@ public static class WorkflowTexts
         "Your other devices stop syncing until you unlink them and link again with the new password. " +
         "Edits not yet synced are uploaded now. Older backup files keep their own password.";
 
+    /// <summary>The browser adds "Undo is in Status"; the mobile app has no
+    /// undo for it, the safety backup is the way back.</summary>
+    public const string ChangePasswordDone =
+        "Password changed. Link your other devices again with the new password and update your password manager. " +
+        "The previous server copy is in Backup → Safety backups.";
+
     // Connect → Unlink.
     public const string UnlinkImplication =
         "Syncing stops; the bookmarks on this device stay. To link again you need the sync ID and its password, " +

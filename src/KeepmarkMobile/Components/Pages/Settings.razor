@@ -1,4 +1,5 @@
 @page "/settings"
+@using Keepmark.Core.Workflow
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
@@ -90,16 +91,11 @@
         <label class="form-label">Confirm new password</label>
         <input type="password" class="form-control" @bind="pwConfirm" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
     </div>
-    <button class="btn btn-warning" @onclick="() => armedPw = true" disabled="@(pwBusy || armedPw)">Change password…</button>
+    <button class="btn btn-warning" @onclick="ArmChangePassword" disabled="@(pwBusy || armedPw)">Change password…</button>
     @if (armedPw)
     {
-        <div class="alert alert-danger mt-2">
-            <strong>Change the sync password?</strong> Your other devices stop syncing until you unlink them and link again with the new password. Edits not yet synced are uploaded now. Older backup files keep their own password.
-            <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-warning" @onclick="ChangePassword" disabled="@pwBusy">Yes, change password</button>
-                <button class="btn btn-secondary" @onclick="() => armedPw = false" disabled="@pwBusy">Cancel</button>
-            </div>
-        </div>
+        <ConfirmBlock Message="Change the sync password?" Implication="@WorkflowTexts.ChangePasswordImplication"
+                      ConfirmLabel="Yes, change password" Busy="pwBusy" OnConfirm="ChangePassword" OnCancel="() => armedPw = false" />
     }
     @if (!string.IsNullOrEmpty(pwError))
     {
@@ -107,7 +103,7 @@
     }
     @if (pwDone)
     {
-        <div class="alert alert-success mt-2" role="status">Password changed. A safety backup of the previous server copy was saved — see Backup → Safety backups. Update your other devices and vault now.</div>
+        <div class="alert alert-success mt-2" role="status">@WorkflowTexts.ChangePasswordDone</div>
     }
 }
 
@@ -179,9 +175,9 @@
 
             if (!confirmed)
             {
+                // Only the lock change needs the PIN: the other settings still save.
                 appLock = AppSettings.AppLock;
-                error = "Not confirmed with the device PIN. App lock unchanged.";
-                return;
+                error = "Not confirmed with the device PIN. App lock unchanged; the other settings are saved.";
             }
         }
 
@@ -192,7 +188,6 @@
         Session.NotifySettingsChanged();
         try { await JS.InvokeVoidAsync("xbsSetTheme", theme); } catch { }
         try { StatusBar.ApplyTheme(theme); } catch { }
-        saved = true;
         AppSettings.AppLock = appLock;
         AppSettings.LockTimeoutMinutes = Math.Clamp(lockTimeout, 0, 60);
         Session.NotifySettingsChanged();
@@ -229,17 +224,26 @@
         return null;
     }
 
-    private async Task ChangePassword()
+    /// <summary>Validate first: the confirmation opens only for a change
+    /// that can run (fields are locked while it is open).</summary>
+    private void ArmChangePassword()
     {
         pwError = string.Empty;
         pwDone = false;
         var invalid = ValidatePasswordChange(pwCurrent, pwNew, pwConfirm);
         if (invalid is not null)
         {
-            armedPw = false;
             pwError = invalid;
             return;
         }
+
+        armedPw = true;
+    }
+
+    private async Task ChangePassword()
+    {
+        pwError = string.Empty;
+        pwDone = false;
 
         pwBusy = true;
         try
