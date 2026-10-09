@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App icon (canvas "5D"): ribbon hanging from a slot, layers rendered from
+     the canvas generator. Hand-made instead of MauiIcon so the themed
+     (monochrome) layer can drop the ribbon shadow and cut the keyhole. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/km_icon_bg" />
+    <foreground android:drawable="@mipmap/km_icon_fg" />
+    <monochrome android:drawable="@mipmap/km_icon_mono" />
+</adaptive-icon>

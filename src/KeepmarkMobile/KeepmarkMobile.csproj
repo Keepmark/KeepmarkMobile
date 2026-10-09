@@ -35,8 +35,8 @@
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.163</ApplicationDisplayVersion>
-        <ApplicationVersion>164</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.164</ApplicationDisplayVersion>
+        <ApplicationVersion>165</ApplicationVersion>
 
         <!-- monodroid mmaps lib/*.so straight from the APK: those entries MUST
              be STORED, never Deflated, or the app SIGABRTs on startup outside
@@ -55,8 +55,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- App Icon (brand sheet format 3 as foreground, navy background) -->
-        <MauiIcon Include="Resources\AppIcon\appicon.png" Color="#243878" />
+        <!-- App icon: hand-made adaptive icon in Platforms/Android/Resources
+             (mipmap-*/km_icon_*), not MauiIcon, which reuses the foreground
+             as the themed layer. -->
 
         <!-- Splash Screen (brand sheet format 8) -->
         <MauiSplashScreen Include="Resources\Splash\splash.png" Color="#FFFFFF" BaseSize="277,237" />
