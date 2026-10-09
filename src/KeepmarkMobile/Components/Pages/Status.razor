@@ -2,6 +2,7 @@
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
+@using Keepmark.Core.Workflow
 @implements IDisposable
 
 <PageTitle>Status</PageTitle>
@@ -95,11 +96,11 @@ else
 
     <h3>Storage</h3>
     <ul>
-        <li>Local database: @FormatBytes(dbSize)</li>
-        <li>Server copy (last sync): @(serverBytes is null ? "never synced" : FormatBytes(serverBytes.Value))
+        <li>Local database: @WorkflowRules.FormatBytes(dbSize)</li>
+        <li>Server copy (last sync): @(serverBytes is null ? "never synced" : WorkflowRules.FormatBytes(serverBytes.Value))
             @if (serverBytes is not null)
             {
-                <text> of @(maxSyncSize is null ? "unknown max (offline?)" : FormatBytes(maxSyncSize.Value))</text>
+                <text> of @(maxSyncSize is null ? "unknown max (offline?)" : WorkflowRules.FormatBytes(maxSyncSize.Value))</text>
                 @if (maxSyncSize is not null && maxSyncSize.Value > 0)
                 {
                     <text> (@ServerPctText%)</text>
@@ -354,19 +355,6 @@ else
             ? 0
             : Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value);
 
-    private static string FormatBytes(long bytes)    {
-        if (bytes < 1024)
-        {
-            return $"{bytes} B";
-        }
-
-        if (bytes < 1024L * 1024)
-        {
-            return $"{bytes / 1024.0:0.#} KB";
-        }
-
-        return $"{bytes / (1024.0 * 1024):0.##} MB";
-    }
 
     public void Dispose()
     {

@@ -1,0 +1,11 @@
+@* Outcome of one action cluster, rendered right under its button
+   (docs/WORKFLOWS.md rule 5): red alert on error, green status on success. *@
+@if (!string.IsNullOrEmpty(Text))
+{
+    <div class="alert mt-2 @(Error ? "alert-danger" : "alert-success")" role="@(Error ? "alert" : "status")">@Text</div>
+}
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public bool Error { get; set; }
+}

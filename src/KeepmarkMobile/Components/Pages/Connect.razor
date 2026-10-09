@@ -2,6 +2,7 @@
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
+@using Keepmark.Core.Workflow
 
 <PageTitle>Connect</PageTitle>
 
@@ -14,7 +15,7 @@
 else if (linked)
 {
     <div class="alert alert-success">
-        Linked to <strong>@linkedUrl</strong> (sync <code>@ShortId(linkedId)</code>).
+        Linked to <strong>@linkedUrl</strong> (sync <code>@WorkflowRules.ShortId(linkedId)</code>).
     </div>
     <p>To move to another service use <a href="switch-service">Move service</a>, to save or restore an encrypted copy use <a href="backup">Backup</a>.</p>
     @if (!string.IsNullOrEmpty(message))
@@ -104,7 +105,7 @@ else
             <div class="xbs-verified" role="status">
                 <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                 <div class="xbs-verified-text">
-                    <strong>Sync <code>@ShortId(reconcile.Candidate.Id)</code> opened</strong>
+                    <strong>Sync <code>@WorkflowRules.ShortId(reconcile.Candidate.Id)</code> opened</strong>
                     <span>@reconcile.RemoteCount item(s) on the server · @reconcile.LocalCount on this device</span>
                 </div>
                 <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@busy">Change</button>
@@ -329,8 +330,6 @@ else
         }
     }
 
-    private static string ShortId(string? id) =>
-        id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
 
     private void Disarm() => armed = null;
 
@@ -346,18 +345,6 @@ else
         }, err => unlinkError = err, "connect-unlink");
     }
 
-    private static void RequireMatchingPasswords(string first, string second)
-    {
-        if (first.Length < 8)
-        {
-            throw new InvalidOperationException("Use a password of at least 8 characters.");
-        }
-
-        if (!string.Equals(first, second, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Passwords do not match.");
-        }
-    }
 
     private async Task CheckService()
     {
@@ -404,7 +391,7 @@ else
     {
         await RunStepAsync(async () =>
         {
-            RequireMatchingPasswords(newPassword, confirmPassword);
+            WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
             await Session.CreateNewSyncAsync(serviceUrl.Trim(), newPassword);
             AppSettings.ServiceUrl = serviceUrl.Trim();
             reconcile = null;
@@ -419,7 +406,7 @@ else
     {
         await RunStepAsync(async () =>
         {
-            RequireMatchingPasswords(newPassword, confirmPassword);
+            WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
             await Session.CreateNewSyncWithUploadAsync(serviceUrl.Trim(), newPassword);
             AppSettings.ServiceUrl = serviceUrl.Trim();
             reconcile = null;

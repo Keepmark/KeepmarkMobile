@@ -1,0 +1,27 @@
+@* The one confirmation pattern (docs/WORKFLOWS.md rule 2): an inline block
+   next to the action, the question in bold, one implication line (what is
+   lost, where, who else is affected), then "Yes, <verb>" and Cancel.
+   Destructive confirms are red. The page owns the armed flag. *@
+<div class="alert @(Danger ? "alert-danger" : "alert-warning") mt-2 mb-2" role="group" aria-label="@Message">
+    <strong>@Message</strong>
+    @if (!string.IsNullOrEmpty(Implication))
+    {
+        <text> @Implication</text>
+    }
+    @ChildContent
+    <div class="mt-2 d-flex gap-2">
+        <button class="btn @(Danger ? "btn-danger" : "btn-primary")" @onclick="OnConfirm" disabled="@Busy">@ConfirmLabel</button>
+        <button class="btn btn-secondary" @onclick="OnCancel" disabled="@Busy">Cancel</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Message { get; set; } = string.Empty;
+    [Parameter] public string? Implication { get; set; }
+    [Parameter, EditorRequired] public string ConfirmLabel { get; set; } = string.Empty;
+    [Parameter] public bool Danger { get; set; } = true;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

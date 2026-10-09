@@ -1,7 +1,8 @@
 @page "/backup"
 @inject KeepmarkMobile.Services.XbsSession Session
-@inject KeepmarkMobile.Services.ToastState Toast
+@inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @using Keepmark.Core.Safety
+@using Keepmark.Core.Workflow
 
 <PageTitle>Backup</PageTitle>
 
@@ -13,70 +14,48 @@
 }
 else
 {
-    <p class="text-muted">Save your local bookmarks to an encrypted file (password of your choice), or restore from one. The file opens only with that password.</p>
-
     <div class="mb-3">
         <h4>Export</h4>
+        <p class="text-muted">Save this device's @localCount item(s) to an encrypted file. Choose a backup password of
+            at least 8 characters. @WorkflowTexts.BackupPasswordHint</p>
         <label class="form-label">Backup password</label>
         <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
-        <label class="form-label mt-2">Confirm password</label>
+        <label class="form-label mt-2">Confirm backup password</label>
         <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
-        <div class="form-text">Encrypts your current @localCount local item(s). Keep the password: without it the file is unreadable.</div>
         <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">Export encrypted backup</button>
-        @if (!string.IsNullOrEmpty(bkpMessage))
-        {
-            <div class="alert mt-2 @(bkpError ? "alert-danger" : "alert-success")" role="@(bkpError ? "alert" : "status")">@bkpMessage</div>
-        }
+        <StepMessage Text="@bkpMessage" Error="bkpError" />
     </div>
 
     <div class="mb-3">
-        <h4>Import</h4>
+        <h4>Restore from a backup file</h4>
+        <p class="text-muted">@WorkflowTexts.ImportImplication(linked)</p>
         <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
         @if (impPath is not null)
         {
             <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
             @if (impCount is null)
             {
-                <label class="form-label">Backup password</label>
-                <input type="password" class="form-control" @bind="impPassword" autocomplete="current-password" />
-                <div class="form-text">Unlocking verifies the password first — a wrong password stops here.</div>
-                <div class="mt-2 d-flex gap-2">
-                    <button class="btn btn-primary" @onclick="PreviewImport" disabled="@busy">Unlock backup</button>
-                </div>
+                <label class="form-label">Password of this backup</label>
+                <input type="password" class="form-control" @bind="impPassword" autocomplete="off" />
+                <button class="btn btn-primary mt-2" @onclick="PreviewImport" disabled="@busy">Check backup</button>
             }
             else
             {
-                @* Read with this password: restore uses the same one, so it is no longer editable. *@
-                <p class="text-muted mb-1">Password verified. Choose the file again to use a different backup or password.</p>
-            }
-            @if (impCount is not null)
-            {
-                @if (!armedImp)
+                <p class="text-muted mb-1">@WorkflowTexts.ImportChecked(impFileName ?? "Backup", impCount.Value)</p>
+                @if (armedImp)
                 {
-                    <div class="alert alert-warning mt-2">
-                        Backup holds <strong>@impCount</strong> item(s); your local tree has <strong>@localCount</strong>.
-                        <div class="mt-2">
-                            <button class="btn btn-danger" @onclick='() => armedImp = true' disabled="@busy">Replace local with backup…</button>
-                        </div>
-                    </div>
+                    <ConfirmBlock Message="@($"Replace your {localCount} item(s) with the {impCount} from this backup?")"
+                                  Implication="@WorkflowTexts.ImportImplication(linked)"
+                                  ConfirmLabel="Yes, restore" Busy="busy"
+                                  OnConfirm="ExecuteImport" OnCancel="() => armedImp = false" />
                 }
                 else
                 {
-                    <div class="alert alert-danger mt-2">
-                        <strong>Replace your @localCount local item(s) with the @impCount from backup?</strong>
-                        A safety backup of the current local tree is saved first; the restored tree syncs up right after.
-                        <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-danger" @onclick="ExecuteImport" disabled="@busy">Yes, restore</button>
-                            <button class="btn btn-secondary" @onclick="() => armedImp = false" disabled="@busy">Cancel</button>
-                        </div>
-                    </div>
+                    <button class="btn btn-danger mt-1" @onclick="() => armedImp = true" disabled="@busy">Replace with this backup…</button>
                 }
             }
         }
-        @if (!string.IsNullOrEmpty(impMessage))
-        {
-            <div class="alert mt-2 @(impError ? "alert-danger" : "alert-success")" role="@(impError ? "alert" : "status")">@impMessage</div>
-        }
+        <StepMessage Text="@impMessage" Error="impError" />
     </div>
 
     <div class="mb-3">
@@ -86,10 +65,7 @@ else
             Restore one to undo a download, upload, import, password change, move or duplicates cleanup —
             or delete it to free space. Newest first, oldest auto-pruned beyond five.</p>
         <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">Refresh list</button>
-        @if (!string.IsNullOrEmpty(safetyMessage))
-        {
-            <div class="alert mt-2 @(safetyError ? "alert-danger" : "alert-success")" role="@(safetyError ? "alert" : "status")">@safetyMessage</div>
-        }
+        <StepMessage Text="@safetyMessage" Error="safetyError" />
         @if (safetyList.Count == 0)
         {
             <p class="text-muted">No safety backups yet.</p>
@@ -99,7 +75,7 @@ else
             <div class="card mb-2">
                 <div class="card-body py-2">
                     <div><strong>@SafetyBackupFiles.Describe(sb)</strong></div>
-                    <div class="form-text">@sb.FileName · @FormatBytes(sb.SizeBytes)
+                    <div class="form-text">@sb.FileName · @WorkflowRules.FormatBytes(sb.SizeBytes)
                         @if (sb.SyncId is not null)
                         {
                             <text> · sync <code>@sb.SyncId</code></text>
@@ -107,32 +83,17 @@ else
                     </div>
                     @if (armedRestore == sb.FileName)
                     {
-                        <div class="alert alert-danger mt-2 mb-2">
-                            @if (sb.Side == "local")
-                            {
-                                <text><strong>Replace your @localCount local item(s) with this backup (@sb.Items items)?</strong>
-                                A pre-restore backup of the current tree is saved first; the restored tree syncs up after.</text>
-                            }
-                            else
-                            {
-                                <text><strong>Upload this backup (@sb.Items items) onto the currently linked sync?</strong>
-                                A pre-restore backup of the server copy is saved first. Refused when unlinked.</text>
-                            }
-                            <div class="mt-2 d-flex gap-2">
-                                <button class="btn btn-danger" @onclick="ExecuteSafetyRestore" disabled="@busy">Yes, restore</button>
-                                <button class="btn btn-secondary" @onclick="() => armedRestore = null" disabled="@busy">Cancel</button>
-                            </div>
-                        </div>
+                        <ConfirmBlock Message="Restore this safety backup?"
+                                      Implication="@WorkflowTexts.SafetyRestoreImplication(sb.Side, sb.Items)"
+                                      ConfirmLabel="Yes, restore" Busy="busy"
+                                      OnConfirm="ExecuteSafetyRestore" OnCancel="() => armedRestore = null" />
                     }
                     else if (armedDelete == sb.FileName)
                     {
-                        <div class="alert alert-warning mt-2 mb-2">
-                            <strong>Delete this safety backup?</strong> There is no undo for this.
-                            <div class="mt-2 d-flex gap-2">
-                                <button class="btn btn-danger" @onclick="ExecuteSafetyDelete" disabled="@busy">Yes, delete</button>
-                                <button class="btn btn-secondary" @onclick="() => armedDelete = null" disabled="@busy">Cancel</button>
-                            </div>
-                        </div>
+                        <ConfirmBlock Message="Delete this safety backup?"
+                                      Implication="@WorkflowTexts.SafetyDeleteImplication"
+                                      ConfirmLabel="Yes, delete" Busy="busy"
+                                      OnConfirm="ExecuteSafetyDelete" OnCancel="() => armedDelete = null" />
                     }
                     else
                     {
@@ -149,9 +110,8 @@ else
 
 @code {
     private int localCount;
+    private bool linked;
     private bool busy;
-    private string message = string.Empty;
-    private bool isError;
     private string bkpPassword = string.Empty;
     private string bkpConfirm = string.Empty;
     private string bkpMessage = string.Empty;
@@ -176,13 +136,18 @@ else
             await Task.Delay(100);
         }
 
+        await RefreshCountsAsync();
+        await RefreshSafetyListAsync();
+    }
+
+    private async Task RefreshCountsAsync()
+    {
+        linked = await Creds.GetAsync() is not null;
         if (Session.Store is not null)
         {
             var stats = await Session.Store.GetStatsAsync();
             localCount = stats.Folders + stats.Bookmarks + stats.Separators;
         }
-
-        await RefreshSafetyListAsync();
     }
 
     private async Task RefreshSafetyListAsync()
@@ -197,39 +162,13 @@ else
         }
     }
 
-    private static string FormatBytes(long bytes)
-    {
-        if (bytes < 1024)
-        {
-            return $"{bytes} B";
-        }
-
-        if (bytes < 1024L * 1024)
-        {
-            return $"{bytes / 1024.0:0.#} KB";
-        }
-
-        return $"{bytes / (1024.0 * 1024):0.##} MB";
-    }
-
-    private static void RequireMatchingPasswords(string first, string second)
-    {
-        if (first.Length < 8)
-        {
-            throw new InvalidOperationException("Use a password of at least 8 characters.");
-        }
-
-        if (!string.Equals(first, second, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Passwords do not match.");
-        }
-    }
-
+    /// <summary>Export: a new password typed twice. The fields are cleared on
+    /// success only, so a failed export can be retried as is.</summary>
     private async Task ExportBackup()
     {
         await RunAsync(async () =>
         {
-            RequireMatchingPasswords(bkpPassword, bkpConfirm);
+            WorkflowRules.RequireNewPassword(bkpPassword, bkpConfirm);
             var path = await Session.ExportBackupAsync(bkpPassword);
             bkpPassword = string.Empty;
             bkpConfirm = string.Empty;
@@ -237,21 +176,16 @@ else
             {
                 await Share.Default.RequestAsync(new ShareFileRequest(
                     "Save encrypted backup", new ShareFile(path)));
-                Ok($"Backup exported ({localCount} items). Choose where to keep the file.");
+                return WorkflowTexts.ExportDone(localCount) + " Choose where to keep the file.";
             }
             catch
             {
-                Ok($"Backup saved privately. Export it from the app folder when needed.");
+                return WorkflowTexts.ExportDone(localCount) + " It is saved in the app folder; share it from there when needed.";
             }
-        });
-        // Passwords never linger, on success or failure.
-        bkpPassword = string.Empty;
-        bkpConfirm = string.Empty;
-        bkpMessage = message;
-        bkpError = isError;
-        message = string.Empty;
+        }, (text, error) => (bkpMessage, bkpError) = (text, error));
     }
 
+    /// <summary>Step 1: choosing a file always starts the restore over.</summary>
     private async Task PickBackup()
     {
         await RunAsync(async () =>
@@ -259,7 +193,7 @@ else
             var picked = await FilePicker.Default.PickAsync();
             if (picked is null)
             {
-                return;
+                return string.Empty;
             }
 
             // The picker name is untrusted: strip any path, require JSON.
@@ -271,7 +205,7 @@ else
 
             // Copy into our cache with a size cap: the picked URI may not be a
             // direct file path, and imports must never OOM the app.
-            ForgetImportTmp();
+            ForgetImport();
             var tmp = Path.Combine(FileSystem.CacheDirectory,
                 $"import-{Guid.NewGuid():N}-{safeName}");
             await using (var src = await picked.OpenReadAsync())
@@ -282,22 +216,23 @@ else
 
             impPath = tmp;
             impFileName = safeName;
-            impCount = null;
-            armedImp = false;
-            Ok("File selected. Enter its password and Unlock backup.");
-        });
-        impMessage = message;
-        impError = isError;
-        message = string.Empty;
+            return string.Empty;
+        }, (text, error) => (impMessage, impError) = (text, error));
     }
 
-    private void ForgetImportTmp()
+    /// <summary>Back to step 1: no file, no password, nothing checked.</summary>
+    private void ForgetImport()
     {
         if (impPath is not null)
         {
             try { File.Delete(impPath); } catch { }
             impPath = null;
         }
+
+        impFileName = null;
+        impPassword = string.Empty;
+        impCount = null;
+        armedImp = false;
     }
 
     private static async Task CopyCappedAsync(Stream src, Stream dst, long maxBytes)
@@ -318,56 +253,66 @@ else
         }
     }
 
+    /// <summary>Step 2: decrypt and count, nothing changes. A wrong password
+    /// clears only the password; the file stays chosen.</summary>
     private async Task PreviewImport()
     {
         await RunAsync(async () =>
         {
             if (impPath is null)
             {
-                throw new InvalidOperationException("Choose a backup file first.");
+                throw new InvalidOperationException("Choose the backup file first.");
             }
 
             if (string.IsNullOrEmpty(impPassword))
             {
-                throw new InvalidOperationException("Enter the backup password.");
+                throw new InvalidOperationException("Enter the password of this backup.");
             }
 
-            impCount = await Session.PreviewBackupAsync(impPath, impPassword);
+            try
+            {
+                impCount = await Session.PreviewBackupAsync(impPath, impPassword);
+            }
+            catch
+            {
+                impPassword = string.Empty;
+                throw;
+            }
+
             armedImp = false;
-            Ok("Backup reads correctly. Review the counts above.");
-        });
-        impMessage = message;
-        impError = isError;
-        message = string.Empty;
+            return string.Empty;
+        }, (text, error) => (impMessage, impError) = (text, error));
     }
 
+    /// <summary>Step 3 (confirmed). On failure the flow goes back to the
+    /// password step with the file kept, never to a half-checked state.</summary>
     private async Task ExecuteImport()
     {
         await RunAsync(async () =>
         {
             if (impPath is null || impCount is null)
             {
-                throw new InvalidOperationException("Read the backup first.");
+                throw new InvalidOperationException("Check the backup first.");
             }
 
-            var restored = await Session.ImportBackupAsync(impPath, impPassword);
-            impPassword = string.Empty;
-            impCount = null;
-            armedImp = false;
-            ForgetImportTmp();
-            if (Session.Store is not null)
+            int restored;
+            try
             {
-                var stats = await Session.Store.GetStatsAsync();
-                localCount = stats.Folders + stats.Bookmarks + stats.Separators;
+                restored = await Session.ImportBackupAsync(impPath, impPassword);
+            }
+            catch
+            {
+                impPassword = string.Empty;
+                impCount = null;
+                armedImp = false;
+                throw;
             }
 
-            Ok($"Restored {restored} item(s). Safety backup of the replaced bookmarks saved — see Safety backups below. They sync up automatically.");
-        });
-        // The import flow is over either way: never keep the password around.
-        impPassword = string.Empty;
-        impMessage = message;
-        impError = isError;
-        message = string.Empty;
+            ForgetImport();
+            await RefreshCountsAsync();
+            await RefreshSafetyListAsync();
+            return WorkflowTexts.ImportDone(restored, linked);
+        }, (text, error) => (impMessage, impError) = (text, error));
     }
 
     private async Task RefreshSafety()
@@ -375,11 +320,8 @@ else
         await RunAsync(async () =>
         {
             await RefreshSafetyListAsync();
-            Ok($"Safety list refreshed ({safetyList.Count} backup(s)).");
-        });
-        safetyMessage = message;
-        safetyError = isError;
-        message = string.Empty;
+            return $"Safety list refreshed ({safetyList.Count} backup(s)).";
+        }, (text, error) => (safetyMessage, safetyError) = (text, error));
     }
 
     private async Task ExecuteSafetyRestore()
@@ -393,18 +335,11 @@ else
 
             var restored = await Session.RestoreSafetyBackupAsync(armedRestore);
             armedRestore = null;
-            if (Session.Store is not null)
-            {
-                var stats = await Session.Store.GetStatsAsync();
-                localCount = stats.Folders + stats.Bookmarks + stats.Separators;
-            }
-
+            await RefreshCountsAsync();
             await RefreshSafetyListAsync();
-            Ok($"Restored {restored} item(s). A pre-restore backup was saved first.");
-        });
-        safetyMessage = message;
-        safetyError = isError;
-        message = string.Empty;
+            return WorkflowTexts.SafetyRestoreDone(restored);
+        }, (text, error) => (safetyMessage, safetyError) = (text, error));
+        armedRestore = null;
     }
 
     private async Task ExecuteSafetyDelete()
@@ -419,44 +354,32 @@ else
             await Session.DeleteSafetyBackupAsync(armedDelete);
             armedDelete = null;
             await RefreshSafetyListAsync();
-            Ok("Safety backup deleted.");
-        });
-        safetyMessage = message;
-        safetyError = isError;
-        message = string.Empty;
+            return "Safety backup deleted.";
+        }, (text, error) => (safetyMessage, safetyError) = (text, error));
+        armedDelete = null;
     }
 
-    private async Task RunAsync(Func<Task> action, [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
+    /// <summary>Runs one action and reports into that action's own message
+    /// box only: the other sections and their fields are left alone.</summary>
+    private async Task RunAsync(Func<Task<string>> action, Action<string, bool> report,
+        [System.Runtime.CompilerServices.CallerMemberName] string op = "?")
     {
         busy = true;
-        isError = false;
-        message = string.Empty;
+        report(string.Empty, false);
         try
         {
             Session.Log.Debug("backup", $"{op}: start");
-            await action();
+            report(await action(), false);
             Session.Log.Debug("backup", $"{op}: ok");
         }
         catch (Exception ex)
         {
-            isError = true;
-            message = ex.Message;
+            report(ex.Message, true);
             Session.Log.Warn("backup", $"{op} failed: {ex.GetType().Name}");
         }
         finally
         {
-            // Export passwords never linger. impPassword is excluded on
-            // purpose: it is entered at "Unlock backup" and reused at
-            // "Yes, restore" (ExecuteImport clears it when the flow ends).
-            bkpPassword = string.Empty;
-            bkpConfirm = string.Empty;
             busy = false;
         }
-    }
-
-    private void Ok(string text)
-    {
-        isError = false;
-        message = text;
     }
 }

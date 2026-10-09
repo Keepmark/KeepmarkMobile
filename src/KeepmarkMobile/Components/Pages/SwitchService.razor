@@ -5,6 +5,7 @@
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject NavigationManager Nav
+@using Keepmark.Core.Workflow
 
 <PageTitle>Move service</PageTitle>
 
@@ -40,7 +41,7 @@ else if (step == 4)
         }
         else if (direction == "merge")
         {
-            <p>@Core.Sync.MoveResult.Describe("existing", "merge", targetUrl, ShortId(probe?.Candidate.Id)) Safety backups of both sides were saved — see Backup → Safety backups.</p>
+            <p>@Core.Sync.MoveResult.Describe("existing", "merge", targetUrl, WorkflowRules.ShortId(probe?.Candidate.Id)) Safety backups of both sides were saved — see Backup → Safety backups.</p>
         }
         else
         {
@@ -155,7 +156,7 @@ else
         <div class="xbs-verified" role="status">
             <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
             <div class="xbs-verified-text">
-                <strong>Sync <code>@ShortId(probe?.Candidate.Id)</code> opened</strong>
+                <strong>Sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> opened</strong>
                 <span>@probe!.RemoteCount item(s) on the server · @localCount on this device</span>
             </div>
             <button class="xbs-link-btn" @onclick="Unverify" disabled="@busy">Change</button>
@@ -187,12 +188,12 @@ else
             }
             else if (direction == "upload")
             {
-                <p>Keep this device's copy: replace the <strong>@probe?.RemoteCount</strong> item(s) of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong> with your <strong>@localCount</strong>.</p>
+                <p>Keep this device's copy: replace the <strong>@probe?.RemoteCount</strong> item(s) of sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong> with your <strong>@localCount</strong>.</p>
                 <p class="text-muted mb-0">The server copy is saved to Backup → Safety backups first. The app then syncs with that sync.</p>
             }
             else if (direction == "merge")
             {
-                <p>Merge your <strong>@localCount</strong> item(s) with the <strong>@probe?.RemoteCount</strong> of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
+                <p>Merge your <strong>@localCount</strong> item(s) with the <strong>@probe?.RemoteCount</strong> of sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
                 @if (mergeStats is not null)
                 {
                     <ul class="xbs-review-list">
@@ -208,7 +209,7 @@ else
             }
             else
             {
-                <p>Keep the server copy: replace your <strong>@localCount</strong> item(s) on this device with the <strong>@probe?.RemoteCount</strong> of sync <code>@ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
+                <p>Keep the server copy: replace your <strong>@localCount</strong> item(s) on this device with the <strong>@probe?.RemoteCount</strong> of sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
                 <p class="text-muted mb-0">Your current bookmarks are saved to Backup → Safety backups first.</p>
             }
         </div>
@@ -289,8 +290,6 @@ else
         }
     }
 
-    private static string ShortId(string? id) =>
-        id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
 
     /// <summary>Changing direction invalidates the merge preview (counts must
     /// always match the verified sync + direction).</summary>
@@ -409,7 +408,7 @@ else
         {
             if (slot == "new")
             {
-                RequireMatchingPasswords(newPassword, confirmPassword);
+                WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
             }
             else if (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe)))
             {
@@ -482,7 +481,7 @@ else
 
             if (slot == "new")
             {
-                RequireMatchingPasswords(newPassword, confirmPassword);
+                WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
                 createdId = await Session.CreateNewSyncWithUploadAsync(targetUrl.Trim(), newPassword);
             }
             else
@@ -541,18 +540,6 @@ else
         }
     }
 
-    private static void RequireMatchingPasswords(string first, string second)
-    {
-        if (first.Length < 8)
-        {
-            throw new InvalidOperationException("Use a password of at least 8 characters.");
-        }
-
-        if (!string.Equals(first, second, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Passwords do not match.");
-        }
-    }
 
 
     /// <summary>One action cluster, one adjacent error box: each wizard step
