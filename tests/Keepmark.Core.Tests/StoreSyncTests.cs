@@ -234,6 +234,33 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task FolderBookmarkCounts_CountThroughSubfoldersAndSkipSeparators()
+    {
+        List<BookmarkNode> tree =
+        [
+            new() { Id = 1, Title = "Top", Children = [
+                new() { Id = 2, Title = "A", Url = "https://a.example" },
+                new() { Id = 3, Title = "---", Url = "xbs:separator" },
+                new() { Id = 4, Title = "Sub", Children = [
+                    new() { Id = 5, Title = "B", Url = "https://b.example" },
+                    new() { Id = 6, Title = "C", Url = "https://c.example" },
+                ]},
+                new() { Id = 7, Title = "Empty", Children = [] },
+            ]},
+            new() { Id = 8, Title = "Loose", Url = "https://loose.example" },
+        ];
+        await _store.ReplaceAllAsync(tree, "blob", "t1", "1.8.0");
+
+        var counts = await _store.GetFolderBookmarkCountsAsync();
+        var folders = (await _store.GetAllFoldersAsync()).ToDictionary(f => f.Title!, f => f.RowId);
+
+        Assert.Equal(3, counts.Count);
+        Assert.Equal(3, counts[folders["Top"]]);
+        Assert.Equal(2, counts[folders["Sub"]]);
+        Assert.Equal(0, counts[folders["Empty"]]);
+    }
+
+    [Fact]
     public async Task Crud_AddUpdateMoveDelete_RoundTrip()
     {
         await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");

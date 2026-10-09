@@ -774,6 +774,35 @@ public sealed class BookmarkStore : IAsyncDisposable
             tags, maxDepth, urls);
     }
 
+    /// <summary>
+    /// Bookmarks inside each folder, counted through every subfolder
+    /// (separators excluded). Folders with no bookmarks map to 0.
+    /// </summary>
+    public async Task<Dictionary<int, int>> GetFolderBookmarkCountsAsync()
+    {
+        var rows = await Db.QueryAsync<ItemRow>(
+            "SELECT RowId, ParentRowId, IsFolder, Url FROM Items").ConfigureAwait(false);
+        var byId = rows.ToDictionary(r => r.RowId);
+        var counts = rows.Where(r => r.IsFolder).ToDictionary(r => r.RowId, _ => 0);
+        foreach (var r in rows)
+        {
+            if (r.IsFolder || r.Url == XbsConstants.SeparatorUrl)
+            {
+                continue;
+            }
+
+            // Walk up the ancestors; the hop limit guards against a corrupt cycle.
+            var parent = r.ParentRowId;
+            for (var hops = 0; parent is int p && byId.TryGetValue(p, out var f) && hops < 1024; hops++)
+            {
+                counts[p] = counts.GetValueOrDefault(p) + 1;
+                parent = f.ParentRowId;
+            }
+        }
+
+        return counts;
+    }
+
     public async Task<string?> GetMetaAsync(string key) =>
         (await Db.FindAsync<MetaRow>(key).ConfigureAwait(false))?.Value;
 

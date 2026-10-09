@@ -130,7 +130,7 @@ else
                         @foreach (var r in pinnedRows)
                         {
                             <BookmarkRow @key="@("p" + r.RowId)" Row="r" Pinned="true" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
-                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
                 }
@@ -141,7 +141,7 @@ else
             <div class="xbs-list">
                 @foreach (var r in rows)
                 {
-                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
                 }
             </div>
         }
@@ -270,6 +270,7 @@ else
     private int? flashNodeId;
     private readonly HashSet<int> expandedRows = new();
     private Dictionary<int, string> pinPaths = new();
+    private Dictionary<int, int> folderCounts = new();
     private string sortMode = "Default";
     private CancellationTokenSource? flashTimer;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
@@ -399,6 +400,7 @@ else
             allFolders = await Session.Store.GetAllFoldersAsync();
             pinnedRows = await Session.Store.GetByNodeIdsAsync(pinned);
             pinPaths = await Session.Store.GetFolderPathsAsync();
+            folderCounts = await Session.Store.GetFolderBookmarkCountsAsync();
             byRow.Clear();
             foreach (var r in rows.Concat(pinnedRows)) byRow[r.RowId] = r;
             foreach (var h in hits)

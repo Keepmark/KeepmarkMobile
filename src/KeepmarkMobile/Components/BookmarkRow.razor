@@ -49,6 +49,8 @@ else
     [Parameter] public bool Flash { get; set; }
     [Parameter] public bool Expanded { get; set; }
     [Parameter] public string? FolderPath { get; set; }
+    /// <summary>Bookmarks inside a folder row (through all subfolders), shown as its subtitle.</summary>
+    [Parameter] public int? Count { get; set; }
     [Parameter] public EventCallback<ItemRow> OnOpen { get; set; }
     [Parameter] public EventCallback<(ItemRow Row, RowAction Action)> OnAction { get; set; }
 
@@ -58,7 +60,7 @@ else
     private string PlainTitle => Row.IsFolder
         ? (string.IsNullOrWhiteSpace(Row.Title) ? L.Get(Str.SheetTypeFolder) : Row.Title)
         : (string.IsNullOrWhiteSpace(Row.Title) ? ShortUrl(Row.Url) is { Length: > 0 } u ? u : L.Get(Str.RowNoTitle) : Row.Title);
-    private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Expanded ? Row.Url ?? string.Empty : ShortUrl(Row.Url);
+    private string Sub => Row.IsFolder ? (FolderPath ?? (Count is int n ? Loc.Plural(Str.HomeCountBookmarks, n) : string.Empty)) : Expanded ? Row.Url ?? string.Empty : ShortUrl(Row.Url);
 
     // Collapsed rows show the URL without scheme/www (the full URL is in the
     // expanded row and in the actions sheet).
