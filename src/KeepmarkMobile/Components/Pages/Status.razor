@@ -5,19 +5,19 @@
 @using Keepmark.Core.Workflow
 @implements IDisposable
 
-<PageTitle>Status</PageTitle>
+<PageTitle>@L.Get(Str.CommonStatus)</PageTitle>
 
-<h1>Status</h1>
+<h1>@L.Get(Str.CommonStatus)</h1>
 
 @if (!loaded)
 {
-    <p role="status"><em>Loading…</em></p>
+    <p role="status"><em>@L.Get(Str.CommonLoading)</em></p>
 }
 else
 {
     @if (status == Core.Sync.SyncStatus.Syncing)
     {
-        <div class="alert alert-info" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Sync in progress… values below refresh when it finishes.</div>
+        <div class="alert alert-info" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.StatusInProgress)</div>
     }
 
     @if (!string.IsNullOrEmpty(conflictResult))
@@ -30,29 +30,29 @@ else
         @* One panel, top of the page: what happened, the two copies, the three
            ways out, and the confirm/progress/error right under the choice. *@
         <section class="xbs-conflict" aria-labelledby="conflict-title">
-            <h2 id="conflict-title" class="xbs-step-title">Sync conflict</h2>
-            <p class="xbs-conflict-lead">The server copy changed on another device while this one had unsynced edits. Syncing is paused until you choose which copy to keep.</p>
+            <h2 id="conflict-title" class="xbs-step-title">@L.Get(Str.StatusConflictTitle)</h2>
+            <p class="xbs-conflict-lead">@L.Get(Str.StatusConflictLead)</p>
             @if (conflictPreview is null)
             {
                 @if (string.IsNullOrEmpty(conflictError))
                 {
-                    <p role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Comparing both copies…</p>
+                    <p role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.StatusComparing)</p>
                 }
                 else
                 {
                     <div class="alert alert-danger" role="alert">@conflictError</div>
-                    <button class="btn btn-primary" @onclick="RetryConflictPreview" disabled="@busy">Compare again</button>
+                    <button class="btn btn-primary" @onclick="RetryConflictPreview" disabled="@busy">@L.Get(Str.StatusCompareAgain)</button>
                 }
             }
             else
             {
                 <div class="xbs-conflict-sides">
-                    <div><span>This device</span><strong>@conflictPreview.LocalCount</strong><small>items</small></div>
-                    <div><span>Server</span><strong>@conflictPreview.RemoteCount</strong><small>updated @FormatRelative(conflictPreview.RemoteLastUpdated)</small></div>
+                    <div><span>@L.Get(Str.StatusThisDevice)</span><strong>@conflictPreview.LocalCount</strong><small>@L.Get(Str.StatusItems)</small></div>
+                    <div><span>@L.Get(Str.StatusServer)</span><strong>@conflictPreview.RemoteCount</strong><small>@L.Get(Str.StatusUpdated, FormatRelative(conflictPreview.RemoteLastUpdated))</small></div>
                 </div>
                 @if (conflictPreview.LocalOnly + conflictPreview.RemoteOnly + conflictPreview.TitleConflicts > 0)
                 {
-                    <p class="xbs-hint">Merging would upload @conflictPreview.LocalOnly, download @conflictPreview.RemoteOnly@(conflictPreview.TitleConflicts > 0 ? $" and keep the server title for {conflictPreview.TitleConflicts} renamed item(s)" : "").</p>
+                    <p class="xbs-hint">@MergeHint()</p>
                 }
                 <DirectionPicker Name="conflictDirection" Value="@choice" ValueChanged="v => { choice = v; armedDirection = null; }"
                                  LocalCount="conflictPreview.LocalCount" RemoteCount="conflictPreview.RemoteCount"
@@ -71,7 +71,7 @@ else
                                   Busy="busy" OnConfirm="() => ResolveConflict(armedDirection.Value)" OnCancel="() => armedDirection = null">
                         @if (busy)
                         {
-                            <p class="mt-2 mb-0" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Resolving conflict…</p>
+                            <p class="mt-2 mb-0" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.StatusResolving)</p>
                         }
                     </ConfirmBlock>
                 }
@@ -83,54 +83,54 @@ else
         </section>
     }
 
-    <h3>Synchronization</h3>
+    <h3>@L.Get(Str.StatusSyncH)</h3>
     <ul>
-        <li>Mode: @AppSettings.Mode</li>
-        <li>State: @status</li>
-        <li>Last sync: @(lastSync?.ToString("u") ?? "never")</li>
-        <li>Service: @(serviceUrl ?? "not linked")</li>
-        <li>Service version: @(serviceVersion ?? (serviceUrl is null ? "—" : "unknown (offline?)"))</li>
+        <li>@L.Get(Str.StatusModeLine, ModeLabel)</li>
+        <li>@L.Get(Str.StatusStateLine, Core.Sync.SyncStatusText.Label(status))</li>
+        <li>@L.Get(Str.StatusLastSyncLine, lastSync?.ToLocalTime().ToString("g") ?? L.Get(Str.StatusNever))</li>
+        <li>@L.Get(Str.StatusServiceLine, serviceUrl ?? L.Get(Str.StatusNotLinkedLower))</li>
+        <li>@L.Get(Str.StatusServiceVersionLine, serviceVersion ?? (serviceUrl is null ? "—" : L.Get(Str.StatusUnknownOffline)))</li>
     </ul>
 
-    <h3>Storage</h3>
+    <h3>@L.Get(Str.StatusStorageH)</h3>
     <ul>
-        <li>Local database: @WorkflowRules.FormatBytes(dbSize)</li>
-        <li>Server copy (last sync): @(serverBytes is null ? "never synced" : WorkflowRules.FormatBytes(serverBytes.Value))
+        <li>@L.Get(Str.StatusLocalDb, WorkflowRules.FormatBytes(dbSize))</li>
+        <li>@L.Get(Str.StatusServerCopyLabel) @(serverBytes is null ? L.Get(Str.StatusNeverSynced) : WorkflowRules.FormatBytes(serverBytes.Value))
             @if (serverBytes is not null)
             {
-                <text> of @(maxSyncSize is null ? "unknown max (offline?)" : WorkflowRules.FormatBytes(maxSyncSize.Value))</text>
+                <text> @L.Get(Str.StatusOf) @(maxSyncSize is null ? L.Get(Str.StatusUnknownMax) : WorkflowRules.FormatBytes(maxSyncSize.Value))</text>
                 @if (maxSyncSize is not null && maxSyncSize.Value > 0)
                 {
                     <text> (@ServerPctText%)</text>
-                    <div class="progress mt-1" role="progressbar" aria-label="Service space used" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress mt-1" role="progressbar" aria-label="@L.Get(Str.StatusSpaceAria)" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
                         <div class="progress-bar" style="width: @ServerPctText%"></div>
                     </div>
                 }
             }
-            <small class="text-muted"> — exact bytes your sync occupies on the service</small></li>
-        <li>Pending edits: @pending
+            <small class="text-muted"> @L.Get(Str.StatusExactBytes)</small></li>
+        <li>@L.Get(Str.StatusPendingLabel) @pending
             @if (pending > 0)
             {
-                <small class="text-muted"> — server figure predates them</small>
+                <small class="text-muted"> @L.Get(Str.StatusPendingNote)</small>
             }
         </li>
     </ul>
 
-    <h3>Content</h3>
+    <h3>@L.Get(Str.StatusContentH)</h3>
     <ul>
-        <li>Folders: @stats?.Folders · Bookmarks: @stats?.Bookmarks · Separators: @stats?.Separators</li>
-        <li>Distinct tags: @stats?.DistinctTags · Max depth: @stats?.MaxDepth · Duplicate URLs: @stats?.DuplicateUrls
+        <li>@L.Get(Str.StatusFolders) @stats?.Folders · @L.Get(Str.StatusBookmarks) @stats?.Bookmarks · @L.Get(Str.StatusSeparators) @stats?.Separators</li>
+        <li>@L.Get(Str.StatusTags) @stats?.DistinctTags · @L.Get(Str.StatusDepth) @stats?.MaxDepth · @L.Get(Str.StatusDupUrls) @stats?.DuplicateUrls
             @if ((stats?.DuplicateUrls ?? 0) > 0)
             {
-                <text> <a href="duplicates">Resolve →</a></text>
+                <text> <a href="duplicates">@L.Get(Str.StatusResolveLink)</a></text>
             }
         </li>
     </ul>
 
-    <h3>App</h3>
+    <h3>@L.Get(Str.StatusAppH)</h3>
     <ul>
-        <li>Version: @AppInfo.VersionString (build @AppInfo.BuildString)</li>
-        <li>Sync format: @Core.XbsConstants.SyncClientVersion · API: @Core.XbsConstants.ApiVersion</li>
+        <li>@L.Get(Str.StatusVersion) @AppInfo.VersionString (@L.Get(Str.StatusBuild) @AppInfo.BuildString)</li>
+        <li>@L.Get(Str.StatusSyncFormat) @Core.XbsConstants.SyncClientVersion · @L.Get(Str.StatusApi) @Core.XbsConstants.ApiVersion</li>
     </ul>
 }
 
@@ -167,10 +167,20 @@ else
 
     private string ChoiceLabel => choice switch
     {
-        "download" => "Keep the server copy…",
-        "upload" => "Keep this device's copy…",
-        _ => "Merge both…",
+        "download" => L.Get(Str.StatusKeepServer),
+        "upload" => L.Get(Str.StatusKeepDevice),
+        _ => L.Get(Str.StatusMergeBoth),
     };
+
+    private string ModeLabel => AppSettings.Mode == Core.Sync.SyncMode.Manual
+        ? L.Get(Str.StatusModeManual)
+        : L.Get(Str.StatusModeAuto);
+
+    private string MergeHint() => conflictPreview is { } p && p.LocalOnly + p.RemoteOnly + p.TitleConflicts > 0
+        ? (p.TitleConflicts > 0
+            ? Loc.Plural(Str.StatusMergeWouldTitles, p.TitleConflicts, p.LocalOnly, p.RemoteOnly)
+            : L.Get(Str.StatusMergeWould, p.LocalOnly, p.RemoteOnly))
+        : string.Empty;
 
     private void Arm(Core.Sync.ConflictResolutionDirection d)
     {
@@ -178,11 +188,11 @@ else
         conflictError = null;
     }
 
-    private static string ResultText(Core.Sync.ConflictResolutionDirection d) => d switch
+    private string ResultText(Core.Sync.ConflictResolutionDirection d) => d switch
     {
-        Core.Sync.ConflictResolutionDirection.Pull => "Conflict resolved: downloaded the server copy. Your previous local bookmarks are in Backup → Safety backups.",
-        Core.Sync.ConflictResolutionDirection.Push => "Conflict resolved: uploaded your local bookmarks. The previous server copy is in Backup → Safety backups.",
-        _ => "Conflict resolved: merged both sides (nothing deleted). Both previous sides are in Backup → Safety backups.",
+        Core.Sync.ConflictResolutionDirection.Pull => L.Get(Str.StatusResolvedPull),
+        Core.Sync.ConflictResolutionDirection.Push => L.Get(Str.StatusResolvedPush),
+        _ => L.Get(Str.StatusResolvedMerge),
     };
 
     protected override async Task OnInitializedAsync()
@@ -287,15 +297,15 @@ else
         }
     }
 
-    private static string FormatRelative(string? isoUtc)
+    private string FormatRelative(string? isoUtc)
     {
         if (string.IsNullOrEmpty(isoUtc) || !DateTimeOffset.TryParse(isoUtc, out var dto))
-            return "unknown time";
+            return L.Get(Str.RelUnknown);
         var diff = DateTimeOffset.UtcNow - dto;
-        if (diff.TotalMinutes < 1) return "just now";
-        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes} min ago";
-        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours} h ago";
-        return $"{(int)diff.TotalDays} d ago";
+        if (diff.TotalMinutes < 1) return L.Get(Str.RelNow);
+        if (diff.TotalHours < 1) return L.Get(Str.RelMinutes, (int)diff.TotalMinutes);
+        if (diff.TotalDays < 1) return L.Get(Str.RelHours, (int)diff.TotalHours);
+        return L.Get(Str.RelDays, (int)diff.TotalDays);
     }
 
     /// <summary>Service quota + version, fetched once per visit (not on every
