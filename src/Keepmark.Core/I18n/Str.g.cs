@@ -365,10 +365,6 @@ public static partial class Str
     public const string SettingsSyncMode = nameof(SettingsSyncMode);
     public const string SettingsModeAuto = nameof(SettingsModeAuto);
     public const string SettingsModeManual = nameof(SettingsModeManual);
-    public const string SettingsLinkedService = nameof(SettingsLinkedService);
-    public const string SettingsNotLinked = nameof(SettingsNotLinked);
-    public const string SettingsMoveHintA = nameof(SettingsMoveHintA);
-    public const string SettingsMoveHintB = nameof(SettingsMoveHintB);
     public const string SettingsLogVerbosity = nameof(SettingsLogVerbosity);
     public const string SettingsVerbosityHint = nameof(SettingsVerbosityHint);
     public const string SettingsTheme = nameof(SettingsTheme);
@@ -385,15 +381,15 @@ public static partial class Str
     public const string SettingsChangePasswordHint = nameof(SettingsChangePasswordHint);
     public const string SettingsChangePasswordBtn = nameof(SettingsChangePasswordBtn);
     public const string SettingsChangePasswordMessage = nameof(SettingsChangePasswordMessage);
-    public const string SettingsGestures = nameof(SettingsGestures);
-    public const string SettingsGestureTapBold = nameof(SettingsGestureTapBold);
-    public const string SettingsGestureTapRest = nameof(SettingsGestureTapRest);
-    public const string SettingsGestureSwipeRightBold = nameof(SettingsGestureSwipeRightBold);
-    public const string SettingsGestureSwipeRightRest = nameof(SettingsGestureSwipeRightRest);
-    public const string SettingsGestureSwipeLeftBold = nameof(SettingsGestureSwipeLeftBold);
-    public const string SettingsGestureSwipeLeftRest = nameof(SettingsGestureSwipeLeftRest);
-    public const string SettingsGestureMenuBold = nameof(SettingsGestureMenuBold);
-    public const string SettingsGestureMenuRest = nameof(SettingsGestureMenuRest);
+    public const string HelpGesturesH = nameof(HelpGesturesH);
+    public const string HelpGestureTapBold = nameof(HelpGestureTapBold);
+    public const string HelpGestureTapRest = nameof(HelpGestureTapRest);
+    public const string HelpGestureSwipeRightBold = nameof(HelpGestureSwipeRightBold);
+    public const string HelpGestureSwipeRightRest = nameof(HelpGestureSwipeRightRest);
+    public const string HelpGestureSwipeLeftBold = nameof(HelpGestureSwipeLeftBold);
+    public const string HelpGestureSwipeLeftRest = nameof(HelpGestureSwipeLeftRest);
+    public const string HelpGestureMenuBold = nameof(HelpGestureMenuBold);
+    public const string HelpGestureMenuRest = nameof(HelpGestureMenuRest);
     public const string ValCurrentPasswordRequired = nameof(ValCurrentPasswordRequired);
     public const string ValNewPasswordRequired = nameof(ValNewPasswordRequired);
     public const string ValNewMustDiffer = nameof(ValNewMustDiffer);
@@ -625,4 +621,18 @@ public static partial class Str
     public const string WfSafetyRestoreLocal = nameof(WfSafetyRestoreLocal);
     /// <summary>Base for Loc.Plural (WfSafetyRestoreRemote_one / WfSafetyRestoreRemote_other).</summary>
     public const string WfSafetyRestoreRemote = nameof(WfSafetyRestoreRemote);
+    public const string NavHelp = nameof(NavHelp);
+    public const string HelpTitle = nameof(HelpTitle);
+    public const string HelpStartH = nameof(HelpStartH);
+    public const string HelpStartBody = nameof(HelpStartBody);
+    public const string HelpAddH = nameof(HelpAddH);
+    public const string HelpAddBody = nameof(HelpAddBody);
+    public const string HelpSyncH = nameof(HelpSyncH);
+    public const string HelpSyncBody = nameof(HelpSyncBody);
+    public const string HelpBackupH = nameof(HelpBackupH);
+    public const string HelpBackupBody = nameof(HelpBackupBody);
+    public const string HelpToolsH = nameof(HelpToolsH);
+    public const string HelpToolsBody = nameof(HelpToolsBody);
+    public const string HelpLockH = nameof(HelpLockH);
+    public const string HelpLockBody = nameof(HelpLockBody);
 }

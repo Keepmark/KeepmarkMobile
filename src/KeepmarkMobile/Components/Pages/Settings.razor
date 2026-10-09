@@ -33,12 +33,6 @@
 </div>
 
 <div class="mb-3">
-    <label class="form-label">@L.Get(Str.SettingsLinkedService)</label>
-    <p class="form-control-plaintext"><strong>@(linkedUrl ?? L.Get(Str.SettingsNotLinked))</strong></p>
-    <small class="text-muted">@L.Get(Str.SettingsMoveHintA) <a href="switch-service">@L.Get(Str.NavMoveService)</a> @L.Get(Str.SettingsMoveHintB)</small>
-</div>
-
-<div class="mb-3">
     <label class="form-label">@L.Get(Str.SettingsLogVerbosity)</label>
     <select class="form-select" @bind="verbosity" @bind:after="ApplyVerbosity">
         <option value="@Core.Logging.XbsLogLevel.Error">@L.Get(Str.LogLevelError)</option>
@@ -103,13 +97,6 @@
         <div class="alert alert-success mt-2" role="status">@WorkflowTexts.ChangePasswordDone</div>
     }
 }
-
-<h3 class="mt-4">@L.Get(Str.SettingsGestures)</h3>
-<ul>
-    <li><strong>@L.Get(Str.SettingsGestureTapBold)</strong> @L.Get(Str.SettingsGestureTapRest)</li>
-    <li><strong>@L.Get(Str.SettingsGestureSwipeRightBold)</strong> @L.Get(Str.SettingsGestureSwipeRightRest) <strong>@L.Get(Str.SettingsGestureSwipeLeftBold)</strong> @L.Get(Str.SettingsGestureSwipeLeftRest)</li>
-    <li><strong>@L.Get(Str.SettingsGestureMenuBold)</strong> @L.Get(Str.SettingsGestureMenuRest)</li>
-</ul>
 
 @code {
     private Core.Sync.SyncMode mode;
