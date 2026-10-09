@@ -7,7 +7,6 @@
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.LanguageService LangSvc
-@inject NavigationManager Nav
 
 <PageTitle>@L.Get(Str.SettingsTitle)</PageTitle>
 
@@ -148,13 +147,12 @@
         Session.NotifySettingsChanged();
     }
 
-    /// <summary>The language applies at once: culture first, then a full
-    /// reload so every already-rendered text is drawn again.</summary>
+    /// <summary>The language applies at once: Apply() sets the culture and the
+    /// layout redraws its whole tree (no restart, no page reload).</summary>
     private void ApplyLanguage()
     {
         AppSettings.Language = language is "en" or "it" or "fr" or "es" or "de" ? language : "system";
         LangSvc.Apply();
-        Nav.NavigateTo(Nav.Uri, forceLoad: true);
     }
 
     private async Task Save()

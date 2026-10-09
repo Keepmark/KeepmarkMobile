@@ -12,7 +12,7 @@
 @inject KeepmarkMobile.Services.LanguageService Lang
 @implements IDisposable
 
-<div class="page">
+<div class="page" @key="Lang.Version">
     @if (syncing)
     {
         <div class="xbs-toploader" role="progressbar" aria-label="@L.Get(Str.LayoutSyncingAria)"></div>
@@ -70,6 +70,7 @@
         LockState.PromptRequested += OnPromptRequested;
         Toast.Changed += OnToast;
         SharedImport.Arrived += OnShareArrived;
+        Lang.Changed += OnLanguageChanged;
         _ = WatchSessionAsync();
     }
 
@@ -87,6 +88,12 @@
             }
         }
     }
+
+    private void OnLanguageChanged() => _ = InvokeAsync(async () =>
+    {
+        StateHasChanged();
+        await ApplyLanguageAsync();
+    });
 
     public async Task ApplyLanguageAsync()
     {
@@ -223,6 +230,7 @@
         LockState.PromptRequested -= OnPromptRequested;
         Toast.Changed -= OnToast;
         SharedImport.Arrived -= OnShareArrived;
+        Lang.Changed -= OnLanguageChanged;
         if (Session.Engine is not null)
         {
             Session.Engine.StatusChanged -= OnEngineStatus;

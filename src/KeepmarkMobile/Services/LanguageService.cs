@@ -15,6 +15,12 @@ public sealed class LanguageService
 
     public string ActiveLang { get; private set; } = "en";
 
+    /// <summary>Bumped on every Apply; the layout keys its tree on it so a
+    /// language change redraws every text without restarting the app.</summary>
+    public int Version { get; private set; }
+
+    public event Action? Changed;
+
     public void Apply()
     {
         ActiveLang = Langs.Resolve(_settings.Language, SystemCulture);
@@ -26,5 +32,7 @@ public sealed class LanguageService
         CultureInfo.DefaultThreadCurrentUICulture = culture;
         CultureInfo.CurrentCulture = culture;
         CultureInfo.CurrentUICulture = culture;
+        Version++;
+        Changed?.Invoke();
     }
 }
