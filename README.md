@@ -5,7 +5,7 @@
 > read it before reviewing code).
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.140 (141)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.141 (142)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -16,7 +16,7 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
 
 ## Requirements (load-bearing)
 
-- Android only, API 29+. English-only UI/logs (i18n keys for later).
+- Android only, API 29+. UI in en/it/fr/es/de: default follows the Android language, override in Settings → Language (reloads the UI). Logs stay English. Every UI text is a key in `Keepmark.Core/I18n` (`Str` + `Catalog.*.cs`, parity checked by `I18nTests`); wording follows `docs/UI-TERMS.md`.
 - Sync: auto default + manual mode; **409 conflict never silently merged**;
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.
