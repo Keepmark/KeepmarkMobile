@@ -1,5 +1,6 @@
 @page "/duplicates"
 @using System.Linq
+@using Keepmark.Core.Workflow
 @using Microsoft.JSInterop
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.ToastState Toast
@@ -34,11 +35,9 @@ else
                 }
                 @if (armedGroup == g.Url)
                 {
-                    <div class="d-flex gap-2 align-items-center flex-wrap mt-1">
-                        <span><strong>Delete @markedHere?</strong></span>
-                        <button class="btn btn-danger" disabled="@busy" aria-label="Delete @markedHere marked in group @g.Url" @onclick="() => ExecuteGroup(g)">Yes, delete</button>
-                        <button class="btn btn-secondary" disabled="@busy" aria-label="Keep group @g.Url" @onclick="() => armedGroup = null">Cancel</button>
-                    </div>
+                    var confirm = WorkflowTexts.DupDeleteConfirm(markedHere);
+                    <ConfirmBlock Message="@confirm.Message" Implication="@confirm.Implication" ConfirmLabel="@confirm.ConfirmLabel"
+                                  Busy="busy" OnConfirm="() => ExecuteGroup(g)" OnCancel="() => armedGroup = null" />
                 }
                 else
                 {
@@ -61,10 +60,10 @@ else
         }
         else
         {
-            <span><strong>Delete @MarkedCount()?</strong> One copy of each URL stays.</span>
-            <div class="d-flex gap-2">
-                <button class="btn btn-danger" disabled="@busy" @onclick="ExecuteAll">Yes, delete</button>
-                <button class="btn btn-secondary" disabled="@busy" @onclick="() => armedAll = false">Cancel</button>
+            var confirm = WorkflowTexts.DupDeleteConfirm(MarkedCount());
+            <div class="w-100">
+                <ConfirmBlock Message="@confirm.Message" Implication="@confirm.Implication" ConfirmLabel="@confirm.ConfirmLabel"
+                              Busy="busy" OnConfirm="ExecuteAll" OnCancel="() => armedAll = false" />
             </div>
         }
     </div>
@@ -237,7 +236,7 @@ else
         StateHasChanged();
         Session.Log.Info("duplicates", deleted > 0 ? $"Deleted {deleted} duplicate(s)" : "Nothing to delete");
         _ = Toast.ShowAsync(deleted > 0
-            ? $"Deleted {deleted} duplicate(s). Safety backup saved — see Backup → Safety backups."
+            ? WorkflowTexts.DupDeleteDone(deleted)
             : "Nothing to delete");
     }
 
@@ -293,7 +292,7 @@ else
         StateHasChanged();
         Session.Log.Info("duplicates", count > 0 ? $"Deleted {count} duplicate(s)" : "Nothing to delete");
         _ = Toast.ShowAsync(count > 0
-            ? $"Deleted {count} duplicate(s). Safety backup saved — see Backup → Safety backups."
+            ? WorkflowTexts.DupDeleteDone(count)
             : "Nothing to delete");
     }
 

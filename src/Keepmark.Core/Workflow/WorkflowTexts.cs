@@ -93,4 +93,14 @@ public static class WorkflowTexts
         $"Restored {count} item(s). The state before the restore is saved as a new safety backup.";
 
     public const string SafetyDeleteImplication = "This safety backup is gone for good.";
+
+    // Duplicates.
+    public static Confirm DupDeleteConfirm(int count) => new(
+        $"Delete {count} marked duplicate(s)?",
+        "One copy of each URL always stays; while linked the deletion is uploaded and your other devices get it at their next sync. " +
+        "A safety backup is saved first.",
+        "Yes, delete");
+
+    public static string DupDeleteDone(int count) =>
+        $"Deleted {count} duplicate(s). Safety backup saved — see Backup → Safety backups.";
 }

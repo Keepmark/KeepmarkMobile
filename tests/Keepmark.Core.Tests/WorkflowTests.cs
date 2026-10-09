@@ -84,4 +84,14 @@ public class WorkflowTests
         Assert.Contains("other devices stay linked", WorkflowTexts.MoveImplication);
         Assert.Equal("Create a new sync on example.org and upload 12 bookmarks?", WorkflowTexts.MoveNewConfirm("example.org", 12));
     }
+
+    [Fact]
+    public void DuplicateTextsMatchTheBrowser()
+    {
+        var c = WorkflowTexts.DupDeleteConfirm(3);
+        Assert.Equal("Delete 3 marked duplicate(s)?", c.Message);
+        Assert.Contains("One copy of each URL always stays", c.Implication);
+        Assert.Equal("Yes, delete", c.ConfirmLabel);
+        Assert.Contains("Backup → Safety backups", WorkflowTexts.DupDeleteDone(3));
+    }
 }
