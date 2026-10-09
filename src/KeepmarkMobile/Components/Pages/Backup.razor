@@ -1,6 +1,7 @@
 @page "/backup"
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
+@inject KeepmarkMobile.Services.ToastState Toast
 @using Keepmark.Core.Safety
 @using Keepmark.Core.Workflow
 
@@ -320,8 +321,8 @@ else
         await RunAsync(async () =>
         {
             await RefreshSafetyListAsync();
-            return $"Safety list refreshed ({safetyList.Count} backup(s)).";
-        }, (text, error) => (safetyMessage, safetyError) = (text, error));
+            return $"Safety list refreshed ({safetyList.Count} backup(s))";
+        }, ReportSafetyToast);
     }
 
     private async Task ExecuteSafetyRestore()
@@ -354,9 +355,23 @@ else
             await Session.DeleteSafetyBackupAsync(armedDelete);
             armedDelete = null;
             await RefreshSafetyListAsync();
-            return "Safety backup deleted.";
-        }, (text, error) => (safetyMessage, safetyError) = (text, error));
+            return "Safety backup deleted";
+        }, ReportSafetyToast);
         armedDelete = null;
+    }
+
+    /// <summary>Short confirmations with nothing to act on: success fades as a
+    /// toast, errors stay inline next to the button.</summary>
+    private void ReportSafetyToast(string text, bool error)
+    {
+        if (!error && !string.IsNullOrEmpty(text))
+        {
+            (safetyMessage, safetyError) = (string.Empty, false);
+            _ = Toast.ShowAsync(text);
+            return;
+        }
+
+        (safetyMessage, safetyError) = (text, error);
     }
 
     /// <summary>Runs one action and reports into that action's own message
