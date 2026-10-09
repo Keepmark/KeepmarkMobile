@@ -1,0 +1,16 @@
+@* Brand mark in the top bars: a white ribbon hanging from the bar's top edge,
+   shaded where it leaves the edge, keyhole in its body (canvas "BrHang", the
+   app icon's ribbon). The host stretches it to the bar height; gradients are
+   shared defs in index.html. Decorative: "Keepmark" sits next to it. *@
+<span class="km-brand-mark @Class" aria-hidden="true">
+    <svg viewBox="0 0 26 46">
+        <path d="M0 0h26v46l-13-8-13 8z" fill="url(#km-mark-body)" />
+        <rect width="26" height="9" fill="url(#km-mark-top)" />
+        <circle cx="13" cy="21" r="3.6" fill="#243878" />
+        <path d="M11.3 23h3.4l1 7.5h-5.4z" fill="#243878" />
+    </svg>
+</span>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+}

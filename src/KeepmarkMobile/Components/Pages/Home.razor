@@ -38,7 +38,7 @@ else
         }
         else
         {
-            <img src="img/mark.png" alt="" class="xbs-bar-mark" />
+            <BrandMark Class="xbs-bar-mark" />
             <span class="xbs-barpath"><span class="xbs-barpath-name">Keepmark</span></span>
             <button class="xbs-barbtn" @onclick="OpenSearch" aria-label="@L.Get(Str.HomeSearchPlaceholder)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg></button>
             <button class="xbs-barbtn" @onclick="ToggleSortMenu" aria-label="@L.Get(Str.HomeSortAria, SortLabel)" aria-expanded="@sortMenuOpen.ToString().ToLowerInvariant()">

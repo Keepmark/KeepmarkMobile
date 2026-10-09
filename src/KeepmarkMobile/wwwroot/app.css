@@ -710,7 +710,11 @@ html.xbs-locked, body.xbs-locked {
     box-shadow: 0 0 0 2px var(--km-navy);
 }
 
-.xbs-bar-mark { height: 26px; width: auto; flex: none; margin: 0 0.5rem 0 0.75rem; }
+/* v1.0.165 (canvas "BrHang"): the mark hangs from the bar's top edge, so it
+   stretches to the bar height and pins the ribbon to the top. */
+.km-brand-mark { position: relative; flex: none; align-self: stretch; width: 23px; }
+.km-brand-mark svg { position: absolute; left: 0; top: 0; width: 23px; height: 40px; overflow: visible; filter: drop-shadow(1px 3px 3px rgba(0, 0, 0, 0.55)); }
+.xbs-bar-mark { margin: 0 0.5rem 0 0.75rem; }
 
 .xbs-barpath {
     flex: 1;
