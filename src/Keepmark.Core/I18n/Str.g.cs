@@ -47,6 +47,43 @@ public static partial class Str
     public const string SecConfirmEnable = nameof(SecConfirmEnable);
     public const string SecNotConfirmed = nameof(SecNotConfirmed);
     public const string SecSaved = nameof(SecSaved);
+    public const string CommonYesRestore = nameof(CommonYesRestore);
+    public const string CommonDelete = nameof(CommonDelete);
+    public const string BackupStarting = nameof(BackupStarting);
+    public const string BackupExportH = nameof(BackupExportH);
+    public const string BackupExportIntro_one = nameof(BackupExportIntro_one);
+    public const string BackupExportIntro_other = nameof(BackupExportIntro_other);
+    public const string BackupPassword = nameof(BackupPassword);
+    public const string BackupConfirmPassword = nameof(BackupConfirmPassword);
+    public const string BackupExportBtn = nameof(BackupExportBtn);
+    public const string BackupRestoreH = nameof(BackupRestoreH);
+    public const string BackupChooseFile = nameof(BackupChooseFile);
+    public const string BackupFileLabel = nameof(BackupFileLabel);
+    public const string BackupFilePassword = nameof(BackupFilePassword);
+    public const string BackupCheckBtn = nameof(BackupCheckBtn);
+    public const string BackupFallbackName = nameof(BackupFallbackName);
+    public const string BackupReplaceMessage = nameof(BackupReplaceMessage);
+    public const string BackupReplaceBtn = nameof(BackupReplaceBtn);
+    public const string BackupSafetyH = nameof(BackupSafetyH);
+    public const string BackupSafetyIntro = nameof(BackupSafetyIntro);
+    public const string BackupRefreshList = nameof(BackupRefreshList);
+    public const string BackupNoSafety = nameof(BackupNoSafety);
+    public const string BackupSyncWord = nameof(BackupSyncWord);
+    public const string BackupRestoreMessage = nameof(BackupRestoreMessage);
+    public const string BackupDeleteMessage = nameof(BackupDeleteMessage);
+    public const string BackupRestoreBtn = nameof(BackupRestoreBtn);
+    public const string BackupSaveTitle = nameof(BackupSaveTitle);
+    public const string BackupChooseWhere = nameof(BackupChooseWhere);
+    public const string BackupSavedInApp = nameof(BackupSavedInApp);
+    public const string BackupPickFile = nameof(BackupPickFile);
+    public const string BackupFileTooLarge = nameof(BackupFileTooLarge);
+    public const string BackupChooseFirst = nameof(BackupChooseFirst);
+    public const string BackupEnterPassword = nameof(BackupEnterPassword);
+    public const string BackupCheckFirst = nameof(BackupCheckFirst);
+    public const string BackupSafetyRefreshed_one = nameof(BackupSafetyRefreshed_one);
+    public const string BackupSafetyRefreshed_other = nameof(BackupSafetyRefreshed_other);
+    public const string BackupPickFirst = nameof(BackupPickFirst);
+    public const string BackupSafetyDeleted = nameof(BackupSafetyDeleted);
     public const string ErrSyncNotFound = nameof(ErrSyncNotFound);
     public const string ErrInvalidService = nameof(ErrInvalidService);
     public const string ErrNotAcceptingNewSyncs = nameof(ErrNotAcceptingNewSyncs);
@@ -315,6 +352,10 @@ public static partial class Str
     public const string MoveResultPush = nameof(MoveResultPush);
     public const string MoveResultMerge = nameof(MoveResultMerge);
     public const string MoveResultPull = nameof(MoveResultPull);
+    /// <summary>Base for Loc.Plural (BackupExportIntro_one / BackupExportIntro_other).</summary>
+    public const string BackupExportIntro = nameof(BackupExportIntro);
+    /// <summary>Base for Loc.Plural (BackupSafetyRefreshed_one / BackupSafetyRefreshed_other).</summary>
+    public const string BackupSafetyRefreshed = nameof(BackupSafetyRefreshed);
     /// <summary>Base for Loc.Plural (StatusMergeWouldTitles_one / StatusMergeWouldTitles_other).</summary>
     public const string StatusMergeWouldTitles = nameof(StatusMergeWouldTitles);
     /// <summary>Base for Loc.Plural (WfDupDeleteDone_one / WfDupDeleteDone_other).</summary>

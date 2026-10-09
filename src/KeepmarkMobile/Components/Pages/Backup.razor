@@ -5,54 +5,53 @@
 @using Keepmark.Core.Safety
 @using Keepmark.Core.Workflow
 
-<PageTitle>Backup</PageTitle>
+<PageTitle>@L.Get(Str.NavBackup)</PageTitle>
 
-<h1>Backup</h1>
+<h1>@L.Get(Str.NavBackup)</h1>
 
 @if (!Session.Ready)
 {
-    <p role="status"><em>Starting…</em></p>
+    <p role="status"><em>@L.Get(Str.BackupStarting)</em></p>
 }
 else
 {
     <div class="mb-3">
-        <h4>Export</h4>
-        <p class="text-muted">Save this device's @localCount item(s) to an encrypted file. Choose a backup password of
-            at least 8 characters. @WorkflowTexts.BackupPasswordHint</p>
-        <label class="form-label">Backup password</label>
+        <h4>@L.Get(Str.BackupExportH)</h4>
+        <p class="text-muted">@Loc.Plural(Str.BackupExportIntro, localCount) @WorkflowTexts.BackupPasswordHint</p>
+        <label class="form-label">@L.Get(Str.BackupPassword)</label>
         <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
-        <label class="form-label mt-2">Confirm backup password</label>
+        <label class="form-label mt-2">@L.Get(Str.BackupConfirmPassword)</label>
         <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
-        <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">Export encrypted backup</button>
+        <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">@L.Get(Str.BackupExportBtn)</button>
         <StepMessage Text="@bkpMessage" Error="bkpError" />
     </div>
 
     <div class="mb-3">
-        <h4>Restore from a backup file</h4>
+        <h4>@L.Get(Str.BackupRestoreH)</h4>
         <p class="text-muted">@WorkflowTexts.ImportImplication(linked)</p>
-        <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">Choose backup file…</button>
+        <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">@L.Get(Str.BackupChooseFile)</button>
         @if (impPath is not null)
         {
-            <p class="mt-2 mb-1">File: <strong>@impFileName</strong></p>
+            <p class="mt-2 mb-1">@L.Get(Str.BackupFileLabel) <strong>@impFileName</strong></p>
             @if (impCount is null)
             {
-                <label class="form-label">Password of this backup</label>
+                <label class="form-label">@L.Get(Str.BackupFilePassword)</label>
                 <input type="password" class="form-control" @bind="impPassword" autocomplete="off" />
-                <button class="btn btn-primary mt-2" @onclick="PreviewImport" disabled="@busy">Check backup</button>
+                <button class="btn btn-primary mt-2" @onclick="PreviewImport" disabled="@busy">@L.Get(Str.BackupCheckBtn)</button>
             }
             else
             {
-                <p class="text-muted mb-1">@WorkflowTexts.ImportChecked(impFileName ?? "Backup", impCount.Value)</p>
+                <p class="text-muted mb-1">@WorkflowTexts.ImportChecked(impFileName ?? L.Get(Str.BackupFallbackName), impCount.Value)</p>
                 @if (armedImp)
                 {
-                    <ConfirmBlock Message="@($"Replace your {localCount} item(s) with the {impCount} from this backup?")"
+                    <ConfirmBlock Message="@L.Get(Str.BackupReplaceMessage, localCount, impCount)"
                                   Implication="@WorkflowTexts.ImportImplication(linked)"
-                                  ConfirmLabel="Yes, restore" Busy="busy"
+                                  ConfirmLabel="@L.Get(Str.CommonYesRestore)" Busy="busy"
                                   OnConfirm="ExecuteImport" OnCancel="() => armedImp = false" />
                 }
                 else
                 {
-                    <button class="btn btn-danger mt-1" @onclick="() => armedImp = true" disabled="@busy">Replace with this backup…</button>
+                    <button class="btn btn-danger mt-1" @onclick="() => armedImp = true" disabled="@busy">@L.Get(Str.BackupReplaceBtn)</button>
                 }
             }
         }
@@ -60,16 +59,13 @@ else
     </div>
 
     <div class="mb-3">
-        <h4>Safety backups</h4>
-        <p class="text-muted">Automatic snapshots taken before every overwrite or deletion (encrypted when a sync is linked,
-            otherwise plaintext; kept in the app folder).
-            Restore one to undo a download, upload, import, password change, move or duplicates cleanup —
-            or delete it to free space. Newest first, oldest auto-pruned beyond five.</p>
-        <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">Refresh list</button>
+        <h4>@L.Get(Str.BackupSafetyH)</h4>
+        <p class="text-muted">@L.Get(Str.BackupSafetyIntro)</p>
+        <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">@L.Get(Str.BackupRefreshList)</button>
         <StepMessage Text="@safetyMessage" Error="safetyError" />
         @if (safetyList.Count == 0)
         {
-            <p class="text-muted">No safety backups yet.</p>
+            <p class="text-muted">@L.Get(Str.BackupNoSafety)</p>
         }
         @foreach (var sb in safetyList)
         {
@@ -79,28 +75,28 @@ else
                     <div class="form-text">@sb.FileName · @WorkflowRules.FormatBytes(sb.SizeBytes)
                         @if (sb.SyncId is not null)
                         {
-                            <text> · sync <code>@sb.SyncId</code></text>
+                            <text> · @L.Get(Str.BackupSyncWord) <code>@sb.SyncId</code></text>
                         }
                     </div>
                     @if (armedRestore == sb.FileName)
                     {
-                        <ConfirmBlock Message="Restore this safety backup?"
+                        <ConfirmBlock Message="@L.Get(Str.BackupRestoreMessage)"
                                       Implication="@WorkflowTexts.SafetyRestoreImplication(sb.Side, sb.Items)"
-                                      ConfirmLabel="Yes, restore" Busy="busy"
+                                      ConfirmLabel="@L.Get(Str.CommonYesRestore)" Busy="busy"
                                       OnConfirm="ExecuteSafetyRestore" OnCancel="() => armedRestore = null" />
                     }
                     else if (armedDelete == sb.FileName)
                     {
-                        <ConfirmBlock Message="Delete this safety backup?"
+                        <ConfirmBlock Message="@L.Get(Str.BackupDeleteMessage)"
                                       Implication="@WorkflowTexts.SafetyDeleteImplication"
-                                      ConfirmLabel="Yes, delete" Busy="busy"
+                                      ConfirmLabel="@L.Get(Str.CommonYesDelete)" Busy="busy"
                                       OnConfirm="ExecuteSafetyDelete" OnCancel="() => armedDelete = null" />
                     }
                     else
                     {
                         <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-outline-primary" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">Restore…</button>
-                            <button class="btn btn-outline-danger" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">Delete</button>
+                            <button class="btn btn-outline-primary" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
+                            <button class="btn btn-outline-danger" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">@L.Get(Str.CommonDelete)</button>
                         </div>
                     }
                 </div>
@@ -176,12 +172,12 @@ else
             try
             {
                 await Share.Default.RequestAsync(new ShareFileRequest(
-                    "Save encrypted backup", new ShareFile(path)));
-                return WorkflowTexts.ExportDone(localCount) + " Choose where to keep the file.";
+                    L.Get(Str.BackupSaveTitle), new ShareFile(path)));
+                return WorkflowTexts.ExportDone(localCount) + " " + L.Get(Str.BackupChooseWhere);
             }
             catch
             {
-                return WorkflowTexts.ExportDone(localCount) + " It is saved in the app folder; share it from there when needed.";
+                return WorkflowTexts.ExportDone(localCount) + " " + L.Get(Str.BackupSavedInApp);
             }
         }, (text, error) => (bkpMessage, bkpError) = (text, error));
     }
@@ -201,7 +197,7 @@ else
             var safeName = Path.GetFileName(picked.FileName);
             if (string.IsNullOrWhiteSpace(safeName) || !Core.Crypto.BackupGuard.HasSupportedExtension(safeName))
             {
-                throw new InvalidOperationException("Pick a backup file (.xbs.json).");
+                throw new InvalidOperationException(L.Get(Str.BackupPickFile));
             }
 
             // Copy into our cache with a size cap: the picked URI may not be a
@@ -247,7 +243,7 @@ else
             if (total > maxBytes)
             {
                 throw new InvalidOperationException(
-                    $"File is too large (over {maxBytes / 1024 / 1024} MB).");
+                    Loc.Get(Str.BackupFileTooLarge, maxBytes / 1024 / 1024));
             }
 
             await dst.WriteAsync(buf.AsMemory(0, read)).ConfigureAwait(false);
@@ -262,12 +258,12 @@ else
         {
             if (impPath is null)
             {
-                throw new InvalidOperationException("Choose the backup file first.");
+                throw new InvalidOperationException(L.Get(Str.BackupChooseFirst));
             }
 
             if (string.IsNullOrEmpty(impPassword))
             {
-                throw new InvalidOperationException("Enter the password of this backup.");
+                throw new InvalidOperationException(L.Get(Str.BackupEnterPassword));
             }
 
             try
@@ -293,7 +289,7 @@ else
         {
             if (impPath is null || impCount is null)
             {
-                throw new InvalidOperationException("Check the backup first.");
+                throw new InvalidOperationException(L.Get(Str.BackupCheckFirst));
             }
 
             int restored;
@@ -321,7 +317,7 @@ else
         await RunAsync(async () =>
         {
             await RefreshSafetyListAsync();
-            return $"Safety list refreshed ({safetyList.Count} backup(s))";
+            return Loc.Plural(Str.BackupSafetyRefreshed, safetyList.Count);
         }, ReportSafetyToast);
     }
 
@@ -331,7 +327,7 @@ else
         {
             if (armedRestore is null)
             {
-                throw new InvalidOperationException("Pick a backup first.");
+                throw new InvalidOperationException(L.Get(Str.BackupPickFirst));
             }
 
             var restored = await Session.RestoreSafetyBackupAsync(armedRestore);
@@ -349,13 +345,13 @@ else
         {
             if (armedDelete is null)
             {
-                throw new InvalidOperationException("Pick a backup first.");
+                throw new InvalidOperationException(L.Get(Str.BackupPickFirst));
             }
 
             await Session.DeleteSafetyBackupAsync(armedDelete);
             armedDelete = null;
             await RefreshSafetyListAsync();
-            return "Safety backup deleted";
+            return L.Get(Str.BackupSafetyDeleted);
         }, ReportSafetyToast);
         armedDelete = null;
     }
