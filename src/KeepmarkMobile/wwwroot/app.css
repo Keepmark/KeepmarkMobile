@@ -766,12 +766,12 @@ html.xbs-locked, body.xbs-locked {
     padding: 0 0.5rem 0 0.25rem;
     background: var(--km-navy);
     color: #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.22);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.45);
     transition: box-shadow 0.2s ease;
 }
 
 html.xbs-under .xbs-crumbbar {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), 0 14px 32px rgba(0, 0, 0, 0.6);
 }
 
 .xbs-crumbbar-space { height: calc(44px + 0.5rem); }
@@ -878,7 +878,6 @@ html.xbs-under .xbs-crumbbar {
 .xbs-bigtitle-sub { margin-top: 0.375rem; font-size: 0.875rem; color: var(--km-ink-2); }
 
 /* Inside a folder the big title already names it: the bar drops its copy. */
-html.xbs-short .xbs-pagebar.in-folder .xbs-barpath-name { opacity: 0; }
 
 .xbs-barsearch {
     flex: 1;
@@ -1262,17 +1261,22 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
     .xbs-fab-label { max-width: 0; opacity: 0; }
 }
 
-/* App bar edge (v1.0.126, canvas proposal D): a soft shadow always lifts
+/* App bar edge (v1.0.126, canvas proposal D; stronger since v1.0.149): a shadow always lifts
    the navy bar off the list, and deepens once content scrolls under it.
    On .top-row (full width), so it runs unbroken under the hamburger too;
    the page bar overlays the same box and adds no shadow of its own. */
 @media (max-width: 640px), (max-height: 559px) {
     .top-row {
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), 0 6px 14px rgba(0, 0, 0, 0.22);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.45);
         transition: box-shadow 0.2s ease;
     }
     html.xbs-under .top-row {
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 24px rgba(0, 0, 0, 0.45);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6), 0 14px 32px rgba(0, 0, 0, 0.6);
+    }
+    /* v1.0.149: with the crumb strip the bar and strip read as one navy
+       block, so only the strip (the lowest edge) casts the shadow. */
+    body:has(.xbs-crumbbar) .top-row {
+        box-shadow: none;
     }
 }
 
