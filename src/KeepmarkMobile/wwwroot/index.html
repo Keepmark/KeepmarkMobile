@@ -31,7 +31,13 @@
 
     <div class="status-bar-safe-area"></div>
 
-    <div id="app" role="status">Loading...</div>
+    <!-- Boot placeholder: the Android splash (Resources/Splash, shown 204dp wide,
+         centered) repeated until Blazor replaces #app, so the hand-off doesn't jump. -->
+    <div id="app" role="status" aria-label="Loading">
+        <div style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #172552">
+            <img src="img/splash.png?v=1" alt="" style="width: 204px; height: auto" />
+        </div>
+    </div>
 
     <div id="blazor-error-ui" data-nosnippet>
         An unhandled error has occurred.
