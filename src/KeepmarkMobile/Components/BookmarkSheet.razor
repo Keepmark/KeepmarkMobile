@@ -10,9 +10,9 @@
             {
                 <div class="mb-2">
                     <label class="form-label" for="xbs-f-type">Type</label>
-                    <select id="xbs-f-type" class="form-select" @bind="NewIsFolder">
-                        <option value="false">Bookmark</option>
-                        <option value="true">Folder</option>
+                    <select id="xbs-f-type" class="form-select" @bind="TypeValue">
+                        <option value="bookmark">Bookmark</option>
+                        <option value="folder">Folder</option>
                     </select>
                     @if (NewIsFolder && (url.Length > 0 || description.Length > 0 || tags.Length > 0))
                     {
@@ -161,6 +161,14 @@
     {
         selectedFolder = folderBeforePick;
         showTree = false;
+    }
+
+    // Bound as a string: a bool @bind renders value as a boolean attribute
+    // (true -> value="", false -> omitted), so no option matched after a pick.
+    private string TypeValue
+    {
+        get => NewIsFolder ? "folder" : "bookmark";
+        set => NewIsFolder = value == "folder";
     }
 
     private bool EffectiveIsFolder => IsEdit ? Existing!.IsFolder : NewIsFolder;
