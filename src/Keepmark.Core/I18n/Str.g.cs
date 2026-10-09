@@ -357,6 +357,59 @@ public static partial class Str
     public const string RelMinutes = nameof(RelMinutes);
     public const string RelHours = nameof(RelHours);
     public const string RelDays = nameof(RelDays);
+    public const string CommonNext = nameof(CommonNext);
+    public const string CommonYesMove = nameof(CommonYesMove);
+    public const string SwH1 = nameof(SwH1);
+    public const string SwIntro = nameof(SwIntro);
+    public const string SwNoLinkA = nameof(SwNoLinkA);
+    public const string SwNoLinkB = nameof(SwNoLinkB);
+    public const string SwNoLinkLink = nameof(SwNoLinkLink);
+    public const string SwNoLinkC = nameof(SwNoLinkC);
+    public const string SwComplete = nameof(SwComplete);
+    public const string SwCreatedA = nameof(SwCreatedA);
+    public const string SwCreatedB_one = nameof(SwCreatedB_one);
+    public const string SwCreatedB_other = nameof(SwCreatedB_other);
+    public const string SwNewIdHint = nameof(SwNewIdHint);
+    public const string SwNowSyncingA = nameof(SwNowSyncingA);
+    public const string SwNowSyncingB = nameof(SwNowSyncingB);
+    public const string SwTookRemoteA = nameof(SwTookRemoteA);
+    public const string SwTookRemoteB = nameof(SwTookRemoteB);
+    public const string SwUploadedA = nameof(SwUploadedA);
+    public const string SwUploadedB = nameof(SwUploadedB);
+    public const string SwBackToExplore = nameof(SwBackToExplore);
+    public const string SwStep = nameof(SwStep);
+    public const string SwResumed = nameof(SwResumed);
+    public const string SwWhere = nameof(SwWhere);
+    public const string SwTargetUrl = nameof(SwTargetUrl);
+    public const string SwTargetHint = nameof(SwTargetHint);
+    public const string SwServiceReady = nameof(SwServiceReady);
+    public const string SwServiceLine = nameof(SwServiceLine);
+    public const string SwIntoWhich = nameof(SwIntoWhich);
+    public const string SwANew = nameof(SwANew);
+    public const string SwANewText_one = nameof(SwANewText_one);
+    public const string SwANewText_other = nameof(SwANewText_other);
+    public const string SwExisting = nameof(SwExisting);
+    public const string SwExistingText = nameof(SwExistingText);
+    public const string SwNewOn = nameof(SwNewOn);
+    public const string SwPwHint = nameof(SwPwHint);
+    public const string SwReview = nameof(SwReview);
+    public const string SwExistingOn = nameof(SwExistingOn);
+    public const string SwCheckedHint = nameof(SwCheckedHint);
+    public const string SwRevNew_one = nameof(SwRevNew_one);
+    public const string SwRevNew_other = nameof(SwRevNew_other);
+    public const string SwRevNewNote = nameof(SwRevNewNote);
+    public const string SwRevUpload = nameof(SwRevUpload);
+    public const string SwRevUploadNote = nameof(SwRevUploadNote);
+    public const string SwRevMerge = nameof(SwRevMerge);
+    public const string SwRevMergeNote = nameof(SwRevMergeNote);
+    public const string SwRevDownload = nameof(SwRevDownload);
+    public const string SwRevDownloadNote = nameof(SwRevDownloadNote);
+    public const string SwMoveNow = nameof(SwMoveNow);
+    public const string SwMoving = nameof(SwMoving);
+    public const string SwStartOver = nameof(SwStartOver);
+    public const string SwOpenFirst = nameof(SwOpenFirst);
+    public const string SwRecheck = nameof(SwRecheck);
+    public const string SwPreviewFirst = nameof(SwPreviewFirst);
     public const string CommonYesDownload = nameof(CommonYesDownload);
     public const string CommonYesUpload = nameof(CommonYesUpload);
     public const string CommonYesMerge = nameof(CommonYesMerge);
@@ -444,6 +497,12 @@ public static partial class Str
     public const string ConnUnlinkIntro = nameof(ConnUnlinkIntro);
     /// <summary>Base for Loc.Plural (StatusMergeWouldTitles_one / StatusMergeWouldTitles_other).</summary>
     public const string StatusMergeWouldTitles = nameof(StatusMergeWouldTitles);
+    /// <summary>Base for Loc.Plural (SwANewText_one / SwANewText_other).</summary>
+    public const string SwANewText = nameof(SwANewText);
+    /// <summary>Base for Loc.Plural (SwCreatedB_one / SwCreatedB_other).</summary>
+    public const string SwCreatedB = nameof(SwCreatedB);
+    /// <summary>Base for Loc.Plural (SwRevNew_one / SwRevNew_other).</summary>
+    public const string SwRevNew = nameof(SwRevNew);
     /// <summary>Base for Loc.Plural (WfDupDeleteDone_one / WfDupDeleteDone_other).</summary>
     public const string WfDupDeleteDone = nameof(WfDupDeleteDone);
     /// <summary>Base for Loc.Plural (WfDupDeleteMessage_one / WfDupDeleteMessage_other).</summary>

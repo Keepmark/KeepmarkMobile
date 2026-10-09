@@ -7,53 +7,53 @@
 @inject NavigationManager Nav
 @using Keepmark.Core.Workflow
 
-<PageTitle>Move service</PageTitle>
+<PageTitle>@L.Get(Str.NavMoveService)</PageTitle>
 
-<h1>Move to another service</h1>
-<p class="text-muted">Move your bookmarks to a different xBrowserSync service, into a new or an existing sync. Anything replaced is saved to Backup → Safety backups first.</p>
+<h1>@L.Get(Str.SwH1)</h1>
+<p class="text-muted">@L.Get(Str.SwIntro)</p>
 
 @if (!Session.Ready)
 {
-    <p role="status"><em>Starting…</em></p>
+    <p role="status"><em>@L.Get(Str.BackupStarting)</em></p>
 }
 else if (!linked)
 {
     <div class="alert alert-info">
-        <strong>No service linked yet.</strong>
-        Switch moves an existing connection to another service —
-        <a href="connect">connect a service first</a>, then come back here.
+        <strong>@L.Get(Str.SwNoLinkA)</strong>
+        @L.Get(Str.SwNoLinkB)
+        <a href="connect">@L.Get(Str.SwNoLinkLink)</a>@L.Get(Str.SwNoLinkC)
     </div>
 }
 else if (step == 4)
 {
     <div class="alert alert-success" role="status">
-        <h4>Move complete</h4>
+        <h4>@L.Get(Str.SwComplete)</h4>
         @if (createdId is not null)
         {
-            <p>New sync created on <strong>@targetUrl</strong> with your @localCount item(s).</p>
-            <p>Your new sync ID (save it together with the password — both are needed to open the sync elsewhere):</p>
+            <p>@L.Get(Str.SwCreatedA) <strong>@targetUrl</strong> @Loc.Plural(Str.SwCreatedB, localCount)</p>
+            <p>@L.Get(Str.SwNewIdHint)</p>
             <p><code>@createdId</code></p>
         }
         else
         {
-            <p>Now syncing with sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>.</p>
+            <p>@L.Get(Str.SwNowSyncingA) <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> @L.Get(Str.SwNowSyncingB) <strong>@targetUrl</strong>.</p>
         }
         else if (tookRemote)
         {
-            <p>Your local bookmarks were replaced with the server item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local bookmarks was saved — see Backup → Safety backups.</p>
+            <p>@L.Get(Str.SwTookRemoteA) <strong>@targetUrl</strong>@L.Get(Str.SwTookRemoteB)</p>
         }
         else if (direction == "merge")
         {
-            <p>@Core.Sync.MoveResult.Describe("existing", "merge", targetUrl, WorkflowRules.ShortId(probe?.Candidate.Id)) Safety backups of both sides were saved — see Backup → Safety backups.</p>
+            <p>@Core.Sync.MoveResult.Describe("existing", "merge", targetUrl, WorkflowRules.ShortId(probe?.Candidate.Id)) @L.Get(Str.ConnSafetyBoth)</p>
         }
         else
         {
-            <p>Your @localCount local item(s) replaced the @probe?.RemoteCount server item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten server copy was saved — see Backup → Safety backups.</p>
+            <p>@L.Get(Str.SwUploadedA, localCount, probe?.RemoteCount) <strong>@targetUrl</strong>@L.Get(Str.SwUploadedB)</p>
         }
         <p>@WorkflowTexts.MoveDoneNext</p>
-        <button class="btn btn-secondary" @onclick="CopyId">Copy sync ID</button>
+        <button class="btn btn-secondary" @onclick="CopyId">@L.Get(Str.ConnCopySyncId)</button>
     </div>
-    <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/")'>Back to Explore</button>
+    <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/")'>@L.Get(Str.SwBackToExplore)</button>
 }
 else
 {
@@ -61,34 +61,34 @@ else
     <div class="xbs-wizard-head">
         @if (step > 1)
         {
-            <button class="xbs-back" @onclick="GoBack" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back</button>
+            <button class="xbs-back" @onclick="GoBack" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>@L.Get(Str.CommonBack)</button>
         }
         else
         {
             <span></span>
         }
-        <span class="xbs-stepcount">Step @step of 3</span>
+        <span class="xbs-stepcount">@L.Get(Str.SwStep, step)</span>
     </div>
     @if (resumed)
     {
         <div class="alert alert-info" role="status">
-            Resumed your unfinished move. Counts may have changed while you were away: open the sync again if in doubt.
+            @L.Get(Str.SwResumed)
         </div>
     }
 
     @if (step == 1)
     {
-        <h2 class="xbs-step-title">Where to move</h2>
+        <h2 class="xbs-step-title">@L.Get(Str.SwWhere)</h2>
         <div class="mb-3">
-            <label class="form-label">Target service URL</label>
+            <label class="form-label">@L.Get(Str.SwTargetUrl)</label>
             <input class="form-control" @bind="targetUrl" @bind:event="oninput" inputmode="url" />
-            <div class="form-text">The service that will receive your bookmarks. Your current link keeps working untouched until the move completes.</div>
+            <div class="form-text">@L.Get(Str.SwTargetHint)</div>
         </div>
         @if (!serviceOk)
         {
             @* The next step unlocks only for the exact URL that answered: editing it brings the check back. *@
             <div class="d-grid">
-                <button class="btn btn-primary" @onclick="CheckService" disabled="@busy">Check service</button>
+                <button class="btn btn-primary" @onclick="CheckService" disabled="@busy">@L.Get(Str.ConnCheckService)</button>
             </div>
             @if (!string.IsNullOrEmpty(checkError))
             {
@@ -100,43 +100,43 @@ else
             <div class="xbs-verified" role="status">
                 <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                 <div class="xbs-verified-text">
-                    <strong>Service ready</strong>
-                    <span>@serviceInfo!.Status · API v@(serviceInfo.Version)</span>
+                    <strong>@L.Get(Str.SwServiceReady)</strong>
+                    <span>@L.Get(Str.SwServiceLine, serviceInfo!.Status, serviceInfo.Version)</span>
                 </div>
             </div>
             <div class="d-grid">
-                <button class="btn btn-primary" @onclick="() => step = 2" disabled="@busy">Next</button>
+                <button class="btn btn-primary" @onclick="() => step = 2" disabled="@busy">@L.Get(Str.CommonNext)</button>
             </div>
         }
     }
     else if (step == 2 && !slotChosen)
     {
-        <h2 class="xbs-step-title">Into which sync?</h2>
+        <h2 class="xbs-step-title">@L.Get(Str.SwIntoWhich)</h2>
         <div class="xbs-choices">
             <button class="xbs-choice" @onclick='() => ChooseSlot("new")'>
                 <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></span>
-                <span class="xbs-choice-text"><strong>A new sync</strong><span>Create it on @TargetHost and upload your @localCount item(s).</span></span>
+                <span class="xbs-choice-text"><strong>@L.Get(Str.SwANew)</strong><span>@Loc.Plural(Str.SwANewText, localCount, TargetHost)</span></span>
                 <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </button>
             <button class="xbs-choice" @onclick='() => ChooseSlot("existing")'>
                 <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
-                <span class="xbs-choice-text"><strong>An existing sync</strong><span>You already sync on @TargetHost: open it with its sync ID and password.</span></span>
+                <span class="xbs-choice-text"><strong>@L.Get(Str.SwExisting)</strong><span>@L.Get(Str.SwExistingText, TargetHost)</span></span>
                 <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </button>
         </div>
     }
     else if (step == 2 && slot == "new")
     {
-        <h2 class="xbs-step-title">New sync on @TargetHost</h2>
+        <h2 class="xbs-step-title">@L.Get(Str.SwNewOn, TargetHost)</h2>
         <div class="mb-3">
-            <label class="form-label">New password</label>
+            <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
             <input type="password" class="form-control" @bind="newPassword" @bind:event="oninput" autocomplete="new-password" />
-            <label class="form-label mt-2">Confirm password</label>
+            <label class="form-label mt-2">@L.Get(Str.ConnConfirmPassword)</label>
             <input type="password" class="form-control" @bind="confirmPassword" @bind:event="oninput" autocomplete="new-password" />
-            <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered.</div>
+            <div class="form-text">@L.Get(Str.SwPwHint)</div>
         </div>
         <div class="d-grid">
-            <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">Review the move</button>
+            <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">@L.Get(Str.SwReview)</button>
         </div>
         @if (!string.IsNullOrEmpty(verifyError))
         {
@@ -145,16 +145,16 @@ else
     }
     else if (step == 2 && !VerifiedExisting)
     {
-        <h2 class="xbs-step-title">Existing sync on @TargetHost</h2>
+        <h2 class="xbs-step-title">@L.Get(Str.SwExistingOn, TargetHost)</h2>
         <div class="mb-3">
-            <label class="form-label">Sync ID</label>
+            <label class="form-label">@L.Get(Str.ConnSyncId)</label>
             <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
-            <label class="form-label mt-2">Password</label>
+            <label class="form-label mt-2">@L.Get(Str.CommonPassword)</label>
             <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-            <div class="form-text">Checked against the server copy: a wrong password stops here, nothing is overwritten.</div>
+            <div class="form-text">@L.Get(Str.SwCheckedHint)</div>
         </div>
         <div class="d-grid">
-            <button class="btn btn-primary" @onclick="VerifyExisting" disabled="@busy">Open sync</button>
+            <button class="btn btn-primary" @onclick="VerifyExisting" disabled="@busy">@L.Get(Str.ConnOpenSync)</button>
         </div>
         @if (!string.IsNullOrEmpty(verifyError))
         {
@@ -163,19 +163,19 @@ else
     }
     else if (step == 2)
     {
-        <h2 class="xbs-step-title">Existing sync on @TargetHost</h2>
+        <h2 class="xbs-step-title">@L.Get(Str.SwExistingOn, TargetHost)</h2>
         <div class="xbs-verified" role="status">
             <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
             <div class="xbs-verified-text">
-                <strong>Sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> opened</strong>
-                <span>@probe!.RemoteCount item(s) on the server · @localCount on this device</span>
+                <strong>@L.Get(Str.ConnSyncOpenedA) <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> @L.Get(Str.ConnSyncOpenedB)</strong>
+                <span>@L.Get(Str.ConnItemsCounts, probe!.RemoteCount, localCount)</span>
             </div>
-            <button class="xbs-link-btn" @onclick="Unverify" disabled="@busy">Change</button>
+            <button class="xbs-link-btn" @onclick="Unverify" disabled="@busy">@L.Get(Str.CommonChange)</button>
         </div>
         <DirectionPicker Name="migdir" Value="@PickerValue" ValueChanged="OnPickerChanged"
                          LocalCount="localCount" RemoteCount="probe.RemoteCount" Disabled="busy" />
         <div class="d-grid">
-            <button class="btn btn-primary" @onclick="GoReview" disabled="@busy">Review the move</button>
+            <button class="btn btn-primary" @onclick="GoReview" disabled="@busy">@L.Get(Str.SwReview)</button>
         </div>
         @if (!string.IsNullOrEmpty(verifyError))
         {
@@ -184,50 +184,50 @@ else
     }
     else
     {
-        <h2 class="xbs-step-title">Review the move</h2>
+        <h2 class="xbs-step-title">@L.Get(Str.SwReview)</h2>
         <div class="xbs-review">
             @if (slot == "new")
             {
-                <p>Create a <strong>new sync</strong> on <strong>@TargetHost</strong> and upload your <strong>@localCount</strong> item(s) into it.</p>
-                <p class="text-muted mb-0">Nothing is replaced. The app then syncs with the new sync; its ID is shown at the end.</p>
+                <p>@Loc.Plural(Str.SwRevNew, localCount, TargetHost)</p>
+                <p class="text-muted mb-0">@L.Get(Str.SwRevNewNote)</p>
             }
             else if (direction == "upload")
             {
-                <p>Keep this device's copy: replace the <strong>@probe?.RemoteCount</strong> item(s) of sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong> with your <strong>@localCount</strong>.</p>
-                <p class="text-muted mb-0">The server copy is saved to Backup → Safety backups first. The app then syncs with that sync.</p>
+                <p>@L.Get(Str.SwRevUpload, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost, localCount)</p>
+                <p class="text-muted mb-0">@L.Get(Str.SwRevUploadNote)</p>
             }
             else if (direction == "merge")
             {
-                <p>Merge your <strong>@localCount</strong> item(s) with the <strong>@probe?.RemoteCount</strong> of sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
+                <p>@L.Get(Str.SwRevMerge, localCount, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost)</p>
                 @if (mergeStats is not null)
                 {
                     <ul class="xbs-review-list">
-                        <li><strong>@mergeStats.LocalOnly</strong> upload (only on this device)</li>
-                        <li><strong>@mergeStats.RemoteOnly</strong> download (only on the server)</li>
+                        <li><strong>@mergeStats.LocalOnly</strong> @L.Get(Str.ConnReviewUpload)</li>
+                        <li><strong>@mergeStats.RemoteOnly</strong> @L.Get(Str.ConnReviewDownload)</li>
                         @if (mergeStats.TitleConflicts > 0)
                         {
-                            <li><strong>@mergeStats.TitleConflicts</strong> title conflict(s) keep the server title</li>
+                            <li><strong>@mergeStats.TitleConflicts</strong> @Loc.Plural(Str.ConnReviewTitles, mergeStats.TitleConflicts)</li>
                         }
                     </ul>
                 }
-                <p class="text-muted mb-0">Nothing is deleted. Both copies are saved to Backup → Safety backups first.</p>
+                <p class="text-muted mb-0">@L.Get(Str.SwRevMergeNote)</p>
             }
             else
             {
-                <p>Keep the server copy: replace your <strong>@localCount</strong> item(s) on this device with the <strong>@probe?.RemoteCount</strong> of sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@TargetHost</strong>.</p>
-                <p class="text-muted mb-0">Your current bookmarks are saved to Backup → Safety backups first.</p>
+                <p>@L.Get(Str.SwRevDownload, localCount, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost)</p>
+                <p class="text-muted mb-0">@L.Get(Str.SwRevDownloadNote)</p>
             }
         </div>
         @if (!armedMove)
         {
             <div class="d-grid">
-                <button class="btn @(ReplacesSomething ? "btn-danger" : "btn-primary")" @onclick="ArmMove" disabled="@busy">Move now…</button>
+                <button class="btn @(ReplacesSomething ? "btn-danger" : "btn-primary")" @onclick="ArmMove" disabled="@busy">@L.Get(Str.SwMoveNow)</button>
             </div>
         }
         else
         {
             <ConfirmBlock Message="@MoveConfirm.Message" Implication="@MoveConfirm.Implication"
-                          ConfirmLabel="@(busy ? "Moving…" : MoveConfirm.ConfirmLabel)" Danger="ReplacesSomething" Busy="busy"
+                          ConfirmLabel="@(busy ? L.Get(Str.SwMoving) : MoveConfirm.ConfirmLabel)" Danger="ReplacesSomething" Busy="busy"
                           OnConfirm="Execute" OnCancel="() => armedMove = false" />
         }
         @if (!string.IsNullOrEmpty(reviewError))
@@ -235,7 +235,7 @@ else
             <div class="alert alert-danger mt-2" role="alert">@reviewError</div>
         }
         <div class="text-center mt-3">
-            <button class="xbs-link-btn" @onclick="StartOver" disabled="@busy">Start over</button>
+            <button class="xbs-link-btn" @onclick="StartOver" disabled="@busy">@L.Get(Str.SwStartOver)</button>
         </div>
     }
 }
@@ -366,7 +366,7 @@ else
         {
             if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
             {
-                throw new InvalidOperationException("Enter both the sync ID and its password.");
+                throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
             }
 
             probe = await Session.ProbeLinkAsync(targetUrl.Trim(), syncId.Trim(), password);
@@ -388,7 +388,7 @@ else
         {
             if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
             {
-                throw new InvalidOperationException("Open the existing sync first.");
+                throw new InvalidOperationException(L.Get(Str.SwOpenFirst));
             }
 
             mergeStats = await Session.GetMergePreviewAsync(probe);
@@ -415,7 +415,7 @@ else
         {
             if (slot == "new")
             {
-                return new(WorkflowTexts.MoveNewConfirm(TargetHost, localCount), WorkflowTexts.MoveImplication, "Yes, move");
+                return new(WorkflowTexts.MoveNewConfirm(TargetHost, localCount), WorkflowTexts.MoveImplication, L.Get(Str.CommonYesMove));
             }
 
             var d = WorkflowTexts.DirectionConfirm(PickerValue);
@@ -530,7 +530,7 @@ else
         {
             if (!serviceOk)
             {
-                throw new InvalidOperationException("Re-check the target service first.");
+                throw new InvalidOperationException(L.Get(Str.SwRecheck));
             }
 
             tookRemote = false;
@@ -545,7 +545,7 @@ else
             {
                 if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
                 {
-                    throw new InvalidOperationException("Open the existing sync first.");
+                    throw new InvalidOperationException(L.Get(Str.SwOpenFirst));
                 }
 
                 if (direction == "upload")
@@ -556,7 +556,7 @@ else
                 {
                     if (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe))
                     {
-                        throw new InvalidOperationException("Preview the merge first — counts must match the verified sync.");
+                        throw new InvalidOperationException(L.Get(Str.SwPreviewFirst));
                     }
 
                     await Session.ApplyMergeAsync(probe, Keepmark.Core.Safety.SafetyOperations.SwitchMerge);
@@ -592,11 +592,11 @@ else
         try
         {
             await Clipboard.Default.SetTextAsync(id);
-            _ = Toast.ShowAsync("Sync ID copied — store it with the password");
+            _ = Toast.ShowAsync(L.Get(Str.ConnCopied));
         }
         catch
         {
-            _ = Toast.ShowAsync("Copy failed — transcribe the ID manually", isError: true);
+            _ = Toast.ShowAsync(L.Get(Str.ConnCopyFailed), isError: true);
         }
     }
 
