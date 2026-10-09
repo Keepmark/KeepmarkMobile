@@ -308,6 +308,7 @@ else
             FlashSynced();
         }
 
+        TrackTrouble(s);
         engineStatus = s;
         if (Session.Engine is not null)
         {
@@ -317,18 +318,54 @@ else
         InvokeAsync(StateHasChanged);
     }
 
-    // The status pill only shows when it has something to say: a sync running,
-    // a problem (offline, error, conflict), never synced yet, unsent edits in
-    // manual mode, or for a few seconds after a sync completes. Otherwise it
+    // The status pill only shows when it has something to say: for a few
+    // seconds after a sync succeeds, a conflict (needs a choice), unsent edits
+    // in manual mode, or an offline/error state that has lasted TroubleDelay
+    // (a single failed attempt or a running sync stays silent). Otherwise it
     // steps aside; the drawer head always carries the full sync state.
+    private static readonly TimeSpan TroubleDelay = TimeSpan.FromSeconds(30);
     private bool statusFlash;
     private CancellationTokenSource? statusFlashCts;
+    private bool troubleShown;
+    private CancellationTokenSource? troubleCts;
 
     private bool StatusVisible =>
         statusFlash
-        || engineStatus != Core.Sync.SyncStatus.Idle
-        || lastSync is null
+        || engineStatus == Core.Sync.SyncStatus.Conflict
+        || (troubleShown && engineStatus is Core.Sync.SyncStatus.Offline or Core.Sync.SyncStatus.Error)
         || (Session.Engine is { Mode: Core.Sync.SyncMode.Manual, PendingEdits: > 0 });
+
+    // Offline/Error start a timer; retries (Syncing) in between keep it
+    // running, only a successful Idle clears it.
+    private void TrackTrouble(Core.Sync.SyncStatus s)
+    {
+        if (s is Core.Sync.SyncStatus.Offline or Core.Sync.SyncStatus.Error)
+        {
+            if (troubleCts is not null)
+            {
+                return;
+            }
+
+            var cts = troubleCts = new CancellationTokenSource();
+            _ = Task.Delay(TroubleDelay, cts.Token).ContinueWith(t =>
+            {
+                if (t.IsCanceled)
+                {
+                    return;
+                }
+
+                troubleShown = true;
+                InvokeAsync(StateHasChanged);
+            }, TaskScheduler.Default);
+        }
+        else if (s != Core.Sync.SyncStatus.Syncing)
+        {
+            troubleCts?.Cancel();
+            troubleCts?.Dispose();
+            troubleCts = null;
+            troubleShown = false;
+        }
+    }
 
     private void FlashSynced()
     {
@@ -420,6 +457,7 @@ else
                 .Select(n => n!.Value)
                 .ToHashSet();
             engineStatus = Session.Engine.Status;
+            TrackTrouble(engineStatus);
             lastSync = Session.Engine.LastSyncAt;
             var parent = CurrentParent;
             rows = await Session.Store.GetChildrenAsync(parent);
@@ -1146,6 +1184,8 @@ else
         flashTimer?.Dispose();
         statusFlashCts?.Cancel();
         statusFlashCts?.Dispose();
+        troubleCts?.Cancel();
+        troubleCts?.Dispose();
         undoTimer?.Cancel();
         undoTimer?.Dispose();
         dotNet?.Dispose();
