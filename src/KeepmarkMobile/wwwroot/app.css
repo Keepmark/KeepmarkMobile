@@ -29,6 +29,8 @@ html, body {
     --km-ground: #f5f6fa;
     --km-surface: #ffffff;
     --km-surface-2: #e6e9f3;
+    --km-tile-bg: #eef0f7;
+    --km-tile-ico: #dfe3f4;
     --km-ink: #141b38;
     --km-ink-2: #4a5170;
     --km-line: #dde1ec;
@@ -62,6 +64,8 @@ html, body {
     --km-ground: #0e1226;
     --km-surface: #161b33;
     --km-surface-2: #1f2542;
+    --km-tile-bg: #283158;
+    --km-tile-ico: #343f72;
     --km-ink: #e8eaf4;
     --km-ink-2: #a3a9c4;
     --km-line: #2a3152;
@@ -1575,6 +1579,90 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 .xbs-action .km-ico { color: var(--km-ink-2); }
 .xbs-action:active { background: var(--km-surface-2); }
 .xbs-action.danger, .xbs-action.danger .km-ico { color: var(--km-danger); }
+
+/* Item action sheet (canvas "SheetGridA"): ribbon over the top edge for
+   bookmarks, frequent actions as tiles, then a rounded group. The sheet must
+   not clip the ribbon, so only the details scroll when expanded. */
+.xbs-sheet.menu { position: relative; overflow: visible; padding-top: 0.25rem; }
+.xbs-sheet.menu .xbs-sheet-info.expanded { max-height: 45dvh; overflow-y: auto; }
+
+.xbs-ribbon {
+    position: absolute;
+    left: 20px;
+    top: -18px;
+    width: 52px;
+    height: 85px;
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45));
+    pointer-events: none;
+}
+.xbs-ribbon svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.xbs-ribbon text { fill: #fff; font-size: 22px; font-weight: 700; font-family: inherit; }
+
+.xbs-sheet-head.ribboned { padding-left: 64px; min-height: 56px; padding-top: 0.75rem; }
+
+.xbs-sheet-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.25rem; }
+.xbs-tag {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 13px;
+    background: var(--km-tile-ico);
+    color: var(--km-accent);
+    font-size: 0.78rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+}
+.xbs-sheet-info:not(.expanded) .xbs-sheet-tags { max-height: 26px; overflow: hidden; }
+
+.xbs-action-tiles { display: flex; gap: 8px; margin-top: 1rem; }
+
+.xbs-action-tile {
+    flex: 1;
+    min-width: 0;
+    height: 78px;
+    border: 0;
+    border-radius: 18px;
+    background: var(--km-tile-bg);
+    color: var(--km-ink);
+    font-size: 0.78rem;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.xbs-action-tile:active { filter: brightness(1.15); }
+
+.xbs-action-ico {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: var(--km-tile-ico);
+    color: var(--km-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+.xbs-action-ico .km-ico { width: 20px; height: 20px; }
+.xbs-action-tile.primary .xbs-action-ico { background: var(--km-site, var(--km-accent)); color: #fff; }
+
+.xbs-action-group {
+    margin-top: 10px;
+    background: var(--km-tile-bg);
+    border-radius: 16px;
+    overflow: hidden;
+}
+.xbs-action-group .xbs-action { border-radius: 0; padding: 0 1rem; }
+.xbs-action-group .xbs-action + .xbs-action { border-top: 1px solid var(--km-line); }
+.xbs-action-group .xbs-action .km-ico { color: var(--km-accent); }
+.xbs-action-group .xbs-action .km-ico.chev { width: 18px; height: 18px; color: var(--km-ink-2); }
+.xbs-action-group .xbs-action.danger .km-ico { color: var(--km-danger); }
 
 .xbs-sheet .form-control, .xbs-sheet .form-select { min-height: 52px; border-radius: 14px; }
 .xbs-sheet textarea.form-control { min-height: 4.5rem; }

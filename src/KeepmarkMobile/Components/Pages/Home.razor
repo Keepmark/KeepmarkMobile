@@ -197,11 +197,25 @@ else
 @if (menuFor is not null)
 {
     <div class="xbs-sheet-backdrop" data-back="30" @onclick="() => menuFor = null">
-        <div class="xbs-sheet" role="dialog" aria-modal="true" aria-label="@L.Get(Str.HomeActionsFor, menuFor.Title ?? menuFor.Url ?? L.Get(Str.HomeItemWord))" @onclick:stopPropagation="true">
-            <div class="xbs-sheet-handle" aria-hidden="true"></div>
+        <div class="xbs-sheet menu" style="--km-site: @(menuFor.IsFolder ? "var(--km-accent)" : RowTile.ColorFor(menuFor))" role="dialog" aria-modal="true" aria-label="@L.Get(Str.HomeActionsFor, menuFor.Title ?? menuFor.Url ?? L.Get(Str.HomeItemWord))" @onclick:stopPropagation="true">
+            @* Canvas "SheetGridA": a bookmark's ribbon hangs over the top edge
+               (folders keep the handle and their tile); frequent actions as
+               tiles, then a group with location and the separate Delete.
+               No Cancel: the backdrop and Back close it. *@
+            @if (menuFor.IsFolder)
+            {
+                <div class="xbs-sheet-handle" aria-hidden="true"></div>
+            }
+            else
+            {
+                <RowTile Row="menuFor" Ribbon="true" />
+            }
             <div class="xbs-sheet-info @(MenuExpanded ? "expanded" : string.Empty)" data-sheet-info aria-expanded="@MenuExpanded.ToString().ToLowerInvariant()">
-            <div class="xbs-sheet-head">
-                <RowTile Row="menuFor" Large="true" />
+            <div class="xbs-sheet-head @(menuFor.IsFolder ? string.Empty : "ribboned")">
+                @if (menuFor.IsFolder)
+                {
+                    <RowTile Row="menuFor" Large="true" />
+                }
                 <div class="xbs-sheet-head-text">
                     <h2 class="xbs-sheet-title">@(menuFor.Title ?? menuFor.Url)</h2>
                     @if (!menuFor.IsFolder && !string.IsNullOrEmpty(menuFor.Url))
@@ -213,24 +227,33 @@ else
             @if (!menuFor.IsFolder)
             {
                 @if (!string.IsNullOrEmpty(menuFor.Description)) { <p class="xbs-sheet-desc">@menuFor.Description</p> }
-                @if (!string.IsNullOrEmpty(menuFor.Tags)) { <p class="xbs-row-tags">#@menuFor.Tags.Replace("\u001F", " #") </p> }
+                @if (!string.IsNullOrEmpty(menuFor.Tags))
+                {
+                    <div class="xbs-sheet-tags">
+                        @foreach (var tag in menuFor.Tags.Split('\u001F', StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            <span class="xbs-tag">#@tag</span>
+                        }
+                    </div>
+                }
             }
             </div>
-            <div class="xbs-actions">
+            <div class="xbs-action-tiles">
                 @if (!menuFor.IsFolder)
                 {
-                    <button class="xbs-action" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" /></svg>@L.Get(Str.HomeOpen)</button>
-                    <button class="xbs-action" @onclick="() => ShareRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" /></svg>@L.Get(Str.HomeShare)</button>
+                    <button class="xbs-action-tile primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" /></svg></span>@L.Get(Str.HomeOpen)</button>
+                    <button class="xbs-action-tile" @onclick="() => ShareRow(menuFor)"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" /></svg></span>@L.Get(Str.HomeShare)</button>
                 }
-                <button class="xbs-action" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" /></svg>@L.Get(Str.HomeEdit)</button>
-                <button class="xbs-action" @onclick="() => TogglePin(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg>@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? L.Get(Str.HomeUnpin) : L.Get(Str.HomePin))</button>
+                <button class="xbs-action-tile" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" /></svg></span>@L.Get(Str.HomeEdit)</button>
+                <button class="xbs-action-tile" @onclick="() => TogglePin(menuFor)"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg></span>@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? L.Get(Str.HomeUnpin) : L.Get(Str.HomePin))</button>
+            </div>
+            <div class="xbs-action-group">
                 @if (isSearch || menuFor.ParentRowId != CurrentParent)
                 {
-                    <button class="xbs-action" @onclick="() => GoToLocation(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>@L.Get(Str.HomeGoToLocation)</button>
+                    <button class="xbs-action" @onclick="() => GoToLocation(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span class="flex-grow-1">@L.Get(Str.HomeGoToLocation)</span><svg class="km-ico chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
                 }
                 <button class="xbs-action danger" @onclick="() => DeleteRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12h9l1-12M9.5 7V4.5h5V7" /></svg>@L.Get(Str.CommonDelete)</button>
             </div>
-            <button class="btn btn-secondary w-100 mt-2" @onclick="() => menuFor = null">@L.Get(Str.CommonCancel)</button>
         </div>
     </div>
 }

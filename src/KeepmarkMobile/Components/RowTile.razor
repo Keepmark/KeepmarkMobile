@@ -21,6 +21,15 @@
         </svg>
     </span>
 }
+else if (Ribbon)
+{
+    @* Action sheet: the bookmark hangs over the sheet's top edge like a ribbon
+       slipped into a page; the darker flap above the edge is its folded back
+       (canvas "SheetGridA"). *@
+    <span class="xbs-ribbon" aria-hidden="true">
+        <svg viewBox="0 0 56 92"><path d="M4 0h48l4 18H0z" fill="@Shade" /><path d="M0 18h56v70l-28-15L0 88z" fill="@Color" /><path d="M0 18h56" stroke="rgba(255,255,255,0.3)" stroke-width="1" /><text x="28" y="52" text-anchor="middle">@Initial</text></svg>
+    </span>
+}
 else
 {
     <span class="xbs-tile site @SizeClass" aria-hidden="true">
@@ -31,6 +40,7 @@ else
 @code {
     [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
     [Parameter] public bool Large { get; set; }
+    [Parameter] public bool Ribbon { get; set; }
 
     // White text passes 4.5:1 on every swatch. The last one was the bar navy
     // until v1.0.154; it vanished into the dark list.
@@ -82,6 +92,20 @@ else
             }
 
             return Palette[h % (uint)Palette.Length];
+        }
+    }
+
+    // The site color outside the tile (action sheet accents).
+    public static string ColorFor(ItemRow row) => new RowTile { Row = row }.Color;
+
+    // Site color mixed 30% toward black: the ribbon's folded flap.
+    private string Shade
+    {
+        get
+        {
+            var c = Color;
+            int Ch(int i) => (int)(Convert.ToInt32(c.Substring(i, 2), 16) * 0.7);
+            return $"#{Ch(1):x2}{Ch(3):x2}{Ch(5):x2}";
         }
     }
 }
