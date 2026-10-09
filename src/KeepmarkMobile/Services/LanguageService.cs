@@ -32,6 +32,7 @@ public sealed class LanguageService
         CultureInfo.DefaultThreadCurrentUICulture = culture;
         CultureInfo.CurrentCulture = culture;
         CultureInfo.CurrentUICulture = culture;
+        Langs.Forced = ActiveLang;
         Version++;
         Changed?.Invoke();
     }

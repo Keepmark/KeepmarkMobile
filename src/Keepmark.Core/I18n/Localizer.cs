@@ -28,11 +28,17 @@ public static class Langs
         return Supported.Contains(two) ? two : "en";
     }
 
-    /// <summary>Language of the current UI culture, "en" when unsupported.</summary>
+    /// <summary>Process-wide override set by the app (CurrentUICulture is per
+    /// thread, so a change made on one thread is not seen by the renderer).
+    /// Null in tests: they pin CurrentUICulture instead.</summary>
+    public static string? Forced { get; set; }
+
+    /// <summary>Forced language, else the current UI culture's, "en" when unsupported.</summary>
     public static string Current
     {
         get
         {
+            if (Forced is not null && Supported.Contains(Forced)) return Forced;
             var two = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
             return Supported.Contains(two) ? two : "en";
         }
