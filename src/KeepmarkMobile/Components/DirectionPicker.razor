@@ -2,7 +2,7 @@
    Connect, Move service and the sync conflict panel: one choice here, one
    action button below it on the page. *@
 <fieldset class="xbs-options" disabled="@Disabled">
-    <legend class="xbs-options-legend">@Legend</legend>
+    <legend class="xbs-options-legend">@(Legend ?? L.Get(Str.DirLegend))</legend>
     @foreach (var o in Options())
     {
         <label class="xbs-option">
@@ -24,21 +24,21 @@
     [Parameter] public int LocalCount { get; set; }
     [Parameter] public int RemoteCount { get; set; }
     [Parameter] public bool Disabled { get; set; }
-    [Parameter] public string Legend { get; set; } = "Which copy do you want to keep?";
+    [Parameter] public string? Legend { get; set; }
     [Parameter] public string Name { get; set; } = "direction";
 
     private record Opt(string Key, string Title, string Text, bool Off, string OffWhy);
 
     private IEnumerable<Opt> Options()
     {
-        yield return new("download", "Keep the server copy",
-            $"Download: this device gets the {RemoteCount} server item(s); its {LocalCount} item(s) are replaced.",
-            RemoteCount == 0, "The server copy is empty.");
-        yield return new("merge", "Merge both",
-            "Nothing is deleted: items from both copies are kept, and items removed on one side while offline come back.",
-            LocalCount == 0 || RemoteCount == 0, "Needs items on both sides.");
-        yield return new("upload", "Keep this device's copy",
-            $"Upload: the server gets your {LocalCount} item(s); its {RemoteCount} item(s) are replaced.",
-            LocalCount == 0, "Nothing on this device to upload.");
+        yield return new("download", L.Get(Str.DirKeepServer),
+            L.Get(Str.DirDownloadText, RemoteCount, LocalCount),
+            RemoteCount == 0, L.Get(Str.DirOffServerEmpty));
+        yield return new("merge", L.Get(Str.DirMerge),
+            L.Get(Str.DirMergeText),
+            LocalCount == 0 || RemoteCount == 0, L.Get(Str.DirOffBoth));
+        yield return new("upload", L.Get(Str.DirKeepDevice),
+            L.Get(Str.DirUploadText, LocalCount, RemoteCount),
+            LocalCount == 0, L.Get(Str.DirOffNothingDevice));
     }
 }

@@ -11,7 +11,7 @@
     @ChildContent
     <div class="mt-2 d-flex gap-2">
         <button class="btn @(Danger ? "btn-danger" : "btn-primary")" @onclick="OnConfirm" disabled="@Busy">@ConfirmLabel</button>
-        <button class="btn btn-secondary" @onclick="OnCancel" disabled="@Busy">Cancel</button>
+        <button class="btn btn-secondary" @onclick="OnCancel" disabled="@Busy">@L.Get(Str.CommonCancel)</button>
     </div>
 </div>
 

@@ -3,34 +3,34 @@
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.ToastState Toast
 
-<PageTitle>Logs</PageTitle>
+<PageTitle>@L.Get(Str.NavLogs)</PageTitle>
 
-<h1>Logs</h1>
-<p class="text-muted">Buffer: <strong>@entries.Count</strong> entries · recording at <strong>@minLevel</strong> (change in Settings → Log verbosity). Newest first. At Verbose level entries may include your bookmark titles/URLs — check before sharing.</p>
+<h1>@L.Get(Str.NavLogs)</h1>
+<p class="text-muted">@L.Get(Str.LogsBuffer) <strong>@entries.Count</strong> @L.Get(Str.LogsEntriesRecording) <strong>@minLevel</strong> @L.Get(Str.LogsInfoRest)</p>
 
 <div class="d-flex gap-2 flex-wrap mb-2">
-    <select class="form-select xbs-log-filter-level" aria-label="Log level filter" @bind="level">
-        <option value="">All levels</option>
-        <option value="@Core.Logging.XbsLogLevel.Error">Error</option>
-        <option value="@Core.Logging.XbsLogLevel.Warning">Warning</option>
-        <option value="@Core.Logging.XbsLogLevel.Info">Info</option>
-        <option value="@Core.Logging.XbsLogLevel.Debug">Debug</option>
-        <option value="@Core.Logging.XbsLogLevel.Verbose">Verbose</option>
+    <select class="form-select xbs-log-filter-level" aria-label="@L.Get(Str.LogsLevelFilterAria)" @bind="level">
+        <option value="">@L.Get(Str.LogsAllLevels)</option>
+        <option value="@Core.Logging.XbsLogLevel.Error">@L.Get(Str.LogLevelError)</option>
+        <option value="@Core.Logging.XbsLogLevel.Warning">@L.Get(Str.LogLevelWarning)</option>
+        <option value="@Core.Logging.XbsLogLevel.Info">@L.Get(Str.LogLevelInfo)</option>
+        <option value="@Core.Logging.XbsLogLevel.Debug">@L.Get(Str.LogLevelDebug)</option>
+        <option value="@Core.Logging.XbsLogLevel.Verbose">@L.Get(Str.LogLevelVerboseShort)</option>
     </select>
-    <input class="form-control xbs-log-filter-text" aria-label="Filter log text" placeholder="Filter text…" @bind="filter" @bind:event="oninput" />
-    <button class="btn btn-outline-secondary" @onclick="Refresh">Refresh</button>
-    <button class="btn btn-outline-secondary" @onclick="Export">Export…</button>
-    <button class="btn btn-outline-danger" @onclick="() => armedClear = true" disabled="@armedClear">Clear…</button>
+    <input class="form-control xbs-log-filter-text" aria-label="@L.Get(Str.LogsFilterAria)" placeholder="@L.Get(Str.LogsFilterPlaceholder)" @bind="filter" @bind:event="oninput" />
+    <button class="btn btn-outline-secondary" @onclick="Refresh">@L.Get(Str.CommonRefresh)</button>
+    <button class="btn btn-outline-secondary" @onclick="Export">@L.Get(Str.CommonExport)</button>
+    <button class="btn btn-outline-danger" @onclick="() => armedClear = true" disabled="@armedClear">@L.Get(Str.CommonClear)</button>
 </div>
 @if (armedClear)
 {
-    <ConfirmBlock Message="Clear the log?" Implication="@WorkflowTexts.LogsClearImplication" ConfirmLabel="Yes, clear"
+    <ConfirmBlock Message="@L.Get(Str.LogsClearMessage)" Implication="@WorkflowTexts.LogsClearImplication" ConfirmLabel="@L.Get(Str.CommonYesClear)"
                   OnConfirm="ExecuteClear" OnCancel="() => armedClear = false" />
 }
 
 @if (Shown().Count == 0)
 {
-    <p class="text-muted">No entries. Raise the log verbosity in Settings to record more.</p>
+    <p class="text-muted">@L.Get(Str.LogsNone)</p>
 }
 else
 {
@@ -89,7 +89,7 @@ else
         Session.Log.Clear();
         armedClear = false;
         Refresh();
-        _ = Toast.ShowAsync("Log buffer cleared");
+        _ = Toast.ShowAsync(L.Get(Str.LogsCleared));
     }
 
     private async Task Export()
@@ -104,11 +104,11 @@ else
         try
         {
             await Share.Default.RequestAsync(new ShareFileRequest(
-                "Share log file", new ShareFile(path)));
+                L.Get(Str.LogsShareTitle), new ShareFile(path)));
         }
         catch
         {
-            _ = Toast.ShowAsync("Export cancelled", isError: true);
+            _ = Toast.ShowAsync(L.Get(Str.LogsExportCancelled), isError: true);
         }
     }
 }
