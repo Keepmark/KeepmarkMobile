@@ -227,10 +227,13 @@ Altri colori d'uso (non ridefinire a caso):
 - **Ricerca store**: debounce 250ms + contatore di generazione (scarta i
   risultati stale), soglia 2 caratteri, 50 risultati. Filtri locali piccoli
   (albero, log): `oninput` diretto senza debounce.
-- **Conferme distruttive**: booleano `armed*` + bottone di conferma inline
-  adiacente all'azione; ogni cluster ha il suo box errore vicino.
-- **Password**: mai persistite, azzerate in `finally`; minimo 8 caratteri
-  dove richieste.
+- **Conferme distruttive**: booleano `armed*` della pagina + `ConfirmBlock`
+  (`Components/ConfirmBlock.razor`) adiacente all'azione, testi da
+  `WorkflowTexts` (uguali all'estensione, `docs/WORKFLOWS.md`); la
+  validazione gira prima di armare; ogni cluster ha il suo box errore vicino.
+- **Password**: mai persistite; ogni step azzera i segreti che ha consumato
+  quando riesce, mai su errore (servono al retry); minimo 8 caratteri per
+  ogni password nuova (`WorkflowRules`).
 - **Stabilità dati**: i `RowId` cambiano a ogni sync — rifare il rebase su
   `NodeId` stabile (crumbs, expanded, pinned) prima di ridisegnare.
 
