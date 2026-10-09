@@ -116,11 +116,11 @@ the applied result. Rules:
 8. Corrupt shape (bookmark carrying children): bookmarks kept, children
    flattened into the same folder instead of dropped.
 
-## 7. Safety backups (summary — full spec in `README.md` § Safety backups)
+## 7. Safety backups (summary — full spec in `docs/DEVELOPMENT.md` § Safety backups)
 
 | R | Requirement |
 |---|---|
-| R7.1 | Obligation matrix (§1 of README spec): every overwrite snapshots the DESTROYED side first (upload mode = server copy). Single Home delete keeps 6 s undo instead. No snapshot → operation must fail closed. |
+| R7.1 | Obligation matrix (§1 of the DEVELOPMENT.md spec): every overwrite snapshots the DESTROYED side first (upload mode = server copy). Single Home delete keeps 6 s undo instead. No snapshot → operation must fail closed. |
 | R7.2 | Identity: `safety-{ts}-{operation}[-n].json` + manifest `{FileName, CreatedAtUtc, Operation, Side, Items, SizeBytes, SyncId(truncated), Enc}`; legacy files listed as "Older backup"; retention newest 5 (+ manual delete, two-tap). |
 | R7.3 | Encryption (envelope): files encrypted ONCE under random Master Key; record holds max 3 wraps `{KekId, WrappedKey}` (KEK = sync-derived key, id = SHA256 hex[..8]); rotation = single atomic write (tmp+fsync+rename, `.prev` kept until test-unwrap passes); rotation never fails the user flow. Pre-link/misaligned writes stay plaintext flagged "not encrypted". |
 | R7.4 | Restore: local-side → pre-restore snapshot + replace local (dirty → push/conflict); remote-side → requires link + re-encrypt under CURRENT key + push (409 honest); never deletes the used entry; counts match `ValidateTree`; damaged → refuse. |
