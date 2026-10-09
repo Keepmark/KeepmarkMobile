@@ -65,17 +65,15 @@ else
                 }
                 else
                 {
-                    <div class="alert @(armedDirection == Core.Sync.ConflictResolutionDirection.Merge ? "alert-info" : "alert-danger")" role="alert">
-                        <p class="mb-2">@ConfirmText(armedDirection.Value)</p>
-                        <div class="d-flex gap-2">
-                            <button class="btn @(armedDirection == Core.Sync.ConflictResolutionDirection.Merge ? "btn-primary" : "btn-danger")" @onclick="() => ResolveConflict(armedDirection.Value)" disabled="@busy">@ConfirmLabel(armedDirection.Value)</button>
-                            <button class="btn btn-secondary" @onclick="() => armedDirection = null" disabled="@busy">Cancel</button>
-                        </div>
+                    var confirm = Keepmark.Core.Workflow.WorkflowTexts.DirectionConfirm(choice);
+                    <ConfirmBlock Message="@confirm.Message" Implication="@confirm.Implication"
+                                  ConfirmLabel="@confirm.ConfirmLabel" Danger="@(armedDirection != Core.Sync.ConflictResolutionDirection.Merge)"
+                                  Busy="busy" OnConfirm="() => ResolveConflict(armedDirection.Value)" OnCancel="() => armedDirection = null">
                         @if (busy)
                         {
                             <p class="mt-2 mb-0" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Resolving conflict…</p>
                         }
-                    </div>
+                    </ConfirmBlock>
                 }
                 @if (!string.IsNullOrEmpty(conflictError))
                 {
@@ -179,20 +177,6 @@ else
         armedDirection = d;
         conflictError = null;
     }
-
-    private static string ConfirmText(Core.Sync.ConflictResolutionDirection d) => d switch
-    {
-        Core.Sync.ConflictResolutionDirection.Pull => "Replace the bookmarks on this device with the server copy? Its unsynced edits are lost; a copy is saved to Backup → Safety backups first.",
-        Core.Sync.ConflictResolutionDirection.Push => "Replace the server copy with the bookmarks on this device? Changes from other devices are lost; a copy is saved to Backup → Safety backups first.",
-        _ => "Merge both copies into one and sync it everywhere? Nothing is deleted, but items removed on one side while offline come back. Both copies are saved to Backup → Safety backups first.",
-    };
-
-    private static string ConfirmLabel(Core.Sync.ConflictResolutionDirection d) => d switch
-    {
-        Core.Sync.ConflictResolutionDirection.Pull => "Yes, download",
-        Core.Sync.ConflictResolutionDirection.Push => "Yes, upload",
-        _ => "Yes, merge",
-    };
 
     private static string ResultText(Core.Sync.ConflictResolutionDirection d) => d switch
     {
