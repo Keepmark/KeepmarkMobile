@@ -952,7 +952,7 @@ else
 
     private string SortLabel => SortModes.FirstOrDefault(m => m.Mode == sortMode).Label ?? "Original order";
 
-    private string CurrentName => crumbs.Count == 0 ? "All bookmarks" : crumbs.Peek().Title ?? "Folder";
+    private string CurrentName => crumbs.Count == 0 ? "Keepmark" : crumbs.Peek().Title ?? "Folder";
 
     private string ParentName => crumbs.Count < 2 ? "All bookmarks" : crumbs.ElementAt(1).Title ?? "Folder";
 
