@@ -84,7 +84,7 @@ else
             <div class="mb-3">
                 <label class="form-label">Service URL</label>
                 <input class="form-control" @bind="serviceUrl" inputmode="url" />
-                <div class="form-text">Address of the xBrowserSync service to use. Check verifies it answers with a compatible API version.</div>
+                <div class="form-text">URL of the xBrowserSync service to use. Check verifies it answers with a compatible API version.</div>
                 <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">Check service</button>
                 @if (!string.IsNullOrEmpty(checkError))
                 {
