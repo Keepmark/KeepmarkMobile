@@ -84,6 +84,66 @@ public static partial class Str
     public const string BackupSafetyRefreshed_other = nameof(BackupSafetyRefreshed_other);
     public const string BackupPickFirst = nameof(BackupPickFirst);
     public const string BackupSafetyDeleted = nameof(BackupSafetyDeleted);
+    public const string CommonBack = nameof(CommonBack);
+    public const string CommonHide = nameof(CommonHide);
+    public const string CommonChange = nameof(CommonChange);
+    public const string CommonPassword = nameof(CommonPassword);
+    public const string ConnLinkedTo = nameof(ConnLinkedTo);
+    public const string ConnCopySyncId = nameof(ConnCopySyncId);
+    public const string ConnMoveHintA = nameof(ConnMoveHintA);
+    public const string ConnMoveHintB = nameof(ConnMoveHintB);
+    public const string ConnUnlinkH = nameof(ConnUnlinkH);
+    public const string ConnUnlinkIntro_one = nameof(ConnUnlinkIntro_one);
+    public const string ConnUnlinkIntro_other = nameof(ConnUnlinkIntro_other);
+    public const string ConnUnlinkBtn = nameof(ConnUnlinkBtn);
+    public const string ConnUnlinkMessage = nameof(ConnUnlinkMessage);
+    public const string CommonYesUnlink = nameof(CommonYesUnlink);
+    public const string ConnLead = nameof(ConnLead);
+    public const string ConnLinkExistingTitle = nameof(ConnLinkExistingTitle);
+    public const string ConnLinkExistingText = nameof(ConnLinkExistingText);
+    public const string ConnCreateTitle = nameof(ConnCreateTitle);
+    public const string ConnCreateTextUpload_one = nameof(ConnCreateTextUpload_one);
+    public const string ConnCreateTextUpload_other = nameof(ConnCreateTextUpload_other);
+    public const string ConnCreateTextFresh = nameof(ConnCreateTextFresh);
+    public const string ConnBackupHintA = nameof(ConnBackupHintA);
+    public const string ConnBackupHintLink = nameof(ConnBackupHintLink);
+    public const string ConnBackupHintB = nameof(ConnBackupHintB);
+    public const string ConnService = nameof(ConnService);
+    public const string ConnServiceUrl = nameof(ConnServiceUrl);
+    public const string ConnServiceUrlHint = nameof(ConnServiceUrlHint);
+    public const string ConnCheckService = nameof(ConnCheckService);
+    public const string ConnStatusLine = nameof(ConnStatusLine);
+    public const string ConnSyncOpenedA = nameof(ConnSyncOpenedA);
+    public const string ConnSyncOpenedB = nameof(ConnSyncOpenedB);
+    public const string ConnItemsCounts = nameof(ConnItemsCounts);
+    public const string ConnSyncId = nameof(ConnSyncId);
+    public const string ConnPasswordHint = nameof(ConnPasswordHint);
+    public const string ConnOpenSync = nameof(ConnOpenSync);
+    public const string ConnConfirmPassword = nameof(ConnConfirmPassword);
+    public const string ConnPwNewHint = nameof(ConnPwNewHint);
+    public const string ConnCreateUpload_one = nameof(ConnCreateUpload_one);
+    public const string ConnCreateUpload_other = nameof(ConnCreateUpload_other);
+    public const string ConnCreateUploadHint = nameof(ConnCreateUploadHint);
+    public const string ConnCreateEmptyInstead = nameof(ConnCreateEmptyInstead);
+    public const string ConnReplaceEmptyMessage_one = nameof(ConnReplaceEmptyMessage_one);
+    public const string ConnReplaceEmptyMessage_other = nameof(ConnReplaceEmptyMessage_other);
+    public const string ConnYesCreateEmpty = nameof(ConnYesCreateEmpty);
+    public const string ConnCreateNew = nameof(ConnCreateNew);
+    public const string ConnCreateEmptyHint = nameof(ConnCreateEmptyHint);
+    public const string ConnReviewUpload = nameof(ConnReviewUpload);
+    public const string ConnReviewDownload = nameof(ConnReviewDownload);
+    public const string ConnReviewTitles_one = nameof(ConnReviewTitles_one);
+    public const string ConnReviewTitles_other = nameof(ConnReviewTitles_other);
+    public const string ConnCopied = nameof(ConnCopied);
+    public const string ConnCopyFailed = nameof(ConnCopyFailed);
+    public const string ConnEnterBoth = nameof(ConnEnterBoth);
+    public const string ConnLinkedEmpty = nameof(ConnLinkedEmpty);
+    public const string ConnCreatedEmpty = nameof(ConnCreatedEmpty);
+    public const string ConnCreatedUpload = nameof(ConnCreatedUpload);
+    public const string ConnSafetyLocal = nameof(ConnSafetyLocal);
+    public const string ConnSafetyRemote = nameof(ConnSafetyRemote);
+    public const string ConnSafetyBoth = nameof(ConnSafetyBoth);
+    public const string ConnPreviewFirst = nameof(ConnPreviewFirst);
     public const string DupTitle = nameof(DupTitle);
     public const string DupIntro = nameof(DupIntro);
     public const string DupClean = nameof(DupClean);
@@ -372,6 +432,16 @@ public static partial class Str
     public const string BackupExportIntro = nameof(BackupExportIntro);
     /// <summary>Base for Loc.Plural (BackupSafetyRefreshed_one / BackupSafetyRefreshed_other).</summary>
     public const string BackupSafetyRefreshed = nameof(BackupSafetyRefreshed);
+    /// <summary>Base for Loc.Plural (ConnCreateTextUpload_one / ConnCreateTextUpload_other).</summary>
+    public const string ConnCreateTextUpload = nameof(ConnCreateTextUpload);
+    /// <summary>Base for Loc.Plural (ConnCreateUpload_one / ConnCreateUpload_other).</summary>
+    public const string ConnCreateUpload = nameof(ConnCreateUpload);
+    /// <summary>Base for Loc.Plural (ConnReplaceEmptyMessage_one / ConnReplaceEmptyMessage_other).</summary>
+    public const string ConnReplaceEmptyMessage = nameof(ConnReplaceEmptyMessage);
+    /// <summary>Base for Loc.Plural (ConnReviewTitles_one / ConnReviewTitles_other).</summary>
+    public const string ConnReviewTitles = nameof(ConnReviewTitles);
+    /// <summary>Base for Loc.Plural (ConnUnlinkIntro_one / ConnUnlinkIntro_other).</summary>
+    public const string ConnUnlinkIntro = nameof(ConnUnlinkIntro);
     /// <summary>Base for Loc.Plural (StatusMergeWouldTitles_one / StatusMergeWouldTitles_other).</summary>
     public const string StatusMergeWouldTitles = nameof(StatusMergeWouldTitles);
     /// <summary>Base for Loc.Plural (WfDupDeleteDone_one / WfDupDeleteDone_other).</summary>

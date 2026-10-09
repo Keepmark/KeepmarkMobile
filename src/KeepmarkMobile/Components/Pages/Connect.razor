@@ -5,37 +5,37 @@
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @using Keepmark.Core.Workflow
 
-<PageTitle>Connect</PageTitle>
+<PageTitle>@L.Get(Str.NavConnect)</PageTitle>
 
-<h1>Connect</h1>
+<h1>@L.Get(Str.NavConnect)</h1>
 
 @if (!Session.Ready)
 {
-    <p role="status"><em>Starting…</em></p>
+    <p role="status"><em>@L.Get(Str.BackupStarting)</em></p>
 }
 else if (linked)
 {
     <div class="alert alert-success">
-        Linked to <strong>@linkedUrl</strong> (sync <code>@WorkflowRules.ShortId(linkedId)</code>).
-        <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="CopyLinkedId">Copy sync ID</button>
+        @L.Get(Str.ConnLinkedTo) <strong>@linkedUrl</strong> (@L.Get(Str.BackupSyncWord) <code>@WorkflowRules.ShortId(linkedId)</code>).
+        <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="CopyLinkedId">@L.Get(Str.ConnCopySyncId)</button>
     </div>
-    <p>To move to another service use <a href="switch-service">Move service</a>, to save or restore an encrypted copy use <a href="backup">Backup</a>.</p>
+    <p>@L.Get(Str.ConnMoveHintA) <a href="switch-service">@L.Get(Str.NavMoveService)</a>@L.Get(Str.ConnMoveHintB) <a href="backup">@L.Get(Str.NavBackup)</a>.</p>
     @if (!string.IsNullOrEmpty(message))
     {
         <div class="alert mt-2 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
     }
 
     <hr />
-    <h2>Unlink this device</h2>
-    <p class="text-muted">Forget the sync credentials on this device. Your @localCount local item(s) stay untouched; syncing stops until you link again.</p>
+    <h2>@L.Get(Str.ConnUnlinkH)</h2>
+    <p class="text-muted">@Loc.Plural(Str.ConnUnlinkIntro, localCount)</p>
     @if (!armedUnlink)
     {
-        <button class="btn btn-outline-danger" @onclick="() => { armedUnlink = true; unlinkError = string.Empty; }" disabled="@busy">Unlink this device…</button>
+        <button class="btn btn-outline-danger" @onclick="() => { armedUnlink = true; unlinkError = string.Empty; }" disabled="@busy">@L.Get(Str.ConnUnlinkBtn)</button>
     }
     else
     {
-        <ConfirmBlock Message="Unlink this device?" Implication="@WorkflowTexts.UnlinkImplication"
-                      ConfirmLabel="Yes, unlink" Busy="busy"
+        <ConfirmBlock Message="@L.Get(Str.ConnUnlinkMessage)" Implication="@WorkflowTexts.UnlinkImplication"
+                      ConfirmLabel="@L.Get(Str.CommonYesUnlink)" Busy="busy"
                       OnConfirm="ExecuteUnlink" OnCancel="() => armedUnlink = false" />
     }
     @if (!string.IsNullOrEmpty(unlinkError))
@@ -52,47 +52,47 @@ else
         {
             <div class="alert alert-success" role="status">@message</div>
         }
-        <p class="xbs-connect-lead">Keep your bookmarks in sync across devices, end-to-end encrypted. How do you want to start?</p>
+        <p class="xbs-connect-lead">@L.Get(Str.ConnLead)</p>
         <div class="xbs-choices">
             <button class="xbs-choice" @onclick='() => Choose("existing")'>
                 <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
-                <span class="xbs-choice-text"><strong>Link an existing sync</strong><span>You already sync on another device: enter its sync ID and password.</span></span>
+                <span class="xbs-choice-text"><strong>@L.Get(Str.ConnLinkExistingTitle)</strong><span>@L.Get(Str.ConnLinkExistingText)</span></span>
                 <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </button>
             <button class="xbs-choice" @onclick='() => Choose("new")'>
                 <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></span>
-                <span class="xbs-choice-text"><strong>Create a new sync</strong><span>@(localCount > 0 ? $"First device: pick a password and upload your {localCount} bookmark(s)." : "First device: pick a password and start fresh.")</span></span>
+                <span class="xbs-choice-text"><strong>@L.Get(Str.ConnCreateTitle)</strong><span>@(localCount > 0 ? Loc.Plural(Str.ConnCreateTextUpload, localCount) : L.Get(Str.ConnCreateTextFresh))</span></span>
                 <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </button>
         </div>
-        <p class="xbs-hint mt-3">Have an encrypted backup file? <a href="backup">Restore it from Backup</a> — no connection needed.</p>
+        <p class="xbs-hint mt-3">@L.Get(Str.ConnBackupHintA) <a href="backup">@L.Get(Str.ConnBackupHintLink)</a> @L.Get(Str.ConnBackupHintB)</p>
     }
     else
     {
-        <button class="xbs-back" @onclick="Back" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back</button>
-        <h2 class="xbs-step-title">@(mode == "existing" ? "Link an existing sync" : "Create a new sync")</h2>
+        <button class="xbs-back" @onclick="Back" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>@L.Get(Str.CommonBack)</button>
+        <h2 class="xbs-step-title">@(mode == "existing" ? L.Get(Str.ConnLinkExistingTitle) : L.Get(Str.ConnCreateTitle))</h2>
         <div class="xbs-service-row">
-            <span class="xbs-service-label">Service</span>
+            <span class="xbs-service-label">@L.Get(Str.ConnService)</span>
             <span class="xbs-service-host">@ServiceHost</span>
             @if (reconcile is null)
             {
-                <button class="xbs-link-btn" @onclick="() => showService = !showService" aria-expanded="@ServiceOpen.ToString().ToLowerInvariant()">@(ServiceOpen ? "Hide" : "Change")</button>
+                <button class="xbs-link-btn" @onclick="() => showService = !showService" aria-expanded="@ServiceOpen.ToString().ToLowerInvariant()">@(ServiceOpen ? L.Get(Str.CommonHide) : L.Get(Str.CommonChange))</button>
             }
         </div>
         @if (ServiceOpen && reconcile is null)
         {
             <div class="mb-3">
-                <label class="form-label">Service URL</label>
+                <label class="form-label">@L.Get(Str.ConnServiceUrl)</label>
                 <input class="form-control" @bind="serviceUrl" inputmode="url" />
-                <div class="form-text">URL of the xBrowserSync service to use. Check verifies it answers with a compatible API version.</div>
-                <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">Check service</button>
+                <div class="form-text">@L.Get(Str.ConnServiceUrlHint)</div>
+                <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">@L.Get(Str.ConnCheckService)</button>
                 @if (!string.IsNullOrEmpty(checkError))
                 {
                     <div class="alert alert-danger mt-2" role="alert">@checkError</div>
                 }
                 @if (serviceInfo is not null)
                 {
-                    <p class="mt-2" role="status">Status: <strong>@serviceInfo.Status</strong> · API v@(serviceInfo.Version) · max @(serviceInfo.MaxSyncSize / 1024) KB</p>
+                    <p class="mt-2" role="status">@L.Get(Str.ConnStatusLine, serviceInfo.Status, serviceInfo.Version, serviceInfo.MaxSyncSize / 1024)</p>
                 }
             </div>
         }
@@ -103,22 +103,22 @@ else
             <div class="xbs-verified" role="status">
                 <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                 <div class="xbs-verified-text">
-                    <strong>Sync <code>@WorkflowRules.ShortId(reconcile.Candidate.Id)</code> opened</strong>
-                    <span>@reconcile.RemoteCount item(s) on the server · @reconcile.LocalCount on this device</span>
+                    <strong>@L.Get(Str.ConnSyncOpenedA) <code>@WorkflowRules.ShortId(reconcile.Candidate.Id)</code> @L.Get(Str.ConnSyncOpenedB)</strong>
+                    <span>@L.Get(Str.ConnItemsCounts, reconcile.RemoteCount, reconcile.LocalCount)</span>
                 </div>
-                <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@busy">Change</button>
+                <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@busy">@L.Get(Str.CommonChange)</button>
             </div>
         }
         else if (mode == "existing")
         {
             <div class="mb-3">
-                <label class="form-label">Sync ID</label>
+                <label class="form-label">@L.Get(Str.ConnSyncId)</label>
                 <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
-                <label class="form-label mt-2">Password</label>
+                <label class="form-label mt-2">@L.Get(Str.CommonPassword)</label>
                 <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-                <div class="form-text">The password is verified against the server copy: a wrong password cannot open the sync. Nothing changes until you choose the sync direction in the next step.</div>
+                <div class="form-text">@L.Get(Str.ConnPasswordHint)</div>
                 <div class="mt-3 d-grid">
-                    <button class="btn btn-primary" @onclick="LinkExisting" disabled="@busy">Open sync</button>
+                    <button class="btn btn-primary" @onclick="LinkExisting" disabled="@busy">@L.Get(Str.ConnOpenSync)</button>
                 </div>
                 @if (!string.IsNullOrEmpty(linkError))
                 {
@@ -129,32 +129,32 @@ else
         else
         {
             <div class="mb-3">
-                <label class="form-label">New password</label>
+                <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
                 <input type="password" class="form-control" @bind="newPassword" autocomplete="new-password" />
-                <label class="form-label mt-2">Confirm password</label>
+                <label class="form-label mt-2">@L.Get(Str.ConnConfirmPassword)</label>
                 <input type="password" class="form-control" @bind="confirmPassword" autocomplete="new-password" />
-                <div class="form-text">At least 8 characters. It encrypts everything and cannot be recovered — lose it and the sync is unreadable.</div>
+                <div class="form-text">@L.Get(Str.ConnPwNewHint)</div>
                 <div class="mt-2 d-grid gap-2">
                     @if (localCount > 0)
                     {
-                        <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@busy">Create and upload my @localCount item(s)</button>
-                        <div class="form-text">Creates the sync on this service and uploads your current local bookmarks into it. Nothing local is deleted.</div>
+                        <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@busy">@Loc.Plural(Str.ConnCreateUpload, localCount)</button>
+                        <div class="form-text">@L.Get(Str.ConnCreateUploadHint)</div>
                         @if (armed != "createEmpty")
                         {
-                            <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@busy">Create empty instead…</button>
+                            <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@busy">@L.Get(Str.ConnCreateEmptyInstead)</button>
                         }
                         else
                         {
-                            <ConfirmBlock Message="@($"Replace your {localCount} local item(s) with an empty sync?")"
+                            <ConfirmBlock Message="@Loc.Plural(Str.ConnReplaceEmptyMessage, localCount)"
                                           Implication="@WorkflowTexts.CreateEmptyImplication"
-                                          ConfirmLabel="Yes, create empty" Busy="busy"
+                                          ConfirmLabel="@L.Get(Str.ConnYesCreateEmpty)" Busy="busy"
                                           OnConfirm="CreateNew" OnCancel="Disarm" />
                         }
                     }
                     else
                     {
-                        <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@busy">Create new sync</button>
-                        <div class="form-text">Creates an empty sync on this service and links the app to it.</div>
+                        <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@busy">@L.Get(Str.ConnCreateNew)</button>
+                        <div class="form-text">@L.Get(Str.ConnCreateEmptyHint)</div>
                     }
                 </div>
                 @if (!string.IsNullOrEmpty(linkError))
@@ -186,11 +186,11 @@ else
                 @if (direction == "merge" && mergeStats is not null)
                 {
                     <ul class="xbs-review-list mt-2 mb-0">
-                        <li><strong>@mergeStats.LocalOnly</strong> upload (only on this device)</li>
-                        <li><strong>@mergeStats.RemoteOnly</strong> download (only on the server)</li>
+                        <li><strong>@mergeStats.LocalOnly</strong> @L.Get(Str.ConnReviewUpload)</li>
+                        <li><strong>@mergeStats.RemoteOnly</strong> @L.Get(Str.ConnReviewDownload)</li>
                         @if (mergeStats.TitleConflicts > 0)
                         {
-                            <li><strong>@mergeStats.TitleConflicts</strong> title conflict(s) keep the server title</li>
+                            <li><strong>@mergeStats.TitleConflicts</strong> @Loc.Plural(Str.ConnReviewTitles, mergeStats.TitleConflicts)</li>
                         }
                     </ul>
                 }
@@ -320,11 +320,11 @@ else
         try
         {
             await Clipboard.Default.SetTextAsync(linkedId);
-            _ = Toast.ShowAsync("Sync ID copied — store it with the password");
+            _ = Toast.ShowAsync(L.Get(Str.ConnCopied));
         }
         catch
         {
-            _ = Toast.ShowAsync("Copy failed — transcribe the ID manually", isError: true);
+            _ = Toast.ShowAsync(L.Get(Str.ConnCopyFailed), isError: true);
         }
     }
 
@@ -356,7 +356,7 @@ else
         {
             if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
             {
-                throw new InvalidOperationException("Enter both the sync ID and its password.");
+                throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
             }
 
             reconcile = await Session.ProbeLinkAsync(serviceUrl.Trim(), syncId.Trim(), password);
@@ -372,7 +372,7 @@ else
                 await Session.ApplyRemoteAsync(reconcile);
                 reconcile = null;
                 await RefreshStateAsync();
-                Ok("Linked. Both sides were empty — ready to go.");
+                Ok(L.Get(Str.ConnLinkedEmpty));
             }
             else
             {
@@ -394,7 +394,7 @@ else
             newPassword = string.Empty;
             confirmPassword = string.Empty;
             await RefreshStateAsync();
-            Ok($"New empty sync created and linked. Safety backup of the previous local bookmarks saved — see Backup → Safety backups. {WorkflowTexts.CreatedNext}");
+            Ok($"{L.Get(Str.ConnCreatedEmpty)} {WorkflowTexts.CreatedNext}");
         }, err => linkError = err, "connect-create");
     }
 
@@ -409,15 +409,15 @@ else
             newPassword = string.Empty;
             confirmPassword = string.Empty;
             await RefreshStateAsync();
-            Ok($"New sync created and your local bookmarks were uploaded into it. {WorkflowTexts.CreatedNext}");
+            Ok($"{L.Get(Str.ConnCreatedUpload)} {WorkflowTexts.CreatedNext}");
         }, err => linkError = err, "connect-create");
     }
 
     private string ApplyLabel => direction switch
     {
-        "upload" => "Keep this device's copy…",
-        "merge" => "Merge both…",
-        _ => "Keep the server copy…",
+        "upload" => L.Get(Str.StatusKeepDevice),
+        "merge" => L.Get(Str.StatusMergeBoth),
+        _ => L.Get(Str.StatusKeepServer),
     };
 
     /// <summary>First tap arms the confirm. Merge computes its dry-run here
@@ -455,7 +455,7 @@ else
             mergeStatsFor = null;
             armedApply = false;
             await RefreshStateAsync();
-            Ok($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of your previous local bookmarks saved — see Backup → Safety backups.");
+            Ok($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyLocal)}");
         }, err => applyError = err, "connect-apply");
     }
 
@@ -470,7 +470,7 @@ else
             mergeStatsFor = null;
             armedApply = false;
             await RefreshStateAsync();
-            Ok($"{Core.Sync.MoveResult.Describe("existing", "push", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backup of the previous server copy saved — see Backup → Safety backups.");
+            Ok($"{Core.Sync.MoveResult.Describe("existing", "push", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyRemote)}");
         }, err => applyError = err, "connect-apply");
     }
 
@@ -491,7 +491,7 @@ else
             var target = reconcile!;
             if (mergeStats is null || !ReferenceEquals(mergeStatsFor, target))
             {
-                throw new InvalidOperationException("Preview the merge first — counts must match the linked sync.");
+                throw new InvalidOperationException(L.Get(Str.ConnPreviewFirst));
             }
 
             await Session.ApplyMergeAsync(target, Core.Safety.SafetyOperations.ConnectMerge);
@@ -500,7 +500,7 @@ else
             mergeStatsFor = null;
             armedApply = false;
             await RefreshStateAsync();
-            Ok($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} Safety backups of both sides saved — see Backup → Safety backups.");
+            Ok($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyBoth)}");
         }, err => applyError = err, "connect-apply");
     }
 
