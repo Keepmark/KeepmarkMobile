@@ -34,11 +34,11 @@
         yield return new("download", "Keep the server copy",
             $"Download: this device gets the {RemoteCount} server item(s); its {LocalCount} item(s) are replaced.",
             RemoteCount == 0, "The server copy is empty.");
-        yield return new("upload", "Keep this device's copy",
-            $"Upload: the server gets your {LocalCount} item(s); its {RemoteCount} item(s) are replaced.",
-            LocalCount == 0, "Nothing on this device to upload.");
         yield return new("merge", "Merge both",
             "Nothing is deleted: items from both copies are kept, and items removed on one side while offline come back.",
             LocalCount == 0 || RemoteCount == 0, "Needs items on both sides.");
+        yield return new("upload", "Keep this device's copy",
+            $"Upload: the server gets your {LocalCount} item(s); its {RemoteCount} item(s) are replaced.",
+            LocalCount == 0, "Nothing on this device to upload.");
     }
 }

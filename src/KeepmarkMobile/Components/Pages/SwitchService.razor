@@ -33,11 +33,14 @@ else if (step == 4)
             <p>New sync created on <strong>@targetUrl</strong> with your @localCount item(s).</p>
             <p>Your new sync ID (save it together with the password — both are needed to open the sync elsewhere):</p>
             <p><code>@createdId</code></p>
-            <button class="btn btn-secondary" @onclick="CopyId">Copy sync ID</button>
+        }
+        else
+        {
+            <p>Now syncing with sync <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> on <strong>@targetUrl</strong>.</p>
         }
         else if (tookRemote)
         {
-            <p>Your local tree was replaced with the server item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local bookmarks was saved — see Backup → Safety backups.</p>
+            <p>Your local bookmarks were replaced with the server item(s) from <strong>@targetUrl</strong>. A safety backup of the previous local bookmarks was saved — see Backup → Safety backups.</p>
         }
         else if (direction == "merge")
         {
@@ -47,6 +50,8 @@ else if (step == 4)
         {
             <p>Your @localCount local item(s) replaced the @probe?.RemoteCount server item(s) on <strong>@targetUrl</strong>. A safety backup of the overwritten server copy was saved — see Backup → Safety backups.</p>
         }
+        <p>@WorkflowTexts.MoveDoneNext</p>
+        <button class="btn btn-secondary" @onclick="CopyId">Copy sync ID</button>
     </div>
     <button class="btn btn-primary" @onclick='() => Nav.NavigateTo("/")'>Back to Explore</button>
 }
@@ -64,6 +69,12 @@ else
         }
         <span class="xbs-stepcount">Step @step of 3</span>
     </div>
+    @if (resumed)
+    {
+        <div class="alert alert-info" role="status">
+            Resumed your unfinished move. Counts may have changed while you were away: open the sync again if in doubt.
+        </div>
+    }
 
     @if (step == 1)
     {
@@ -174,12 +185,6 @@ else
     else
     {
         <h2 class="xbs-step-title">Review the move</h2>
-        @if (resumed)
-        {
-            <div class="alert alert-info" role="status">
-                Resumed your unfinished move — counts may have changed while you were away. Go back and open the sync again if in doubt.
-            </div>
-        }
         <div class="xbs-review">
             @if (slot == "new")
             {
@@ -213,9 +218,18 @@ else
                 <p class="text-muted mb-0">Your current bookmarks are saved to Backup → Safety backups first.</p>
             }
         </div>
-        <div class="d-grid">
-            <button class="btn @(ReplacesSomething ? "btn-danger" : "btn-primary")" @onclick="Execute" disabled="@busy">@(busy ? "Moving…" : "Move now")</button>
-        </div>
+        @if (!armedMove)
+        {
+            <div class="d-grid">
+                <button class="btn @(ReplacesSomething ? "btn-danger" : "btn-primary")" @onclick="ArmMove" disabled="@busy">Move now…</button>
+            </div>
+        }
+        else
+        {
+            <ConfirmBlock Message="@MoveConfirm.Message" Implication="@MoveConfirm.Implication"
+                          ConfirmLabel="@(busy ? "Moving…" : MoveConfirm.ConfirmLabel)" Danger="ReplacesSomething" Busy="busy"
+                          OnConfirm="Execute" OnCancel="() => armedMove = false" />
+        }
         @if (!string.IsNullOrEmpty(reviewError))
         {
             <div class="alert alert-danger mt-2" role="alert">@reviewError</div>
@@ -255,6 +269,8 @@ else
     private string reviewError = string.Empty;
     private bool linked;
     private bool resumed;
+    /// <summary>"Move now…" arms the inline confirm; "Yes, …" runs it.</summary>
+    private bool armedMove;
 
     private bool serviceOk =>
         serviceInfo is not null && checkedUrl == targetUrl.Trim();
@@ -284,9 +300,23 @@ else
             direction = draft.Direction is "upload" or "merge" ? draft.Direction : "take";
             probe = draft.Probe;
             verifiedFor = draft.VerifiedFor;
-            step = draft.Step is >= 2 and <= 3 ? draft.Step : 2;
-            resumed = probe is not null;
+            // Resume on step 2, never on the review: a new sync needs its
+            // password again (never stored), a merge its preview again, and
+            // the service its check again. "Review the move" redoes them.
+            step = 2;
+            resumed = true;
             slotChosen = true;
+            try
+            {
+                serviceInfo = await Session.CheckServiceAsync(targetUrl);
+                checkedUrl = targetUrl;
+            }
+            catch (Exception ex)
+            {
+                step = 1;
+                checkError = ex.Message;
+                Session.Log.Warn("switch", $"resume check failed: {ex.GetType().Name}");
+            }
         }
     }
 
@@ -340,6 +370,8 @@ else
             }
 
             probe = await Session.ProbeLinkAsync(targetUrl.Trim(), syncId.Trim(), password);
+            // Consumed: the probe carries the key; a failed check keeps it for a retry.
+            password = string.Empty;
             verifiedFor = $"{targetUrl.Trim()}|{syncId.Trim()}";
             direction = "take";
             mergeStats = null;
@@ -375,6 +407,28 @@ else
     /// <summary>Upload and download overwrite one side: the final button is red.</summary>
     private bool ReplacesSomething => slot == "existing" && direction != "merge";
 
+    /// <summary>The confirm for the final step: new sync, or the chosen
+    /// direction plus what the move leaves behind on the old service.</summary>
+    private WorkflowTexts.Confirm MoveConfirm
+    {
+        get
+        {
+            if (slot == "new")
+            {
+                return new(WorkflowTexts.MoveNewConfirm(TargetHost, localCount), WorkflowTexts.MoveImplication, "Yes, move");
+            }
+
+            var d = WorkflowTexts.DirectionConfirm(PickerValue);
+            return d with { Implication = $"{d.Implication} {WorkflowTexts.MoveImplication}" };
+        }
+    }
+
+    private void ArmMove()
+    {
+        reviewError = string.Empty;
+        armedMove = true;
+    }
+
     private void ChooseSlot(string value)
     {
         slot = value;
@@ -388,6 +442,7 @@ else
     {
         verifyError = string.Empty;
         reviewError = string.Empty;
+        armedMove = false;
         if (step == 3)
         {
             step = 2;
@@ -424,6 +479,7 @@ else
             verifyError = string.Empty;
             reviewError = string.Empty;
             resumed = false;
+            armedMove = false;
             step = 3;
             SaveDraft();
         }
@@ -462,6 +518,7 @@ else
         serviceInfo = null;
         checkedUrl = null;
         resumed = false;
+        armedMove = false;
         checkError = string.Empty;
         verifyError = string.Empty;
         reviewError = string.Empty;
@@ -513,6 +570,8 @@ else
 
             AppSettings.ServiceUrl = targetUrl.Trim();
             newPassword = string.Empty;
+            confirmPassword = string.Empty;
+            armedMove = false;
             step = 4;
             Session.PendingSwitch = null;
             Session.Log.Info("switch", createdId is not null
@@ -524,14 +583,15 @@ else
 
     private async Task CopyId()
     {
-        if (createdId is null)
+        var id = createdId ?? probe?.Candidate.Id;
+        if (id is null)
         {
             return;
         }
 
         try
         {
-            await Clipboard.Default.SetTextAsync(createdId);
+            await Clipboard.Default.SetTextAsync(id);
             _ = Toast.ShowAsync("Sync ID copied — store it with the password");
         }
         catch
@@ -562,9 +622,8 @@ else
         }
         finally
         {
-            password = string.Empty;
-            confirmPassword = string.Empty;
-            newPassword = string.Empty;
+            // Secrets are cleared by each step once consumed, never on a
+            // failure: the retry needs them (a failed Move kept the review).
             busy = false;
         }
     }

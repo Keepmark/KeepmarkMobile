@@ -21,6 +21,36 @@ public static class WorkflowTexts
     public const string UnlinkDone =
         "Device unlinked. Its bookmarks are untouched; link again with the sync ID and password to resume syncing.";
 
+    // Direction choice (Connect, Move, Conflict): picker order and confirms.
+    /// <summary>Keep the server copy / Merge both / Keep this device's copy.</summary>
+    public static readonly string[] DirectionOrder = ["download", "merge", "upload"];
+
+    public sealed record Confirm(string Message, string Implication, string ConfirmLabel);
+
+    public static Confirm DirectionConfirm(string direction) => direction switch
+    {
+        "upload" => new("Replace the server copy with this device's bookmarks?",
+            "Changes from your other devices that are only on the server are lost. A copy is saved to Backup → Safety backups first.",
+            "Yes, upload"),
+        "merge" => new("Merge both copies into one and sync it everywhere?",
+            "Nothing is deleted, but items removed on one side while the other was offline come back. " +
+            "Both copies are saved to Backup → Safety backups first.",
+            "Yes, merge"),
+        _ => new("Replace this device's bookmarks with the server copy?",
+            "Edits on this device that are not yet synced are lost. A copy is saved to Backup → Safety backups first.",
+            "Yes, download"),
+    };
+
+    // Move service.
+    public const string MoveImplication =
+        "The old sync stays on the old service and is not deleted. Your other devices stay linked to the old service " +
+        "until you move them too. Store the new sync ID and password.";
+
+    public static string MoveNewConfirm(string host, int count) =>
+        $"Create a new sync on {host} and upload {count} bookmarks?";
+
+    public const string MoveDoneNext = "Store the sync ID with the password, then move your other devices with it.";
+
     // Backup → Export.
     public const string BackupPasswordHint =
         "It is not your sync password and cannot be recovered: without it the file cannot be opened.";

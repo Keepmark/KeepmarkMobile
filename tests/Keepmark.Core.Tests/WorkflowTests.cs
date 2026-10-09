@@ -58,4 +58,22 @@ public class WorkflowTests
         Assert.Contains("sync ID and its password", WorkflowTexts.UnlinkImplication);
         Assert.Contains("not yet synced", WorkflowTexts.UnlinkImplication);
     }
+
+    [Fact]
+    public void DirectionsComeInOneOrderWithOneLabelEach()
+    {
+        Assert.Equal(["download", "merge", "upload"], WorkflowTexts.DirectionOrder);
+        Assert.Equal(["Yes, download", "Yes, merge", "Yes, upload"],
+            WorkflowTexts.DirectionOrder.Select(d => WorkflowTexts.DirectionConfirm(d).ConfirmLabel));
+        Assert.Contains("not yet synced are lost", WorkflowTexts.DirectionConfirm("download").Implication);
+        Assert.Contains("other devices", WorkflowTexts.DirectionConfirm("upload").Implication);
+    }
+
+    [Fact]
+    public void MoveTextsSayWhatStaysBehind()
+    {
+        Assert.Contains("old sync stays on the old service", WorkflowTexts.MoveImplication);
+        Assert.Contains("other devices stay linked", WorkflowTexts.MoveImplication);
+        Assert.Equal("Create a new sync on example.org and upload 12 bookmarks?", WorkflowTexts.MoveNewConfirm("example.org", 12));
+    }
 }

@@ -42,7 +42,7 @@ Words come from `UI-TERMS.md`. Platform differences are listed at the end.
 |---|---|---|---|---|
 | Connect: new sync | no | Service URL, password + confirm → `Create sync` | none | The password cannot be recovered. After success the full sync ID is shown with `Copy sync ID`. |
 | Connect: existing sync | no | Service URL, sync ID, password → `Open sync` (verifies) → direction → apply | always | Download: unsynced edits on this device are lost. Upload: changes from other devices are lost. Merge: items deleted on one side come back. |
-| Move service | yes | Service URL → `Check service` → New sync (password + confirm) or Existing sync (ID, password → `Open sync` → direction) → review → `Move now` | when it replaces something | The old sync stays on the old service and is not deleted. Other devices stay linked to the old service until they are moved too. Store the new sync ID and password. |
+| Move service | yes | Service URL → `Check service` → New sync (password + confirm) or Existing sync (ID, password → `Open sync` → direction) → review → `Move now…` | always (new: `Yes, move`; existing: the direction's `Yes, download` / `Yes, merge` / `Yes, upload`) | The old sync stays on the old service and is not deleted. Other devices stay linked to the old service until they are moved too. Store the new sync ID and password. |
 | Change password | yes | Current, New, Confirm new → `Change password` | always | Other devices stop syncing until they are unlinked and linked again with the new password. Unsynced local edits are uploaded now. Older backup files keep their own password. |
 | Backup: export | no | Backup password + confirm → `Export encrypted backup` | none | The backup password is not the sync password and cannot be recovered. |
 | Backup: import | yes | `Choose backup file…` → password of that backup → `Check backup` (dry run: item count, nothing changes) → `Replace with this backup…` | always | Replaces local bookmarks and the server copy; the other devices receive it at their next sync. A wrong password clears only the password; the file stays chosen. |
@@ -63,8 +63,9 @@ Words come from `UI-TERMS.md`. Platform differences are listed at the end.
   field is empty. Validation messages appear after pressing it.
 - Busy labels: `Checking…`, `Connecting…`, `Downloading…`, `Uploading…`,
   `Merging…`, `Moving…`, `Changing…`, `Exporting…`, `Importing…`.
-- A wizard that resumes after an app restart never resumes past a step that needs
-  a password; it restarts at the step where the password is asked.
+- A wizard that resumes (after leaving the page or an app restart) never resumes
+  on its final review: it restarts at the step that asks the password, and the
+  service check and merge preview run again.
 - Undo: the last overwrite offers `Undo` for its kind (named in words, not by
   key). Result text: `Undone: <what was undone>.`
 
