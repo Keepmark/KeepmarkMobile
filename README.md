@@ -1,11 +1,52 @@
-# Keepmark — MAUI Blazor Hybrid (Android only)
+# Keepmark for Android (KeepmarkMobile)
+
+Keepmark is private, end-to-end encrypted bookmark sync: an **independent
+alternative compatible with xBrowserSync**. It works with any xBrowserSync
+service (official, self-hosted or community) and with the official
+xBrowserSync apps: syncs created with Keepmark open there, and vice versa.
+Keepmark is not affiliated with or endorsed by xBrowserSync.
+
+The Keepmark family:
+
+- **Keepmark for browsers** — Firefox and Chromium-based browsers (`KeepmarkApp`).
+- **Keepmark for Android** — Android 10+ app (`KeepmarkMobile`).
+- **Keepmark Server** — drop-in xBrowserSync-compatible sync service with
+  opt-in extended features (`KeepmarkApi`).
+
+This repo is the Android app (MAUI Blazor Hybrid, Android 10+ / API 29).
+
+## Features
+
+- **End-to-end encryption**: bookmarks are encrypted on the device
+  (PBKDF2-SHA256 + AES-GCM); the password never leaves the phone and the
+  service operator cannot read the data.
+- **Browse and search** (full-text), add, edit, delete; pinned section,
+  clickable breadcrumb, folder-first sorting, swipe for details.
+- **Share to Keepmark** from any app: the add form opens prefilled.
+- **Automatic or manual sync**; conflicts are never resolved silently —
+  download / upload / merge, merge with preview.
+- **Safety backups**: automatic encrypted snapshot before every destructive
+  step (newest 5 kept), restorable from Backup → Safety backups.
+- **Encrypted backup** export/import, file compatible with Keepmark for browsers.
+- **Duplicates cleanup**: one copy of each link always survives.
+- **Move service**: move your bookmarks to another service, new or existing sync.
+- **App lock** with fingerprint or device PIN, configurable relock time.
+- **Local data encrypted at rest** (SQLCipher); credentials in the Android KeyStore.
+- Light / dark / system theme, logs viewer with share export.
+- **Extended features with Keepmark Server (v1.2)** with automatic fallback
+  on legacy services.
+- **Languages**: English, Italiano, Français, Español, Deutsch — follows the Android language, override in
+  Settings → Language.
+- **Privacy**: no telemetry, HTTPS-only services.
+
+## Developer guide
 
 > Behavioral spec for outsourced code verification:
 > [`docs/verification-spec.md`](docs/verification-spec.md) (requirements Rxx —
 > read it before reviewing code).
 
-Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.141 (142)**,
+Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
+v1.2 extended contract when advertised. Current version: **v1.0.147 (148)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -88,7 +129,7 @@ adb disconnect; adb connect <device-ip>:<port>; adb devices
 ## Commands (from `KeepmarkMobile/`)
 
 ```sh
-dotnet test                                            # Core unit + interop (31 tests)
+dotnet test                                            # Core unit + interop (182 tests)
 dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
 dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug  # deploy+launch
 # add "-p:AdbTarget=-s IP:PORT" when several adb entries are listed. A Debug APK
@@ -354,11 +395,12 @@ instead of a file (documented, no snapshot required).
 
 ## License
 
-GNU GPL v3 — see `LICENSE.md`. Interop logic derived from the official
-xBrowserSync `api` + `app` (also GPLv3) by the xBrowserSync team.
-This is an independent client, not affiliated with xBrowserSync.
+Proprietary — © 2026 Yari Melzani, all rights reserved. See `LICENSE.md`.
+Independent implementation, written from scratch; compatible with the
+xBrowserSync protocol. Not affiliated with or endorsed by xBrowserSync. Third-party notices: `Crypto/LzUtf8.cs` is a C# port of
+`lzutf8` (MIT, © Rotem Dan, notice kept in the file); BouncyCastle (MIT).
 
-Project home (source, releases, issues): <https://github.com/Keepmark>.
+Project home (releases, issues, documentation): <https://github.com/Keepmark>.
 
 ## Disclaimer
 
@@ -366,7 +408,7 @@ Keepmark is provided "as is", without warranty of any kind, express or
 implied, including the implied warranties of merchantability and fitness for
 a particular purpose. Use it at your own risk: the authors are not liable for
 any loss of data (including bookmarks), damage or other consequences arising
-from its use. See sections 15–17 of the GPL v3. Keep your own backups.
+from its use. See `LICENSE.md`. Keep your own backups.
 
 ## Compatibility
 

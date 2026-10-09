@@ -38,7 +38,7 @@ only as method arguments, never stored, never logged.
 |---|---|---|
 | R2.1 | Envelope = `base64(IV16B \|\| AES-GCM-256(lzutf8(JSON)))`; key = PBKDF2-SHA256/250k over UTF-8(password), salt = UTF-8(syncId) | `XCryptoService.cs:DeriveKey/Encrypt/Decrypt`; BouncyCastle required (16B IV — .NET `AesGcm` only does 12B) |
 | R2.2 | Byte-interop BOTH directions with `lzutf8@0.6.0` + original JS client | `CryptoInteropTests.cs` + `TestData/vectors.json` green; never change `Crypto/` without running both Node directions |
-| R2.3 | Legacy sync without version rejected ("open once in the original client") | `DeriveKey` throws `UnsupportedSyncVersionException` on empty version |
+| R2.3 | Legacy sync without version rejected ("open once in the official xBrowserSync client") | `DeriveKey` throws `UnsupportedSyncVersionException` on empty version |
 | R2.4 | Decrypt failure (wrong password / corrupt) surfaces as `InvalidCredentialsException`, never as generic error | Code + wrong-password tests |
 | R2.5 | Encrypted backup envelope `{App:"xBrowserSyncNg", Format:1, Salt:Base64(16B random), Blob}`; password ≥ 8, file ≤ 50 MB, tree ≤ 200k nodes (`BackupGuard`) | `BackupGuardTests.cs`; damaged-file vs wrong-password distinguished (base64 pre-check) |
 
@@ -63,7 +63,7 @@ only as method arguments, never stored, never logged.
 | R4.5 | `ForceSyncAsync` matrix: remote≠local + dirty → Conflict (no auto-merge); remote≠local + clean → pull; equal + dirty → push; equal + clean → stamp `LastSyncAt`. Offline → Offline status, no throw to UI. |
 | R4.6 | **Conflict resolution**: when status is Conflict, engine exposes `ResolveConflictPullAsync`, `ResolveConflictPushAsync`, `ResolveConflictMergeAsync`, and `GetConflictMergePreviewAsync`. UI MUST present 3 choices (Pull/Push/Merge) with preview counts from `GetConflictMergePreviewAsync`. Safety backup of destroyed side(s) taken BEFORE resolution (R7.1). Pull replaces local with remote; Push overwrites remote with local; Merge unions both sides (never deletes). |
 | R4.7 | Version gates: service < MinApiVersion refused at check; remote sync format > SyncClientVersion refused on pull/compare. |
-| R4.8 | `Normalize` on push: empty description/tags → null, descriptions truncated to 300 chars (byte-compatible with the original client). |
+| R4.8 | `Normalize` on push: empty description/tags → null, descriptions truncated to 300 chars (byte-compatible with the official xBrowserSync clients). |
 | R4.9 | Bulk delete by stable NodeId = ONE transaction + ONE push (no sync storms). Single delete returns the subtree for 6 s undo.
 
 ## 5. Credentials & local store
@@ -135,7 +135,7 @@ the applied result. Rules:
 | R8.3 | Secrets hygiene: password fields cleared on success AND failure (keep-new convenience only where stated); password never in logs, toasts, or backup filenames. |
 | R8.4 | Gating matrix: Switch-service menu + page require an existing link (disabled + guard page); Sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty; merge disabled unless both sides hold items); danger buttons outline-first/solid-confirm. |
 | R8.5 | Status page: mode/state/last-sync/service (+version) / local DB bytes / server copy bytes + max + % + bar (one `/info` probe per visit, offline = "unknown") / content stats / app + sync-format + API versions. |
-| R8.6 | About page declares v1.1 + v1.2 extended contract (with fallback) + encryption + independence + GPLv3. Bug-report mail includes app/API versions. |
+| R8.6 | About page declares v1.1 + v1.2 extended contract (with fallback) + encryption + independence + proprietary license (© Yari Melzani). Bug-report mail includes app/API versions. |
 | R8.7 | Error evidence belongs to the step that produced it: wizard pages (Connect, Switch service) render one error box per action cluster (check / verify-link / apply-review) adjacent to its button, with `role="alert"`, instead of a single shared box. Multi-outcome successes restate WHAT ran (mode + direction + target) via the pure `MoveResult.Describe` helper (unit-pinned), never a bare "Done". |
 
 ## 9. Logging (`Logging.cs`, `InMemoryLogger`, Logs page)
@@ -176,7 +176,7 @@ fails the review.
 | `Settings.razor` (R6.8) | Change password: empty current/new, new == current, wrong current → exact R8.1 strings, zero mutations; success → old password dead everywhere, safety row `change-password`, master re-wrapped. Theme/mode/verbosity persist. |
 | `Home.razor` (R4.1, R4.4, R4.5) | Tap opens, ⋮ menu actions, swipe expand/collapse, pinned section, breadcrumb, folder-first sort, share-receive prefill, folder picker Select/Cancel. Edit in Auto → background push; conflicting remote → Conflict status, never silent merge/discard. Scroll/query preserved across `DataChanged`. Single delete → 6 s undo, no safety file. |
 | `Logs.razor` (R9) | 200-entry viewer, level filter, share export. No bodies/passwords/keys/full sync IDs in any row (spot-check after a sync + a merge). |
-| `About.razor` (R8.6) | Declares v1.1 + v1.2 extended contract with fallback, encryption, independence, GPLv3. Bug-report mail carries app + API versions. |
+| `About.razor` (R8.6) | Declares v1.1 + v1.2 extended contract with fallback, encryption, independence, proprietary license. Bug-report mail carries app + API versions. |
 | Cross-view | R4.2 live v1.2 against a v1.2 server (conditional GET 304 + revision CAS in logs). R7.4 restore against real server. Uninstall/reinstall data-loss behavior. |
 
 ## 12. Static checks (reviewer-run, must all pass)
