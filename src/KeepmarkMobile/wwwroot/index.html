@@ -8,12 +8,22 @@
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <!-- Asset cache-buster: bump ?v= on every release that touches CSS/JS,
          otherwise the WebView may keep serving stale files after update. -->
-    <link rel="stylesheet" href="app.css?v=113" />
+    <link rel="stylesheet" href="app.css?v=114" />
     <link rel="stylesheet" href="KeepmarkMobile.styles.css?v=99" />
     <link rel="icon" href="favicon.png?v=80">
 </head>
 
 <body>
+
+    <!-- Shared paint servers for the folder tile (RowTile.razor). Defined once
+         here so every tile references the same ids; 0x0, not display:none,
+         which can drop gradients in WebView. -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+        <defs>
+            <linearGradient id="km-fold-face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b57a8" /><stop offset="1" stop-color="#273f85" /></linearGradient>
+            <filter id="km-fold-lift" x="-20%" y="-30%" width="140%" height="160%"><feDropShadow dx="0" dy="-1.2" stdDeviation="1" flood-color="#000" flood-opacity="0.4" /></filter>
+        </defs>
+    </svg>
 
     <div class="status-bar-safe-area"></div>
 
