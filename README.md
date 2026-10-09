@@ -5,7 +5,7 @@
 > read it before reviewing code).
 
 Rewrite of the xBrowserSync Android client, interoperable with the public
-xBrowserSync API **v1.1.13**. Current version: **v1.0.134 (135)**,
+xBrowserSync API **v1.1.13**. Current version: **v1.0.135 (136)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -54,6 +54,13 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   icon action sheet, side drawer with sync card under the fixed top bar.
 - Security: SQLCipher store, KeyStore creds, no telemetry, HTTPS-only,
   app lock off by default with mandatory device-PIN confirmation on enable.
+- App lock (Settings → Security, `/settings/security`): relock after
+  Immediately / 1 / 5 / 15 / 30 min / 1 h / 4 h / only on restart (Core
+  `LockPolicy`; old free-form timeouts snap down to the stricter preset).
+  Background time uses `SystemClock.ElapsedRealtime` (wall-clock changes
+  can't bypass it). Locked + foreground opens the system prompt directly;
+  a cancel leaves a manual Unlock button (no auto re-prompt loop).
+  Enable/disable or a longer relock time needs the device PIN.
 - Duplicates cleanup: **one copy of each link must always survive**
   (structural enforcement, never just a warning). Single By-link view,
   compact rows, red-✕ marking with locked 🔒 last copy, per-group + global

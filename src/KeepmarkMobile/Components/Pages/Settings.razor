@@ -3,7 +3,6 @@
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
-@inject KeepmarkMobile.Services.IAppLockService AppLock
 @inject KeepmarkMobile.Services.IStatusBarService StatusBar
 @inject Microsoft.JSInterop.IJSRuntime JS
 
@@ -47,30 +46,20 @@
 </div>
 
 <div class="mb-3">
-    <label class="form-label">App lock (device PIN / biometric)</label>
-    <select class="form-select" @bind="appLock">
-        <option value="Off">Off (default)</option>
-        <option value="PinOnly">PIN only (device PIN, pattern or password)</option>
-        <option value="BiometricAndPin">Biometric + PIN fallback</option>
-    </select>
+    <label class="form-label">Security</label>
+    <a class="xbs-setting-link" href="settings/security">
+        <span>
+            <strong>App lock</strong>
+            <small class="text-muted d-block">@LockSummary</small>
+        </span>
+        <span aria-hidden="true">›</span>
+    </a>
 </div>
-
-@if (appLock != "Off")
-{
-    <div class="mb-3">
-        <label class="form-label">Auto-lock after (minutes, 0 = on background)</label>
-        <input type="number" class="form-control" @bind="lockTimeout" min="0" max="60" />
-    </div>
-}
 
 <button class="btn btn-primary" @onclick="Save">Save</button>
 @if (saved)
 {
     <span class="text-success ms-2" role="status">Saved.</span>
-}
-@if (!string.IsNullOrEmpty(error))
-{
-    <div class="alert alert-danger mt-2" role="alert">@error</div>
 }
 
 @if (linkedUrl is not null)
@@ -118,9 +107,6 @@
     private Core.Sync.SyncMode mode;
     private Core.Logging.XbsLogLevel verbosity;
     private string theme = "System";
-    private string appLock = "Off";
-    private int lockTimeout;
-    private string error = string.Empty;
     private bool saved;
     private string? linkedUrl;
     private string pwCurrent = string.Empty;
@@ -136,8 +122,6 @@
         mode = AppSettings.Mode;
         verbosity = AppSettings.Verbosity;
         theme = AppSettings.Theme;
-        appLock = AppSettings.AppLock;
-        lockTimeout = AppSettings.LockTimeoutMinutes;
     }
 
     protected override async Task OnInitializedAsync()
@@ -156,31 +140,7 @@
 
     private async Task Save()
     {
-        error = string.Empty;
         saved = false;
-        // Enabling or disabling app lock always requires device-PIN confirmation.
-        if (appLock != AppSettings.AppLock)
-        {
-            bool confirmed = false;
-            try
-            {
-                confirmed = await AppLock.AuthenticateAsync(
-                    appLock == "Off" ? "Confirm disabling app lock" : "Confirm app lock activation",
-                    requireDeviceCredential: true);
-            }
-            catch
-            {
-                confirmed = false;
-            }
-
-            if (!confirmed)
-            {
-                // Only the lock change needs the PIN: the other settings still save.
-                appLock = AppSettings.AppLock;
-                error = "Not confirmed with the device PIN. App lock unchanged; the other settings are saved.";
-            }
-        }
-
         AppSettings.Mode = mode;
         AppSettings.Verbosity = verbosity;
         AppSettings.Theme = theme is "Light" or "Dark" ? theme : "System";
@@ -188,11 +148,15 @@
         Session.NotifySettingsChanged();
         try { await JS.InvokeVoidAsync("xbsSetTheme", theme); } catch { }
         try { StatusBar.ApplyTheme(theme); } catch { }
-        AppSettings.AppLock = appLock;
-        AppSettings.LockTimeoutMinutes = Math.Clamp(lockTimeout, 0, 60);
-        Session.NotifySettingsChanged();
         saved = true;
     }
+
+    private string LockSummary => AppSettings.AppLock switch
+    {
+        "PinOnly" => "PIN only · " + Keepmark.Core.Security.LockPolicy.Label(AppSettings.LockTimeoutMinutes),
+        "BiometricAndPin" => "Biometric + PIN · " + Keepmark.Core.Security.LockPolicy.Label(AppSettings.LockTimeoutMinutes),
+        _ => "Off",
+    };
 
     private static string? ValidatePasswordChange(string current, string next, string confirm)
     {

@@ -1987,3 +1987,22 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
     background: var(--km-surface);
 }
 .xbs-review-list { margin: 0.25rem 0 0.5rem; padding-left: 1.25rem; }
+
+/* Settings → sub-page row (Security). */
+.xbs-setting-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 56px;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--km-line);
+    border-radius: 12px;
+    background: var(--km-surface);
+    color: var(--km-ink);
+    text-decoration: none;
+}
+
+.xbs-setting-link > span[aria-hidden] { color: var(--km-ink-2); font-size: 1.4rem; }
+
+a.xbs-back { text-decoration: none; }

@@ -41,11 +41,19 @@
     <div class="xbs-lock" role="dialog" aria-modal="true" aria-label="Unlock app">
         <div class="xbs-lock-card">
             <h3>Keepmark is locked</h3>
-            <p class="text-muted">Authenticate to continue.</p>
-            <button class="btn btn-primary btn-lg" @onclick="Unlock">Unlock</button>
-            @if (!string.IsNullOrEmpty(lockError))
+            @if (LockState.AutoPromptSuppressed)
             {
-                <p class="text-danger mt-2">@lockError</p>
+                @* Prompt cancelled or failed: manual retry, never an auto loop. *@
+                <p class="text-muted">Authenticate to continue.</p>
+                <button class="btn btn-primary btn-lg" @onclick="Unlock">Unlock</button>
+                @if (!string.IsNullOrEmpty(lockError))
+                {
+                    <p class="text-danger mt-2">@lockError</p>
+                }
+            }
+            else
+            {
+                <p class="text-muted">Waiting for your PIN or fingerprint…</p>
             }
         </div>
     </div>
@@ -58,6 +66,7 @@
     protected override void OnInitialized()
     {
         LockState.Changed += OnLockChanged;
+        LockState.PromptRequested += OnPromptRequested;
         Toast.Changed += OnToast;
         SharedImport.Arrived += OnShareArrived;
         _ = WatchSessionAsync();
@@ -68,6 +77,12 @@
         if (firstRender)
         {
             await ApplyThemeAsync();
+            // Cold start: the lock may have asked for the prompt before this
+            // layout subscribed.
+            if (LockState.ShouldPrompt)
+            {
+                await Unlock();
+            }
         }
     }
 
@@ -135,6 +150,7 @@
     }
 
     private void OnLockChanged() => InvokeAsync(StateHasChanged);
+    private void OnPromptRequested() => InvokeAsync(Unlock);
     private void OnToast() => InvokeAsync(StateHasChanged);
 
     private void OnShareArrived() => InvokeAsync(() =>
@@ -147,9 +163,18 @@
         }
     });
 
+    /// <summary>Opens the system prompt (auto on resume, or the manual Unlock
+    /// button after a cancel). Single-flight via AuthInProgress.</summary>
     private async Task Unlock()
     {
+        if (!LockState.Locked || LockState.AuthInProgress)
+        {
+            return;
+        }
+
         lockError = string.Empty;
+        LockState.BeginAuth();
+        StateHasChanged();
         bool ok = false;
         try
         {
@@ -159,20 +184,23 @@
         {
             ok = false;
         }
+        finally
+        {
+            LockState.EndAuth(ok);
+        }
 
-        if (ok)
+        if (!ok)
         {
-            LockState.Unlock();
+            lockError = "Not unlocked.";
         }
-        else
-        {
-            lockError = "Authentication failed.";
-        }
+
+        StateHasChanged();
     }
 
     public void Dispose()
     {
         LockState.Changed -= OnLockChanged;
+        LockState.PromptRequested -= OnPromptRequested;
         Toast.Changed -= OnToast;
         SharedImport.Arrived -= OnShareArrived;
         if (Session.Engine is not null)
