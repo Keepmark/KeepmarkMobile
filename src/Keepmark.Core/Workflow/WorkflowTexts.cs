@@ -100,6 +100,10 @@ public static class WorkflowTexts
 
     public const string SafetyDeleteImplication = "This safety backup is gone for good.";
 
+    // Logs (mobile only: the extension has no log clear).
+    public const string LogsClearImplication =
+        "Every log entry on this device is deleted; use Export… first if you need them. Bookmarks and settings are not touched.";
+
     // Duplicates.
     public static Confirm DupDeleteConfirm(int count) => new(
         $"Delete {count} marked duplicate(s)?",

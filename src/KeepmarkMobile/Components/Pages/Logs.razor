@@ -1,4 +1,5 @@
 @page "/logs"
+@using Keepmark.Core.Workflow
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.ToastState Toast
 
@@ -19,16 +20,13 @@
     <input class="form-control xbs-log-filter-text" aria-label="Filter log text" placeholder="Filter text…" @bind="filter" @bind:event="oninput" />
     <button class="btn btn-outline-secondary" @onclick="Refresh">Refresh</button>
     <button class="btn btn-outline-secondary" @onclick="Export">Export…</button>
-    @if (!armedClear)
-    {
-        <button class="btn btn-outline-danger" @onclick="() => armedClear = true">Clear…</button>
-    }
-    else
-    {
-        <button class="btn btn-danger" @onclick="ExecuteClear">Yes, clear</button>
-        <button class="btn btn-secondary" @onclick="() => armedClear = false">Cancel</button>
-    }
+    <button class="btn btn-outline-danger" @onclick="() => armedClear = true" disabled="@armedClear">Clear…</button>
 </div>
+@if (armedClear)
+{
+    <ConfirmBlock Message="Clear the log?" Implication="@WorkflowTexts.LogsClearImplication" ConfirmLabel="Yes, clear"
+                  OnConfirm="ExecuteClear" OnCancel="() => armedClear = false" />
+}
 
 @if (Shown().Count == 0)
 {
