@@ -91,9 +91,9 @@ Project home: <https://github.com/Keepmark>.
 - [Workflows](docs/WORKFLOWS.md) and [UI terms](docs/UI-TERMS.md): shared
   with Keepmark for browsers.
 
-## Contact
+## Feedback
 
-Questions, feedback, security reports: <keepmark@proton.me>.
+Questions, bug reports and ideas: [open an issue](../../issues).
 
 ## License
 
