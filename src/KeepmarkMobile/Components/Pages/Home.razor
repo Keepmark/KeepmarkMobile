@@ -10,29 +10,29 @@
 @inject IJSRuntime JS
 @implements IDisposable
 
-<PageTitle>Explore</PageTitle>
+<PageTitle>@L.Get(Str.NavExplore)</PageTitle>
 
 @if (!ready)
 {
-    <p><em>Loading local bookmarks…</em></p>
+    <p><em>@L.Get(Str.HomeLoading)</em></p>
 }
 else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
 {
-    <p>No sync connected. <a href="connect">Connect to a service</a> to get started.</p>
+    <p>@L.Get(Str.HomeNoSyncA) <a href="connect">@L.Get(Str.HomeConnectLink)</a> @L.Get(Str.HomeNoSyncB)</p>
 }
 else
 {
-    <h1 class="visually-hidden">Bookmarks</h1>
+    <h1 class="visually-hidden">@L.Get(Str.NavGroupBookmarks)</h1>
     <header class="xbs-pagebar @(searchOpen ? "searching" : string.Empty)">
         @if (searchOpen)
         {
-            <button class="xbs-barbtn" data-back="10" @onclick="CloseSearch" aria-label="Close search"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
+            <button class="xbs-barbtn" data-back="10" @onclick="CloseSearch" aria-label="@L.Get(Str.HomeCloseSearch)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
             <div class="xbs-barsearch">
-                <input id="xbs-q" class="xbs-barsearch-input" type="search" enterkeyhint="search" placeholder="Search bookmarks" aria-label="Search bookmarks"
+                <input id="xbs-q" class="xbs-barsearch-input" type="search" enterkeyhint="search" placeholder="@L.Get(Str.HomeSearchPlaceholder)" aria-label="@L.Get(Str.HomeSearchPlaceholder)"
                        @oninput="OnSearchInput" value="@query" />
                 @if (!string.IsNullOrEmpty(query))
                 {
-                    <button class="xbs-barbtn sm" @onclick="ClearSearchAndFocus" aria-label="Clear search"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg></button>
+                    <button class="xbs-barbtn sm" @onclick="ClearSearchAndFocus" aria-label="@L.Get(Str.HomeClearSearch)"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg></button>
                 }
             </div>
         }
@@ -40,21 +40,21 @@ else
         {
             @if (crumbs.Count > 0)
             {
-                <button class="xbs-barbtn" @onclick="GoUp" aria-label="Back to @ParentName"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
+                <button class="xbs-barbtn" @onclick="GoUp" aria-label="@L.Get(Str.HomeBackTo, ParentName)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
             }
             else
             {
                 <img src="img/mark.png" alt="" class="xbs-bar-mark" />
             }
-            <button class="xbs-barpath" @onclick="TogglePathMenu" disabled="@(crumbs.Count == 0)" aria-label="Folder path: @PathLabel" aria-expanded="@pathMenuOpen.ToString().ToLowerInvariant()">
+            <button class="xbs-barpath" @onclick="TogglePathMenu" disabled="@(crumbs.Count == 0)" aria-label="@L.Get(Str.HomeFolderPathAria, PathLabel)" aria-expanded="@pathMenuOpen.ToString().ToLowerInvariant()">
                 @if (crumbs.Count > 0)
                 {
                     <span class="xbs-barpath-up"><span class="xbs-barpath-uptext">@ParentPath</span><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" /></svg></span>
                 }
                 <span class="xbs-barpath-name">@CurrentName</span>
             </button>
-            <button class="xbs-barbtn" @onclick="OpenSearch" aria-label="Search bookmarks"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg></button>
-            <button class="xbs-barbtn" @onclick="ToggleSortMenu" aria-label="Sort: @SortLabel" aria-expanded="@sortMenuOpen.ToString().ToLowerInvariant()">
+            <button class="xbs-barbtn" @onclick="OpenSearch" aria-label="@L.Get(Str.HomeSearchPlaceholder)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg></button>
+            <button class="xbs-barbtn" @onclick="ToggleSortMenu" aria-label="@L.Get(Str.HomeSortAria, SortLabel)" aria-expanded="@sortMenuOpen.ToString().ToLowerInvariant()">
                 <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M4 16l3 3 3-3M14 7h6M14 12h4M14 17h2" /></svg>
                 @if (sortMode != "Default") { <span class="xbs-barbtn-dot" aria-hidden="true"></span> }
             </button>
@@ -64,9 +64,9 @@ else
     @if (pathMenuOpen && !searchOpen)
     {
         <div class="xbs-pop-scrim" data-back="40" @onclick="ClosePops" aria-hidden="true"></div>
-        <div class="xbs-pop left" role="menu" aria-label="Folder path">
+        <div class="xbs-pop left" role="menu" aria-label="@L.Get(Str.HomeFolderPathMenu)">
             <button class="xbs-pop-item" role="menuitem" @onclick="() => { ClosePops(); return GoRoot(); }">
-                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg><span>All bookmarks</span>
+                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" /></svg><span>@L.Get(Str.HomeAllBookmarks)</span>
             </button>
             @{ var depth = 0; }
             @foreach (var c in crumbs.Reverse())
@@ -85,8 +85,8 @@ else
     @if (sortMenuOpen && !searchOpen)
     {
         <div class="xbs-pop-scrim" data-back="40" @onclick="ClosePops" aria-hidden="true"></div>
-        <div class="xbs-pop right" role="menu" aria-label="Sort">
-            <div class="xbs-pop-head">Sort this list</div>
+        <div class="xbs-pop right" role="menu" aria-label="@L.Get(Str.HomeSortMenu)">
+            <div class="xbs-pop-head">@L.Get(Str.HomeSortHead)</div>
             @foreach (var (mode, label) in SortModes)
             {
                 <button class="xbs-pop-item @(sortMode == mode ? "current" : string.Empty)" role="menuitemradio" aria-checked="@((sortMode == mode).ToString().ToLowerInvariant())"
@@ -95,20 +95,20 @@ else
                     @if (sortMode == mode) { <svg class="km-ico sm xbs-pop-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
                 </button>
             }
-            <p class="xbs-pop-note">A–Z and Z–A keep folders on top. Sorting never changes the synced order.</p>
+            <p class="xbs-pop-note">@L.Get(Str.HomeSortNote)</p>
         </div>
     }
 
     @if (searching)
     {
-        <p class="xbs-hint"><em>Searching…</em></p>
+        <p class="xbs-hint"><em>@L.Get(Str.HomeSearching)</em></p>
     }
     else if (isSearch)
     {
-        <h2 class="xbs-section" role="status">@hits.Count result(s)</h2>
+        <h2 class="xbs-section" role="status">@Loc.Plural(Str.HomeResults, hits.Count)</h2>
         @if (hitRows.Count == 0 && !searching)
         {
-            <p class="xbs-hint" role="status">No matches. Try fewer words, check spelling, or clear the search.</p>
+            <p class="xbs-hint" role="status">@L.Get(Str.HomeNoMatches)</p>
         }
         else
         {
@@ -128,7 +128,7 @@ else
             <div class="xbs-pinned-box">
                 <button class="xbs-pinned-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
                     <svg class="km-ico sm xbs-pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg>
-                    <span class="xbs-pinned-label">Pinned</span>
+                    <span class="xbs-pinned-label">@L.Get(Str.HomePinned)</span>
                     <span class="xbs-count">@pinnedRows.Count</span>
                     <svg class="km-ico sm chev @(pinnedOpen ? "open" : string.Empty)" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                 </button>
@@ -155,7 +155,7 @@ else
         }
         else
         {
-            <p class="xbs-hint" role="status">@(crumbs.Count == 0 ? "No bookmarks yet. Tap Add below to create your first." : "This folder is empty. Tap Add below to add one here.")</p>
+            <p class="xbs-hint" role="status">@(crumbs.Count == 0 ? L.Get(Str.HomeEmptyRoot) : L.Get(Str.HomeEmptyFolder))</p>
         }
     }
 
@@ -175,21 +175,21 @@ else
             }
             else
             {
-                <text>@(lastSync is null ? "Not synced yet" : "Synced · " + FormatLastSync(lastSync))</text>
+                <text>@(lastSync is null ? L.Get(Str.NavNotSyncedYet) : L.Get(Str.NavSynced, FormatLastSync(lastSync)))</text>
             }
         </span>
         @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
         {
-            <button class="xbs-statusbar-sync" @onclick="SyncNow">Sync now</button>
+            <button class="xbs-statusbar-sync" @onclick="SyncNow">@L.Get(Str.CommonSyncNow)</button>
         }
     </div>
 }
 
 @if (ready && Session.Engine is not null)
 {
-    <button class="xbs-fab" @onclick="AddNew" aria-label="Add bookmark or folder">
+    <button class="xbs-fab" @onclick="AddNew" aria-label="@L.Get(Str.HomeAddAria)">
         <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-        <span class="xbs-fab-label" aria-hidden="true">Add</span>
+        <span class="xbs-fab-label" aria-hidden="true">@L.Get(Str.HomeAdd)</span>
     </button>
 }
 
@@ -203,7 +203,7 @@ else
 @if (menuFor is not null)
 {
     <div class="xbs-sheet-backdrop" data-back="30" @onclick="() => menuFor = null">
-        <div class="xbs-sheet" role="dialog" aria-modal="true" aria-label="Actions for @(menuFor.Title ?? menuFor.Url ?? "item")" @onclick:stopPropagation="true">
+        <div class="xbs-sheet" role="dialog" aria-modal="true" aria-label="@L.Get(Str.HomeActionsFor, menuFor.Title ?? menuFor.Url ?? L.Get(Str.HomeItemWord))" @onclick:stopPropagation="true">
             <div class="xbs-sheet-handle" aria-hidden="true"></div>
             <div class="xbs-sheet-info @(MenuExpanded ? "expanded" : string.Empty)" data-sheet-info aria-expanded="@MenuExpanded.ToString().ToLowerInvariant()">
             <div class="xbs-sheet-head">
@@ -225,18 +225,18 @@ else
             <div class="xbs-actions">
                 @if (!menuFor.IsFolder)
                 {
-                    <button class="xbs-action" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" /></svg>Open</button>
-                    <button class="xbs-action" @onclick="() => ShareRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" /></svg>Share</button>
+                    <button class="xbs-action" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" /></svg>@L.Get(Str.HomeOpen)</button>
+                    <button class="xbs-action" @onclick="() => ShareRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" /></svg>@L.Get(Str.HomeShare)</button>
                 }
-                <button class="xbs-action" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" /></svg>Edit</button>
-                <button class="xbs-action" @onclick="() => TogglePin(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg>@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? "Unpin" : "Pin")</button>
+                <button class="xbs-action" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" /></svg>@L.Get(Str.HomeEdit)</button>
+                <button class="xbs-action" @onclick="() => TogglePin(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg>@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? L.Get(Str.HomeUnpin) : L.Get(Str.HomePin))</button>
                 @if (isSearch || menuFor.ParentRowId != CurrentParent)
                 {
-                    <button class="xbs-action" @onclick="() => GoToLocation(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>Go to location</button>
+                    <button class="xbs-action" @onclick="() => GoToLocation(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>@L.Get(Str.HomeGoToLocation)</button>
                 }
-                <button class="xbs-action danger" @onclick="() => DeleteRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12h9l1-12M9.5 7V4.5h5V7" /></svg>Delete</button>
+                <button class="xbs-action danger" @onclick="() => DeleteRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12h9l1-12M9.5 7V4.5h5V7" /></svg>@L.Get(Str.CommonDelete)</button>
             </div>
-            <button class="btn btn-secondary w-100 mt-2" @onclick="() => menuFor = null">Cancel</button>
+            <button class="btn btn-secondary w-100 mt-2" @onclick="() => menuFor = null">@L.Get(Str.CommonCancel)</button>
         </div>
     </div>
 }
@@ -244,8 +244,8 @@ else
 @if (undo is not null)
 {
     <div class="xbs-undo">
-        <span>Bookmark deleted.</span>
-        <button class="xbs-undo-btn" @onclick="UndoDelete">Undo</button>
+        <span>@L.Get(Str.HomeDeleted)</span>
+        <button class="xbs-undo-btn" @onclick="UndoDelete">@L.Get(Str.CommonUndo)</button>
     </div>
 }
 
@@ -327,10 +327,10 @@ else
 
     private string FriendlyStatus() => engineStatus switch
     {
-        Core.Sync.SyncStatus.Syncing => "Syncing…",
-        Core.Sync.SyncStatus.Offline => "Offline — will retry",
-        Core.Sync.SyncStatus.Conflict => "Conflict — see Status",
-        Core.Sync.SyncStatus.Error => "Sync error",
+        Core.Sync.SyncStatus.Syncing => L.Get(Str.CommonSyncing),
+        Core.Sync.SyncStatus.Offline => L.Get(Str.NavOffline),
+        Core.Sync.SyncStatus.Conflict => L.Get(Str.NavConflict),
+        Core.Sync.SyncStatus.Error => L.Get(Str.NavSyncError),
         _ => string.Empty
     };
 
@@ -460,11 +460,11 @@ else
         }
     }
 
-    private static string FormatLastSync(DateTimeOffset? value)
+    private string FormatLastSync(DateTimeOffset? value)
     {
         if (value is null)
         {
-            return "never";
+            return L.Get(Str.StatusNever);
         }
 
         var local = value.Value.ToLocalTime();
@@ -580,7 +580,7 @@ else
         Session.Log.Verbose("ui", $"Shared: {row.Title}");
         try
         {
-            await Share.Default.RequestAsync(new ShareTextRequest($"{row.Title}\n{row.Url}", "Share bookmark"));
+            await Share.Default.RequestAsync(new ShareTextRequest($"{row.Title}\n{row.Url}", L.Get(Str.HomeShareTitle)));
         }
         catch { }
     }
@@ -598,7 +598,7 @@ else
         await RefreshAsync();
         // Paint first: the toast must never gate the list update.
         StateHasChanged();
-        _ = Toast.ShowAsync(added ? "Pinned" : "Unpinned");
+        _ = Toast.ShowAsync(added ? L.Get(Str.HomePinnedToast) : L.Get(Str.HomeUnpinnedToast));
     }
 
     private async Task DeleteRow(ItemRow? row)
@@ -813,13 +813,13 @@ else
             await RefreshAsync();
             // Paint first: the toast must never gate the list update.
             StateHasChanged();
-            var done = $"Sync complete {DateTime.Now:HH:mm:ss}";
-            Session.Log.Info("ui", Session.Engine.Status == Core.Sync.SyncStatus.Idle
-                ? done
+            var idle = Session.Engine.Status == Core.Sync.SyncStatus.Idle;
+            Session.Log.Info("ui", idle
+                ? $"Sync complete {DateTime.Now:HH:mm:ss}"
                 : $"Sync finished: {Session.Engine.Status}");
-            _ = Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
-                ? done
-                : $"Sync finished: {Session.Engine.Status}",
+            _ = Toast.ShowAsync(idle
+                ? L.Get(Str.NavSyncComplete, $"{DateTime.Now:HH:mm:ss}")
+                : L.Get(Str.NavSyncFinished, Core.Sync.SyncStatusText.Label(Session.Engine.Status)),
                 isError: Session.Engine.Status is not (Core.Sync.SyncStatus.Idle or Core.Sync.SyncStatus.Offline));
         }
         catch (Exception ex)
@@ -947,27 +947,27 @@ else
     private bool sortMenuOpen;
     private bool focusSearch;
 
-    private static readonly (string Mode, string Label)[] SortModes =
-        [("Default", "Original order"), ("Asc", "A to Z"), ("Desc", "Z to A")];
+    private (string Mode, string Label)[] SortModes =>
+        [("Default", L.Get(Str.HomeSortOriginal)), ("Asc", L.Get(Str.HomeSortAsc)), ("Desc", L.Get(Str.HomeSortDesc))];
 
-    private string SortLabel => SortModes.FirstOrDefault(m => m.Mode == sortMode).Label ?? "Original order";
+    private string SortLabel => SortModes.FirstOrDefault(m => m.Mode == sortMode).Label ?? L.Get(Str.HomeSortOriginal);
 
-    private string CurrentName => crumbs.Count == 0 ? "Keepmark" : crumbs.Peek().Title ?? "Folder";
+    private string CurrentName => crumbs.Count == 0 ? "Keepmark" : crumbs.Peek().Title ?? L.Get(Str.HomeFolderWord);
 
-    private string ParentName => crumbs.Count < 2 ? "All bookmarks" : crumbs.ElementAt(1).Title ?? "Folder";
+    private string ParentName => crumbs.Count < 2 ? L.Get(Str.HomeAllBookmarks) : crumbs.ElementAt(1).Title ?? L.Get(Str.HomeFolderWord);
 
     /// <summary>Ancestors above the current folder, nearest last; long chains keep only the two nearest.</summary>
     private string ParentPath
     {
         get
         {
-            var names = new List<string> { "All bookmarks" };
-            names.AddRange(crumbs.Reverse().SkipLast(1).Select(c => c.Title ?? "Folder"));
+            var names = new List<string> { L.Get(Str.HomeAllBookmarks) };
+            names.AddRange(crumbs.Reverse().SkipLast(1).Select(c => c.Title ?? L.Get(Str.HomeFolderWord)));
             return names.Count > 2 ? "… › " + string.Join(" › ", names.TakeLast(2)) : string.Join(" › ", names);
         }
     }
 
-    private string PathLabel => string.Join(", ", new[] { "All bookmarks" }.Concat(crumbs.Reverse().Select(c => c.Title ?? "Folder")));
+    private string PathLabel => string.Join(", ", new[] { L.Get(Str.HomeAllBookmarks) }.Concat(crumbs.Reverse().Select(c => c.Title ?? L.Get(Str.HomeFolderWord))));
 
     private void ClosePops()
     {

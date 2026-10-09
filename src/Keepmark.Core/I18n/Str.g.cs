@@ -176,6 +176,47 @@ public static partial class Str
     public const string ErrNetwork = nameof(ErrNetwork);
     public const string SettingsLanguage = nameof(SettingsLanguage);
     public const string SettingsLanguageSystem = nameof(SettingsLanguageSystem);
+    public const string CommonUndo = nameof(CommonUndo);
+    public const string HomeLoading = nameof(HomeLoading);
+    public const string HomeNoSyncA = nameof(HomeNoSyncA);
+    public const string HomeConnectLink = nameof(HomeConnectLink);
+    public const string HomeNoSyncB = nameof(HomeNoSyncB);
+    public const string HomeCloseSearch = nameof(HomeCloseSearch);
+    public const string HomeSearchPlaceholder = nameof(HomeSearchPlaceholder);
+    public const string HomeClearSearch = nameof(HomeClearSearch);
+    public const string HomeBackTo = nameof(HomeBackTo);
+    public const string HomeFolderPathAria = nameof(HomeFolderPathAria);
+    public const string HomeSortAria = nameof(HomeSortAria);
+    public const string HomeAllBookmarks = nameof(HomeAllBookmarks);
+    public const string HomeFolderPathMenu = nameof(HomeFolderPathMenu);
+    public const string HomeSortMenu = nameof(HomeSortMenu);
+    public const string HomeSortHead = nameof(HomeSortHead);
+    public const string HomeSortOriginal = nameof(HomeSortOriginal);
+    public const string HomeSortAsc = nameof(HomeSortAsc);
+    public const string HomeSortDesc = nameof(HomeSortDesc);
+    public const string HomeSortNote = nameof(HomeSortNote);
+    public const string HomeSearching = nameof(HomeSearching);
+    public const string HomeResults_one = nameof(HomeResults_one);
+    public const string HomeResults_other = nameof(HomeResults_other);
+    public const string HomeNoMatches = nameof(HomeNoMatches);
+    public const string HomePinned = nameof(HomePinned);
+    public const string HomeEmptyRoot = nameof(HomeEmptyRoot);
+    public const string HomeEmptyFolder = nameof(HomeEmptyFolder);
+    public const string HomeAddAria = nameof(HomeAddAria);
+    public const string HomeAdd = nameof(HomeAdd);
+    public const string HomeActionsFor = nameof(HomeActionsFor);
+    public const string HomeItemWord = nameof(HomeItemWord);
+    public const string HomeFolderWord = nameof(HomeFolderWord);
+    public const string HomeOpen = nameof(HomeOpen);
+    public const string HomeShare = nameof(HomeShare);
+    public const string HomeEdit = nameof(HomeEdit);
+    public const string HomePin = nameof(HomePin);
+    public const string HomeUnpin = nameof(HomeUnpin);
+    public const string HomeGoToLocation = nameof(HomeGoToLocation);
+    public const string HomeDeleted = nameof(HomeDeleted);
+    public const string HomePinnedToast = nameof(HomePinnedToast);
+    public const string HomeUnpinnedToast = nameof(HomeUnpinnedToast);
+    public const string HomeShareTitle = nameof(HomeShareTitle);
     public const string CommonSyncNow = nameof(CommonSyncNow);
     public const string CommonSyncing = nameof(CommonSyncing);
     public const string CommonStatus = nameof(CommonStatus);
@@ -495,6 +536,8 @@ public static partial class Str
     public const string ConnReviewTitles = nameof(ConnReviewTitles);
     /// <summary>Base for Loc.Plural (ConnUnlinkIntro_one / ConnUnlinkIntro_other).</summary>
     public const string ConnUnlinkIntro = nameof(ConnUnlinkIntro);
+    /// <summary>Base for Loc.Plural (HomeResults_one / HomeResults_other).</summary>
+    public const string HomeResults = nameof(HomeResults);
     /// <summary>Base for Loc.Plural (StatusMergeWouldTitles_one / StatusMergeWouldTitles_other).</summary>
     public const string StatusMergeWouldTitles = nameof(StatusMergeWouldTitles);
     /// <summary>Base for Loc.Plural (SwANewText_one / SwANewText_other).</summary>
