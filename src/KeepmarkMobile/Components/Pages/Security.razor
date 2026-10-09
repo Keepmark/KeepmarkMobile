@@ -7,36 +7,36 @@
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject NavigationManager Nav
 
-<PageTitle>Security</PageTitle>
+<PageTitle>@L.Get(Str.SettingsSecurity)</PageTitle>
 
-<a class="xbs-back" href="settings"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Settings</a>
-<h1>Security</h1>
+<a class="xbs-back" href="settings"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>@L.Get(Str.NavSettings)</a>
+<h1>@L.Get(Str.SettingsSecurity)</h1>
 
 <div class="mb-3">
-    <label class="form-label" for="app-lock">App lock (device PIN / biometric)</label>
+    <label class="form-label" for="app-lock">@L.Get(Str.SecAppLockLabel)</label>
     <select id="app-lock" class="form-select" @bind="appLock">
-        <option value="Off">Off (default)</option>
-        <option value="PinOnly">PIN only (device PIN, pattern or password)</option>
-        <option value="BiometricAndPin">Biometric + PIN fallback</option>
+        <option value="Off">@L.Get(Str.SecOff)</option>
+        <option value="PinOnly">@L.Get(Str.SecPinOnly)</option>
+        <option value="BiometricAndPin">@L.Get(Str.SecBiometric)</option>
     </select>
-    <div class="form-text">When the app is locked, the PIN or fingerprint prompt opens right away.</div>
+    <div class="form-text">@L.Get(Str.SecAppLockHint)</div>
 </div>
 
 @if (appLock != "Off")
 {
     <div class="mb-3">
-        <label class="form-label" for="relock">Lock again after the app goes to the background</label>
+        <label class="form-label" for="relock">@L.Get(Str.SecRelockLabel)</label>
         <select id="relock" class="form-select" @bind="relockAfter">
             @foreach (var p in LockPolicy.Presets)
             {
                 <option value="@p">@LockPolicy.Label(p)</option>
             }
         </select>
-        <div class="form-text">The app always locks after a restart. Making this longer asks for the device PIN.</div>
+        <div class="form-text">@L.Get(Str.SecRelockHint)</div>
     </div>
 }
 
-<button class="btn btn-primary" @onclick="Save">Save</button>
+<button class="btn btn-primary" @onclick="Save">@L.Get(Str.CommonSave)</button>
 @if (!string.IsNullOrEmpty(error))
 {
     <div class="alert alert-danger mt-2" role="alert">@error</div>
@@ -63,9 +63,9 @@
         var laxer = appLock != "Off" && LockPolicy.IsLaxer(AppSettings.LockTimeoutMinutes, relockAfter);
         if (lockChanged || laxer)
         {
-            var title = !lockChanged ? "Confirm longer unlock time"
-                : appLock == "Off" ? "Confirm disabling app lock"
-                : "Confirm app lock activation";
+            var title = !lockChanged ? L.Get(Str.SecConfirmLonger)
+                : appLock == "Off" ? L.Get(Str.SecConfirmDisable)
+                : L.Get(Str.SecConfirmEnable);
             bool confirmed = false;
             LockState.BeginAuth();
             try
@@ -86,7 +86,7 @@
             {
                 appLock = AppSettings.AppLock;
                 relockAfter = AppSettings.LockTimeoutMinutes;
-                error = "Not confirmed with the device PIN. Nothing changed.";
+                error = L.Get(Str.SecNotConfirmed);
                 return;
             }
         }
@@ -95,7 +95,7 @@
         AppSettings.LockTimeoutMinutes = relockAfter;
         Session.NotifySettingsChanged();
         // Done here: back to Settings, the confirmation fades on its own.
-        _ = Toast.ShowAsync("Security settings saved");
+        _ = Toast.ShowAsync(L.Get(Str.SecSaved));
         Nav.NavigateTo("settings");
     }
 }
