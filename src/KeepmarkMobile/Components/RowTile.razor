@@ -8,7 +8,14 @@
    keeps the same color everywhere; canvas "Icone" variant 1).
    Not "mark": Bootstrap styles .mark as a padded highlight.
    Decorative: the row label names it. *@
-@if (Row.IsFolder)
+@if (Ribbon && Row.IsFolder)
+{
+    @* Folder ribbon: same shape in the folder navy, folder glyph for the initial. *@
+    <span class="xbs-ribbon" aria-hidden="true">
+        <svg viewBox="0 0 56 92"><path d="M4 0h48l4 18H0z" fill="#1b2a5e" /><path d="M0 18h56v70l-28-15L0 88z" fill="url(#km-fold-face)" /><path d="M0 18h56" stroke="rgba(255,255,255,0.3)" stroke-width="1" /><path transform="translate(2 1)" d="M17.5 36.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" /></svg>
+    </span>
+}
+else if (Row.IsFolder)
 {
     <span class="xbs-tile folder @SizeClass" aria-hidden="true">
         <svg viewBox="0 0 40 40">

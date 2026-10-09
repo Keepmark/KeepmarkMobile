@@ -197,30 +197,23 @@ else
 @if (menuFor is not null)
 {
     <div class="xbs-sheet-backdrop" data-back="30" @onclick="() => menuFor = null">
-        <div class="xbs-sheet menu" style="--km-site: @(menuFor.IsFolder ? "var(--km-accent)" : RowTile.ColorFor(menuFor))" role="dialog" aria-modal="true" aria-label="@L.Get(Str.HomeActionsFor, menuFor.Title ?? menuFor.Url ?? L.Get(Str.HomeItemWord))" @onclick:stopPropagation="true">
-            @* Canvas "SheetGridA": a bookmark's ribbon hangs over the top edge
-               (folders keep the handle and their tile); frequent actions as
-               tiles, then a group with location and the separate Delete.
-               No Cancel: the backdrop and Back close it. *@
-            @if (menuFor.IsFolder)
-            {
-                <div class="xbs-sheet-handle" aria-hidden="true"></div>
-            }
-            else
-            {
-                <RowTile Row="menuFor" Ribbon="true" />
-            }
+        <div class="xbs-sheet menu" style="--km-site: @(menuFor.IsFolder ? "#273f85" : RowTile.ColorFor(menuFor))" role="dialog" aria-modal="true" aria-label="@L.Get(Str.HomeActionsFor, menuFor.Title ?? menuFor.Url ?? L.Get(Str.HomeItemWord))" @onclick:stopPropagation="true">
+            @* Canvas "SheetGridA": a ribbon hangs over the top edge (site color
+               for bookmarks, navy with a folder glyph for folders); frequent
+               actions as tiles, then a group with location and the separate
+               Delete. No Cancel: the backdrop and Back close it. *@
+            <RowTile Row="menuFor" Ribbon="true" />
             <div class="xbs-sheet-info @(MenuExpanded ? "expanded" : string.Empty)" data-sheet-info aria-expanded="@MenuExpanded.ToString().ToLowerInvariant()">
-            <div class="xbs-sheet-head @(menuFor.IsFolder ? string.Empty : "ribboned")">
-                @if (menuFor.IsFolder)
-                {
-                    <RowTile Row="menuFor" Large="true" />
-                }
+            <div class="xbs-sheet-head ribboned">
                 <div class="xbs-sheet-head-text">
                     <h2 class="xbs-sheet-title">@(menuFor.Title ?? menuFor.Url)</h2>
                     @if (!menuFor.IsFolder && !string.IsNullOrEmpty(menuFor.Url))
                     {
                         <div class="xbs-sheet-url">@menuFor.Url</div>
+                    }
+                    else if (menuFor.IsFolder && folderCounts.TryGetValue(menuFor.RowId, out var menuCount))
+                    {
+                        <div class="xbs-sheet-url">@Loc.Plural(Str.HomeCountBookmarks, menuCount)</div>
                     }
                 </div>
             </div>
@@ -239,9 +232,9 @@ else
             }
             </div>
             <div class="xbs-action-tiles">
+                <button class="xbs-action-tile primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="@(menuFor.IsFolder ? "M9 6l6 6-6 6" : "M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5")" /></svg></span>@L.Get(Str.HomeOpen)</button>
                 @if (!menuFor.IsFolder)
                 {
-                    <button class="xbs-action-tile primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5" /></svg></span>@L.Get(Str.HomeOpen)</button>
                     <button class="xbs-action-tile" @onclick="() => ShareRow(menuFor)"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" /></svg></span>@L.Get(Str.HomeShare)</button>
                 }
                 <button class="xbs-action-tile" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" /></svg></span>@L.Get(Str.HomeEdit)</button>
@@ -598,15 +591,15 @@ else
         return Task.CompletedTask;
     }
 
-    // Action sheet details: clamped by default; swipe right shows the full
-    // title/URL/description/tags, swipe left clamps again (same as rows).
-    private ItemRow? menuExpandedFor;
-    private bool MenuExpanded => menuFor is not null && ReferenceEquals(menuExpandedFor, menuFor);
+    // Action sheet details: full title/URL/description/tags by default;
+    // swipe left clamps them, swipe right expands again.
+    private ItemRow? menuCollapsedFor;
+    private bool MenuExpanded => menuFor is not null && !ReferenceEquals(menuCollapsedFor, menuFor);
 
     [JSInvokable]
     public Task OnSheetSwipe(int dir)
     {
-        menuExpandedFor = dir > 0 ? menuFor : null;
+        menuCollapsedFor = dir < 0 ? menuFor : null;
         StateHasChanged();
         return Task.CompletedTask;
     }
