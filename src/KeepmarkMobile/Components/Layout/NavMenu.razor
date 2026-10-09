@@ -11,7 +11,7 @@
     </div>
 </div>
 
-<button class="navbar-toggler xbs-nav-toggler" aria-label="Navigation menu" aria-expanded="@((!collapseNavMenu).ToString().ToLowerInvariant())" @onclick="ToggleNavMenu"></button>
+<button class="navbar-toggler xbs-nav-toggler" aria-label="@L.Get(Str.NavMenuAria)" aria-expanded="@((!collapseNavMenu).ToString().ToLowerInvariant())" @onclick="ToggleNavMenu"></button>
 
 @if (!collapseNavMenu)
 {
@@ -32,34 +32,34 @@
                 }
                 else
                 {
-                    <div class="xbs-drawer-host">No service linked</div>
+                    <div class="xbs-drawer-host">@L.Get(Str.NavNoService)</div>
                 }
             </div>
-            <button class="xbs-drawer-syncbtn" @onclick="SyncAndClose" disabled="@(!linked)" title="@(linked ? "Upload local changes and download server changes now" : "Link a service first (Connect)")">
-                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5" /></svg>Sync now
+            <button class="xbs-drawer-syncbtn" @onclick="SyncAndClose" disabled="@(!linked)" title="@(linked ? L.Get(Str.NavSyncTitleLinked) : L.Get(Str.NavLinkFirst))">
+                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5" /></svg>@L.Get(Str.CommonSyncNow)
             </button>
         </div>
     </div>
-    <nav class="xbs-drawer-nav" aria-label="Main">
-        <div class="xbs-nav-group">Bookmarks</div>
-            <NavLink class="xbs-nav" href="" Match="NavLinkMatch.All" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-3.5L7 20z" /></svg><span class="xbs-nav-label">Explore</span></NavLink>
-            <NavLink class="xbs-nav" href="duplicates" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M5 15V6a1 1 0 0 1 1-1h9" /></svg><span class="xbs-nav-label">Duplicates</span>@if (dupCount > 0) { <span class="xbs-nav-badge">@dupCount</span> }</NavLink>
-            <NavLink class="xbs-nav" href="backup" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4zM4 7l2-3h12l2 3M10 11h4" /></svg><span class="xbs-nav-label">Backup</span></NavLink>
-        <div class="xbs-nav-group">Sync</div>
-            <NavLink class="xbs-nav" href="connect" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg><span class="xbs-nav-label">Connect</span></NavLink>
-            <NavLink class="xbs-nav" href="status" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4" /></svg><span class="xbs-nav-label">Status</span></NavLink>
+    <nav class="xbs-drawer-nav" aria-label="@L.Get(Str.NavMainAria)">
+        <div class="xbs-nav-group">@L.Get(Str.NavGroupBookmarks)</div>
+            <NavLink class="xbs-nav" href="" Match="NavLinkMatch.All" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-3.5L7 20z" /></svg><span class="xbs-nav-label">@L.Get(Str.NavExplore)</span></NavLink>
+            <NavLink class="xbs-nav" href="duplicates" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M5 15V6a1 1 0 0 1 1-1h9" /></svg><span class="xbs-nav-label">@L.Get(Str.NavDuplicates)</span>@if (dupCount > 0) { <span class="xbs-nav-badge">@dupCount</span> }</NavLink>
+            <NavLink class="xbs-nav" href="backup" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4zM4 7l2-3h12l2 3M10 11h4" /></svg><span class="xbs-nav-label">@L.Get(Str.NavBackup)</span></NavLink>
+        <div class="xbs-nav-group">@L.Get(Str.NavGroupSync)</div>
+            <NavLink class="xbs-nav" href="connect" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg><span class="xbs-nav-label">@L.Get(Str.NavConnect)</span></NavLink>
+            <NavLink class="xbs-nav" href="status" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4" /></svg><span class="xbs-nav-label">@L.Get(Str.CommonStatus)</span></NavLink>
         @if (linked)
         {
-            <NavLink class="xbs-nav" href="switch-service" title="@SwitchTitle" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">Move service</span></NavLink>
+            <NavLink class="xbs-nav" href="switch-service" title="@SwitchTitle" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">@L.Get(Str.NavMoveService)</span></NavLink>
         }
         else
         {
-            <span class="xbs-nav disabled" aria-disabled="true" title="@SwitchTitle"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">Move service</span></span>
+            <span class="xbs-nav disabled" aria-disabled="true" title="@SwitchTitle"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">@L.Get(Str.NavMoveService)</span></span>
         }
-        <div class="xbs-nav-group">App</div>
-            <NavLink class="xbs-nav" href="settings" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></svg><span class="xbs-nav-label">Settings</span></NavLink>
-            <NavLink class="xbs-nav" href="logs" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h9l3 3v13H6zM9 10h6M9 14h6M9 18h3" /></svg><span class="xbs-nav-label">Logs</span></NavLink>
-            <NavLink class="xbs-nav" href="about" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></svg><span class="xbs-nav-label">About</span></NavLink>
+        <div class="xbs-nav-group">@L.Get(Str.NavGroupApp)</div>
+            <NavLink class="xbs-nav" href="settings" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></svg><span class="xbs-nav-label">@L.Get(Str.NavSettings)</span></NavLink>
+            <NavLink class="xbs-nav" href="logs" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h9l3 3v13H6zM9 10h6M9 14h6M9 18h3" /></svg><span class="xbs-nav-label">@L.Get(Str.NavLogs)</span></NavLink>
+            <NavLink class="xbs-nav" href="about" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></svg><span class="xbs-nav-label">@L.Get(Str.NavAbout)</span></NavLink>
     </nav>
     <div class="xbs-drawer-foot">Keepmark v@(AppInfo.VersionString)</div>
 </div>
@@ -71,7 +71,7 @@
     private bool collapseNavMenu = true;
 
     private string NavMenuCssClass => collapseNavMenu ? "collapse" : string.Empty;
-    private string SwitchTitle => linked ? "Move to another service" : "Link a service first (Connect)";
+    private string SwitchTitle => linked ? L.Get(Str.NavMoveTitle) : L.Get(Str.NavLinkFirst);
 
     protected override async Task OnInitializedAsync()
     {
@@ -173,18 +173,18 @@
         {
             if (!linked || Session.Engine is null)
             {
-                return "Not connected";
+                return L.Get(Str.NavNotConnected);
             }
 
             return Session.Engine.Status switch
             {
-                Core.Sync.SyncStatus.Syncing => "Syncing…",
-                Core.Sync.SyncStatus.Offline => "Offline — will retry",
-                Core.Sync.SyncStatus.Conflict => "Conflict — see Status",
-                Core.Sync.SyncStatus.Error => "Sync error",
+                Core.Sync.SyncStatus.Syncing => L.Get(Str.CommonSyncing),
+                Core.Sync.SyncStatus.Offline => L.Get(Str.NavOffline),
+                Core.Sync.SyncStatus.Conflict => L.Get(Str.NavConflict),
+                Core.Sync.SyncStatus.Error => L.Get(Str.NavSyncError),
                 _ => Session.Engine.LastSyncAt is { } t
-                    ? "Synced · " + (t.ToLocalTime().Date == DateTime.Now.Date ? t.ToLocalTime().ToString("t") : t.ToLocalTime().ToString("g"))
-                    : "Not synced yet"
+                    ? L.Get(Str.NavSynced, t.ToLocalTime().Date == DateTime.Now.Date ? t.ToLocalTime().ToString("t") : t.ToLocalTime().ToString("g"))
+                    : L.Get(Str.NavNotSyncedYet)
             };
         }
     }
@@ -208,8 +208,8 @@
             // Paint first: the toast must never gate the status update.
             StateHasChanged();
             _ = Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
-                ? $"Sync complete {DateTime.Now:HH:mm:ss}"
-                : $"Sync finished: {Session.Engine.Status}");
+                ? L.Get(Str.NavSyncComplete, $"{DateTime.Now:HH:mm:ss}")
+                : L.Get(Str.NavSyncFinished, Core.Sync.SyncStatusText.Label(Session.Engine.Status)));
         }
         catch (Exception ex)
         {

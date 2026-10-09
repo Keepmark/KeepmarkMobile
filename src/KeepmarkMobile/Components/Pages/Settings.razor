@@ -6,82 +6,94 @@
 @inject KeepmarkMobile.Services.IStatusBarService StatusBar
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject KeepmarkMobile.Services.ToastState Toast
+@inject KeepmarkMobile.Services.LanguageService LangSvc
+@inject NavigationManager Nav
 
-<PageTitle>Settings</PageTitle>
+<PageTitle>@L.Get(Str.SettingsTitle)</PageTitle>
 
-<h1>Settings</h1>
+<h1>@L.Get(Str.SettingsTitle)</h1>
 
 <div class="mb-3">
-    <label class="form-label">Sync mode (default: Automatic)</label>
+    <label class="form-label">@L.Get(Str.SettingsLanguage)</label>
+    <select class="form-select" @bind="language" @bind:after="ApplyLanguage">
+        <option value="system">@L.Get(Str.SettingsLanguageSystem)</option>
+        <option value="en">English</option>
+        <option value="it">Italiano</option>
+        <option value="fr">Français</option>
+        <option value="es">Español</option>
+        <option value="de">Deutsch</option>
+    </select>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">@L.Get(Str.SettingsSyncMode)</label>
     <select class="form-select" @bind="mode">
-        <option value="@Core.Sync.SyncMode.Auto">Automatic — sync on every change</option>
-        <option value="@Core.Sync.SyncMode.Manual">Manual — only via Sync now</option>
+        <option value="@Core.Sync.SyncMode.Auto">@L.Get(Str.SettingsModeAuto)</option>
+        <option value="@Core.Sync.SyncMode.Manual">@L.Get(Str.SettingsModeManual)</option>
     </select>
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Linked service</label>
-    <p class="form-control-plaintext"><strong>@(linkedUrl ?? "Not linked")</strong></p>
-    <small class="text-muted">To move your data to another service, use the <a href="switch-service">Move service</a> section.</small>
+    <label class="form-label">@L.Get(Str.SettingsLinkedService)</label>
+    <p class="form-control-plaintext"><strong>@(linkedUrl ?? L.Get(Str.SettingsNotLinked))</strong></p>
+    <small class="text-muted">@L.Get(Str.SettingsMoveHintA) <a href="switch-service">@L.Get(Str.NavMoveService)</a> @L.Get(Str.SettingsMoveHintB)</small>
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Log verbosity</label>
+    <label class="form-label">@L.Get(Str.SettingsLogVerbosity)</label>
     <select class="form-select" @bind="verbosity" @bind:after="ApplyVerbosity">
-        <option value="@Core.Logging.XbsLogLevel.Error">Error</option>
-        <option value="@Core.Logging.XbsLogLevel.Warning">Warning</option>
-        <option value="@Core.Logging.XbsLogLevel.Info">Info</option>
-        <option value="@Core.Logging.XbsLogLevel.Debug">Debug</option>
-        <option value="@Core.Logging.XbsLogLevel.Verbose">Verbose (may include your bookmark titles/URLs)</option>
+        <option value="@Core.Logging.XbsLogLevel.Error">@L.Get(Str.LogLevelError)</option>
+        <option value="@Core.Logging.XbsLogLevel.Warning">@L.Get(Str.LogLevelWarning)</option>
+        <option value="@Core.Logging.XbsLogLevel.Info">@L.Get(Str.LogLevelInfo)</option>
+        <option value="@Core.Logging.XbsLogLevel.Debug">@L.Get(Str.LogLevelDebug)</option>
+        <option value="@Core.Logging.XbsLogLevel.Verbose">@L.Get(Str.LogLevelVerbose)</option>
     </select>
-    <div class="form-text">Applies instantly, no Save needed.</div>
+    <div class="form-text">@L.Get(Str.SettingsVerbosityHint)</div>
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Theme</label>
+    <label class="form-label">@L.Get(Str.SettingsTheme)</label>
     <select class="form-select" @bind="theme">
-        <option value="System">System (default)</option>
-        <option value="Light">Light</option>
-        <option value="Dark">Dark</option>
+        <option value="System">@L.Get(Str.SettingsThemeSystem)</option>
+        <option value="Light">@L.Get(Str.SettingsThemeLight)</option>
+        <option value="Dark">@L.Get(Str.SettingsThemeDark)</option>
     </select>
 </div>
 
 <div class="mb-3">
-    <label class="form-label">Security</label>
+    <label class="form-label">@L.Get(Str.SettingsSecurity)</label>
     <a class="xbs-setting-link" href="settings/security">
         <span>
-            <strong>App lock</strong>
+            <strong>@L.Get(Str.SettingsAppLock)</strong>
             <small class="text-muted d-block">@LockSummary</small>
         </span>
         <span aria-hidden="true">›</span>
     </a>
 </div>
 
-<button class="btn btn-primary" @onclick="Save">Save</button>
+<button class="btn btn-primary" @onclick="Save">@L.Get(Str.CommonSave)</button>
 
 @if (linkedUrl is not null)
 {
-    <h3 class="mt-4">Change password</h3>
-    <p class="text-muted">Re-encrypts the sync with a new password. Your current password is verified
-        first and never leaves this device. The old password stops working on all devices
-        immediately — update your vault and other devices.</p>
+    <h3 class="mt-4">@L.Get(Str.SettingsChangePassword)</h3>
+    <p class="text-muted">@L.Get(Str.SettingsChangePasswordHint)</p>
     <div class="mb-3">
-        <label class="form-label">Current password</label>
+        <label class="form-label">@L.Get(Str.CommonCurrentPassword)</label>
         <input type="password" class="form-control" @bind="pwCurrent" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />
     </div>
     <div class="mb-3">
-        <label class="form-label">New password</label>
+        <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
         <input type="password" class="form-control" @bind="pwNew" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
     </div>
     <div class="mb-3">
-        <label class="form-label">Confirm new password</label>
+        <label class="form-label">@L.Get(Str.CommonConfirmNewPassword)</label>
         <input type="password" class="form-control" @bind="pwConfirm" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
     </div>
-    <button class="btn btn-warning" @onclick="ArmChangePassword" disabled="@(pwBusy || armedPw)">Change password…</button>
+    <button class="btn btn-warning" @onclick="ArmChangePassword" disabled="@(pwBusy || armedPw)">@L.Get(Str.SettingsChangePasswordBtn)</button>
     @if (armedPw)
     {
-        <ConfirmBlock Message="Change the sync password?" Implication="@WorkflowTexts.ChangePasswordImplication"
-                      ConfirmLabel="Yes, change password" Busy="pwBusy" OnConfirm="ChangePassword" OnCancel="() => armedPw = false" />
+        <ConfirmBlock Message="@L.Get(Str.SettingsChangePasswordMessage)" Implication="@WorkflowTexts.ChangePasswordImplication"
+                      ConfirmLabel="@L.Get(Str.CommonYesChangePassword)" Busy="pwBusy" OnConfirm="ChangePassword" OnCancel="() => armedPw = false" />
     }
     @if (!string.IsNullOrEmpty(pwError))
     {
@@ -93,17 +105,18 @@
     }
 }
 
-<h3 class="mt-4">Gestures</h3>
+<h3 class="mt-4">@L.Get(Str.SettingsGestures)</h3>
 <ul>
-    <li><strong>Tap</strong> a bookmark to open it, a folder to enter it.</li>
-    <li><strong>Swipe right</strong> to expand full details, <strong>swipe left</strong> to collapse.</li>
-    <li><strong>⋮ button or long-press</strong> for details and all actions (Open, Edit, Share, Pin, Delete).</li>
+    <li><strong>@L.Get(Str.SettingsGestureTapBold)</strong> @L.Get(Str.SettingsGestureTapRest)</li>
+    <li><strong>@L.Get(Str.SettingsGestureSwipeRightBold)</strong> @L.Get(Str.SettingsGestureSwipeRightRest) <strong>@L.Get(Str.SettingsGestureSwipeLeftBold)</strong> @L.Get(Str.SettingsGestureSwipeLeftRest)</li>
+    <li><strong>@L.Get(Str.SettingsGestureMenuBold)</strong> @L.Get(Str.SettingsGestureMenuRest)</li>
 </ul>
 
 @code {
     private Core.Sync.SyncMode mode;
     private Core.Logging.XbsLogLevel verbosity;
     private string theme = "System";
+    private string language = "system";
     private string? linkedUrl;
     private string pwCurrent = string.Empty;
     private string pwNew = string.Empty;
@@ -118,6 +131,7 @@
         mode = AppSettings.Mode;
         verbosity = AppSettings.Verbosity;
         theme = AppSettings.Theme;
+        language = AppSettings.Language;
     }
 
     protected override async Task OnInitializedAsync()
@@ -134,6 +148,15 @@
         Session.NotifySettingsChanged();
     }
 
+    /// <summary>The language applies at once: culture first, then a full
+    /// reload so every already-rendered text is drawn again.</summary>
+    private void ApplyLanguage()
+    {
+        AppSettings.Language = language is "en" or "it" or "fr" or "es" or "de" ? language : "system";
+        LangSvc.Apply();
+        Nav.NavigateTo(Nav.Uri, forceLoad: true);
+    }
+
     private async Task Save()
     {
         AppSettings.Mode = mode;
@@ -143,41 +166,41 @@
         Session.NotifySettingsChanged();
         try { await JS.InvokeVoidAsync("xbsSetTheme", theme); } catch { }
         try { StatusBar.ApplyTheme(theme); } catch { }
-        _ = Toast.ShowAsync("Settings saved");
+        _ = Toast.ShowAsync(L.Get(Str.SettingsSaved));
     }
 
     private string LockSummary => AppSettings.AppLock switch
     {
-        "PinOnly" => "PIN only · " + Keepmark.Core.Security.LockPolicy.Label(AppSettings.LockTimeoutMinutes),
-        "BiometricAndPin" => "Biometric + PIN · " + Keepmark.Core.Security.LockPolicy.Label(AppSettings.LockTimeoutMinutes),
-        _ => "Off",
+        "PinOnly" => L.Get(Str.SettingsLockPinOnly, Keepmark.Core.Security.LockPolicy.Label(AppSettings.LockTimeoutMinutes)),
+        "BiometricAndPin" => L.Get(Str.SettingsLockBiometricPin, Keepmark.Core.Security.LockPolicy.Label(AppSettings.LockTimeoutMinutes)),
+        _ => L.Get(Str.SettingsLockOff),
     };
 
-    private static string? ValidatePasswordChange(string current, string next, string confirm)
+    private string? ValidatePasswordChange(string current, string next, string confirm)
     {
         if (string.IsNullOrEmpty(current))
         {
-            return "Current password is required.";
+            return L.Get(Str.ValCurrentPasswordRequired);
         }
 
         if (string.IsNullOrEmpty(next))
         {
-            return "A new password is required.";
+            return L.Get(Str.ValNewPasswordRequired);
         }
 
         if (next == current)
         {
-            return "The new password must be different from the current one.";
+            return L.Get(Str.ValNewMustDiffer);
         }
 
         if (next.Length < Keepmark.Core.Crypto.BackupGuard.MinPasswordLength)
         {
-            return "Use a password of at least 8 characters.";
+            return WorkflowRules.PasswordTooShort;
         }
 
         if (next != confirm)
         {
-            return "New passwords do not match.";
+            return L.Get(Str.ValNewMismatch);
         }
 
         return null;

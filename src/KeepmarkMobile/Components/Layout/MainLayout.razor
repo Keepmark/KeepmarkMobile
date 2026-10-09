@@ -9,13 +9,14 @@
 @inject KeepmarkMobile.Services.IStatusBarService StatusBar
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject NavigationManager Nav
+@inject KeepmarkMobile.Services.LanguageService Lang
 @implements IDisposable
 
 <div class="page">
     @if (syncing)
     {
-        <div class="xbs-toploader" role="progressbar" aria-label="Syncing"></div>
-        <div class="xbs-syncing-pill" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Syncing…</div>
+        <div class="xbs-toploader" role="progressbar" aria-label="@L.Get(Str.LayoutSyncingAria)"></div>
+        <div class="xbs-syncing-pill" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.CommonSyncing)</div>
     }
     <div class="sidebar">
         <NavMenu />
@@ -38,14 +39,14 @@
 
 @if (LockState.Locked)
 {
-    <div class="xbs-lock" role="dialog" aria-modal="true" aria-label="Unlock app">
+    <div class="xbs-lock" role="dialog" aria-modal="true" aria-label="@L.Get(Str.LayoutUnlockAria)">
         <div class="xbs-lock-card">
-            <h3>Keepmark is locked</h3>
+            <h3>@L.Get(Str.LayoutLockedTitle)</h3>
             @if (LockState.AutoPromptSuppressed)
             {
                 @* Prompt cancelled or failed: manual retry, never an auto loop. *@
-                <p class="text-muted">Authenticate to continue.</p>
-                <button class="btn btn-primary btn-lg" @onclick="Unlock">Unlock</button>
+                <p class="text-muted">@L.Get(Str.LayoutAuthenticate)</p>
+                <button class="btn btn-primary btn-lg" @onclick="Unlock">@L.Get(Str.LayoutUnlock)</button>
                 @if (!string.IsNullOrEmpty(lockError))
                 {
                     <p class="text-danger mt-2">@lockError</p>
@@ -53,7 +54,7 @@
             }
             else
             {
-                <p class="text-muted">Waiting for your PIN or fingerprint…</p>
+                <p class="text-muted">@L.Get(Str.LayoutWaiting)</p>
             }
         </div>
     </div>
@@ -77,12 +78,31 @@
         if (firstRender)
         {
             await ApplyThemeAsync();
+            await ApplyLanguageAsync();
             // Cold start: the lock may have asked for the prompt before this
             // layout subscribed.
             if (LockState.ShouldPrompt)
             {
                 await Unlock();
             }
+        }
+    }
+
+    public async Task ApplyLanguageAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("xbsSetLang", Lang.ActiveLang, new
+            {
+                jumpTo = L.Get(Str.JsJumpTo),
+                top = L.Get(Str.JsTop),
+                bottom = L.Get(Str.JsBottom),
+                scrollBottom = L.Get(Str.JsScrollBottom),
+                scrollTop = L.Get(Str.JsScrollTop),
+            });
+        }
+        catch
+        {
         }
     }
 
@@ -178,7 +198,7 @@
         bool ok = false;
         try
         {
-            ok = await AppLock.AuthenticateAsync("Unlock Keepmark", requireDeviceCredential: false);
+            ok = await AppLock.AuthenticateAsync(L.Get(Str.LayoutUnlockPrompt), requireDeviceCredential: false);
         }
         catch
         {
@@ -191,7 +211,7 @@
 
         if (!ok)
         {
-            lockError = "Not unlocked.";
+            lockError = L.Get(Str.LayoutNotUnlocked);
         }
 
         StateHasChanged();
