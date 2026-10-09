@@ -251,6 +251,7 @@ internal static partial class Catalogs
         [Str.HomeFolderPathAria] = "Chemin du dossier : {0}",
         [Str.HomeSortAria] = "Tri : {0}",
         [Str.HomeAllBookmarks] = "Tous les favoris",
+        [Str.HomeRootTitle] = "Favoris",
         [Str.HomeFolderPathMenu] = "Chemin du dossier",
         [Str.HomeSortMenu] = "Tri",
         [Str.HomeSortHead] = "Trier cette liste",

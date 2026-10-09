@@ -247,6 +247,7 @@ public static partial class Str
     public const string HomeFolderPathAria = nameof(HomeFolderPathAria);
     public const string HomeSortAria = nameof(HomeSortAria);
     public const string HomeAllBookmarks = nameof(HomeAllBookmarks);
+    public const string HomeRootTitle = nameof(HomeRootTitle);
     public const string HomeFolderPathMenu = nameof(HomeFolderPathMenu);
     public const string HomeSortMenu = nameof(HomeSortMenu);
     public const string HomeSortHead = nameof(HomeSortHead);

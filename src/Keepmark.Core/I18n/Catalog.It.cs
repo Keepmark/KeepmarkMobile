@@ -251,6 +251,7 @@ internal static partial class Catalogs
         [Str.HomeFolderPathAria] = "Percorso cartella: {0}",
         [Str.HomeSortAria] = "Ordinamento: {0}",
         [Str.HomeAllBookmarks] = "Tutti i segnalibri",
+        [Str.HomeRootTitle] = "Segnalibri",
         [Str.HomeFolderPathMenu] = "Percorso cartella",
         [Str.HomeSortMenu] = "Ordinamento",
         [Str.HomeSortHead] = "Ordina questo elenco",

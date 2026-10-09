@@ -251,6 +251,7 @@ internal static partial class Catalogs
         [Str.HomeFolderPathAria] = "Ordnerpfad: {0}",
         [Str.HomeSortAria] = "Sortierung: {0}",
         [Str.HomeAllBookmarks] = "Alle Lesezeichen",
+        [Str.HomeRootTitle] = "Lesezeichen",
         [Str.HomeFolderPathMenu] = "Ordnerpfad",
         [Str.HomeSortMenu] = "Sortierung",
         [Str.HomeSortHead] = "Diese Liste sortieren",

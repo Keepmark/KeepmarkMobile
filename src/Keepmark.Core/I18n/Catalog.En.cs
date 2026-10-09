@@ -251,6 +251,7 @@ internal static partial class Catalogs
         [Str.HomeFolderPathAria] = "Folder path: {0}",
         [Str.HomeSortAria] = "Sort: {0}",
         [Str.HomeAllBookmarks] = "All bookmarks",
+        [Str.HomeRootTitle] = "Bookmarks",
         [Str.HomeFolderPathMenu] = "Folder path",
         [Str.HomeSortMenu] = "Sort",
         [Str.HomeSortHead] = "Sort this list",
