@@ -238,7 +238,7 @@ else
                     <button class="xbs-action-tile" @onclick="() => ShareRow(menuFor)"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" /></svg></span>@L.Get(Str.HomeShare)</button>
                 }
                 <button class="xbs-action-tile" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" /></svg></span>@L.Get(Str.HomeEdit)</button>
-                <button class="xbs-action-tile" @onclick="() => TogglePin(menuFor)"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg></span>@(menuFor.NodeId is not null && pinned.Contains(menuFor.NodeId.Value) ? L.Get(Str.HomeUnpin) : L.Get(Str.HomePin))</button>
+                <button class="xbs-action-tile pin @(MenuPinned ? "on" : string.Empty)" aria-pressed="@MenuPinned.ToString().ToLowerInvariant()" @onclick="() => TogglePin(menuFor)"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg></span>@(MenuPinned ? L.Get(Str.HomeUnpin) : L.Get(Str.HomePin))</button>
             </div>
             <div class="xbs-action-group">
                 @if (isSearch || menuFor.ParentRowId != CurrentParent)
@@ -267,6 +267,7 @@ else
     private List<ItemRow> pinnedRows = [];
     private List<ItemRow> allFolders = [];
     private HashSet<int> pinned = [];
+    private bool MenuPinned => menuFor?.NodeId is int id && pinned.Contains(id);
     private readonly Stack<ItemRow> crumbs = new();
     private readonly Dictionary<int, ItemRow> byRow = new();
     private string query = string.Empty;

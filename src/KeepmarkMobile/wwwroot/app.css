@@ -1651,6 +1651,9 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 }
 .xbs-action-ico .km-ico { width: 20px; height: 20px; }
 .xbs-action-tile.primary .xbs-action-ico { background: var(--km-site, var(--km-accent)); color: #fff; }
+.xbs-action-tile.pin .km-ico { transition: transform .2s ease; }
+.xbs-action-tile.pin.on .xbs-action-ico { background: #f0a92e; color: #3a2600; }
+.xbs-action-tile.pin.on .km-ico { transform: rotate(35deg); }
 
 .xbs-action-group {
     margin-top: 10px;
