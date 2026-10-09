@@ -6,8 +6,8 @@ namespace Keepmark.Core.Tests;
 public class WorkflowTests
 {
     [Theory]
-    [InlineData("short", "short", WorkflowRules.PasswordTooShort)]
-    [InlineData("long-enough", "long-enouGh", WorkflowRules.PasswordsDoNotMatch)]
+    [InlineData("short", "short", "Use a password of at least 8 characters.")]
+    [InlineData("long-enough", "long-enouGh", "Passwords do not match.")]
     [InlineData("long-enough", "long-enough", null)]
     public void NewPasswordRule(string password, string confirm, string? expected) =>
         Assert.Equal(expected, WorkflowRules.CheckNewPassword(password, confirm));
@@ -89,7 +89,7 @@ public class WorkflowTests
     public void DuplicateTextsMatchTheBrowser()
     {
         var c = WorkflowTexts.DupDeleteConfirm(3);
-        Assert.Equal("Delete 3 marked duplicate(s)?", c.Message);
+        Assert.Equal("Delete 3 marked duplicates?", c.Message);
         Assert.Contains("One copy of each URL always stays", c.Implication);
         Assert.Equal("Yes, delete", c.ConfirmLabel);
         Assert.Contains("Backup → Safety backups", WorkflowTexts.DupDeleteDone(3));

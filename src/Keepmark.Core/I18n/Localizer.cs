@@ -1,59 +1,89 @@
+using System.Globalization;
+
 namespace Keepmark.Core.I18n;
 
-// English-only for now (plan decision). Every user-facing and log string goes
-// through keys here so a future multilingual pass only adds a table.
-// Log strings stay English forever, even after UI localization.
+// UI strings in en/it/fr/es/de. The active language is CurrentUICulture
+// (set at app start from the Language setting). Log strings stay English.
+// Every key lives in Str.g.cs and in the five Catalog.*.cs files.
 
 public interface IXbsLocalizer
 {
     string Get(string key, params object?[] args);
 }
 
-public static class Str
+public static class Langs
 {
-    public const string ErrSyncNotFound = nameof(ErrSyncNotFound);
-    public const string ErrInvalidService = nameof(ErrInvalidService);
-    public const string ErrNotAcceptingNewSyncs = nameof(ErrNotAcceptingNewSyncs);
-    public const string ErrDailyNewSyncLimit = nameof(ErrDailyNewSyncLimit);
-    public const string ErrDataOutOfSync = nameof(ErrDataOutOfSync);
-    public const string ErrSyncTooLarge = nameof(ErrSyncTooLarge);
-    public const string ErrThrottled = nameof(ErrThrottled);
-    public const string ErrServiceOffline = nameof(ErrServiceOffline);
-    public const string ErrInvalidCredentials = nameof(ErrInvalidCredentials);
-    public const string ErrUnsupportedSyncVersion = nameof(ErrUnsupportedSyncVersion);
-    public const string ErrUnsupportedApiVersion = nameof(ErrUnsupportedApiVersion);
-    public const string ErrIncompleteSyncInfo = nameof(ErrIncompleteSyncInfo);
-    public const string ErrUnexpectedResponse = nameof(ErrUnexpectedResponse);
-    public const string ErrNetwork = nameof(ErrNetwork);
-}
+    public static readonly string[] Supported = ["en", "it", "fr", "es", "de"];
 
-public sealed class EnglishLocalizer : IXbsLocalizer
-{
-    private static readonly Dictionary<string, string> Table = new()
+    /// <summary>An explicit supported setting wins; otherwise the base language
+    /// of <paramref name="systemCulture"/> if supported, else "en".</summary>
+    public static string Resolve(string? setting, CultureInfo systemCulture)
     {
-        [Str.ErrSyncNotFound] = "Sync not found on this service. It may have been removed (syncs expire after 3 weeks of inactivity).",
-        [Str.ErrInvalidService] = "This does not look like a valid xBrowserSync service. Check the service URL.",
-        [Str.ErrNotAcceptingNewSyncs] = "This service is not accepting new syncs right now. You can still connect an existing sync ID.",
-        [Str.ErrDailyNewSyncLimit] = "Daily new-sync limit reached on this service. Try again tomorrow.",
-        [Str.ErrDataOutOfSync] = "The server copy changed since your last sync. Download the latest version before uploading.",
-        [Str.ErrSyncTooLarge] = "Sync data exceeds the service size limit. Remove some bookmarks and retry.",
-        [Str.ErrThrottled] = "Too many requests. The service asked us to slow down — retry in a few minutes.",
-        [Str.ErrServiceOffline] = "Cannot reach the service. Check your connection and the service URL.",
-        [Str.ErrInvalidCredentials] = "Wrong password for this sync ID. Decryption failed.",
-        [Str.ErrUnsupportedSyncVersion] = "This sync was created by a newer client (v{0}). Update the app to open it.",
-        [Str.ErrUnsupportedApiVersion] = "Service API v{0} is older than the minimum supported v{1}.",
-        [Str.ErrIncompleteSyncInfo] = "Sync is not set up yet. Connect to a service first.",
-        [Str.ErrUnexpectedResponse] = "The service returned data in an unexpected format.",
-        [Str.ErrNetwork] = "Network error: {0}",
-    };
-
-    public string Get(string key, params object?[] args)
-    {
-        if (!Table.TryGetValue(key, out var template))
+        if (setting is not null && Supported.Contains(setting))
         {
-            return key;
+            return setting;
         }
 
-        return args.Length == 0 ? template : string.Format(template, args);
+        var two = systemCulture.TwoLetterISOLanguageName.ToLowerInvariant();
+        return Supported.Contains(two) ? two : "en";
     }
+
+    /// <summary>Language of the current UI culture, "en" when unsupported.</summary>
+    public static string Current
+    {
+        get
+        {
+            var two = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
+            return Supported.Contains(two) ? two : "en";
+        }
+    }
+}
+
+/// <summary>Static access for code without DI (workflow texts, lock labels…).</summary>
+public static class Loc
+{
+    public static string Get(string key, params object?[] args)
+    {
+        var template = Catalogs.Lookup(Langs.Current, key) ?? Catalogs.Lookup("en", key) ?? key;
+        return args.Length == 0 ? template : string.Format(CultureInfo.CurrentCulture, template, args);
+    }
+
+    /// <summary>Picks <c>baseKey_one</c> / <c>baseKey_other</c>; the count is {0},
+    /// extra arguments follow as {1}, {2}… French also uses "one" for 0.</summary>
+    public static string Plural(string baseKey, long count, params object?[] args)
+    {
+        var one = count == 1 || (Langs.Current == "fr" && count == 0);
+        var all = new object?[args.Length + 1];
+        all[0] = count;
+        args.CopyTo(all, 1);
+        return Get(baseKey + (one ? "_one" : "_other"), all);
+    }
+}
+
+public sealed class XbsLocalizer : IXbsLocalizer
+{
+    public string Get(string key, params object?[] args) => Loc.Get(key, args);
+}
+
+public static partial class Str
+{
+}
+
+internal static partial class Catalogs
+{
+    private static Dictionary<string, Dictionary<string, string>>? _all;
+
+    private static Dictionary<string, Dictionary<string, string>> All => _all ??= new()
+    {
+        ["en"] = En,
+        ["it"] = It,
+        ["fr"] = Fr,
+        ["es"] = Es,
+        ["de"] = De,
+    };
+
+    internal static IReadOnlyDictionary<string, Dictionary<string, string>> Tables => All;
+
+    internal static string? Lookup(string lang, string key) =>
+        All.TryGetValue(lang, out var table) && table.TryGetValue(key, out var s) ? s : null;
 }

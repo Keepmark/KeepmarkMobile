@@ -9,7 +9,7 @@
     <!-- Asset cache-buster: bump ?v= on every release that touches CSS/JS,
          otherwise the WebView may keep serving stale files after update. -->
     <link rel="stylesheet" href="app.css?v=106" />
-    <link rel="stylesheet" href="KeepmarkMobile.styles.css?v=98" />
+    <link rel="stylesheet" href="KeepmarkMobile.styles.css?v=99" />
     <link rel="icon" href="favicon.png?v=80">
 </head>
 
@@ -47,6 +47,15 @@
             });
             window.xbsSetTheme('System');
         })();
+        // Language: Blazor calls xbsSetLang with the active language and the few
+        // strings that live in JS (gestures.js); English stays the fallback.
+        window.xbsSetLang = function (lang, strings) {
+            try {
+                document.documentElement.lang = lang || 'en';
+                window.__xbsStrings = strings || {};
+                if (window.__xbsRelabel) window.__xbsRelabel();
+            } catch (e) { }
+        };
     </script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
     <script src="js/gestures.js?v=98"></script>

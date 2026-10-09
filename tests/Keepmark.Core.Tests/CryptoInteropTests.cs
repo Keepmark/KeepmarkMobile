@@ -19,7 +19,7 @@ public sealed class CryptoInteropTests
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "vectors.json")),
         new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
 
-    private static XCryptoService Crypto() => new(new EnglishLocalizer(), new InMemoryLogger());
+    private static XCryptoService Crypto() => new(new XbsLocalizer(), new InMemoryLogger());
 
     [Fact]
     public void DeriveKey_MatchesNodePbkdf2()

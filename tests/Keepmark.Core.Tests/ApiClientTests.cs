@@ -27,7 +27,7 @@ public sealed class ApiClientTests
         var handler = new FakeHandler();
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/") };
         var log = new InMemoryLogger();
-        return (new XSyncApiClient(http, new EnglishLocalizer(), log), handler, log);
+        return (new XSyncApiClient(http, new XbsLocalizer(), log), handler, log);
     }
 
     private static HttpResponseMessage Json(object body, HttpStatusCode status = HttpStatusCode.OK) =>

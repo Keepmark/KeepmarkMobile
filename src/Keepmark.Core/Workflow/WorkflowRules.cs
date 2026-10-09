@@ -1,4 +1,5 @@
 using Keepmark.Core.Crypto;
+using Keepmark.Core.I18n;
 
 namespace Keepmark.Core.Workflow;
 
@@ -8,8 +9,8 @@ namespace Keepmark.Core.Workflow;
 /// </summary>
 public static class WorkflowRules
 {
-    public const string PasswordTooShort = "Use a password of at least 8 characters.";
-    public const string PasswordsDoNotMatch = "Passwords do not match.";
+    public static string PasswordTooShort => Loc.Get(Str.WfPasswordTooShort);
+    public static string PasswordsDoNotMatch => Loc.Get(Str.WfPasswordsDoNotMatch);
 
     /// <summary>A password the user invents (new sync, move to a new sync,
     /// change password, backup export): at least

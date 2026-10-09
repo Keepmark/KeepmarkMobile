@@ -57,6 +57,13 @@ public sealed class XbsSettings
         set => Preferences.Set("theme", value);
     }
 
+    /// <summary>UI language: "system" (default, the Android language) or en/it/fr/es/de.</summary>
+    public string Language
+    {
+        get => Preferences.Get("ui_language", "system");
+        set => Preferences.Set("ui_language", value);
+    }
+
     public string OpenMode
     {
         get => Preferences.Get(KOpenMode, "CustomTabs");

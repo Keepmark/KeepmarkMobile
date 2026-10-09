@@ -33,10 +33,10 @@ public sealed class ConflictResolutionTests : IAsyncLifetime
         _dbPath = Path.Combine(Path.GetTempPath(), $"xbs-conflict-{Guid.NewGuid():N}.db");
         _store = new BookmarkStore(_dbPath, Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant(), new InMemoryLogger());
         await _store.InitializeAsync();
-        _crypto = new XCryptoService(new EnglishLocalizer(), new InMemoryLogger());
+        _crypto = new XCryptoService(new XbsLocalizer(), new InMemoryLogger());
         _api = new FakeApi { EnforceTimestampBase = true };
         _creds = new MemCreds(new SyncCredentials("sync-id", "https://example.test", Key, "1.8.0"));
-        _engine = new SyncEngine(_ => _api, _crypto, _store, _creds, new EnglishLocalizer(), new InMemoryLogger(),
+        _engine = new SyncEngine(_ => _api, _crypto, _store, _creds, new XbsLocalizer(), new InMemoryLogger(),
             saveSafetyBackup: (side, _, op, items, id) =>
             {
                 _snapshots.Add((side, op, items, id ?? string.Empty));

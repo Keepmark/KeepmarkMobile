@@ -2,6 +2,8 @@
 // since connect/switch wizards have four different outcomes. Pure for
 // testability; callers append IDs + copy buttons. Port of KeepmarkApp
 // describeMoveResult (src/popup/ui.ts).
+using Keepmark.Core.I18n;
+
 namespace Keepmark.Core.Sync;
 
 public static class MoveResult
@@ -11,13 +13,9 @@ public static class MoveResult
     public static string Describe(string mode, string direction, string serviceUrl, string? syncId) =>
         (mode, direction) switch
         {
-            ("new", _) =>
-                $"Created a new sync on {serviceUrl} and uploaded your bookmarks.",
-            (_, "push") =>
-                $"Overwrote the remote sync {syncId} on {serviceUrl} with your local bookmarks.",
-            (_, "merge") =>
-                $"Merged your local bookmarks with the remote sync {syncId} on {serviceUrl} (nothing deleted).",
-            _ =>
-                $"Replaced your local bookmarks with the remote sync {syncId} from {serviceUrl}.",
+            ("new", _) => Loc.Get(Str.MoveResultNew, serviceUrl),
+            (_, "push") => Loc.Get(Str.MoveResultPush, serviceUrl, syncId),
+            (_, "merge") => Loc.Get(Str.MoveResultMerge, serviceUrl, syncId),
+            _ => Loc.Get(Str.MoveResultPull, serviceUrl, syncId),
         };
 }

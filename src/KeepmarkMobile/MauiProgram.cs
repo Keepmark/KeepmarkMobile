@@ -1,4 +1,4 @@
-﻿using Keepmark.Core.I18n;
+using Keepmark.Core.I18n;
 using KeepmarkMobile.Services;
 
 namespace KeepmarkMobile;
@@ -17,8 +17,9 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
 
-        builder.Services.AddSingleton<IXbsLocalizer, EnglishLocalizer>();
+        builder.Services.AddSingleton<IXbsLocalizer, XbsLocalizer>();
         builder.Services.AddSingleton<XbsSettings>();
+        builder.Services.AddSingleton<LanguageService>();
         builder.Services.AddSingleton<SecureCredentialStore>();
         builder.Services.AddSingleton<PinnedStore>();
         builder.Services.AddSingleton<ToastState>();
@@ -34,6 +35,9 @@ public static class MauiProgram
         builder.Services.AddBlazorWebViewDeveloperTools();
 #endif
 
-        return builder.Build();
+        var app = builder.Build();
+        // Before the first page renders: every text reads the active culture.
+        app.Services.GetRequiredService<LanguageService>().Apply();
+        return app;
     }
 }

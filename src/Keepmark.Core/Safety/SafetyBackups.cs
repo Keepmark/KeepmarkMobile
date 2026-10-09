@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using Keepmark.Core.I18n;
+
 namespace Keepmark.Core.Safety;
 
 // Operation labels for safety backups: WHAT the user was doing when the
@@ -26,21 +28,21 @@ public static class SafetyOperations
 
     public static string Describe(string operation) => operation switch
     {
-        TakeRemote => "Downloaded server copy — Connect",
-        UploadLocal => "Uploaded local bookmarks — Connect",
-        CreateEmpty => "Created empty sync — Connect",
-        ImportBackup => "Imported encrypted backup",
-        ChangePassword => "Changed sync password — Settings",
-        SwitchTakeRemote => "Downloaded server copy — Move service",
-        SwitchUpload => "Uploaded local bookmarks — Move service",
-        ConnectMerge => "Merged both sides — Connect",
-        SwitchMerge => "Merged both sides — Move service",
-        DuplicatesCleanup => "Deleted duplicates",
-        PreRestore => "Before safety-backup restore",
-        ConflictPull => "Conflict resolved: downloaded server copy",
-        ConflictPush => "Conflict resolved: uploaded local bookmarks",
-        ConflictMerge => "Conflict resolved: merged both sides",
-        _ => "Older backup",
+        TakeRemote => Loc.Get(Str.SafetyOpTakeRemote),
+        UploadLocal => Loc.Get(Str.SafetyOpUploadLocal),
+        CreateEmpty => Loc.Get(Str.SafetyOpCreateEmpty),
+        ImportBackup => Loc.Get(Str.SafetyOpImportBackup),
+        ChangePassword => Loc.Get(Str.SafetyOpChangePassword),
+        SwitchTakeRemote => Loc.Get(Str.SafetyOpSwitchTakeRemote),
+        SwitchUpload => Loc.Get(Str.SafetyOpSwitchUpload),
+        ConnectMerge => Loc.Get(Str.SafetyOpConnectMerge),
+        SwitchMerge => Loc.Get(Str.SafetyOpSwitchMerge),
+        DuplicatesCleanup => Loc.Get(Str.SafetyOpDuplicatesCleanup),
+        PreRestore => Loc.Get(Str.SafetyOpPreRestore),
+        ConflictPull => Loc.Get(Str.SafetyOpConflictPull),
+        ConflictPush => Loc.Get(Str.SafetyOpConflictPush),
+        ConflictMerge => Loc.Get(Str.SafetyOpConflictMerge),
+        _ => Loc.Get(Str.SafetyOpLegacy),
     };
 }
 

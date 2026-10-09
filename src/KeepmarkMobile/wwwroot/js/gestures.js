@@ -5,6 +5,11 @@
 // Duplicates rows: <div class="xbs-duprow" data-rowid="N">…</div>
 //   swipe right/left -> OnDupSwipeRight/Left (no long-press there)
 
+// UI strings come from C# (xbsSetLang in index.html); English is the fallback.
+function str(key, fallback) {
+    return (window.__xbsStrings && window.__xbsStrings[key]) || fallback;
+}
+
 window.xbsGestures = (() => {
     let dotNet = null;
     let dupRef = null;
@@ -175,11 +180,11 @@ window.xbsGestures = (() => {
         goMenu = document.createElement('div');
         goMenu.className = 'xbs-go-menu';
         goMenu.setAttribute('role', 'menu');
-        goMenu.setAttribute('aria-label', 'Jump to');
+        goMenu.setAttribute('aria-label', str('jumpTo', 'Jump to'));
         goMenu.innerHTML =
             `<div class="xbs-go-menu-card">` +
-            `<button type="button" role="menuitem" data-dir="up">${EDGE_UP}<span>Top</span></button>` +
-            `<button type="button" role="menuitem" data-dir="down">${EDGE_DOWN}<span>Bottom</span></button></div>`;
+            `<button type="button" role="menuitem" data-dir="up">${EDGE_UP}<span data-xbs-s="top">${str('top', 'Top')}</span></button>` +
+            `<button type="button" role="menuitem" data-dir="down">${EDGE_DOWN}<span data-xbs-s="bottom">${str('bottom', 'Bottom')}</span></button></div>`;
         goMenu.addEventListener('click', (e) => {
             const b = e.target.closest && e.target.closest('button[data-dir]');
             closeMenu();
@@ -215,12 +220,27 @@ window.xbsGestures = (() => {
         return !!ex && ex.toLowerCase() === 'true';
     }
 
+    // Re-label the floating jump controls after the language is applied.
+    window.__xbsRelabel = function () {
+        if (goMenu) {
+            goMenu.setAttribute('aria-label', str('jumpTo', 'Jump to'));
+            goMenu.querySelectorAll('[data-xbs-s]').forEach((el) => {
+                el.textContent = str(el.dataset.xbsS, el.textContent);
+            });
+        }
+        if (go && goDir) {
+            const d = goDir;
+            goDir = null;
+            setDir(d);
+        }
+    };
+
     function setDir(dir) {
         if (goDir === dir) return;
         goDir = dir;
         go.querySelector('.xbs-go-face').innerHTML = dir === 'down' ? ARROW_DOWN : ARROW_UP;
-        go.setAttribute('aria-label', dir === 'down' ? 'Scroll to bottom' : 'Scroll to top');
-        goChip.textContent = dir === 'down' ? 'Bottom' : 'Top';
+        go.setAttribute('aria-label', dir === 'down' ? str('scrollBottom', 'Scroll to bottom') : str('scrollTop', 'Scroll to top'));
+        goChip.textContent = dir === 'down' ? str('bottom', 'Bottom') : str('top', 'Top');
     }
 
     function showGo() {

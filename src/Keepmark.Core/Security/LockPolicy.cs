@@ -1,3 +1,5 @@
+using Keepmark.Core.I18n;
+
 namespace Keepmark.Core.Security;
 
 // Pure app-lock timing rules (no platform clock, no UI): the MAUI side feeds
@@ -59,14 +61,14 @@ public static class LockPolicy
 
     private static long Rank(int v) => v == RestartOnly ? long.MaxValue : v;
 
-    /// <summary>Short English label for a preset.</summary>
+    /// <summary>Short label for a preset, in the active UI language.</summary>
     public static string Label(int after) => Snap(after) switch
     {
-        0 => "Immediately",
-        1 => "After 1 minute",
-        60 => "After 1 hour",
-        240 => "After 4 hours",
-        RestartOnly => "Only when the app restarts",
-        var m => $"After {m} minutes",
+        0 => Loc.Get(Str.LockImmediately),
+        1 => Loc.Get(Str.LockAfter1Minute),
+        60 => Loc.Get(Str.LockAfter1Hour),
+        240 => Loc.Get(Str.LockAfter4Hours),
+        RestartOnly => Loc.Get(Str.LockOnlyOnRestart),
+        var m => Loc.Get(Str.LockAfterMinutes, m),
     };
 }

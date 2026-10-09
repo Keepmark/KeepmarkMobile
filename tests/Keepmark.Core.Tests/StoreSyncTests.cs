@@ -167,11 +167,11 @@ public sealed class StoreSyncTests : IAsyncLifetime
         _keyHex = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
         _store = new BookmarkStore(_dbPath, _keyHex, new InMemoryLogger());
         await _store.InitializeAsync();
-        _crypto = new XCryptoService(new EnglishLocalizer(), new InMemoryLogger());
+        _crypto = new XCryptoService(new XbsLocalizer(), new InMemoryLogger());
         _api = new FakeApi();
         _creds = new SyncCredentials("sync-id", "https://example.test", Key, "1.8.0");
         _engine = new SyncEngine(_ => _api, _crypto, _store, new MemCreds(_creds),
-            new EnglishLocalizer(), new InMemoryLogger());
+            new XbsLocalizer(), new InMemoryLogger());
     }
 
     public async Task DisposeAsync()

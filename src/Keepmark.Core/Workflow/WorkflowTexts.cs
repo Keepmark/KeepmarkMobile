@@ -1,3 +1,5 @@
+using Keepmark.Core.I18n;
+
 namespace Keepmark.Core.Workflow;
 
 /// <summary>
@@ -8,32 +10,25 @@ namespace Keepmark.Core.Workflow;
 /// </summary>
 public static class WorkflowTexts
 {
+    // Every text reads the active UI language at call time (Loc): none of
+    // these may be a const or a static readonly field.
+
     // Change password.
-    public const string ChangePasswordImplication =
-        "Your other devices stop syncing until you unlink them and link again with the new password. " +
-        "Edits not yet synced are uploaded now. Older backup files keep their own password.";
+    public static string ChangePasswordImplication => Loc.Get(Str.WfChangePasswordImplication);
 
     /// <summary>The browser adds "Undo is in Status"; the mobile app has no
     /// undo for it, the safety backup is the way back.</summary>
-    public const string ChangePasswordDone =
-        "Password changed. Link your other devices again with the new password and update your password manager. " +
-        "The previous server copy is in Backup → Safety backups.";
+    public static string ChangePasswordDone => Loc.Get(Str.WfChangePasswordDone);
 
     // Connect → Unlink.
-    public const string UnlinkImplication =
-        "Syncing stops; the bookmarks on this device stay. To link again you need the sync ID and its password, " +
-        "so copy the sync ID first if you have not saved it. Edits not yet synced stay on this device only.";
+    public static string UnlinkImplication => Loc.Get(Str.WfUnlinkImplication);
 
-    public const string UnlinkDone =
-        "Device unlinked. Its bookmarks are untouched; link again with the sync ID and password to resume syncing.";
+    public static string UnlinkDone => Loc.Get(Str.WfUnlinkDone);
 
     // Connect → new sync.
-    public const string CreatedNext =
-        "Copy the sync ID above and store it with the password: both are needed to link your other devices.";
+    public static string CreatedNext => Loc.Get(Str.WfCreatedNext);
 
-    public const string CreateEmptyImplication =
-        "This device starts empty and the empty sync is what your other devices get. " +
-        "The current bookmarks are saved to Backup → Safety backups first.";
+    public static string CreateEmptyImplication => Loc.Get(Str.WfCreateEmptyImplication);
 
     // Direction choice (Connect, Move, Conflict): picker order and confirms.
     /// <summary>Keep the server copy / Merge both / Keep this device's copy.</summary>
@@ -43,74 +38,50 @@ public static class WorkflowTexts
 
     public static Confirm DirectionConfirm(string direction) => direction switch
     {
-        "upload" => new("Replace the server copy with this device's bookmarks?",
-            "Changes from your other devices that are only on the server are lost. A copy is saved to Backup → Safety backups first.",
-            "Yes, upload"),
-        "merge" => new("Merge both copies into one and sync it everywhere?",
-            "Nothing is deleted, but items removed on one side while the other was offline come back. " +
-            "Both copies are saved to Backup → Safety backups first.",
-            "Yes, merge"),
-        _ => new("Replace this device's bookmarks with the server copy?",
-            "Edits on this device that are not yet synced are lost. A copy is saved to Backup → Safety backups first.",
-            "Yes, download"),
+        "upload" => new(Loc.Get(Str.WfDirUploadMessage), Loc.Get(Str.WfDirUploadImplication), Loc.Get(Str.CommonYesUpload)),
+        "merge" => new(Loc.Get(Str.WfDirMergeMessage), Loc.Get(Str.WfDirMergeImplication), Loc.Get(Str.CommonYesMerge)),
+        _ => new(Loc.Get(Str.WfDirDownloadMessage), Loc.Get(Str.WfDirDownloadImplication), Loc.Get(Str.CommonYesDownload)),
     };
 
     // Move service.
-    public const string MoveImplication =
-        "The old sync stays on the old service and is not deleted. Your other devices stay linked to the old service " +
-        "until you move them too. Store the new sync ID and password.";
+    public static string MoveImplication => Loc.Get(Str.WfMoveImplication);
 
-    public static string MoveNewConfirm(string host, int count) =>
-        $"Create a new sync on {host} and upload {count} bookmarks?";
+    public static string MoveNewConfirm(string host, int count) => Loc.Plural(Str.WfMoveNewConfirm, count, host);
 
-    public const string MoveDoneNext = "Store the sync ID with the password, then move your other devices with it.";
+    public static string MoveDoneNext => Loc.Get(Str.WfMoveDoneNext);
 
     // Backup → Export.
-    public const string BackupPasswordHint =
-        "It is not your sync password and cannot be recovered: without it the file cannot be opened.";
+    public static string BackupPasswordHint => Loc.Get(Str.WfBackupPasswordHint);
 
-    public static string ExportDone(int count) =>
-        $"Backup of {count} item(s) exported. Keep its password: it is not your sync password and cannot be recovered.";
+    public static string ExportDone(int count) => Loc.Plural(Str.WfExportDone, count);
 
     // Backup → Restore from a backup file.
-    public static string ImportChecked(string fileName, int count) =>
-        $"{fileName}: {count} item(s), password correct. Nothing has changed yet.";
+    public static string ImportChecked(string fileName, int count) => Loc.Plural(Str.WfImportChecked, count, fileName);
 
     /// <summary>Unlinked, the mobile app restores this device only; linked, the
     /// restored tree is uploaded like any local edit.</summary>
-    public static string ImportImplication(bool linked) => linked
-        ? "This device's bookmarks and the server copy are replaced; your other devices get the backup at their next sync. " +
-          "The current bookmarks are saved to Safety backups first."
-        : "This device's bookmarks are replaced. The current bookmarks are saved to Safety backups first.";
+    public static string ImportImplication(bool linked) =>
+        Loc.Get(linked ? Str.WfImportImplicationLinked : Str.WfImportImplicationLocal);
 
-    public static string ImportDone(int count, bool linked) => linked
-        ? $"Restored {count} item(s); they are uploaded now and your other devices get them at their next sync. " +
-          "The previous bookmarks are in Safety backups below."
-        : $"Restored {count} item(s) on this device. The previous bookmarks are in Safety backups below.";
+    public static string ImportDone(int count, bool linked) =>
+        Loc.Plural(linked ? Str.WfImportDoneLinked : Str.WfImportDoneLocal, count);
 
     // Backup → Safety backups.
-    public static string SafetyRestoreImplication(string side, int items) => side == "local"
-        ? $"This device's bookmarks are replaced with this copy ({items} items) and, while linked, uploaded; " +
-          "your other devices get it at their next sync. The current bookmarks are saved as a safety backup first."
-        : $"The server copy is replaced with this copy ({items} items); your other devices get it at their next sync. " +
-          "The current server copy is saved as a safety backup first.";
+    public static string SafetyRestoreImplication(string side, int items) =>
+        Loc.Plural(side == "local" ? Str.WfSafetyRestoreLocal : Str.WfSafetyRestoreRemote, items);
 
-    public static string SafetyRestoreDone(int count) =>
-        $"Restored {count} item(s). The state before the restore is saved as a new safety backup.";
+    public static string SafetyRestoreDone(int count) => Loc.Plural(Str.WfSafetyRestoreDone, count);
 
-    public const string SafetyDeleteImplication = "This safety backup is gone for good.";
+    public static string SafetyDeleteImplication => Loc.Get(Str.WfSafetyDeleteImplication);
 
     // Logs (mobile only: the extension has no log clear).
-    public const string LogsClearImplication =
-        "Every log entry on this device is deleted; use Export… first if you need them. Bookmarks and settings are not touched.";
+    public static string LogsClearImplication => Loc.Get(Str.WfLogsClearImplication);
 
     // Duplicates.
     public static Confirm DupDeleteConfirm(int count) => new(
-        $"Delete {count} marked duplicate(s)?",
-        "One copy of each URL always stays; while linked the deletion is uploaded and your other devices get it at their next sync. " +
-        "A safety backup is saved first.",
-        "Yes, delete");
+        Loc.Plural(Str.WfDupDeleteMessage, count),
+        Loc.Get(Str.WfDupDeleteImplication),
+        Loc.Get(Str.CommonYesDelete));
 
-    public static string DupDeleteDone(int count) =>
-        $"Deleted {count} duplicate(s). Safety backup saved — see Backup → Safety backups.";
+    public static string DupDeleteDone(int count) => Loc.Plural(Str.WfDupDeleteDone, count);
 }
