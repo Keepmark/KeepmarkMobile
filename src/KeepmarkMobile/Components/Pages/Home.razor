@@ -153,7 +153,7 @@ else
         </div>
     }
 
-    <div class="xbs-statusbar @StatusClass" role="status">
+    <div class="xbs-statusbar @StatusClass @(StatusVisible ? string.Empty : "away")" role="status" aria-hidden="@(StatusVisible ? "false" : "true")">
         <span class="xbs-status-dot" aria-hidden="true"></span>
         <span class="xbs-statusbar-main">
             @if (!string.IsNullOrEmpty(FriendlyStatus()))
@@ -303,6 +303,11 @@ else
 
     private void OnStatus(Core.Sync.SyncStatus s)
     {
+        if (engineStatus == Core.Sync.SyncStatus.Syncing && s == Core.Sync.SyncStatus.Idle)
+        {
+            FlashSynced();
+        }
+
         engineStatus = s;
         if (Session.Engine is not null)
         {
@@ -310,6 +315,37 @@ else
         }
 
         InvokeAsync(StateHasChanged);
+    }
+
+    // The status pill only shows when it has something to say: a sync running,
+    // a problem (offline, error, conflict), never synced yet, unsent edits in
+    // manual mode, or for a few seconds after a sync completes. Otherwise it
+    // steps aside; the drawer head always carries the full sync state.
+    private bool statusFlash;
+    private CancellationTokenSource? statusFlashCts;
+
+    private bool StatusVisible =>
+        statusFlash
+        || engineStatus != Core.Sync.SyncStatus.Idle
+        || lastSync is null
+        || (Session.Engine is { Mode: Core.Sync.SyncMode.Manual, PendingEdits: > 0 });
+
+    private void FlashSynced()
+    {
+        statusFlashCts?.Cancel();
+        statusFlashCts?.Dispose();
+        var cts = statusFlashCts = new CancellationTokenSource();
+        statusFlash = true;
+        _ = Task.Delay(3000, cts.Token).ContinueWith(t =>
+        {
+            if (t.IsCanceled)
+            {
+                return;
+            }
+
+            statusFlash = false;
+            InvokeAsync(StateHasChanged);
+        }, TaskScheduler.Default);
     }
 
     private string StatusClass => engineStatus switch
@@ -1108,6 +1144,8 @@ else
         debounce?.Dispose();
         flashTimer?.Cancel();
         flashTimer?.Dispose();
+        statusFlashCts?.Cancel();
+        statusFlashCts?.Dispose();
         undoTimer?.Cancel();
         undoTimer?.Dispose();
         dotNet?.Dispose();

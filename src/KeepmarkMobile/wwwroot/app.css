@@ -1178,7 +1178,11 @@ html.xbs-under .xbs-crumbbar {
     font-size: 0.8125rem;
     font-weight: 500;
     color: var(--km-ink);
+    transition: opacity 0.25s ease-out, transform 0.25s ease-out;
 }
+
+/* Nothing to report (synced and idle): the pill slides away (Home.StatusVisible). */
+.xbs-statusbar.away { opacity: 0; transform: translateY(12px); pointer-events: none; }
 
 .xbs-status-dot {
     width: 8px;
