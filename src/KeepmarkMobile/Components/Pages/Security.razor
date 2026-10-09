@@ -4,6 +4,8 @@
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.IAppLockService AppLock
 @inject KeepmarkMobile.Services.AppLockState LockState
+@inject KeepmarkMobile.Services.ToastState Toast
+@inject NavigationManager Nav
 
 <PageTitle>Security</PageTitle>
 
@@ -35,10 +37,6 @@
 }
 
 <button class="btn btn-primary" @onclick="Save">Save</button>
-@if (saved)
-{
-    <span class="text-success ms-2" role="status">Saved.</span>
-}
 @if (!string.IsNullOrEmpty(error))
 {
     <div class="alert alert-danger mt-2" role="alert">@error</div>
@@ -48,7 +46,6 @@
     private string appLock = "Off";
     private int relockAfter = LockPolicy.DefaultMinutes;
     private string error = string.Empty;
-    private bool saved;
 
     protected override void OnInitialized()
     {
@@ -59,7 +56,6 @@
     private async Task Save()
     {
         error = string.Empty;
-        saved = false;
 
         // Turning the lock on/off, or keeping the app unlocked longer, weakens
         // or changes protection: always confirm with the device PIN.
@@ -97,8 +93,9 @@
 
         AppSettings.AppLock = appLock;
         AppSettings.LockTimeoutMinutes = relockAfter;
-        relockAfter = AppSettings.LockTimeoutMinutes;
         Session.NotifySettingsChanged();
-        saved = true;
+        // Done here: back to Settings, the confirmation fades on its own.
+        _ = Toast.ShowAsync("Security settings saved");
+        Nav.NavigateTo("settings");
     }
 }
