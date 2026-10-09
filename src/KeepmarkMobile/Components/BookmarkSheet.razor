@@ -5,47 +5,47 @@
     <div class="xbs-sheet-backdrop" data-back="30" @onclick="RequestCancel">
         <div class="xbs-sheet" role="dialog" aria-modal="true" aria-labelledby="xbs-sheet-title" @onclick:stopPropagation="true">
             <div class="xbs-sheet-handle" aria-hidden="true"></div>
-            <h2 id="xbs-sheet-title" class="xbs-sheet-title mb-3">@(IsEdit ? (EffectiveIsFolder ? "Edit folder" : "Edit bookmark") : NewIsFolder ? "New folder" : "New bookmark")</h2>
+            <h2 id="xbs-sheet-title" class="xbs-sheet-title mb-3">@(IsEdit ? (EffectiveIsFolder ? L.Get(Str.SheetEditFolder) : L.Get(Str.SheetEditBookmark)) : NewIsFolder ? L.Get(Str.SheetNewFolder) : L.Get(Str.SheetNewBookmark))</h2>
             @if (!IsEdit)
             {
                 <div class="mb-2">
-                    <label class="form-label" for="xbs-f-type">Type</label>
+                    <label class="form-label" for="xbs-f-type">@L.Get(Str.SheetType)</label>
                     <select id="xbs-f-type" class="form-select" @bind="TypeValue">
-                        <option value="bookmark">Bookmark</option>
-                        <option value="folder">Folder</option>
+                        <option value="bookmark">@L.Get(Str.SheetTypeBookmark)</option>
+                        <option value="folder">@L.Get(Str.SheetTypeFolder)</option>
                     </select>
                     @if (NewIsFolder && (url.Length > 0 || description.Length > 0 || tags.Length > 0))
                     {
-                        <div class="form-text">URL, description and tags are hidden for folders — switch back to Bookmark to see them again. Nothing is lost.</div>
+                        <div class="form-text">@L.Get(Str.SheetFolderHidden)</div>
                     }
                 </div>
             }
             <div class="mb-2">
-                <label class="form-label" for="xbs-f-title">Title</label>
+                <label class="form-label" for="xbs-f-title">@L.Get(Str.SheetTitle)</label>
                 <input id="xbs-f-title" class="form-control" @ref="titleInput" @bind="title" autofocus
                        aria-invalid="@((fieldError == "title").ToString().ToLowerInvariant())" aria-describedby="@(fieldError is null ? null : "xbs-form-error")" />
             </div>
             @if (!EffectiveIsFolder)
             {
                 <div class="mb-2">
-                    <label class="form-label" for="xbs-f-url">URL</label>
+                    <label class="form-label" for="xbs-f-url">@L.Get(Str.SheetUrl)</label>
                     <input id="xbs-f-url" class="form-control" @bind="url" inputmode="url"
                            aria-invalid="@((fieldError == "url").ToString().ToLowerInvariant())" aria-describedby="@(fieldError is null ? null : "xbs-form-error")" />
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" for="xbs-f-desc">Description</label>
+                    <label class="form-label" for="xbs-f-desc">@L.Get(Str.SheetDescription)</label>
                     <textarea id="xbs-f-desc" class="form-control" @bind="description" rows="2" maxlength="300"></textarea>
                 </div>
                 <div class="mb-2">
-                    <label class="form-label" for="xbs-f-tags">Tags (comma separated)</label>
+                    <label class="form-label" for="xbs-f-tags">@L.Get(Str.SheetTags)</label>
                     <input id="xbs-f-tags" class="form-control" @bind="tags" />
                 </div>
             }
             <div class="mb-3">
-                <label class="form-label" for="xbs-f-folder">Folder</label>
+                <label class="form-label" for="xbs-f-folder">@L.Get(Str.SheetFolderLabel)</label>
                 <button type="button" id="xbs-f-folder" class="form-control xbs-folder-btn" aria-expanded="@showTree.ToString().ToLowerInvariant()" @onclick="OpenTree">
                     <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
-                    <span class="xbs-folder-btn-text">@(SelectedFolderPath() ?? "Top level")</span>
+                    <span class="xbs-folder-btn-text">@(SelectedFolderPath() ?? L.Get(Str.SheetTopLevel))</span>
                     <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                 </button>
             </div>
@@ -56,28 +56,28 @@
             @if (confirmDiscard)
             {
                 <div class="alert alert-warning" role="alert">
-                    <strong>Discard unsaved changes?</strong>
+                    <strong>@L.Get(Str.SheetDiscardQ)</strong>
                     <div class="mt-2 d-flex gap-2">
-                        <button class="btn btn-danger" @onclick="Discard">Discard</button>
-                        <button class="btn btn-secondary" @onclick="() => confirmDiscard = false">Keep editing</button>
+                        <button class="btn btn-danger" @onclick="Discard">@L.Get(Str.SheetDiscard)</button>
+                        <button class="btn btn-secondary" @onclick="() => confirmDiscard = false">@L.Get(Str.SheetKeepEditing)</button>
                     </div>
                 </div>
             }
             <div class="xbs-sheet-actions">
-                <button class="btn btn-secondary" @onclick="RequestCancel">Cancel</button>
-                <button class="btn btn-primary" @onclick="Save">Save</button>
+                <button class="btn btn-secondary" @onclick="RequestCancel">@L.Get(Str.CommonCancel)</button>
+                <button class="btn btn-primary" @onclick="Save">@L.Get(Str.CommonSave)</button>
             </div>
         </div>
         @if (showTree)
         {
-            <div class="xbs-tree-full" role="dialog" aria-modal="true" aria-label="Choose folder" @onclick:stopPropagation="true">
+            <div class="xbs-tree-full" role="dialog" aria-modal="true" aria-label="@L.Get(Str.SheetChooseFolder)" @onclick:stopPropagation="true">
                 <div class="xbs-tree-head">
-                    <button type="button" class="xbs-tree-close" aria-label="Cancel" @onclick="CancelTree">
+                    <button type="button" class="xbs-tree-close" aria-label="@L.Get(Str.CommonCancel)" @onclick="CancelTree">
                         <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
                     </button>
                     <div class="xbs-tree-headtext">
-                        <h2 class="xbs-tree-title">Choose folder</h2>
-                        <div class="xbs-tree-sub">Save in: @(SelectedFolderPath() ?? "Top level")</div>
+                        <h2 class="xbs-tree-title">@L.Get(Str.SheetChooseFolder)</h2>
+                        <div class="xbs-tree-sub">@L.Get(Str.SheetSaveIn, SelectedFolderPath() ?? L.Get(Str.SheetTopLevel))</div>
                     </div>
                 </div>
                 <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnHighlight"
@@ -256,7 +256,7 @@
         if (string.IsNullOrWhiteSpace(title))
         {
             fieldError = "title";
-            error = "Title is required.";
+            error = L.Get(Str.SheetTitleRequired);
             return;
         }
 
@@ -266,7 +266,7 @@
             if (string.IsNullOrWhiteSpace(url))
             {
                 fieldError = "url";
-                error = "URL is required.";
+                error = L.Get(Str.SheetUrlRequired);
                 return;
             }
 
@@ -274,7 +274,7 @@
                 (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps))
             {
                 fieldError = "url";
-                error = "URL must start with http:// or https://.";
+                error = L.Get(Str.SheetUrlScheme);
                 return;
             }
 

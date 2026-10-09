@@ -19,7 +19,7 @@ else
         <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
             <RowTile Row="Row" />
             <div class="xbs-row-text">
-                <div class="xbs-row-title">@if (Pinned) { <svg class="km-ico xbs-pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg><span class="visually-hidden">(pinned)</span> }@PlainTitle</div>
+                <div class="xbs-row-title">@if (Pinned) { <svg class="km-ico xbs-pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg><span class="visually-hidden">@L.Get(Str.RowPinned)</span> }@PlainTitle</div>
                 <div class="xbs-row-sub">@Sub</div>
                 @if (Expanded && !Row.IsFolder)
                 {
@@ -38,7 +38,7 @@ else
                 }
             </div>
             <button type="button" class="xbs-row-chev" @onclick="OnMenu" @onclick:stopPropagation="true"
-                    @onkeydown:stopPropagation="true" aria-label="Actions for @PlainTitle"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="18.5" r="1.6" /></svg></button>
+                    @onkeydown:stopPropagation="true" aria-label="@L.Get(Str.RowActionsFor, PlainTitle)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="18.5" r="1.6" /></svg></button>
         </div>
     </div>
 }
@@ -54,10 +54,10 @@ else
 
     private bool IsSeparator => !Row.IsFolder && Row.Url == Core.XbsConstants.SeparatorUrl;
     private string? RowExpanded => Row.IsFolder ? null : Expanded.ToString().ToLowerInvariant();
-    private string RowLabel => (Row.IsFolder ? "Open folder " : "Open bookmark ") + PlainTitle;
+    private string RowLabel => L.Get(Row.IsFolder ? Str.RowOpenFolder : Str.RowOpenBookmark, PlainTitle);
     private string PlainTitle => Row.IsFolder
-        ? (string.IsNullOrWhiteSpace(Row.Title) ? "Folder" : Row.Title)
-        : (string.IsNullOrWhiteSpace(Row.Title) ? ShortUrl(Row.Url) is { Length: > 0 } u ? u : "(no title)" : Row.Title);
+        ? (string.IsNullOrWhiteSpace(Row.Title) ? L.Get(Str.SheetTypeFolder) : Row.Title)
+        : (string.IsNullOrWhiteSpace(Row.Title) ? ShortUrl(Row.Url) is { Length: > 0 } u ? u : L.Get(Str.RowNoTitle) : Row.Title);
     private string Sub => Row.IsFolder ? (FolderPath ?? string.Empty) : Expanded ? Row.Url ?? string.Empty : ShortUrl(Row.Url);
 
     // Collapsed rows show the URL without scheme/www (the full URL is in the
