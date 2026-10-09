@@ -13,6 +13,14 @@ public static class WorkflowTexts
         "Your other devices stop syncing until you unlink them and link again with the new password. " +
         "Edits not yet synced are uploaded now. Older backup files keep their own password.";
 
+    // Connect → Unlink.
+    public const string UnlinkImplication =
+        "Syncing stops; the bookmarks on this device stay. To link again you need the sync ID and its password, " +
+        "so copy the sync ID first if you have not saved it. Edits not yet synced stay on this device only.";
+
+    public const string UnlinkDone =
+        "Device unlinked. Its bookmarks are untouched; link again with the sync ID and password to resume syncing.";
+
     // Backup → Export.
     public const string BackupPasswordHint =
         "It is not your sync password and cannot be recovered: without it the file cannot be opened.";

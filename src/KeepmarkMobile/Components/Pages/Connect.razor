@@ -1,6 +1,7 @@
 @page "/connect"
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
+@inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @using Keepmark.Core.Workflow
 
@@ -16,6 +17,7 @@ else if (linked)
 {
     <div class="alert alert-success">
         Linked to <strong>@linkedUrl</strong> (sync <code>@WorkflowRules.ShortId(linkedId)</code>).
+        <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="CopyLinkedId">Copy sync ID</button>
     </div>
     <p>To move to another service use <a href="switch-service">Move service</a>, to save or restore an encrypted copy use <a href="backup">Backup</a>.</p>
     @if (!string.IsNullOrEmpty(message))
@@ -28,17 +30,13 @@ else if (linked)
     <p class="text-muted">Forget the sync credentials on this device. Your @localCount local item(s) stay untouched; syncing stops until you link again.</p>
     @if (!armedUnlink)
     {
-        <button class="btn btn-outline-danger" @onclick="() => armedUnlink = true" disabled="@busy">Unlink…</button>
+        <button class="btn btn-outline-danger" @onclick="() => { armedUnlink = true; unlinkError = string.Empty; }" disabled="@busy">Unlink this device…</button>
     }
     else
     {
-        <div class="alert alert-danger">
-            <strong>Unlink this device?</strong> Syncing stops; the bookmarks on this device stay untouched.
-            <div class="mt-2 d-flex gap-2">
-                <button class="btn btn-danger" @onclick="ExecuteUnlink" disabled="@busy">Yes, unlink</button>
-                <button class="btn btn-secondary" @onclick="() => armedUnlink = false" disabled="@busy">Cancel</button>
-            </div>
-        </div>
+        <ConfirmBlock Message="Unlink this device?" Implication="@WorkflowTexts.UnlinkImplication"
+                      ConfirmLabel="Yes, unlink" Busy="busy"
+                      OnConfirm="ExecuteUnlink" OnCancel="() => armedUnlink = false" />
     }
     @if (!string.IsNullOrEmpty(unlinkError))
     {
@@ -333,6 +331,24 @@ else
 
     private void Disarm() => armed = null;
 
+    private async Task CopyLinkedId()
+    {
+        if (string.IsNullOrEmpty(linkedId))
+        {
+            return;
+        }
+
+        try
+        {
+            await Clipboard.Default.SetTextAsync(linkedId);
+            _ = Toast.ShowAsync("Sync ID copied — store it with the password");
+        }
+        catch
+        {
+            _ = Toast.ShowAsync("Copy failed — transcribe the ID manually", isError: true);
+        }
+    }
+
     private async Task ExecuteUnlink()
     {
         await RunStepAsync(async () =>
@@ -341,7 +357,7 @@ else
             armedUnlink = false;
             await RefreshStateAsync();
             Session.Log.Info("connect", "Device unlinked");
-            Ok("Device unlinked. Local bookmarks kept; link again to resume syncing.");
+            Ok(WorkflowTexts.UnlinkDone);
         }, err => unlinkError = err, "connect-unlink");
     }
 

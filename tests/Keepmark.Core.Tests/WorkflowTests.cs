@@ -51,4 +51,11 @@ public class WorkflowTests
         Assert.StartsWith("This device's bookmarks", WorkflowTexts.SafetyRestoreImplication("local", 4));
         Assert.StartsWith("The server copy", WorkflowTexts.SafetyRestoreImplication("remote", 4));
     }
+
+    [Fact]
+    public void UnlinkTextSaysWhatIsNeededToLinkAgain()
+    {
+        Assert.Contains("sync ID and its password", WorkflowTexts.UnlinkImplication);
+        Assert.Contains("not yet synced", WorkflowTexts.UnlinkImplication);
+    }
 }
