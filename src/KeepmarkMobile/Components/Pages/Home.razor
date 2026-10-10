@@ -241,15 +241,37 @@ else
                 <button class="xbs-action-tile" @onclick="() => { var r = menuFor; menuFor = null; sheetFor = new SheetTarget(r, null); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" /></svg></span>@L.Get(Str.HomeEdit)</button>
                 <button class="xbs-action-tile pin @(MenuPinned ? "on" : string.Empty)" aria-pressed="@MenuPinned.ToString().ToLowerInvariant()" @onclick="() => TogglePin(menuFor)"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg></span>@(MenuPinned ? L.Get(Str.HomeUnpin) : L.Get(Str.HomePin))</button>
             </div>
+            @* Canvas "MoveQuick" (D): where the item lives (tap = go there) with
+               Move beside it, then recent destinations for a one-tap move. *@
+            <div class="xbs-loc">
+                <button class="xbs-loc-path" @onclick="() => GoToLocation(menuFor)" aria-label="@($"{L.Get(Str.HomeGoToLocation)}: {FolderPath(menuFor.ParentRowId)}")">
+                    <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
+                    <span class="xbs-loc-text"><small>@L.Get(Str.HomeLocation)</small><span>@FolderPath(menuFor.ParentRowId)</span></span>
+                </button>
+                <button class="xbs-loc-move" @onclick="OpenMovePicker"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z M10 13.5h6M13.5 11l2.5 2.5-2.5 2.5" /></svg>@L.Get(Str.HomeMove)</button>
+            </div>
+            @if (MenuQuickTargets is { Count: > 0 } quick)
+            {
+                <div class="xbs-quick-label">@L.Get(Str.HomeMoveQuick)</div>
+                <div class="xbs-quick-chips">
+                    @foreach (var f in quick)
+                    {
+                        <button class="xbs-quick-chip" @onclick="() => MoveRow(menuFor, f.RowId)"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span>@(f.Title ?? L.Get(Str.SheetTypeFolder))</span></button>
+                    }
+                    <button class="xbs-quick-chip other" @onclick="OpenMovePicker"><span>@L.Get(Str.HomeMoveOther)</span></button>
+                </div>
+            }
             <div class="xbs-action-group">
-                @if (isSearch || menuFor.ParentRowId != CurrentParent)
-                {
-                    <button class="xbs-action" @onclick="() => GoToLocation(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span class="flex-grow-1">@L.Get(Str.HomeGoToLocation)</span><svg class="km-ico chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
-                }
                 <button class="xbs-action danger" @onclick="() => DeleteRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12h9l1-12M9.5 7V4.5h5V7" /></svg>@L.Get(Str.CommonDelete)</button>
             </div>
         </div>
     </div>
+}
+
+@if (movingFor is not null)
+{
+    <MovePicker Row="movingFor" Folders="allFolders" Recents="MoveRecentRowIds()"
+                OnMove="t => MoveRow(movingFor, t)" OnCancel="() => movingFor = null" CreateFolderIn="CreateFolderIn" />
 }
 
 @if (undo is not null)
@@ -257,6 +279,14 @@ else
     <div class="xbs-undo">
         <span>@L.Get(Str.HomeDeleted)</span>
         <button class="xbs-undo-btn" @onclick="UndoDelete">@L.Get(Str.CommonUndo)</button>
+    </div>
+}
+else if (moved is not null)
+{
+    <div class="xbs-undo" role="status">
+        <span>@moved.Value.Text</span>
+        <button class="xbs-undo-btn ghost" @onclick="ShowMoved">@L.Get(Str.HomeMoveShow)</button>
+        <button class="xbs-undo-btn" @onclick="UndoMove">@L.Get(Str.CommonUndo)</button>
     </div>
 }
 
@@ -283,6 +313,9 @@ else
     private bool gesturesInit;
     private SheetTarget? sheetFor;
     private ItemRow? menuFor;
+    private ItemRow? movingFor;
+    // Last move, for the undo bar: the row, where it came from (RowId and stable NodeId) and the bar text.
+    private (ItemRow Row, int? FromRowId, int? FromNodeId, string Text)? moved;
     private bool pinnedOpen = false;
     private int? flashRowId;
     private int? flashNodeId;
@@ -455,7 +488,7 @@ else
         // nav drawer: whoever is still open keeps the lock.
         if (ready)
         {
-            try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", menuFor is not null || sheetFor is not null, "sheet"); } catch { }
+            try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", menuFor is not null || sheetFor is not null || movingFor is not null, "sheet"); } catch { }
         }
     }
 
@@ -738,8 +771,16 @@ else
 
             undo = (parentNode, legacy.Subtree);
         }
+        moved = null;
         await RefreshAsync();
         StateHasChanged();
+        StartUndoTimer();
+    }
+
+    /// <summary>Hides the undo bar (delete or move) after 6s.</summary>
+    private void StartUndoTimer()
+    {
+        undoTimer?.Cancel();
         undoTimer = new CancellationTokenSource();
         var token = undoTimer.Token;
         _ = Task.Run(async () =>
@@ -747,10 +788,215 @@ else
             try
             {
                 await Task.Delay(6000, token);
-                await InvokeAsync(() => { undo = null; StateHasChanged(); });
+                await InvokeAsync(() => { undo = null; moved = null; StateHasChanged(); });
             }
             catch (Exception ex) when (ex is TaskCanceledException || ex is InvalidOperationException || ex is ObjectDisposedException) { }
         });
+    }
+
+    private const string MoveRecentsKey = "move_recents";
+
+    /// <summary>Recent move destinations as current RowIds, most recent first.
+    /// Stored as NodeIds (stable across sync rewrites); vanished folders drop out.</summary>
+    private List<int> MoveRecentRowIds()
+    {
+        var result = new List<int>();
+        foreach (var part in Preferences.Get(MoveRecentsKey, string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (int.TryParse(part, out int nodeId) && allFolders.FirstOrDefault(f => f.NodeId == nodeId) is { } f)
+            {
+                result.Add(f.RowId);
+            }
+        }
+
+        return result;
+    }
+
+    private static void RememberMoveTarget(int nodeId)
+    {
+        var ids = Preferences.Get(MoveRecentsKey, string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Where(p => p != nodeId.ToString()).Prepend(nodeId.ToString()).Take(6);
+        Preferences.Set(MoveRecentsKey, string.Join(',', ids));
+    }
+
+    /// <summary>Quick-move chips for the open menu: recents except the current
+    /// folder and, for a folder, anything inside it.</summary>
+    private List<ItemRow>? MenuQuickTargets => menuFor is null ? null : MoveRecentRowIds()
+        .Where(id => id != menuFor.ParentRowId && !IsInside(id, menuFor))
+        .Select(id => allFolders.First(f => f.RowId == id))
+        .Take(3)
+        .ToList();
+
+    /// <summary>True when folder rowId is the row itself or one of its descendants.</summary>
+    private bool IsInside(int rowId, ItemRow row)
+    {
+        if (!row.IsFolder)
+        {
+            return false;
+        }
+
+        int? cur = rowId;
+        for (int guard = 0; cur is not null && guard < 256; guard++)
+        {
+            if (cur == row.RowId)
+            {
+                return true;
+            }
+
+            cur = allFolders.FirstOrDefault(f => f.RowId == cur.Value)?.ParentRowId;
+        }
+
+        return false;
+    }
+
+    /// <summary>Folder path as "Work › Dev"; top level when null.</summary>
+    private string FolderPath(int? rowId)
+    {
+        var parts = new Stack<string>();
+        for (int guard = 0; rowId is not null && guard < 256; guard++)
+        {
+            var f = allFolders.FirstOrDefault(x => x.RowId == rowId.Value);
+            if (f is null)
+            {
+                break;
+            }
+
+            parts.Push(f.Title ?? L.Get(Str.SheetTypeFolder));
+            rowId = f.ParentRowId;
+        }
+
+        return parts.Count == 0 ? L.Get(Str.SheetTopLevel) : string.Join(" › ", parts);
+    }
+
+    private void OpenMovePicker()
+    {
+        movingFor = menuFor;
+        menuFor = null;
+    }
+
+    private async Task MoveRow(ItemRow? row, int? targetRowId)
+    {
+        menuFor = null;
+        movingFor = null;
+        if (row is null || Session.Engine is null || row.ParentRowId == targetRowId)
+        {
+            return;
+        }
+
+        var target = targetRowId is null ? null : allFolders.FirstOrDefault(f => f.RowId == targetRowId.Value);
+        if (targetRowId is not null && target is null)
+        {
+            return;
+        }
+
+        var from = row.ParentRowId is null ? null : allFolders.FirstOrDefault(f => f.RowId == row.ParentRowId.Value);
+        var path = FolderPath(targetRowId);
+
+        // Optimistic UI: the row leaves the folder list at once. Search hits
+        // stay (only their path changes); the refresh below reconciles.
+        if (!isSearch)
+        {
+            rows.RemoveAll(r => r.RowId == row.RowId);
+            expandedRows.Remove(row.RowId);
+        }
+
+        StateHasChanged();
+        await Task.Delay(1);
+        _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
+        try
+        {
+            await MoveCoreAsync(row, targetRowId, target?.NodeId);
+        }
+        catch (Exception ex)
+        {
+            Session.Log.Warn("ui", $"Move failed: {ex.GetType().Name}");
+            await RefreshAsync();
+            StateHasChanged();
+            _ = Toast.ShowAsync(L.Get(Str.HomeMoveFailed), isError: true);
+            return;
+        }
+
+        Session.Log.Info("ui", "Moved item");
+        Session.Log.Verbose("ui", $"Moved: {row.Title} -> {path}");
+        if (target?.NodeId is int targetNode)
+        {
+            RememberMoveTarget(targetNode);
+        }
+
+        undo = null;
+        moved = (row, row.ParentRowId, from?.NodeId,
+            L.Get(Str.HomeMoved, row.Title ?? row.Url ?? L.Get(Str.HomeItemWord), path));
+        await RefreshAsync();
+        StateHasChanged();
+        StartUndoTimer();
+    }
+
+    /// <summary>Moves by stable NodeIds; legacy rows (or a destination without
+    /// a NodeId) keep the RowId path instead of silently landing at top level.</summary>
+    private async Task MoveCoreAsync(ItemRow row, int? toRowId, int? toNodeId)
+    {
+        if (row.NodeId is not null && (toRowId is null || toNodeId is not null))
+        {
+            await Session.Engine!.MoveBookmarkByNodeIdAsync(row.NodeId.Value, toNodeId);
+        }
+        else
+        {
+            await Session.Engine!.MoveBookmarkAsync(row.RowId, toRowId);
+        }
+    }
+
+    private async Task UndoMove()
+    {
+        if (moved is null || Session.Engine is null) return;
+        var m = moved.Value;
+        moved = null;
+        undoTimer?.Cancel();
+        StateHasChanged();
+        try
+        {
+            // Back to the original folder (appended at its end).
+            await MoveCoreAsync(m.Row, m.FromRowId, m.FromNodeId);
+            Session.Log.Info("ui", "Undid move");
+        }
+        catch (Exception ex)
+        {
+            Session.Log.Warn("ui", $"Undo move failed: {ex.GetType().Name}");
+            _ = Toast.ShowAsync(L.Get(Str.HomeMoveFailed), isError: true);
+        }
+
+        await RefreshAsync();
+    }
+
+    private async Task ShowMoved()
+    {
+        if (moved is null) return;
+        var row = moved.Value.Row;
+        moved = null;
+        undoTimer?.Cancel();
+        await GoToLocation(row);
+    }
+
+    private async Task<int?> CreateFolderIn(int? parentRowId, string title)
+    {
+        if (Session.Engine is null) return null;
+        try
+        {
+            var parent = parentRowId is null ? null : allFolders.FirstOrDefault(f => f.RowId == parentRowId.Value);
+            var node = new Core.Models.BookmarkNode { Title = title, Children = [] };
+            int rowId = parent is null || parent.NodeId is not null
+                ? await Session.Engine.AddBookmarkByNodeIdAsync(parent?.NodeId, node)
+                : await Session.Engine.AddBookmarkAsync(parentRowId, node);
+            Session.Log.Info("ui", "Created folder (move)");
+            await RefreshAsync();
+            StateHasChanged();
+            return rowId;
+        }
+        catch (Exception ex)
+        {
+            Session.Log.Warn("ui", $"Create folder failed: {ex.GetType().Name}");
+            _ = Toast.ShowAsync(ex.Message, isError: true);
+            return null;
+        }
     }
 
     private async Task UndoDelete()

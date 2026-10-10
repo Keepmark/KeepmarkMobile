@@ -644,4 +644,22 @@ public static partial class Str
     public const string HelpToolsBody = nameof(HelpToolsBody);
     public const string HelpLockH = nameof(HelpLockH);
     public const string HelpLockBody = nameof(HelpLockBody);
+    public const string HomeLocation = nameof(HomeLocation);
+    public const string HomeMove = nameof(HomeMove);
+    public const string HomeMoveQuick = nameof(HomeMoveQuick);
+    public const string HomeMoveOther = nameof(HomeMoveOther);
+    public const string HomeMoved = nameof(HomeMoved);
+    public const string HomeMoveFailed = nameof(HomeMoveFailed);
+    public const string HomeMoveShow = nameof(HomeMoveShow);
+    public const string MoveTitle = nameof(MoveTitle);
+    public const string MoveFrom = nameof(MoveFrom);
+    public const string MoveRecent = nameof(MoveRecent);
+    public const string MoveAllFolders = nameof(MoveAllFolders);
+    public const string MoveHereNow = nameof(MoveHereNow);
+    public const string MoveNewFolderIn = nameof(MoveNewFolderIn);
+    public const string MoveFolderName = nameof(MoveFolderName);
+    public const string MoveCreate = nameof(MoveCreate);
+    public const string MoveTo = nameof(MoveTo);
+    public const string MoveSearch = nameof(MoveSearch);
+    public const string MoveClose = nameof(MoveClose);
 }
