@@ -15,6 +15,10 @@
   <img src="https://img.shields.io/badge/languages-en%20%C2%B7%20it%20%C2%B7%20fr%20%C2%B7%20es%20%C2%B7%20de%20%C2%B7%20ja%20%C2%B7%20pt--BR%20%C2%B7%20ru%20%C2%B7%20zh-4a5170" alt="Languages" />
 </p>
 
+<p align="center">
+  <img src="docs/img/ecosystem.png" alt="Keepmark in a browser and on Android: the same encrypted bookmarks everywhere" />
+</p>
+
 ---
 
 Keepmark keeps the same bookmarks on your browsers and your phone. Everything
@@ -57,6 +61,21 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 With **Keepmark Server** you also get revision-based conflict detection,
 faster "nothing changed" checks and the option to delete your sync from the
 server. On other services Keepmark falls back automatically.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/img/screens/01-browse.png" width="24%" alt="Browse folders" />
+  <img src="docs/img/screens/02-folder.png" width="24%" alt="Search" />
+  <img src="docs/img/screens/03-connect.png" width="24%" alt="Connect choice" />
+  <img src="docs/img/screens/04-duplicates.png" width="24%" alt="Duplicates" />
+</p>
+
+<p align="center">
+  <img src="docs/img/screens/05-backup.png" width="24%" alt="Encrypted backups" />
+  <img src="docs/img/screens/06-actions.png" width="24%" alt="Bookmark actions" />
+  <img src="docs/img/screens/07-pinned.png" width="24%" alt="Pinned bookmarks" />
+</p>
 
 ## The Keepmark family
 
