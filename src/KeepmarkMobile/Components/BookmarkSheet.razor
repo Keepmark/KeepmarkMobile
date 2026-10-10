@@ -138,9 +138,9 @@
         var parts = new Stack<string>();
         while (cur is not null)
         {
-            if (cur.Title is not null)
+            if (cur.DisplayTitle is not null)
             {
-                parts.Push(cur.Title);
+                parts.Push(cur.DisplayTitle);
             }
 
             cur = cur.ParentRowId is not null && byId.TryGetValue(cur.ParentRowId.Value, out var p) ? p : null;

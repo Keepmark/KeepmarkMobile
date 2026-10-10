@@ -62,7 +62,7 @@ else
                     depth++;
                     var isCurrent = depth == crumbs.Count;
                     @* Earlier ribbons sit on top: the next one shows through their tail notch. *@
-                    <button class="xbs-crumb" style="z-index: @(crumbs.Count - depth + 1)" aria-current="@(isCurrent ? "location" : null)" @onclick="() => JumpTo(c.RowId)"><span>@(c.Title ?? L.Get(Str.HomeFolderWord))</span></button>
+                    <button class="xbs-crumb" style="z-index: @(crumbs.Count - depth + 1)" aria-current="@(isCurrent ? "location" : null)" @onclick="() => JumpTo(c.RowId)"><span>@(c.DisplayTitle ?? L.Get(Str.HomeFolderWord))</span></button>
                 }
             </nav>
         </div>
@@ -198,7 +198,7 @@ else
 @if (menuFor is not null)
 {
     <div class="xbs-sheet-backdrop" data-back="30" @onclick="() => menuFor = null">
-        <div class="xbs-sheet menu" style="--km-site: @(menuFor.IsFolder ? "#273f85" : RowTile.ColorFor(menuFor))" role="dialog" aria-modal="true" aria-label="@L.Get(Str.HomeActionsFor, menuFor.Title ?? menuFor.Url ?? L.Get(Str.HomeItemWord))" @onclick:stopPropagation="true">
+        <div class="xbs-sheet menu" style="--km-site: @(menuFor.IsFolder ? "#273f85" : RowTile.ColorFor(menuFor))" role="dialog" aria-modal="true" aria-label="@L.Get(Str.HomeActionsFor, menuFor.DisplayTitle ?? menuFor.Url ?? L.Get(Str.HomeItemWord))" @onclick:stopPropagation="true">
             @* Canvas "SheetGridA": a ribbon hangs over the top edge (site color
                for bookmarks, navy with a folder glyph for folders); frequent
                actions as tiles, then a group with location and the separate
@@ -207,7 +207,7 @@ else
             <div class="xbs-sheet-info @(MenuExpanded ? "expanded" : string.Empty)" data-sheet-info aria-expanded="@MenuExpanded.ToString().ToLowerInvariant()">
             <div class="xbs-sheet-head ribboned">
                 <div class="xbs-sheet-head-text">
-                    <h2 class="xbs-sheet-title">@(menuFor.Title ?? menuFor.Url)</h2>
+                    <h2 class="xbs-sheet-title">@(menuFor.DisplayTitle ?? menuFor.Url)</h2>
                     @if (!menuFor.IsFolder && !string.IsNullOrEmpty(menuFor.Url))
                     {
                         <div class="xbs-sheet-url">@menuFor.Url</div>
@@ -256,7 +256,7 @@ else
                 <div class="xbs-quick-chips">
                     @foreach (var f in quick)
                     {
-                        <button class="xbs-quick-chip" @onclick="() => MoveRow(menuFor, f.RowId)"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span>@(f.Title ?? L.Get(Str.SheetTypeFolder))</span></button>
+                        <button class="xbs-quick-chip" @onclick="() => MoveRow(menuFor, f.RowId)"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span>@(f.DisplayTitle ?? L.Get(Str.SheetTypeFolder))</span></button>
                     }
                     <button class="xbs-quick-chip other" @onclick="OpenMovePicker"><span>@L.Get(Str.HomeMoveOther)</span></button>
                 </div>
@@ -861,7 +861,7 @@ else if (moved is not null)
                 break;
             }
 
-            parts.Push(f.Title ?? L.Get(Str.SheetTypeFolder));
+            parts.Push(f.DisplayTitle ?? L.Get(Str.SheetTypeFolder));
             rowId = f.ParentRowId;
         }
 
@@ -925,7 +925,7 @@ else if (moved is not null)
 
         undo = null;
         moved = (row, row.ParentRowId, from?.NodeId,
-            L.Get(Str.HomeMoved, row.Title ?? row.Url ?? L.Get(Str.HomeItemWord), path));
+            L.Get(Str.HomeMoved, row.DisplayTitle ?? row.Url ?? L.Get(Str.HomeItemWord), path));
         await RefreshAsync();
         StateHasChanged();
         StartUndoTimer();
@@ -1269,7 +1269,7 @@ else if (moved is not null)
 
     private void TogglePinned() => pinnedOpen = !pinnedOpen;
 
-    private static string SortTitle(Core.Data.ItemRow r) => r.Title ?? r.Url ?? string.Empty;
+    private static string SortTitle(Core.Data.ItemRow r) => r.DisplayTitle ?? r.Url ?? string.Empty;
 
     /// <summary>Display rank only: folders 0, bookmarks 1, separators 2. Never persisted.</summary>
     private static int RankForSort(Core.Data.ItemRow r) =>
@@ -1292,7 +1292,7 @@ else if (moved is not null)
 
     private string SortLabel => SortModes.FirstOrDefault(m => m.Mode == sortMode).Label ?? L.Get(Str.HomeSortOriginal);
 
-    private string CurrentName => crumbs.Count == 0 ? "Keepmark" : crumbs.Peek().Title ?? L.Get(Str.HomeFolderWord);
+    private string CurrentName => crumbs.Count == 0 ? "Keepmark" : crumbs.Peek().DisplayTitle ?? L.Get(Str.HomeFolderWord);
 
 
     /// <summary>"3 folders · 1 bookmark" for the big title of a short list (this level only).</summary>

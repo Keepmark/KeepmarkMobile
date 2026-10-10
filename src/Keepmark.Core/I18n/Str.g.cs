@@ -271,6 +271,9 @@ public static partial class Str
     public const string HomeActionsFor = nameof(HomeActionsFor);
     public const string HomeItemWord = nameof(HomeItemWord);
     public const string HomeFolderWord = nameof(HomeFolderWord);
+    public const string ContainerMenu = nameof(ContainerMenu);
+    public const string ContainerOther = nameof(ContainerOther);
+    public const string ContainerToolbar = nameof(ContainerToolbar);
     public const string HomeOpen = nameof(HomeOpen);
     public const string HomeShare = nameof(HomeShare);
     public const string HomeEdit = nameof(HomeEdit);

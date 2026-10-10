@@ -37,6 +37,11 @@ public sealed class ItemRow
     public string? Tags { get; set; }
     public bool IsFolder { get; set; }
     public int SortOrder { get; set; }
+
+    /// <summary>Title for the UI: top-level "[xbs] …" containers get a localized
+    /// name. Display only — never write it back (Title is the synced value).</summary>
+    [Ignore]
+    public string? DisplayTitle => ContainerNames.Display(Title, ParentRowId is null);
 }
 
 public sealed record SearchHit(
@@ -828,9 +833,9 @@ public sealed class BookmarkStore : IAsyncDisposable
             var cur = byId[rowId];
             while (cur.ParentRowId is not null && byId.TryGetValue(cur.ParentRowId.Value, out var p))
             {
-                if (p.Title is not null)
+                if (p.DisplayTitle is { } name)
                 {
-                    parts.Push(p.Title);
+                    parts.Push(name);
                 }
 
                 cur = p;

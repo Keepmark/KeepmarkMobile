@@ -41,7 +41,7 @@
                             <button type="button" class="xbs-move-chip @(on ? "on" : string.Empty)" aria-pressed="@on.ToString().ToLowerInvariant()"
                                     @onclick="() => Select(f.RowId)">
                                 <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
-                                <span>@(f.Title ?? L.Get(Str.SheetTypeFolder))</span>
+                                <span>@(f.DisplayTitle ?? L.Get(Str.SheetTypeFolder))</span>
                             </button>
                         }
                     </div>
@@ -61,7 +61,7 @@
                 <div class="xbs-move-tree" role="tree" aria-label="@L.Get(Str.MoveSearch)">
                     @foreach (var f in Filtered)
                     {
-                        @RowFor(f.RowId, f.Title ?? L.Get(Str.SheetTypeFolder), 0, false, false, sub: PathOf(f.ParentRowId))
+                        @RowFor(f.RowId, f.DisplayTitle ?? L.Get(Str.SheetTypeFolder), 0, false, false, sub: PathOf(f.ParentRowId))
                     }
                     @if (Filtered.Count == 0)
                     {
@@ -128,7 +128,7 @@
     private ElementReference newInput;
     private bool focusNew;
 
-    private string Name => Row.Title ?? Row.Url ?? L.Get(Str.HomeItemWord);
+    private string Name => Row.DisplayTitle ?? Row.Url ?? L.Get(Str.HomeItemWord);
     private bool CanMove => hasSelection && selected != Row.ParentRowId;
 
     protected override void OnParametersSet()
@@ -236,8 +236,8 @@
         Filtered = string.IsNullOrWhiteSpace(filter)
             ? []
             : ById.Values
-                .Where(f => f.Title is not null && f.Title.Contains(filter, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(f => f.Title)
+                .Where(f => f.DisplayTitle is not null && f.DisplayTitle.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(f => f.DisplayTitle)
                 .ToList();
     }
 
@@ -289,7 +289,7 @@
 
     private string NameOf(int? rowId) =>
         rowId is not null && ById.TryGetValue(rowId.Value, out var f)
-            ? f.Title ?? L.Get(Str.SheetTypeFolder)
+            ? f.DisplayTitle ?? L.Get(Str.SheetTypeFolder)
             : L.Get(Str.SheetTopLevel);
 
     /// <summary>Full path of a folder ("Work › Dev"); top level when null.</summary>
@@ -299,7 +299,7 @@
         var cur = rowId is not null && ById.TryGetValue(rowId.Value, out var p) ? p : null;
         while (cur is not null)
         {
-            parts.Push(cur.Title ?? L.Get(Str.SheetTypeFolder));
+            parts.Push(cur.DisplayTitle ?? L.Get(Str.SheetTypeFolder));
             cur = cur.ParentRowId is not null && ById.TryGetValue(cur.ParentRowId.Value, out var q) ? q : null;
         }
 
@@ -361,7 +361,7 @@
     {
         var hasKids = ByParent.TryGetValue(node.RowId, out var kids) && kids.Count > 0;
         var isCollapsed = collapsed.Contains(node.RowId);
-        @RowFor(node.RowId, node.Title ?? L.Get(Str.SheetTypeFolder), level, hasKids, isCollapsed)
+        @RowFor(node.RowId, node.DisplayTitle ?? L.Get(Str.SheetTypeFolder), level, hasKids, isCollapsed)
         @if (hasKids && !isCollapsed)
         {
             <div class="xbs-move-kids" role="group">

@@ -209,6 +209,49 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Containers_ShowLocalizedNames_ButKeepSyncedTitles()
+    {
+        List<BookmarkNode> tree =
+        [
+            new() { Id = 1, Title = ContainerNames.Menu, Children = [
+                new() { Id = 2, Title = ContainerNames.Menu, Children = [
+                    new() { Id = 3, Title = "Deep", Url = "https://deep.example.com" },
+                ]},
+            ]},
+            new() { Id = 4, Title = ContainerNames.Other, Children = [
+                new() { Id = 5, Title = "Docs", Url = "https://docs.example.com" },
+            ]},
+            new() { Id = 6, Title = ContainerNames.Toolbar, Children = [] },
+        ];
+        await _store.ReplaceAllAsync(tree, "blob", "t1", "1.8.0");
+
+        // Synced titles are untouched: the mirror pushed to the service keeps "[xbs] …".
+        var (roots, _, _, _) = await _store.LoadMirrorAsync();
+        Assert.Equal([ContainerNames.Menu, ContainerNames.Other, ContainerNames.Toolbar], roots.Select(r => r.Title));
+        Assert.Equal(ContainerNames.Menu, roots[0].Children![0].Title);
+
+        var rows = await _store.GetChildrenAsync(null);
+        Assert.Equal(["Bookmarks Menu", "Other Bookmarks", "Bookmarks Toolbar"], rows.Select(r => r.DisplayTitle));
+        Assert.Equal([ContainerNames.Menu, ContainerNames.Other, ContainerNames.Toolbar], rows.Select(r => r.Title));
+
+        // Only top-level containers are renamed: a nested folder titled "[xbs] Menu" stays as is.
+        var paths = await _store.GetFolderPathsAsync();
+        var deep = (await _store.SearchAsync("deep")).Single();
+        Assert.Equal($"Bookmarks Menu / {ContainerNames.Menu}", paths[deep.RowId]);
+        Assert.Equal("Other Bookmarks", (await _store.SearchAsync("docs")).Single().FolderPath);
+    }
+
+    [Fact]
+    public void ContainerNames_LeaveOtherTitlesAlone()
+    {
+        Assert.Equal("Bookmarks Menu", ContainerNames.Display(ContainerNames.Menu, isTopLevel: true));
+        Assert.Equal(ContainerNames.Menu, ContainerNames.Display(ContainerNames.Menu, isTopLevel: false));
+        Assert.Equal("[xbs] Mobile", ContainerNames.Display("[xbs] Mobile", isTopLevel: true));
+        Assert.Equal("Work", ContainerNames.Display("Work", isTopLevel: true));
+        Assert.Null(ContainerNames.Display(null, isTopLevel: true));
+    }
+
+    [Fact]
     public async Task Search_FindsByTitleTagAndUrlFragment()
     {
         await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");

@@ -5,7 +5,7 @@
     <div class="xbs-row xbs-row-sep" data-rowid="@Row.RowId" data-sep="1" aria-hidden="true">
         <div class="xbs-row-inner">
             <div class="xbs-row-text">
-                <div class="xbs-row-title">@(Row.Title ?? "—")</div>
+                <div class="xbs-row-title">@(Row.DisplayTitle ?? "—")</div>
             </div>
         </div>
     </div>
@@ -58,8 +58,8 @@ else
     private string? RowExpanded => Row.IsFolder ? null : Expanded.ToString().ToLowerInvariant();
     private string RowLabel => L.Get(Row.IsFolder ? Str.RowOpenFolder : Str.RowOpenBookmark, PlainTitle);
     private string PlainTitle => Row.IsFolder
-        ? (string.IsNullOrWhiteSpace(Row.Title) ? L.Get(Str.SheetTypeFolder) : Row.Title)
-        : (string.IsNullOrWhiteSpace(Row.Title) ? ShortUrl(Row.Url) is { Length: > 0 } u ? u : L.Get(Str.RowNoTitle) : Row.Title);
+        ? (string.IsNullOrWhiteSpace(Row.DisplayTitle) ? L.Get(Str.SheetTypeFolder) : Row.DisplayTitle)
+        : (string.IsNullOrWhiteSpace(Row.DisplayTitle) ? ShortUrl(Row.Url) is { Length: > 0 } u ? u : L.Get(Str.RowNoTitle) : Row.DisplayTitle);
     private string Sub => Row.IsFolder ? (FolderPath ?? (Count is int n ? Loc.Plural(Str.HomeCountBookmarks, n) : string.Empty)) : Expanded ? Row.Url ?? string.Empty : ShortUrl(Row.Url);
 
     // Collapsed rows show the URL without scheme/www (the full URL is in the
