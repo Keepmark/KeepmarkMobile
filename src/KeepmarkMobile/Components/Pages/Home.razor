@@ -102,7 +102,7 @@ else
             <div class="xbs-list">
                 @foreach (var id in hitRows)
                 {
-                    <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRows.Contains(id)" Flash="flashRowId == id" Pinned="pinned.Contains(byRow[id].NodeId ?? -1)"
+                    <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRows.Contains(id)" Flash="flashRowId == id" Pinned="IsPinned(id)"
                                  FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
                 }
             </div>
@@ -142,7 +142,7 @@ else
             <div class="xbs-list">
                 @foreach (var r in rows)
                 {
-                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="pinned.Contains(r.NodeId ?? -1)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
                 }
             </div>
         }
@@ -297,8 +297,10 @@ else if (moved is not null)
     private List<ItemRow> rows = [];
     private List<ItemRow> pinnedRows = [];
     private List<ItemRow> allFolders = [];
-    private HashSet<int> pinned = [];
-    private bool MenuPinned => menuFor?.NodeId is int id && pinned.Contains(id);
+    private List<string> pinned = [];
+    private Dictionary<int, string> pinKeyByRow = [];
+    private bool MenuPinned => menuFor is not null && IsPinned(menuFor.RowId);
+    private bool IsPinned(int rowId) => pinKeyByRow.TryGetValue(rowId, out var k) && pinned.Contains(k);
     private readonly Stack<ItemRow> crumbs = new();
     private readonly Dictionary<int, ItemRow> byRow = new();
     private string query = string.Empty;
@@ -523,7 +525,8 @@ else if (moved is not null)
                 _ => rows
             };
             allFolders = await Session.Store.GetAllFoldersAsync();
-            pinnedRows = await Session.Store.GetByNodeIdsAsync(pinned);
+            await MigrateLegacyPinsAsync();
+            (pinnedRows, pinKeyByRow) = await Session.Store.GetPinnedAsync(pinned);
             pinPaths = await Session.Store.GetFolderPathsAsync();
             folderCounts = await Session.Store.GetFolderBookmarkCountsAsync();
             byRow.Clear();
@@ -718,8 +721,14 @@ else if (moved is not null)
         menuFor = null;
         StateHasChanged();
         await Task.Delay(1);
-        if (row?.NodeId is null || Session.Engine is null) return;
-        bool added = Pins.Toggle(row.NodeId.Value);
+        if (row is null || Session.Engine is null) return;
+        if (!pinKeyByRow.TryGetValue(row.RowId, out var pinKey))
+        {
+            pinKeyByRow = await Session.Store.GetPinKeysAsync();
+            if (!pinKeyByRow.TryGetValue(row.RowId, out pinKey)) return;
+        }
+
+        bool added = Pins.Toggle(pinKey);
         pinned = Pins.Load();
         sortMode = AppSettings.ListSort;
         Session.Log.Info("ui", added ? "Pinned item" : "Unpinned item");
@@ -727,6 +736,22 @@ else if (moved is not null)
         // Paint first: the toast must never gate the list update.
         StateHasChanged();
         _ = Toast.ShowAsync(added ? L.Get(Str.HomePinnedToast) : L.Get(Str.HomeUnpinnedToast));
+    }
+
+    // Builds before 1.0.174 pinned by NodeId; convert once while the ids still
+    // match this device's mirror, then drop the legacy list.
+    private async Task MigrateLegacyPinsAsync()
+    {
+        var ids = Pins.LoadLegacyIds();
+        if (ids.Count == 0 || Session.Store is null) return;
+        var keys = await Session.Store.GetPinKeysAsync();
+        foreach (var r in await Session.Store.GetByNodeIdsAsync(ids))
+        {
+            if (keys.TryGetValue(r.RowId, out var k) && !pinned.Contains(k)) pinned.Add(k);
+        }
+
+        Pins.Save(pinned);
+        Pins.ClearLegacy();
     }
 
     private async Task DeleteRow(ItemRow? row)

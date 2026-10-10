@@ -816,6 +816,78 @@ public sealed class BookmarkStore : IAsyncDisposable
 
     public long GetFileSize() => new FileInfo(_dbPath).Length;
 
+    /// <summary>
+    /// Stable pin key for every row: bookmarks by URL ("u:…"), folders by the raw
+    /// title path from the root ("f:…"). NodeIds are not stable — any client that
+    /// rewrites the sync renumbers them — so pins must never be keyed on them.
+    /// </summary>
+    public async Task<Dictionary<int, string>> GetPinKeysAsync()
+    {
+        var all = await Db.Table<ItemRow>().ToListAsync().ConfigureAwait(false);
+        return PinKeys(all);
+    }
+
+    // Bookmark keys are "u:" + URL + this + title: the title only picks the pinned
+    // copy among duplicates; the URL alone still matches after a title edit.
+    private const string PinTitleSep = "\u001e";
+
+    internal static Dictionary<int, string> PinKeys(List<ItemRow> all)
+    {
+        var byId = all.ToDictionary(r => r.RowId);
+        var keys = new Dictionary<int, string>();
+        foreach (var r in all)
+        {
+            if (!r.IsFolder)
+            {
+                keys[r.RowId] = r.Url is { Length: > 0 } url ? "u:" + url + PinTitleSep + r.Title : "n:" + r.RowId;
+                continue;
+            }
+
+            var parts = new Stack<string>();
+            for (ItemRow? cur = r; cur is not null; cur = cur.ParentRowId is int pid && byId.TryGetValue(pid, out var p) ? p : null)
+            {
+                parts.Push(cur.Title ?? string.Empty);
+            }
+
+            keys[r.RowId] = "f:" + string.Join("\u001f", parts);
+        }
+
+        return keys;
+    }
+
+    private static string UrlPart(string key) =>
+        key.StartsWith("u:", StringComparison.Ordinal) && key.IndexOf(PinTitleSep, StringComparison.Ordinal) is int i and >= 0
+            ? key[..i] : key;
+
+    /// <summary>Rows for the given pin keys, in key order; one row per key (first copy).</summary>
+    public async Task<(List<ItemRow> Rows, Dictionary<int, string> KeyByRow)> GetPinnedAsync(IReadOnlyList<string> pinKeys)
+    {
+        var all = await Db.Table<ItemRow>().OrderBy(r => r.RowId).ToListAsync().ConfigureAwait(false);
+        var keyByRow = PinKeys(all);
+        var firstByKey = new Dictionary<string, ItemRow>();
+        var firstByUrl = new Dictionary<string, ItemRow>();
+        foreach (var r in all)
+        {
+            var key = keyByRow[r.RowId];
+            firstByKey.TryAdd(key, r);
+            firstByUrl.TryAdd(UrlPart(key), r);
+        }
+
+        var rows = new List<ItemRow>();
+        foreach (var k in pinKeys.Distinct())
+        {
+            var row = firstByKey.GetValueOrDefault(k) ?? firstByUrl.GetValueOrDefault(UrlPart(k));
+            if (row is not null && !rows.Contains(row))
+            {
+                // Title edited: report the row under its stored key so it still shows as pinned.
+                keyByRow[row.RowId] = k;
+                rows.Add(row);
+            }
+        }
+
+        return (rows, keyByRow);
+    }
+
     public async Task<Dictionary<int, string>> GetFolderPathsAsync()
     {
         var paths = await Db.Table<ItemRow>().ToListAsync().ConfigureAwait(false);

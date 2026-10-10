@@ -242,6 +242,57 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PinKeys_SurviveFullReplaceWithRenumberedIds()
+    {
+        static List<BookmarkNode> Tree(int b) =>
+        [
+            new() { Id = b + 1, Title = ContainerNames.Toolbar, Children = [
+                new() { Id = b + 2, Title = "Wiki", Url = "https://en.wikipedia.org/" },
+                new() { Id = b + 3, Title = "Daily", Children = [
+                    new() { Id = b + 4, Title = "HN", Url = "https://news.ycombinator.com/" },
+                ]},
+            ]},
+            new() { Id = b + 5, Title = ContainerNames.Other, Children = [
+                new() { Id = b + 6, Title = "Daily", Children = [] },
+            ]},
+        ];
+
+        await _store.ReplaceAllAsync(Tree(0), "blob", "t1", "1.8.0");
+        var keys = await _store.GetPinKeysAsync();
+        var wiki = (await _store.SearchAsync("wiki")).Single(h => !h.IsFolder);
+        var daily = (await _store.GetByNodeIdsAsync([3])).Single();
+        List<string> pins = [keys[wiki.RowId], keys[daily.RowId]];
+
+        // Another client rewrites the sync: same tree, every NodeId shifted.
+        await _store.ReplaceAllAsync(Tree(100), "blob", "t2", "1.8.0");
+        var (rows, keyByRow) = await _store.GetPinnedAsync(pins);
+
+        Assert.Equal(["Wiki", "Daily"], rows.Select(r => r.Title));
+        Assert.Equal([102, 103], rows.Select(r => r.NodeId));
+        // Duplicate URL: the pinned copy wins; a title edit still keeps the pin.
+        static List<BookmarkNode> Dup(string title) =>
+        [
+            new() { Id = 1, Title = ContainerNames.Other, Children = [new() { Id = 2, Title = "MDN", Url = "https://developer.mozilla.org/" }] },
+            new() { Id = 3, Title = ContainerNames.Toolbar, Children = [new() { Id = 4, Title = title, Url = "https://developer.mozilla.org/" }] },
+        ];
+        await _store.ReplaceAllAsync(Dup("MDN Web Docs"), "blob", "t3", "1.8.0");
+        var dupKeys = await _store.GetPinKeysAsync();
+        var toolbarCopy = (await _store.GetByNodeIdsAsync([4])).Single();
+        List<string> dupPins = [dupKeys[toolbarCopy.RowId]];
+        Assert.Equal(["MDN Web Docs"], (await _store.GetPinnedAsync(dupPins)).Rows.Select(r => r.Title));
+        await _store.ReplaceAllAsync(Dup("MDN docs"), "blob", "t4", "1.8.0");
+        var (renamed, renamedKeys) = await _store.GetPinnedAsync(dupPins);
+        Assert.Single(renamed);
+        Assert.Equal(dupPins[0], renamedKeys[renamed[0].RowId]);
+        await _store.ReplaceAllAsync(Tree(100), "blob", "t5", "1.8.0");
+        (_, keyByRow) = await _store.GetPinnedAsync(pins);
+
+        // Same-named folder elsewhere is a different pin.
+        var otherDaily = (await _store.GetByNodeIdsAsync([106])).Single();
+        Assert.DoesNotContain(keyByRow[otherDaily.RowId], pins);
+    }
+
+    [Fact]
     public void ContainerNames_LeaveOtherTitlesAlone()
     {
         Assert.Equal("Menu", ContainerNames.Display(ContainerNames.Menu, isTopLevel: true));
