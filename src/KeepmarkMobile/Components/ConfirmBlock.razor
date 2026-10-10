@@ -6,7 +6,7 @@
     <strong>@Message</strong>
     @if (!string.IsNullOrEmpty(Implication))
     {
-        <text> @Implication</text>
+        @($" {Implication}")
     }
     @ChildContent
     <div class="mt-2 d-flex gap-2">
