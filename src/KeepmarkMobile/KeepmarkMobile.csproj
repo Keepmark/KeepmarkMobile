@@ -54,6 +54,18 @@
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
     </PropertyGroup>
 
+    <!-- Release signing: Play upload key, kept outside the repo. Password comes
+         from KEEPMARK_KEY_PASS (env:), never from this file. Skipped when the
+         keystore is missing, so Release still builds (debug-signed) elsewhere. -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Release' And Exists('$(HOME)/keys/keepmark-upload.keystore')">
+        <AndroidKeyStore>true</AndroidKeyStore>
+        <AndroidSigningKeyStore>$(HOME)/keys/keepmark-upload.keystore</AndroidSigningKeyStore>
+        <AndroidSigningKeyAlias>keepmark</AndroidSigningKeyAlias>
+        <AndroidSigningStorePass>env:KEEPMARK_KEY_PASS</AndroidSigningStorePass>
+        <AndroidSigningKeyPass>env:KEEPMARK_KEY_PASS</AndroidSigningKeyPass>
+        <AndroidPackageFormats>aab;apk</AndroidPackageFormats>
+    </PropertyGroup>
+
     <ItemGroup>
         <!-- App icon: hand-made adaptive icon in Platforms/Android/Resources
              (mipmap-*/km_icon_*), not MauiIcon, which reuses the foreground
