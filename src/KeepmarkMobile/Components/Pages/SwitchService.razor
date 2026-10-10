@@ -37,18 +37,18 @@ else if (step == 4)
         else
         {
             <p>@L.Get(Str.SwNowSyncingA) <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> @L.Get(Str.SwNowSyncingB) <strong>@TargetUrlClean</strong>.</p>
-        }
-        else if (tookRemote)
-        {
-            <p>@L.Get(Str.SwTookRemoteA) <strong>@TargetUrlClean</strong>@L.Get(Str.SwTookRemoteB)</p>
-        }
-        else if (direction == "merge")
-        {
-            <p>@Core.Sync.MoveResult.Describe("existing", "merge", TargetUrlClean, WorkflowRules.ShortId(probe?.Candidate.Id)) @L.Get(Str.ConnSafetyBoth)</p>
-        }
-        else
-        {
-            <p>@L.Get(Str.SwUploadedA, localCount, probe?.RemoteCount) <strong>@TargetUrlClean</strong>@L.Get(Str.SwUploadedB)</p>
+            @if (tookRemote)
+            {
+                <p>@L.Get(Str.SwTookRemoteA) <strong>@TargetUrlClean</strong>@L.Get(Str.SwTookRemoteB)</p>
+            }
+            else if (direction == "merge")
+            {
+                <p>@Core.Sync.MoveResult.Describe("existing", "merge", TargetUrlClean, WorkflowRules.ShortId(probe?.Candidate.Id)) @L.Get(Str.ConnSafetyBoth)</p>
+            }
+            else
+            {
+                <p>@L.Get(Str.SwUploadedA, localCount, probe?.RemoteCount) <strong>@TargetUrlClean</strong>@L.Get(Str.SwUploadedB)</p>
+            }
         }
         <p>@WorkflowTexts.MoveDoneNext</p>
         <button class="btn btn-secondary" @onclick="CopyId">@L.Get(Str.ConnCopySyncId)</button>
