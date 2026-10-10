@@ -88,7 +88,7 @@ else
         <li>@L.Get(Str.StatusModeLine, ModeLabel)</li>
         <li>@L.Get(Str.StatusStateLine, Core.Sync.SyncStatusText.Label(status))</li>
         <li>@L.Get(Str.StatusLastSyncLine, lastSync?.ToLocalTime().ToString("g") ?? L.Get(Str.StatusNever))</li>
-        <li>@L.Get(Str.StatusServiceLine, serviceUrl ?? L.Get(Str.StatusNotLinkedLower))</li>
+        <li>@L.Get(Str.StatusServiceLine, serviceUrl is null ? L.Get(Str.StatusNotLinkedLower) : WorkflowRules.NormalizeServiceUrl(serviceUrl))</li>
         <li>@L.Get(Str.StatusServiceVersionLine, serviceVersion ?? (serviceUrl is null ? "—" : L.Get(Str.StatusUnknownOffline)))</li>
         @if (syncExpiryDays is not null)
         {
@@ -102,10 +102,10 @@ else
         <li>@L.Get(Str.StatusServerCopyLabel) @(serverBytes is null ? L.Get(Str.StatusNeverSynced) : WorkflowRules.FormatBytes(serverBytes.Value))
             @if (serverBytes is not null)
             {
-                <text> @L.Get(Str.StatusOf) @(maxSyncSize is null ? L.Get(Str.StatusUnknownMax) : WorkflowRules.FormatBytes(maxSyncSize.Value))</text>
+                @($" {L.Get(Str.StatusOf)} {(maxSyncSize is null ? L.Get(Str.StatusUnknownMax) : WorkflowRules.FormatBytes(maxSyncSize.Value))}")
                 @if (maxSyncSize is not null && maxSyncSize.Value > 0)
                 {
-                    <text> (@ServerPctText%)</text>
+                    @(" ")<text>(@ServerPctText%)</text>
                     <div class="progress mt-1" role="progressbar" aria-label="@L.Get(Str.StatusSpaceAria)" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
                         <div class="progress-bar" style="width: @ServerPctText%"></div>
                     </div>
@@ -126,7 +126,7 @@ else
         <li>@L.Get(Str.StatusTags) @stats?.DistinctTags · @L.Get(Str.StatusDepth) @stats?.MaxDepth · @L.Get(Str.StatusDupUrls) @stats?.DuplicateUrls
             @if ((stats?.DuplicateUrls ?? 0) > 0)
             {
-                <text> <a href="duplicates">@L.Get(Str.StatusResolveLink)</a></text>
+                @(" ")<a href="duplicates">@L.Get(Str.StatusResolveLink)</a>
             }
         </li>
     </ul>

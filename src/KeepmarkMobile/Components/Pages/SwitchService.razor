@@ -30,25 +30,25 @@ else if (step == 4)
         <h4>@L.Get(Str.SwComplete)</h4>
         @if (createdId is not null)
         {
-            <p>@L.Get(Str.SwCreatedA) <strong>@targetUrl</strong> @Loc.Plural(Str.SwCreatedB, localCount)</p>
+            <p>@L.Get(Str.SwCreatedA) <strong>@TargetUrlClean</strong> @Loc.Plural(Str.SwCreatedB, localCount)</p>
             <p>@L.Get(Str.SwNewIdHint)</p>
             <p><code>@createdId</code></p>
         }
         else
         {
-            <p>@L.Get(Str.SwNowSyncingA) <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> @L.Get(Str.SwNowSyncingB) <strong>@targetUrl</strong>.</p>
+            <p>@L.Get(Str.SwNowSyncingA) <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> @L.Get(Str.SwNowSyncingB) <strong>@TargetUrlClean</strong>.</p>
         }
         else if (tookRemote)
         {
-            <p>@L.Get(Str.SwTookRemoteA) <strong>@targetUrl</strong>@L.Get(Str.SwTookRemoteB)</p>
+            <p>@L.Get(Str.SwTookRemoteA) <strong>@TargetUrlClean</strong>@L.Get(Str.SwTookRemoteB)</p>
         }
         else if (direction == "merge")
         {
-            <p>@Core.Sync.MoveResult.Describe("existing", "merge", targetUrl, WorkflowRules.ShortId(probe?.Candidate.Id)) @L.Get(Str.ConnSafetyBoth)</p>
+            <p>@Core.Sync.MoveResult.Describe("existing", "merge", TargetUrlClean, WorkflowRules.ShortId(probe?.Candidate.Id)) @L.Get(Str.ConnSafetyBoth)</p>
         }
         else
         {
-            <p>@L.Get(Str.SwUploadedA, localCount, probe?.RemoteCount) <strong>@targetUrl</strong>@L.Get(Str.SwUploadedB)</p>
+            <p>@L.Get(Str.SwUploadedA, localCount, probe?.RemoteCount) <strong>@TargetUrlClean</strong>@L.Get(Str.SwUploadedB)</p>
         }
         <p>@WorkflowTexts.MoveDoneNext</p>
         <button class="btn btn-secondary" @onclick="CopyId">@L.Get(Str.ConnCopySyncId)</button>
@@ -81,7 +81,7 @@ else
         <h2 class="xbs-step-title">@L.Get(Str.SwWhere)</h2>
         <div class="mb-3">
             <label class="form-label">@L.Get(Str.SwTargetUrl)</label>
-            <input class="form-control" @bind="targetUrl" @bind:event="oninput" inputmode="url" />
+            <input class="form-control" @bind="targetUrl" @bind:event="oninput" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
             <div class="form-text">@L.Get(Str.SwTargetHint)</div>
         </div>
         @if (!serviceOk)
@@ -249,6 +249,7 @@ else
     private int step = 1;
     private string targetUrl = Core.XbsConstants.DefaultServiceUrl;
     private Core.Api.ServiceInfoResponse? serviceInfo;
+    private string TargetUrlClean => WorkflowRules.NormalizeServiceUrl(targetUrl);
     private int? targetExpiryDays;
     private string? checkedUrl;
     private string slot = "new";
@@ -278,7 +279,7 @@ else
     private bool armedMove;
 
     private bool serviceOk =>
-        serviceInfo is not null && checkedUrl == targetUrl.Trim();
+        serviceInfo is not null && checkedUrl == TargetUrlClean;
 
     protected override async Task OnInitializedAsync()
     {
@@ -313,9 +314,9 @@ else
             slotChosen = true;
             try
             {
-                serviceInfo = await Session.CheckServiceAsync(targetUrl);
-                checkedUrl = targetUrl;
-                targetExpiryDays = await Session.GetSyncExpiryDaysAsync(targetUrl);
+                serviceInfo = await Session.CheckServiceAsync(TargetUrlClean);
+                checkedUrl = TargetUrlClean;
+                targetExpiryDays = await Session.GetSyncExpiryDaysAsync(TargetUrlClean);
             }
             catch (Exception ex)
             {
@@ -339,13 +340,13 @@ else
 
     private bool CanReview() => slot == "new"
         ? newPassword.Length > 0 && confirmPassword.Length > 0
-        : probe is not null && verifiedFor == $"{targetUrl.Trim()}|{syncId.Trim()}";
+        : probe is not null && verifiedFor == $"{TargetUrlClean}|{syncId.Trim()}";
 
     /// <summary>An existing sync stays verified only for the exact ID it was
     /// verified with: editing the ID (or URL) brings the credential inputs
     /// back automatically.</summary>
     private bool VerifiedExisting =>
-        probe is not null && verifiedFor == $"{targetUrl.Trim()}|{syncId.Trim()}";
+        probe is not null && verifiedFor == $"{TargetUrlClean}|{syncId.Trim()}";
 
     private void Unverify()
     {
@@ -359,8 +360,8 @@ else
     {
         await RunStepAsync(async () =>
         {
-            serviceInfo = await Session.CheckServiceAsync(targetUrl.Trim());
-            checkedUrl = targetUrl.Trim();
+            serviceInfo = await Session.CheckServiceAsync(TargetUrlClean);
+            checkedUrl = TargetUrlClean;
             targetExpiryDays = await Session.GetSyncExpiryDaysAsync(checkedUrl);
             resumed = false;
             SaveDraft();
@@ -376,10 +377,10 @@ else
                 throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
             }
 
-            probe = await Session.ProbeLinkAsync(targetUrl.Trim(), syncId.Trim(), password);
+            probe = await Session.ProbeLinkAsync(TargetUrlClean, syncId.Trim(), password);
             // Consumed: the probe carries the key; a failed check keeps it for a retry.
             password = string.Empty;
-            verifiedFor = $"{targetUrl.Trim()}|{syncId.Trim()}";
+            verifiedFor = $"{TargetUrlClean}|{syncId.Trim()}";
             direction = "take";
             mergeStats = null;
             mergeStatsFor = null;
@@ -393,7 +394,7 @@ else
     {
         await RunStepAsync(async () =>
         {
-            if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
+            if (probe is null || verifiedFor != $"{TargetUrlClean}|{syncId.Trim()}")
             {
                 throw new InvalidOperationException(L.Get(Str.SwOpenFirst));
             }
@@ -404,7 +405,7 @@ else
     }
 
     private string TargetHost =>
-        Uri.TryCreate(targetUrl.Trim(), UriKind.Absolute, out var u) ? u.Host : targetUrl.Trim();
+        Uri.TryCreate(TargetUrlClean, UriKind.Absolute, out var u) ? u.Host : TargetUrlClean;
 
     /// <summary>The picker speaks download/upload/merge; this page keeps "take" for download.</summary>
     private string PickerValue => direction == "take" ? "download" : direction;
@@ -502,7 +503,7 @@ else
     private void SaveDraft()
     {
         Session.PendingSwitch = new Services.SwitchDraft(
-            targetUrl.Trim(), slot, syncId.Trim(), direction, probe, verifiedFor, step);
+            TargetUrlClean, slot, syncId.Trim(), direction, probe, verifiedFor, step);
     }
 
     private void StartOver()
@@ -547,11 +548,11 @@ else
             if (slot == "new")
             {
                 WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
-                createdId = await Session.CreateNewSyncWithUploadAsync(targetUrl.Trim(), newPassword);
+                createdId = await Session.CreateNewSyncWithUploadAsync(TargetUrlClean, newPassword);
             }
             else
             {
-                if (probe is null || verifiedFor != $"{targetUrl.Trim()}|{syncId.Trim()}")
+                if (probe is null || verifiedFor != $"{TargetUrlClean}|{syncId.Trim()}")
                 {
                     throw new InvalidOperationException(L.Get(Str.SwOpenFirst));
                 }
@@ -576,7 +577,7 @@ else
                 }
             }
 
-            AppSettings.ServiceUrl = targetUrl.Trim();
+            AppSettings.ServiceUrl = TargetUrlClean;
             newPassword = string.Empty;
             confirmPassword = string.Empty;
             armedMove = false;

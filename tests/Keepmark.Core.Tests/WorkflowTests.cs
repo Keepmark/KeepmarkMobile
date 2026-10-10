@@ -31,6 +31,16 @@ public class WorkflowTests
         Assert.Equal(expected, WorkflowRules.ShortId(id));
 
     [Theory]
+    [InlineData("Https://api.xbrowsersync.org", "https://api.xbrowsersync.org")]
+    [InlineData("  HTTPS://Sync.Example.ORG:8443/Api/ ", "https://sync.example.org:8443/Api/")]
+    [InlineData("https://api.xbrowsersync.org", "https://api.xbrowsersync.org")]
+    [InlineData("not a url", "not a url")]
+    [InlineData("ftp://Host", "ftp://Host")]
+    [InlineData(null, "")]
+    public void NormalizeServiceUrl(string? raw, string expected) =>
+        Assert.Equal(expected, WorkflowRules.NormalizeServiceUrl(raw));
+
+    [Theory]
     [InlineData(null, "—")]
     [InlineData(0, "kept forever")]
     [InlineData(1, "deleted after 1 day without use")]

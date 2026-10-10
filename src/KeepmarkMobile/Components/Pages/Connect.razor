@@ -83,7 +83,7 @@ else
         {
             <div class="mb-3">
                 <label class="form-label">@L.Get(Str.ConnServiceUrl)</label>
-                <input class="form-control" @bind="serviceUrl" inputmode="url" />
+                <input class="form-control" @bind="serviceUrl" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
                 <div class="form-text">@L.Get(Str.ConnServiceUrlHint)</div>
                 <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">@L.Get(Str.ConnCheckService)</button>
                 @if (!string.IsNullOrEmpty(checkError))
@@ -239,6 +239,7 @@ else
     private string? mode;
     private bool showService;
     private bool ServiceOpen => showService || !string.IsNullOrEmpty(checkError);
+    private string ServiceUrlClean => WorkflowRules.NormalizeServiceUrl(serviceUrl);
     private string ServiceHost => Uri.TryCreate(serviceUrl, UriKind.Absolute, out var u) ? u.Host : serviceUrl;
 
     private void Choose(string value)
@@ -345,8 +346,8 @@ else
     {
         await RunStepAsync(async () =>
         {
-            serviceInfo = await Session.CheckServiceAsync(serviceUrl.Trim());
-            AppSettings.ServiceUrl = serviceUrl.Trim();
+            serviceInfo = await Session.CheckServiceAsync(ServiceUrlClean);
+            AppSettings.ServiceUrl = ServiceUrlClean;
         }, err => checkError = err, "connect-check");
     }
 
@@ -359,10 +360,10 @@ else
                 throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
             }
 
-            reconcile = await Session.ProbeLinkAsync(serviceUrl.Trim(), syncId.Trim(), password);
+            reconcile = await Session.ProbeLinkAsync(ServiceUrlClean, syncId.Trim(), password);
             // Consumed: the candidate carries the key; a failed check keeps it for a retry.
             password = string.Empty;
-            AppSettings.ServiceUrl = serviceUrl.Trim();
+            AppSettings.ServiceUrl = ServiceUrlClean;
             mergeStats = null;
             mergeStatsFor = null;
             applyError = string.Empty;
@@ -387,8 +388,8 @@ else
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
-            await Session.CreateNewSyncAsync(serviceUrl.Trim(), newPassword);
-            AppSettings.ServiceUrl = serviceUrl.Trim();
+            await Session.CreateNewSyncAsync(ServiceUrlClean, newPassword);
+            AppSettings.ServiceUrl = ServiceUrlClean;
             reconcile = null;
             armed = null;
             newPassword = string.Empty;
@@ -403,8 +404,8 @@ else
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
-            await Session.CreateNewSyncWithUploadAsync(serviceUrl.Trim(), newPassword);
-            AppSettings.ServiceUrl = serviceUrl.Trim();
+            await Session.CreateNewSyncWithUploadAsync(ServiceUrlClean, newPassword);
+            AppSettings.ServiceUrl = ServiceUrlClean;
             reconcile = null;
             newPassword = string.Empty;
             confirmPassword = string.Empty;

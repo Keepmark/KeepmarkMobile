@@ -39,6 +39,25 @@ public static class WorkflowRules
     public static string ShortId(string? id) =>
         id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
 
+    /// <summary>Service URL as stored and shown: trimmed, scheme and host in
+    /// lower case (Android keyboards capitalize the first letter: "Https://…").
+    /// Path, port and anything not an absolute http(s) URL are kept as typed.</summary>
+    public static string NormalizeServiceUrl(string? url)
+    {
+        var s = (url ?? string.Empty).Trim();
+        var sep = s.IndexOf("://", StringComparison.Ordinal);
+        if (sep < 0 || !Uri.TryCreate(s, UriKind.Absolute, out var u) || (u.Scheme != "https" && u.Scheme != "http"))
+        {
+            return s;
+        }
+
+        var rest = s[(sep + 3)..];
+        var slash = rest.IndexOf('/');
+        var authority = slash < 0 ? rest : rest[..slash];
+        var path = slash < 0 ? string.Empty : rest[slash..];
+        return $"{u.Scheme}://{authority.ToLowerInvariant()}{path}";
+    }
+
     /// <summary>Server's inactive-sync expiry (v1.2 <c>/info</c> capabilities):
     /// "—" when unknown (legacy or offline service).</summary>
     public static string DescribeSyncExpiry(int? days) => days switch

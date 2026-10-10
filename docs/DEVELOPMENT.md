@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.171 (172)**,
+v1.2 extended contract when advertised. Current version: **v1.0.172 (173)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -200,6 +200,11 @@ M in `src/KeepmarkMobile/KeepmarkMobile.csproj`; CSS/JS releases also bump
 - Ternary with `: null` or nested ternaries inside attributes fails to parse —
   use `@code` helpers.
 - Blazor renders bool ARIA as `True/False` — must lowercase.
+- Inside `@if { }` blocks Blazor drops the whitespace between and before
+  inline expressions and `<text> …</text>` (seen live as `2 KBof 1 MB`,
+  `3Resolve`): build the run as one string, `@($" {a} {b}")`, or emit `@(" ")`.
+- URL inputs need `autocapitalize="off" autocorrect="off" spellcheck="false"`
+  (Android capitalized `Https://`); store via `WorkflowRules.NormalizeServiceUrl`.
 - sqlite-net enables shared-cache; SQLCipher `PRAGMA key` needs ExecuteScalar.
 - AndroidX Biometric forbids custom negative button with DEVICE_CREDENTIAL.
 
