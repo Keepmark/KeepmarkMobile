@@ -31,6 +31,14 @@ public class WorkflowTests
         Assert.Equal(expected, WorkflowRules.ShortId(id));
 
     [Theory]
+    [InlineData(null, "—")]
+    [InlineData(0, "kept forever")]
+    [InlineData(1, "deleted after 1 day without use")]
+    [InlineData(21, "deleted after 21 days without use")]
+    public void DescribeSyncExpiry(int? days, string expected) =>
+        Assert.Equal(expected, WorkflowRules.DescribeSyncExpiry(days));
+
+    [Theory]
     [InlineData(512, "512 B")]
     [InlineData(2048, "2 KB")]
     [InlineData(3 * 1024 * 1024, "3 MB")]

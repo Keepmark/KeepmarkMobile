@@ -78,6 +78,17 @@ public sealed class ApiCapabilities
     public bool ConditionalGet { get; set; }
     [JsonPropertyName("delete")]
     public bool Delete { get; set; }
+
+    /// <summary>Raw wire value; kept untyped so a malformed field never fails
+    /// the whole probe (that would silently drop the client to v1.1).</summary>
+    [JsonPropertyName("syncExpiryDays")]
+    public JsonElement? SyncExpiryDaysRaw { get; set; }
+
+    /// <summary>Days an unused sync is kept before the server deletes it
+    /// (0 = forever); null when absent or not a non-negative integer.</summary>
+    [JsonIgnore]
+    public int? SyncExpiryDays =>
+        SyncExpiryDaysRaw is { ValueKind: JsonValueKind.Number } e && e.TryGetInt32(out var d) && d >= 0 ? d : null;
 }
 
 public sealed class ServiceInfoResponse

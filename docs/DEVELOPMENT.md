@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.170 (171)**,
+v1.2 extended contract when advertised. Current version: **v1.0.171 (172)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -25,6 +25,12 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   names (`ItemRow.DisplayTitle` → `ContainerNames`, v1.0.170). Display only:
   `Title` keeps the synced value every client looks containers up by, and the
   edit form still shows it raw. Use `DisplayTitle` for any new title/path in the UI.
+- Status and Switch service show the server's inactive-sync expiry from the
+  v1.2 `/info` `capabilities.syncExpiryDays` (`0` = kept forever; v1.0.171):
+  `XbsSession.GetSyncExpiryDaysAsync` → `WorkflowRules.DescribeSyncExpiry`.
+  Display only, never stored; the line is hidden on legacy/offline services.
+  `ApiCapabilities.SyncExpiryDays` reads a raw `JsonElement`, so a malformed
+  value is ignored instead of failing the v1.2 probe.
 - Sync: auto default + manual mode; **409 conflict never silently merged**;
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.

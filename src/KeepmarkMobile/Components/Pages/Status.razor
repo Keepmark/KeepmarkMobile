@@ -90,6 +90,10 @@ else
         <li>@L.Get(Str.StatusLastSyncLine, lastSync?.ToLocalTime().ToString("g") ?? L.Get(Str.StatusNever))</li>
         <li>@L.Get(Str.StatusServiceLine, serviceUrl ?? L.Get(Str.StatusNotLinkedLower))</li>
         <li>@L.Get(Str.StatusServiceVersionLine, serviceVersion ?? (serviceUrl is null ? "—" : L.Get(Str.StatusUnknownOffline)))</li>
+        @if (syncExpiryDays is not null)
+        {
+            <li>@L.Get(Str.StatusSyncExpiryLine, WorkflowRules.DescribeSyncExpiry(syncExpiryDays))</li>
+        }
     </ul>
 
     <h3>@L.Get(Str.StatusStorageH)</h3>
@@ -141,6 +145,7 @@ else
     private long dbSize;
     private long? serverBytes;
     private long? maxSyncSize;
+    private int? syncExpiryDays;
     private int pending;
     private string? serviceUrl;
     private string? serviceVersion;
@@ -319,14 +324,17 @@ else
 
         try
         {
+            var expiry = Session.GetSyncExpiryDaysAsync(serviceUrl);
             var info = await Session.CheckServiceAsync(serviceUrl);
             maxSyncSize = info.MaxSyncSize;
             serviceVersion = info.Version;
+            syncExpiryDays = await expiry;
         }
         catch
         {
             maxSyncSize = null;
             serviceVersion = null;
+            syncExpiryDays = null;
         }
     }
 

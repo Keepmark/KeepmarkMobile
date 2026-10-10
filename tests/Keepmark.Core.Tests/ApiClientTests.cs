@@ -314,4 +314,30 @@ public sealed class ApiClientTests
         Assert.Equal(4, full.Meta?.Revision);
         Assert.Equal("h", full.Meta?.Hash);
     }
+
+    [Theory]
+    [InlineData("21", 21)]
+    [InlineData("0", 0)]
+    [InlineData("-1", null)]
+    [InlineData("1.5", null)]
+    [InlineData("\"21\"", null)]
+    [InlineData("null", null)]
+    [InlineData(null, null)]
+    public async Task SyncExpiryDays_MalformedNeverBreaksTheProbe(string? raw, int? expected)
+    {
+        var (client, handler, _) = Create();
+        var expiry = raw is null ? string.Empty : $",\"syncExpiryDays\":{raw}";
+        handler.Responder = _ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                "{\"maxSyncSize\":1,\"status\":1,\"version\":\"1.2.0\","
+                + $"\"capabilities\":{{\"revision\":true,\"conditionalGet\":true,\"delete\":true{expiry}}}}}",
+                System.Text.Encoding.UTF8, "application/json"),
+        };
+
+        var info = await client.GetInfoV12Async();
+
+        Assert.True(info.Capabilities?.Revision); // a bad optional field never downgrades to v1.1
+        Assert.Equal(expected, info.Capabilities?.SyncExpiryDays);
+    }
 }

@@ -102,6 +102,10 @@ else
                 <div class="xbs-verified-text">
                     <strong>@L.Get(Str.SwServiceReady)</strong>
                     <span>@L.Get(Str.SwServiceLine, serviceInfo!.Status, serviceInfo.Version)</span>
+                    @if (targetExpiryDays is not null)
+                    {
+                        <span>@L.Get(Str.StatusSyncExpiryLine, WorkflowRules.DescribeSyncExpiry(targetExpiryDays))</span>
+                    }
                 </div>
             </div>
             <div class="d-grid">
@@ -245,6 +249,7 @@ else
     private int step = 1;
     private string targetUrl = Core.XbsConstants.DefaultServiceUrl;
     private Core.Api.ServiceInfoResponse? serviceInfo;
+    private int? targetExpiryDays;
     private string? checkedUrl;
     private string slot = "new";
     /// <summary>Step 2 first asks new vs existing; false shows that choice.</summary>
@@ -310,6 +315,7 @@ else
             {
                 serviceInfo = await Session.CheckServiceAsync(targetUrl);
                 checkedUrl = targetUrl;
+                targetExpiryDays = await Session.GetSyncExpiryDaysAsync(targetUrl);
             }
             catch (Exception ex)
             {
@@ -355,6 +361,7 @@ else
         {
             serviceInfo = await Session.CheckServiceAsync(targetUrl.Trim());
             checkedUrl = targetUrl.Trim();
+            targetExpiryDays = await Session.GetSyncExpiryDaysAsync(checkedUrl);
             resumed = false;
             SaveDraft();
         }, err => checkError = err, "switch-check");
@@ -516,6 +523,7 @@ else
         tookRemote = false;
         createdId = null;
         serviceInfo = null;
+        targetExpiryDays = null;
         checkedUrl = null;
         resumed = false;
         armedMove = false;

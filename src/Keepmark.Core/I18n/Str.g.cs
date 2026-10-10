@@ -433,6 +433,10 @@ public static partial class Str
     public const string StatusNotLinkedLower = nameof(StatusNotLinkedLower);
     public const string StatusServiceVersionLine = nameof(StatusServiceVersionLine);
     public const string StatusUnknownOffline = nameof(StatusUnknownOffline);
+    public const string StatusSyncExpiryLine = nameof(StatusSyncExpiryLine);
+    public const string StatusExpiryNever = nameof(StatusExpiryNever);
+    public const string StatusExpiryDays_one = nameof(StatusExpiryDays_one);
+    public const string StatusExpiryDays_other = nameof(StatusExpiryDays_other);
     public const string StatusStorageH = nameof(StatusStorageH);
     public const string StatusLocalDb = nameof(StatusLocalDb);
     public const string StatusServerCopyLabel = nameof(StatusServerCopyLabel);
@@ -607,6 +611,8 @@ public static partial class Str
     public const string HomeCountBookmarks = nameof(HomeCountBookmarks);
     /// <summary>Base for Loc.Plural (StatusMergeWouldTitles_one / StatusMergeWouldTitles_other).</summary>
     public const string StatusMergeWouldTitles = nameof(StatusMergeWouldTitles);
+    /// <summary>Base for Loc.Plural (StatusExpiryDays_one / StatusExpiryDays_other).</summary>
+    public const string StatusExpiryDays = nameof(StatusExpiryDays);
     /// <summary>Base for Loc.Plural (SwANewText_one / SwANewText_other).</summary>
     public const string SwANewText = nameof(SwANewText);
     /// <summary>Base for Loc.Plural (SwCreatedB_one / SwCreatedB_other).</summary>

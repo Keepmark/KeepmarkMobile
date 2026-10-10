@@ -103,6 +103,24 @@ public sealed class XbsSession : IAsyncDisposable
         return info;
     }
 
+    /// <summary>Inactive-sync expiry advertised by a v1.2 service (0 = never);
+    /// null on legacy, offline or malformed answers. Display only, never stored.</summary>
+    public async Task<int?> GetSyncExpiryDaysAsync(string serviceUrl, CancellationToken ct = default)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(Core.XbsConstants.ServiceProbeTimeout);
+            var info = await ApiFor(serviceUrl).GetInfoV12Async(cts.Token).ConfigureAwait(false);
+            return info.Capabilities?.SyncExpiryDays;
+        }
+        catch (Exception ex)
+        {
+            _log.Debug("session", $"Expiry probe skipped: {ex.GetType().Name}");
+            return null;
+        }
+    }
+
     /// <summary>Onboarding step: validate credentials + fetch both counts for the reconcile screen.</summary>
     public async Task<ReconcileInfo> ProbeLinkAsync(string serviceUrl, string syncId, string password, CancellationToken ct = default)
     {

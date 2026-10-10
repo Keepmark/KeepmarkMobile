@@ -39,6 +39,15 @@ public static class WorkflowRules
     public static string ShortId(string? id) =>
         id is null || id.Length <= 8 ? "…" : $"{id[..4]}…{id[^2..]}";
 
+    /// <summary>Server's inactive-sync expiry (v1.2 <c>/info</c> capabilities):
+    /// "—" when unknown (legacy or offline service).</summary>
+    public static string DescribeSyncExpiry(int? days) => days switch
+    {
+        null => "—",
+        0 => Loc.Get(Str.StatusExpiryNever),
+        _ => Loc.Plural(Str.StatusExpiryDays, days.Value),
+    };
+
     public static string FormatBytes(long bytes)
     {
         if (bytes < 1024)
