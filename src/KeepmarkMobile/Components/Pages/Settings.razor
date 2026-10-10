@@ -21,6 +21,10 @@
         <option value="fr">Français</option>
         <option value="es">Español</option>
         <option value="de">Deutsch</option>
+        <option value="ja">日本語</option>
+        <option value="pt">Português (Brasil)</option>
+        <option value="ru">Русский</option>
+        <option value="zh">简体中文</option>
     </select>
 </div>
 
@@ -138,7 +142,7 @@
     /// layout redraws its whole tree (no restart, no page reload).</summary>
     private void ApplyLanguage()
     {
-        AppSettings.Language = language is "en" or "it" or "fr" or "es" or "de" ? language : "system";
+        AppSettings.Language = language is "en" or "it" or "fr" or "es" or "de" or "ja" or "pt" or "ru" or "zh" ? language : "system";
         LangSvc.Apply();
     }
 

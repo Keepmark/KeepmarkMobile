@@ -12,7 +12,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Android-10%2B-1f6f5c" alt="Android 10+" />
   <img src="https://img.shields.io/badge/encryption-end--to--end-243878" alt="End-to-end encrypted" />
-  <img src="https://img.shields.io/badge/languages-en%20%C2%B7%20it%20%C2%B7%20fr%20%C2%B7%20es%20%C2%B7%20de-4a5170" alt="Languages" />
+  <img src="https://img.shields.io/badge/languages-en%20%C2%B7%20it%20%C2%B7%20fr%20%C2%B7%20es%20%C2%B7%20de%20%C2%B7%20ja%20%C2%B7%20pt--BR%20%C2%B7%20ru%20%C2%B7%20zh-4a5170" alt="Languages" />
 </p>
 
 ---
@@ -51,7 +51,7 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 | **Safety backups** | Automatic snapshot before every destructive step (newest 5 kept) |
 | **Duplicates** | Find links saved more than once; one copy of each always survives |
 | **Move service** | Move your bookmarks to another service, into a new or existing sync |
-| **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch |
+| **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch, 日本語, Português (Brasil), Русский, 简体中文 |
 | **Logs** | Built-in viewer with share export, sync IDs and secrets redacted |
 
 With **Keepmark Server** you also get revision-based conflict detection,

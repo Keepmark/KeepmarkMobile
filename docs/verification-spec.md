@@ -11,7 +11,7 @@ File paths are relative to `KeepmarkMobile/`. Commands run from `KeepmarkMobile/
 (JDK 21; system JDK is rejected): `dotnet test` (xUnit, no device),
 Android build `dotnet build src/KeepmarkMobile -f net10.0-android -c Debug`.
 
-Global rules (verify everywhere): UI strings in en/it/fr/es/de via `Loc`/`IXbsLocalizer` (log strings stay English); no telemetry;
+Global rules (verify everywhere): UI strings in en/it/fr/es/de/ja/pt/ru/zh via `Loc`/`IXbsLocalizer` (log strings stay English); no telemetry;
 HTTPS-only service URLs (reject `http://` except `localhost` for dev);
 no `any`-style dynamic typing leaks into persisted state; raw passwords exist
 only as method arguments, never stored, never logged.

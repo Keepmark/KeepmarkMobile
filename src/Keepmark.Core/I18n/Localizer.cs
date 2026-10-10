@@ -2,9 +2,10 @@ using System.Globalization;
 
 namespace Keepmark.Core.I18n;
 
-// UI strings in en/it/fr/es/de. The active language is CurrentUICulture
+// UI strings in en/it/fr/es/de/ja/pt/ru/zh (pt = Brazilian Portuguese,
+// zh = Simplified Chinese; zh-TW/zh-HK fall back to it). The active language is CurrentUICulture
 // (set at app start from the Language setting). Log strings stay English.
-// Every key lives in Str.g.cs and in the five Catalog.*.cs files.
+// Every key lives in Str.g.cs and in the nine Catalog.*.cs files.
 
 public interface IXbsLocalizer
 {
@@ -13,7 +14,7 @@ public interface IXbsLocalizer
 
 public static class Langs
 {
-    public static readonly string[] Supported = ["en", "it", "fr", "es", "de"];
+    public static readonly string[] Supported = ["en", "it", "fr", "es", "de", "ja", "pt", "ru", "zh"];
 
     /// <summary>An explicit supported setting wins; otherwise the base language
     /// of <paramref name="systemCulture"/> if supported, else "en".</summary>
@@ -55,10 +56,10 @@ public static class Loc
     }
 
     /// <summary>Picks <c>baseKey_one</c> / <c>baseKey_other</c>; the count is {0},
-    /// extra arguments follow as {1}, {2}… French also uses "one" for 0.</summary>
+    /// extra arguments follow as {1}, {2}… French and Brazilian Portuguese also use "one" for 0.</summary>
     public static string Plural(string baseKey, long count, params object?[] args)
     {
-        var one = count == 1 || (Langs.Current == "fr" && count == 0);
+        var one = count == 1 || (Langs.Current is "fr" or "pt" && count == 0);
         var all = new object?[args.Length + 1];
         all[0] = count;
         args.CopyTo(all, 1);
@@ -86,6 +87,10 @@ internal static partial class Catalogs
         ["fr"] = Fr,
         ["es"] = Es,
         ["de"] = De,
+        ["ja"] = Ja,
+        ["pt"] = Pt,
+        ["ru"] = Ru,
+        ["zh"] = Zh,
     };
 
     internal static IReadOnlyDictionary<string, Dictionary<string, string>> Tables => All;

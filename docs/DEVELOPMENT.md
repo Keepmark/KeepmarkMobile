@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.167 (168)**,
+v1.2 extended contract when advertised. Current version: **v1.0.169 (170)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
@@ -20,7 +20,7 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
 
 ## Requirements (load-bearing)
 
-- Android only, API 29+. UI in en/it/fr/es/de: default follows the Android language, override in Settings → Language (reloads the UI). Logs stay English. Every UI text is a key in `Keepmark.Core/I18n` (`Str` + `Catalog.*.cs`, parity checked by `I18nTests`); wording follows `docs/UI-TERMS.md`.
+- Android only, API 29+. UI in en/it/fr/es/de/ja/pt-BR/ru/zh (codes `ja`, `pt`, `ru`, `zh`; zh-TW falls back to Simplified): default follows the Android language, override in Settings → Language (reloads the UI). Logs stay English. Every UI text is a key in `Keepmark.Core/I18n` (`Str` + `Catalog.*.cs`, parity checked by `I18nTests`); wording follows `docs/UI-TERMS.md`.
 - Sync: auto default + manual mode; **409 conflict never silently merged**;
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.
@@ -92,7 +92,7 @@ adb disconnect; adb connect <device-ip>:<port>; adb devices
 ## Commands (from `KeepmarkMobile/`)
 
 ```sh
-dotnet test                                            # Core unit + interop (182 tests)
+dotnet test                                            # Core unit + interop (187 tests)
 dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
 dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug  # deploy+launch
 # add "-p:AdbTarget=-s IP:PORT" when several adb entries are listed. A Debug APK

@@ -7,7 +7,7 @@ namespace Keepmark.Core.Tests;
 
 public class I18nTests
 {
-    private static readonly string[] Others = ["it", "fr", "es", "de"];
+    private static readonly string[] Others = ["it", "fr", "es", "de", "ja", "pt", "ru", "zh"];
 
     private static IEnumerable<string> Placeholders(string s) =>
         Regex.Matches(s, @"\{\d+\}").Select(m => m.Value).OrderBy(x => x, StringComparer.Ordinal);
@@ -63,7 +63,11 @@ public class I18nTests
 
     [Theory]
     [InlineData("system", "it-CH", "it")]
-    [InlineData("system", "pt-BR", "en")]
+    [InlineData("system", "pt-BR", "pt")]
+    [InlineData("system", "ja-JP", "ja")]
+    [InlineData("system", "ru-RU", "ru")]
+    [InlineData("system", "zh-TW", "zh")]
+    [InlineData("system", "ko-KR", "en")]
     [InlineData("fr", "it-IT", "fr")]
     [InlineData("xx", "de-DE", "de")]
     public void ResolvePicksExplicitThenSystemThenEnglish(string setting, string system, string expected) =>
@@ -78,6 +82,8 @@ public class I18nTests
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("it-IT");
             Assert.Equal("Lingua", Loc.Get(Str.SettingsLanguage));
             CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("pt-BR");
+            Assert.Equal("Idioma", Loc.Get(Str.SettingsLanguage));
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("ko-KR");
             Assert.Equal("Language", Loc.Get(Str.SettingsLanguage));
         }
         finally
