@@ -231,20 +231,20 @@ public sealed class StoreSyncTests : IAsyncLifetime
         Assert.Equal(ContainerNames.Menu, roots[0].Children![0].Title);
 
         var rows = await _store.GetChildrenAsync(null);
-        Assert.Equal(["Bookmarks Menu", "Other Bookmarks", "Bookmarks Toolbar"], rows.Select(r => r.DisplayTitle));
+        Assert.Equal(["Menu", "Other", "Toolbar"], rows.Select(r => r.DisplayTitle));
         Assert.Equal([ContainerNames.Menu, ContainerNames.Other, ContainerNames.Toolbar], rows.Select(r => r.Title));
 
         // Only top-level containers are renamed: a nested folder titled "[xbs] Menu" stays as is.
         var paths = await _store.GetFolderPathsAsync();
         var deep = (await _store.SearchAsync("deep")).Single();
-        Assert.Equal($"Bookmarks Menu / {ContainerNames.Menu}", paths[deep.RowId]);
-        Assert.Equal("Other Bookmarks", (await _store.SearchAsync("docs")).Single().FolderPath);
+        Assert.Equal($"Menu / {ContainerNames.Menu}", paths[deep.RowId]);
+        Assert.Equal("Other", (await _store.SearchAsync("docs")).Single().FolderPath);
     }
 
     [Fact]
     public void ContainerNames_LeaveOtherTitlesAlone()
     {
-        Assert.Equal("Bookmarks Menu", ContainerNames.Display(ContainerNames.Menu, isTopLevel: true));
+        Assert.Equal("Menu", ContainerNames.Display(ContainerNames.Menu, isTopLevel: true));
         Assert.Equal(ContainerNames.Menu, ContainerNames.Display(ContainerNames.Menu, isTopLevel: false));
         Assert.Equal("[xbs] Mobile", ContainerNames.Display("[xbs] Mobile", isTopLevel: true));
         Assert.Equal("Work", ContainerNames.Display("Work", isTopLevel: true));
