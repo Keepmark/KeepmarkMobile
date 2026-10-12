@@ -98,7 +98,9 @@ wording, so moving between them feels the same.
 
 ## Get it
 
-Download the latest APK from the [Releases](../../releases) page.
+Download the APK from the
+[latest release](https://github.com/Keepmark/KeepmarkMobile/releases/latest)
+(all versions: [Releases](https://github.com/Keepmark/KeepmarkMobile/releases)).
 Project home: <https://github.com/Keepmark>.
 
 ## Build from source
