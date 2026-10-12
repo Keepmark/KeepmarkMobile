@@ -98,7 +98,21 @@ wording, so moving between them feels the same.
 
 ## Get it
 
-Download the APK from the
+**Google Play (closed testing).** Keepmark is in closed testing on Google
+Play and testers are welcome:
+
+1. Join the [keepmark-testers](https://groups.google.com/g/keepmark-testers)
+   group with the Google account you use on Play Store.
+2. Opt in to the test:
+   <https://play.google.com/apps/testing/com.keepmark.mobile>
+3. Install from
+   [Google Play](https://play.google.com/store/apps/details?id=com.keepmark.mobile).
+
+Please keep the app installed for at least 14 days. Feedback is welcome in
+[issues](https://github.com/Keepmark/KeepmarkMobile/issues) or at
+keepmark@proton.me.
+
+**APK.** Download the APK from the
 [latest release](https://github.com/Keepmark/KeepmarkMobile/releases/latest)
 (all versions: [Releases](https://github.com/Keepmark/KeepmarkMobile/releases)).
 Project home: <https://github.com/Keepmark>.
