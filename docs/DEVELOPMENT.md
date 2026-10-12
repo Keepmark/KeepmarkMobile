@@ -9,8 +9,19 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.172 (173)**,
+v1.2 extended contract when advertised. Current version: **v1.0.178 (179)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
+
+Distribution:
+
+- Google Play (closed testing):
+  <https://play.google.com/store/apps/details?id=com.keepmark.mobile>.
+  Testers join <https://groups.google.com/g/keepmark-testers>, then opt in at
+  <https://play.google.com/apps/testing/com.keepmark.mobile>.
+- GitHub releases (<https://github.com/Keepmark/KeepmarkMobile/releases>,
+  tag `v1.0.N`): Release APK signed with the upload key
+  (`~/keys/keepmark-upload.keystore`). Play re-signs with its own key, so the
+  two installs cannot update each other. Create them with `gh release create`.
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
 is NOT a git repo). Solution `KeepmarkMobile.slnx`:
