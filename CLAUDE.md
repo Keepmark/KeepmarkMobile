@@ -5,7 +5,8 @@ architecture map, async/UI patterns, engineering rules, safety-backup spec).
 Edit that file, not this one. Repo-wide layout is in `../AGENTS.md` (loaded via
 `../CLAUDE.md`). Behavioral requirements for review: `docs/verification-spec.md`.
 
-`README.md` is the user-facing GitHub landing page (no build details there).
+`README.md` is the user-facing GitHub landing page (plus a short "Build from source"
+section; keep it in sync with the commands below).
 
 Quick reminders (details in docs/DEVELOPMENT.md):
 
