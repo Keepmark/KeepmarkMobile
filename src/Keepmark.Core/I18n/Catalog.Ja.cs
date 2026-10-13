@@ -622,6 +622,8 @@ internal static partial class Catalogs
         [Str.MoveNewFolderIn] = "{0} に新しいフォルダー",
         [Str.MoveFolderName] = "フォルダー名",
         [Str.MoveCreate] = "作成",
+        [Str.PickerNewBadge] = "新規",
+        [Str.PickerRemoveNew] = "新しいフォルダー {0} を削除",
         [Str.MoveTo] = "{0} に移動",
         [Str.MoveSearch] = "フォルダーを検索",
         [Str.MoveClose] = "閉じる",

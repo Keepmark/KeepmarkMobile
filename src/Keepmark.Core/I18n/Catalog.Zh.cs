@@ -623,6 +623,8 @@ internal static partial class Catalogs
         [Str.MoveNewFolderIn] = "在 {0} 中新建文件夹",
         [Str.MoveFolderName] = "文件夹名称",
         [Str.MoveCreate] = "创建",
+        [Str.PickerNewBadge] = "新建",
+        [Str.PickerRemoveNew] = "移除新文件夹 {0}",
         [Str.MoveTo] = "移至 {0}",
         [Str.MoveSearch] = "搜索文件夹",
         [Str.MoveClose] = "关闭",

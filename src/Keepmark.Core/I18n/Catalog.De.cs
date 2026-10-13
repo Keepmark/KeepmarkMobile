@@ -622,6 +622,8 @@ internal static partial class Catalogs
         [Str.MoveNewFolderIn] = "Neuer Ordner in {0}",
         [Str.MoveFolderName] = "Ordnername",
         [Str.MoveCreate] = "Erstellen",
+        [Str.PickerNewBadge] = "neu",
+        [Str.PickerRemoveNew] = "Neuen Ordner {0} entfernen",
         [Str.MoveTo] = "Nach {0} verschieben",
         [Str.MoveSearch] = "Ordner suchen",
         [Str.MoveClose] = "Schließen",

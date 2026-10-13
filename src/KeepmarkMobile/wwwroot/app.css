@@ -2069,6 +2069,18 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
     border-left: 1.5px solid var(--km-line);
 }
 
+.xbs-tree-new { margin: 10px 0 4px; }
+.xbs-tree-badge {
+    flex: none;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--km-tint);
+    color: var(--km-tint-ink);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+.xbs-tree-draft .xbs-tree-label { font-style: italic; }
+
 .xbs-tree-foot {
     flex-shrink: 0;
     display: flex;

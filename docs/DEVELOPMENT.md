@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.178 (179)**,
+v1.2 extended contract when advertised. Current version: **v1.0.179 (180)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:

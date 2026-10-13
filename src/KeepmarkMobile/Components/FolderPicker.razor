@@ -25,6 +25,10 @@
         {
             @TreeNode(root, 0)
         }
+        @if (Draft is not null && Draft.ParentRowId is null)
+        {
+            @DraftNode(0)
+        }
     }
     else
     {
@@ -46,6 +50,24 @@
         }
     }
     </div>
+    @if (AllowCreate && Draft is null && string.IsNullOrWhiteSpace(filter))
+    {
+        @if (creating)
+        {
+            <form class="xbs-move-new xbs-tree-new" @onsubmit="CreateDraft" @onsubmit:preventDefault="true">
+                <input class="form-control" placeholder="@L.Get(Str.MoveFolderName)" aria-label="@L.Get(Str.MoveFolderName)"
+                       @bind="newName" @bind:event="oninput" @ref="newInput" />
+                <button type="submit" class="btn btn-primary" disabled="@string.IsNullOrWhiteSpace(newName)">@L.Get(Str.MoveCreate)</button>
+            </form>
+        }
+        else
+        {
+            <button type="button" class="xbs-move-newbtn xbs-tree-new" @onclick="StartCreate">
+                <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                <span>@L.Get(Str.MoveNewFolderIn, NameOf(Selected))</span>
+            </button>
+        }
+    }
     </div>
     <div class="xbs-tree-foot">
         <button type="button" class="btn btn-secondary" @onclick="Cancel">@L.Get(Str.CommonCancel)</button>
@@ -62,6 +84,22 @@
 
     /// <summary>RowId whose whole subtree is hidden (cannot move a folder into itself).</summary>
     [Parameter] public int? ExcludeSubtreeRoot { get; set; }
+
+    /// <summary>Shows "New folder in …": the folder is only a draft here,
+    /// created by the owner on Save (cancel leaves nothing behind).</summary>
+    [Parameter] public bool AllowCreate { get; set; }
+    [Parameter] public DraftFolder? Draft { get; set; }
+    [Parameter] public EventCallback<DraftFolder?> DraftChanged { get; set; }
+
+    /// <summary>Selected value meaning "the draft folder" (real RowIds are positive).</summary>
+    public const int DraftRowId = -1;
+
+    public sealed record DraftFolder(int? ParentRowId, string Title);
+
+    private bool creating;
+    private bool focusNew;
+    private string newName = string.Empty;
+    private ElementReference newInput;
 
     private List<ItemRow> Roots = [];
     private Dictionary<int, List<ItemRow>> ByParent = new();
@@ -118,6 +156,12 @@
         }
 
         var sel = Selected;
+        if (sel == DraftRowId && Draft?.ParentRowId is not null)
+        {
+            collapsed.Remove(Draft.ParentRowId.Value);
+            sel = Draft.ParentRowId;
+        }
+
         while (sel is not null && ById.TryGetValue(sel.Value, out var node) && node.ParentRowId is not null)
         {
             collapsed.Remove(node.ParentRowId.Value);
@@ -126,6 +170,52 @@
     }
 
     private Task Highlight(int? rowId) => SelectedChanged.InvokeAsync(rowId);
+
+    private void StartCreate()
+    {
+        creating = true;
+        focusNew = true;
+        newName = string.Empty;
+    }
+
+    private async Task CreateDraft()
+    {
+        var name = newName.Trim();
+        if (name.Length == 0)
+        {
+            return;
+        }
+
+        creating = false;
+        // The draft goes under the highlighted folder (a vanished one = top level).
+        var parent = Selected is not null && ById.ContainsKey(Selected.Value) ? Selected : null;
+        await DraftChanged.InvokeAsync(new DraftFolder(parent, name));
+        await SelectedChanged.InvokeAsync(DraftRowId);
+    }
+
+    private async Task RemoveDraft()
+    {
+        var parent = Draft?.ParentRowId;
+        await DraftChanged.InvokeAsync(null);
+        if (Selected == DraftRowId)
+        {
+            await SelectedChanged.InvokeAsync(parent);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (focusNew && creating)
+        {
+            focusNew = false;
+            try { await newInput.FocusAsync(); } catch { }
+        }
+    }
+
+    private string NameOf(int? rowId) =>
+        rowId is not null && ById.TryGetValue(rowId.Value, out var f)
+            ? f.DisplayTitle ?? L.Get(Str.SheetTypeFolder)
+            : L.Get(Str.SheetTopLevel);
     private Task Confirm() => OnConfirm.InvokeAsync();
     private Task Cancel() => OnCancel.InvokeAsync();
 
@@ -178,7 +268,9 @@
 
     private RenderFragment TreeNode(ItemRow Node, int Level) => __builder =>
     {
-        var hasKids = ByParent.TryGetValue(Node.RowId, out var kids) && kids.Count > 0;
+        var realKids = ByParent.TryGetValue(Node.RowId, out var kids) && kids.Count > 0;
+        var draftHere = Draft is not null && Draft.ParentRowId == Node.RowId;
+        var hasKids = realKids || draftHere;
         var isCollapsed = collapsed.Contains(Node.RowId);
         var isSelected = Selected == Node.RowId;
         <div class="xbs-tree-item">
@@ -203,7 +295,8 @@
                     <span class="xbs-tree-label">@(Node.DisplayTitle ?? L.Get(Str.SheetTypeFolder))</span>
                     @if (hasKids)
                     {
-                        <span class="xbs-tree-count" aria-label="@L.Get(Str.PickerSubfolders, kids!.Count)">@kids!.Count</span>
+                        var count = (kids?.Count ?? 0) + (draftHere ? 1 : 0);
+                        <span class="xbs-tree-count" aria-label="@L.Get(Str.PickerSubfolders, count)">@count</span>
                     }
                     @if (isSelected) { <svg class="km-ico xbs-tree-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
                 </button>
@@ -211,12 +304,40 @@
             @if (hasKids && !isCollapsed)
             {
                 <div class="xbs-tree-kids" role="group">
-                    @foreach (var k in kids!)
+                    @if (realKids)
                     {
-                        @TreeNode(k, Level + 1)
+                        @foreach (var k in kids!)
+                        {
+                            @TreeNode(k, Level + 1)
+                        }
+                    }
+                    @if (draftHere)
+                    {
+                        @DraftNode(Level + 1)
                     }
                 </div>
             }
+        </div>
+    };
+
+    private RenderFragment DraftNode(int Level) => __builder =>
+    {
+        var isSelected = Selected == DraftRowId;
+        <div class="xbs-tree-item">
+            <div class="xbs-tree-row xbs-tree-draft @(isSelected ? "selected" : string.Empty)">
+                <span class="xbs-tree-exp xbs-tree-exp-ph" aria-hidden="true"></span>
+                <button type="button" role="treeitem" aria-selected="@(isSelected.ToString().ToLowerInvariant())" aria-level="@(Level + 1)"
+                        class="xbs-tree-node" @onclick="() => Highlight(DraftRowId)" @onclick:stopPropagation="true">
+                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg></span>
+                    <span class="xbs-tree-label">@Draft!.Title</span>
+                    <span class="xbs-tree-badge">@L.Get(Str.PickerNewBadge)</span>
+                    @if (isSelected) { <svg class="km-ico xbs-tree-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
+                </button>
+                <button type="button" class="xbs-tree-exp" aria-label="@L.Get(Str.PickerRemoveNew, Draft!.Title)"
+                        @onclick="RemoveDraft" @onclick:stopPropagation="true">
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
+            </div>
         </div>
     };
 }

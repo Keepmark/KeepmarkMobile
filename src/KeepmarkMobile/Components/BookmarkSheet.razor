@@ -81,7 +81,8 @@
                     </div>
                 </div>
                 <FolderPicker Folders="Folders" Selected="selectedFolder" SelectedChanged="OnHighlight"
-                              ExcludeSubtreeRoot="Existing?.RowId" OnConfirm="() => showTree = false" OnCancel="CancelTree" />
+                              ExcludeSubtreeRoot="Existing?.RowId" OnConfirm="() => showTree = false" OnCancel="CancelTree"
+                              AllowCreate="true" Draft="draft" DraftChanged="d => draft = d" />
             </div>
         }
     </div>
@@ -103,6 +104,8 @@
     private string tags = string.Empty;
     private bool NewIsFolder;
     private int? selectedFolder;
+    // New folder typed in the picker: created on Save, only when still selected.
+    private FolderPicker.DraftFolder? draft;
     private bool showTree;
     private string error = string.Empty;
     private string? fieldError;
@@ -119,20 +122,37 @@
     private bool initIsFolder;
     private int? initFolder;
     private int? folderBeforePick;
+    private FolderPicker.DraftFolder? draftBeforePick;
 
     private bool IsEdit => Existing is not null;
 
+    private bool DraftSelected => selectedFolder == FolderPicker.DraftRowId && draft is not null;
+
     private string? SelectedFolderPath()
     {
+        if (DraftSelected)
+        {
+            var parent = PathParts(draft!.ParentRowId);
+            parent.Add(draft.Title);
+            return "\U0001F4C1 " + string.Join(" / ", parent);
+        }
+
         if (selectedFolder is null)
         {
             return null;
         }
 
+        var parts = PathParts(selectedFolder);
+        return parts.Count == 0 ? null : "\U0001F4C1 " + string.Join(" / ", parts);
+    }
+
+    /// <summary>Folder titles from the top down to <paramref name="rowId"/> (empty when unknown or top level).</summary>
+    private List<string> PathParts(int? rowId)
+    {
         var byId = Folders.ToDictionary(f => f.RowId);
-        if (!byId.TryGetValue(selectedFolder.Value, out var cur))
+        if (rowId is null || !byId.TryGetValue(rowId.Value, out var cur))
         {
-            return null;
+            return [];
         }
 
         var parts = new Stack<string>();
@@ -146,12 +166,13 @@
             cur = cur.ParentRowId is not null && byId.TryGetValue(cur.ParentRowId.Value, out var p) ? p : null;
         }
 
-        return "\U0001F4C1 " + string.Join(" / ", parts);
+        return parts.ToList();
     }
 
     private void OpenTree()
     {
         folderBeforePick = selectedFolder;
+        draftBeforePick = draft;
         showTree = true;
     }
 
@@ -160,6 +181,7 @@
     private void CancelTree()
     {
         selectedFolder = folderBeforePick;
+        draft = draftBeforePick;
         showTree = false;
     }
 
@@ -201,6 +223,7 @@
         fieldError = null;
         confirmDiscard = false;
         showTree = false;
+        draft = null;
         if (Existing is not null)
         {
             title = Existing.Title ?? string.Empty;
@@ -282,13 +305,17 @@
                 .Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
+        // A selected draft folder: ParentRowId is where the new folder goes,
+        // the item is saved inside it.
+        var parentRowId = DraftSelected ? draft!.ParentRowId : selectedFolder;
         await OnSave.InvokeAsync(new BookmarkEdit(Existing?.RowId, title.Trim(),
             EffectiveIsFolder ? null : url.Trim(),
             EffectiveIsFolder ? null : description.Trim(),
-            EffectiveIsFolder ? null : tagList, EffectiveIsFolder, selectedFolder));
+            EffectiveIsFolder ? null : tagList, EffectiveIsFolder, parentRowId,
+            DraftSelected ? draft!.Title : null));
     }
 
     public sealed record BookmarkEdit(
         int? RowId, string Title, string? Url, string? Description,
-        List<string>? Tags, bool IsFolder, int? ParentRowId);
+        List<string>? Tags, bool IsFolder, int? ParentRowId, string? NewFolderTitle = null);
 }

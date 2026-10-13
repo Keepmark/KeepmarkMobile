@@ -624,6 +624,8 @@ internal static partial class Catalogs
         [Str.MoveNewFolderIn] = "Новая папка в {0}",
         [Str.MoveFolderName] = "Имя папки",
         [Str.MoveCreate] = "Создать",
+        [Str.PickerNewBadge] = "новая",
+        [Str.PickerRemoveNew] = "Убрать новую папку {0}",
         [Str.MoveTo] = "Переместить в {0}",
         [Str.MoveSearch] = "Поиск папок",
         [Str.MoveClose] = "Закрыть",

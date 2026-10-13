@@ -668,6 +668,8 @@ public static partial class Str
     public const string MoveNewFolderIn = nameof(MoveNewFolderIn);
     public const string MoveFolderName = nameof(MoveFolderName);
     public const string MoveCreate = nameof(MoveCreate);
+    public const string PickerNewBadge = nameof(PickerNewBadge);
+    public const string PickerRemoveNew = nameof(PickerRemoveNew);
     public const string MoveTo = nameof(MoveTo);
     public const string MoveSearch = nameof(MoveSearch);
     public const string MoveClose = nameof(MoveClose);

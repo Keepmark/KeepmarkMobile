@@ -1098,17 +1098,24 @@ else if (moved is not null)
                 Title = e.Title, Url = e.Url, Description = e.Description, Tags = e.Tags,
                 Children = e.IsFolder ? [] : null
             };
-            if (parentRowId is null || parentRow?.NodeId is not null)
+            // Draft folder from the picker: folder + item go in as one subtree
+            // (one transaction, one push; nothing created if the sheet was cancelled).
+            if (e.NewFolderTitle is not null)
             {
-                await Session.Engine.AddBookmarkByNodeIdAsync(parentRow?.NodeId, node);
-            }
-            else
-            {
-                await Session.Engine.AddBookmarkAsync(parentRowId, node);
+                node = new Core.Models.BookmarkNode { Title = e.NewFolderTitle, Children = [node] };
             }
 
-            var parentNode = parentRow?.NodeId;
+            _ = parentRowId is null || parentRow?.NodeId is not null
+                ? await Session.Engine.AddBookmarkByNodeIdAsync(parentRow?.NodeId, node)
+                : await Session.Engine.AddBookmarkAsync(parentRowId, node);
+
+            // Next "Add" defaults to the folder just used (the new one when created here).
+            var parentNode = e.NewFolderTitle is not null ? node.Id : parentRow?.NodeId;
             Preferences.Set("last_create_folder", parentNode?.ToString() ?? string.Empty);
+            if (e.NewFolderTitle is not null)
+            {
+                Session.Log.Info("ui", "Created folder (sheet)");
+            }
         }
         else
         {
@@ -1117,6 +1124,17 @@ else if (moved is not null)
             int? parentNodeId = e.ParentRowId is not null
                 ? allFolders.FirstOrDefault(f => f.RowId == e.ParentRowId.Value)?.NodeId
                 : null;
+            if (e.NewFolderTitle is not null)
+            {
+                // Draft folder from the picker: create it, then move the item into it below.
+                var folder = new Core.Models.BookmarkNode { Title = e.NewFolderTitle, Children = [] };
+                int folderRow = e.ParentRowId is null || parentNodeId is not null
+                    ? await Session.Engine.AddBookmarkByNodeIdAsync(parentNodeId, folder)
+                    : await Session.Engine.AddBookmarkAsync(e.ParentRowId, folder);
+                Session.Log.Info("ui", "Created folder (sheet)");
+                e = e with { ParentRowId = folderRow };
+                parentNodeId = folder.Id;
+            }
             if (nodeId is not null)
             {
                 await Session.Engine.UpdateBookmarkByNodeIdAsync(nodeId.Value, e.Title, e.Url, e.Description, e.Tags);

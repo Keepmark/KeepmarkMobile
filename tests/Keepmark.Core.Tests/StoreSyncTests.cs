@@ -435,6 +435,31 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AddFolderWithChild_AssignsDistinctNodeIds()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        var parent = (await _store.GetChildrenAsync(null)).Single(r => r.IsFolder);
+
+        // New folder + its first bookmark in one insert (picker draft folder).
+        int folderRow = await _store.AddNodeByParentNodeIdAsync(parent.NodeId, new BookmarkNode
+        {
+            Title = "Draft",
+            Children = [new BookmarkNode { Title = "Inside", Url = "https://inside.example" }]
+        });
+
+        var folder = await _store.GetNodeAsync(folderRow);
+        Assert.NotNull(folder);
+        Assert.True(folder!.IsFolder);
+        var kids = await _store.GetChildrenAsync(folderRow);
+        var child = Assert.Single(kids);
+        Assert.Equal("Inside", child.Title);
+        Assert.NotNull(folder.NodeId);
+        Assert.NotNull(child.NodeId);
+        Assert.NotEqual(folder.NodeId, child.NodeId);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+    }
+
+    [Fact]
     public async Task NodeIdMutations_SurviveReplaceAll_Rekey()
     {
         await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");

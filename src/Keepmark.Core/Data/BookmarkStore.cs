@@ -188,6 +188,21 @@ public sealed class BookmarkStore : IAsyncDisposable
         _log.Info("store", $"Local restore: {CountNodes(roots)} nodes, marked dirty");
     }
 
+    /// <summary>Gives every node of a new subtree without an id a fresh NodeId
+    /// (root first), so a folder added together with its first child keeps
+    /// stable identities for both.</summary>
+    private static void AssignMissingIds(BookmarkNode node, ref int nextId)
+    {
+        node.Id ??= nextId++;
+        if (node.Children is not null)
+        {
+            foreach (var child in node.Children)
+            {
+                AssignMissingIds(child, ref nextId);
+            }
+        }
+    }
+
     private static void InsertNode(SQLiteConnection tran, BookmarkNode node, int? parentRowId, ref int order)
     {
         var row = new ItemRow
@@ -366,7 +381,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             }
 
             int nextId = (tran.ExecuteScalar<int?>("SELECT MAX(NodeId) FROM Items") ?? 0) + 1;
-            node.Id ??= nextId;
+            AssignMissingIds(node, ref nextId);
             int order = (tran.ExecuteScalar<int?>(
                 parentRowId is null
                     ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
@@ -539,7 +554,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         await db.RunInTransactionAsync(tran =>
         {
             int nextId = (tran.ExecuteScalar<int?>("SELECT MAX(NodeId) FROM Items") ?? 0) + 1;
-            node.Id ??= nextId;
+            AssignMissingIds(node, ref nextId);
             int order = (tran.ExecuteScalar<int?>(
                 parentRowId is null
                     ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
