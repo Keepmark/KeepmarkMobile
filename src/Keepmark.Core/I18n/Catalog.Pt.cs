@@ -632,7 +632,7 @@ internal static partial class Catalogs
         [Str.HelpSyncH] = "Sincronização",
         [Str.HelpSyncBody] = "No modo Automático cada alteração é sincronizada na hora; no modo Manual só quando você toca em Sincronizar agora. Se este dispositivo e o servidor mudaram, você escolhe o que manter: a cópia do servidor, seus favoritos locais ou os dois mesclados. Nada é sobrescrito sem um backup de segurança antes.",
         [Str.HelpBackupH] = "Backups e desfazer",
-        [Str.HelpBackupBody] = "Antes de cada substituição ou exclusão, o app salva um backup de segurança. Encontre-os em Backup, em Backups de segurança, e restaure um para desfazer a alteração. Em Backup você também pode exportar um arquivo criptografado e restaurar a partir dele.",
+        [Str.HelpBackupBody] = "Antes de substituir seus favoritos (download, envio, importação, restauração, troca de senha, troca de serviço ou limpeza de duplicados), o app salva um backup de segurança. Encontre-os em Backup, em Backups de segurança, e restaure um para desfazer a alteração. Excluir um único favorito ou uma pasta não cria backup: use Desfazer, exibido por alguns segundos. Em Backup você também pode exportar um arquivo criptografado e restaurar a partir dele.",
         [Str.HelpToolsH] = "Organizar e mudar",
         [Str.HelpToolsBody] = "Duplicados encontra favoritos com a mesma URL para você excluir as cópias extras. Mudar de serviço copia seus favoritos para outro serviço xBrowserSync.",
         [Str.HelpLockH] = "Bloqueio do app",

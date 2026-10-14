@@ -632,7 +632,7 @@ internal static partial class Catalogs
         [Str.HelpSyncH] = "Sincronizzazione",
         [Str.HelpSyncBody] = "In modalità Automatica ogni modifica viene sincronizzata subito; in modalità Manuale solo quando tocchi Sincronizza ora. Se sia questo dispositivo sia il server sono cambiati, scegli tu cosa tenere: la copia sul server, i segnalibri locali oppure entrambi uniti. Niente viene sovrascritto senza un backup di sicurezza.",
         [Str.HelpBackupH] = "Backup e annullamento",
-        [Str.HelpBackupBody] = "Prima di ogni sovrascrittura o eliminazione l'app salva un backup di sicurezza. Li trovi in Backup, sotto Backup di sicurezza, e ne ripristini uno per annullare la modifica. In Backup puoi anche esportare un file cifrato e ripristinare da esso.",
+        [Str.HelpBackupBody] = "Prima di sovrascrivere i segnalibri (download, caricamento, importazione, ripristino, cambio password, cambio servizio o pulizia dei duplicati) l'app salva un backup di sicurezza. Li trovi in Backup, sotto Backup di sicurezza, e ne ripristini uno per annullare la modifica. Eliminare un singolo segnalibro o una cartella non crea backup: usa Annulla, che resta visibile per qualche secondo. In Backup puoi anche esportare un file cifrato e ripristinare da esso.",
         [Str.HelpToolsH] = "Ordine e spostamenti",
         [Str.HelpToolsBody] = "Duplicati trova i segnalibri con lo stesso URL, così puoi eliminare le copie in più. Cambia servizio sposta i tuoi segnalibri su un altro servizio xBrowserSync.",
         [Str.HelpLockH] = "Blocco app",

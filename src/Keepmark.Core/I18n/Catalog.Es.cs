@@ -632,7 +632,7 @@ internal static partial class Catalogs
         [Str.HelpSyncH] = "Sincronización",
         [Str.HelpSyncBody] = "En modo Automático cada cambio se sincroniza al instante; en modo Manual solo cuando tocas Sincronizar ahora. Si tanto este dispositivo como el servidor han cambiado, tú eliges qué conservar: la copia del servidor, tus marcadores locales o ambos combinados. Nada se sobrescribe sin una copia preventiva previa.",
         [Str.HelpBackupH] = "Copias y deshacer",
-        [Str.HelpBackupBody] = "Antes de cada sobrescritura o eliminación, la app guarda una copia preventiva. Las encuentras en Copia de seguridad, en Copias preventivas, y restauras una para deshacer el cambio. En Copia de seguridad también puedes exportar un archivo cifrado y restaurar desde él.",
+        [Str.HelpBackupBody] = "Antes de sobrescribir tus marcadores (descarga, subida, importación, restauración, cambio de contraseña, cambio de servicio o limpieza de duplicados), la app guarda una copia preventiva. Las encuentras en Copia de seguridad, en Copias preventivas, y restauras una para deshacer el cambio. Eliminar un solo marcador o una carpeta no crea copia: usa Deshacer, visible durante unos segundos. En Copia de seguridad también puedes exportar un archivo cifrado y restaurar desde él.",
         [Str.HelpToolsH] = "Orden y traslados",
         [Str.HelpToolsBody] = "Duplicados encuentra los marcadores con la misma URL para que puedas borrar las copias sobrantes. Cambiar de servicio traslada tus marcadores a otro servicio xBrowserSync.",
         [Str.HelpLockH] = "Bloqueo de la app",

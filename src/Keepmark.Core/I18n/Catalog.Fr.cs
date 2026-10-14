@@ -632,7 +632,7 @@ internal static partial class Catalogs
         [Str.HelpSyncH] = "Synchronisation",
         [Str.HelpSyncBody] = "En mode Automatique, chaque modification est synchronisée aussitôt ; en mode Manuel, seulement quand vous touchez Synchroniser maintenant. Si cet appareil et le serveur ont tous deux changé, vous choisissez quoi garder : la copie du serveur, vos favoris locaux ou les deux fusionnés. Rien n'est écrasé sans sauvegarde de sécurité préalable.",
         [Str.HelpBackupH] = "Sauvegardes et annulation",
-        [Str.HelpBackupBody] = "Avant chaque écrasement ou suppression, l'application enregistre une sauvegarde de sécurité. Retrouvez-les dans Sauvegarde, sous Sauvegardes de sécurité, et restaurez-en une pour annuler la modification. Dans Sauvegarde, vous pouvez aussi exporter un fichier chiffré et restaurer à partir de celui-ci.",
+        [Str.HelpBackupBody] = "Avant d'écraser vos favoris (téléchargement, envoi, importation, restauration, changement de mot de passe, changement de service ou nettoyage des doublons), l'application enregistre une sauvegarde de sécurité. Retrouvez-les dans Sauvegarde, sous Sauvegardes de sécurité, et restaurez-en une pour annuler la modification. Supprimer un seul favori ou un dossier ne crée pas de sauvegarde : utilisez Annuler, affiché pendant quelques secondes. Dans Sauvegarde, vous pouvez aussi exporter un fichier chiffré et restaurer à partir de celui-ci.",
         [Str.HelpToolsH] = "Ranger et déplacer",
         [Str.HelpToolsBody] = "Doublons trouve les favoris ayant la même URL pour que vous puissiez supprimer les copies en trop. Changer de service copie vos favoris vers un autre service xBrowserSync.",
         [Str.HelpLockH] = "Verrouillage de l'application",

@@ -632,7 +632,7 @@ internal static partial class Catalogs
         [Str.HelpSyncH] = "Syncing",
         [Str.HelpSyncBody] = "In Automatic mode every change is synced at once; in Manual mode only when you tap Sync now. If this device and the server both changed, you choose what to keep: the server copy, your local bookmarks, or both merged. Nothing is overwritten without a safety backup first.",
         [Str.HelpBackupH] = "Backups and undo",
-        [Str.HelpBackupBody] = "Before every overwrite or deletion the app saves a safety backup. Find them in Backup, under Safety backups, and restore one to undo the change. In Backup you can also export an encrypted file and restore from it.",
+        [Str.HelpBackupBody] = "Before overwriting your bookmarks (download, upload, import, restore, password change, move service or duplicate cleanup) the app saves a safety backup. Find them in Backup, under Safety backups, and restore one to undo the change. Deleting a single bookmark or folder saves no backup: use Undo, shown for a few seconds. In Backup you can also export an encrypted file and restore from it.",
         [Str.HelpToolsH] = "Tidy up and move",
         [Str.HelpToolsBody] = "Duplicates finds bookmarks with the same URL so you can delete the extra copies. Move service copies your bookmarks to a different xBrowserSync service.",
         [Str.HelpLockH] = "App lock",

@@ -632,7 +632,7 @@ internal static partial class Catalogs
         [Str.HelpSyncH] = "Synchronisierung",
         [Str.HelpSyncBody] = "Im Modus Automatisch wird jede Änderung sofort synchronisiert; im Modus Manuell nur, wenn du auf Jetzt synchronisieren tippst. Haben sich dieses Gerät und der Server beide geändert, entscheidest du, was bleibt: die Serverkopie, deine lokalen Lesezeichen oder beide zusammengeführt. Nichts wird ohne vorherige Sicherheitskopie überschrieben.",
         [Str.HelpBackupH] = "Sicherungen und Rückgängig",
-        [Str.HelpBackupBody] = "Vor jedem Überschreiben oder Löschen legt die App eine Sicherheitskopie an. Du findest sie unter Sicherung bei Sicherheitskopien und stellst eine wieder her, um die Änderung rückgängig zu machen. Unter Sicherung kannst du auch eine verschlüsselte Datei exportieren und daraus wiederherstellen.",
+        [Str.HelpBackupBody] = "Bevor deine Lesezeichen überschrieben werden (Download, Upload, Import, Wiederherstellung, Passwortänderung, Dienstwechsel oder Bereinigung von Duplikaten), legt die App eine Sicherheitskopie an. Du findest sie unter Sicherung bei Sicherheitskopien und stellst eine wieder her, um die Änderung rückgängig zu machen. Das Löschen eines einzelnen Lesezeichens oder Ordners legt keine Kopie an: Nutze Rückgängig, das einige Sekunden lang angezeigt wird. Unter Sicherung kannst du auch eine verschlüsselte Datei exportieren und daraus wiederherstellen.",
         [Str.HelpToolsH] = "Aufräumen und umziehen",
         [Str.HelpToolsBody] = "Duplikate findet Lesezeichen mit derselben URL, damit du überzählige Kopien löschen kannst. Dienst wechseln überträgt deine Lesezeichen zu einem anderen xBrowserSync-Dienst.",
         [Str.HelpLockH] = "App-Sperre",
