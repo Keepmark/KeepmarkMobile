@@ -19,9 +19,10 @@ Distribution:
   Testers join <https://groups.google.com/g/keepmark-testers>, then opt in at
   <https://play.google.com/apps/testing/com.keepmark.mobile>.
 - GitHub releases (<https://github.com/Keepmark/KeepmarkMobile/releases>,
-  tag `v1.0.N`): Release APK signed with the upload key
-  (`~/keys/keepmark-upload.keystore`). Play re-signs with its own key, so the
-  two installs cannot update each other. Create them with `gh release create`.
+  tag `v1.0.N`, `gh release create`): release notes only, **no APK or other
+  assets** (since 2026-10-15). Each release explains how to join the testers
+  group, so new users come in through Play closed testing. The signed AAB
+  for Play is built with the upload key (`~/keys/keepmark-upload.keystore`).
 
 `KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
 is NOT a git repo). Solution `KeepmarkMobile.slnx`:

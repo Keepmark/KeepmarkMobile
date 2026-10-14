@@ -113,55 +113,9 @@ Please keep the app installed for at least 14 days. Feedback is welcome in
 [issues](https://github.com/Keepmark/KeepmarkMobile/issues) or at
 keepmark@proton.me.
 
-**APK.** Download the APK from the
-[latest release](https://github.com/Keepmark/KeepmarkMobile/releases/latest)
-(currently [1.0.190](https://github.com/Keepmark/KeepmarkMobile/releases/tag/v1.0.190);
-all versions: [Releases](https://github.com/Keepmark/KeepmarkMobile/releases)).
+Release notes for every version are on the
+[Releases](https://github.com/Keepmark/KeepmarkMobile/releases) page.
 Project home: <https://github.com/Keepmark>.
-
-## Build from source
-
-Requirements:
-
-- .NET 10 SDK with the MAUI Android workload: `dotnet workload install maui-android`
-- JDK 21 (newer JDKs are rejected by the Android build with `XA0030`)
-- Android SDK with platform-tools
-
-Point the build at the JDK and the SDK (adjust the paths):
-
-```sh
-export JAVA_HOME=$HOME/jdk-21
-export ANDROID_HOME=$HOME/android-sdk ANDROID_SDK_ROOT=$HOME/android-sdk
-export PATH=$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$PATH
-```
-
-From the repository root:
-
-```sh
-dotnet test                                           # Core unit + crypto interop tests
-dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
-```
-
-Run the Debug build on a connected device or emulator (Debug uses Fast
-Deployment, so install it this way, not with `adb install`):
-
-```sh
-dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug
-```
-
-Build a self-contained APK that installs with `adb install` or by opening it
-on the phone:
-
-```sh
-dotnet publish src/KeepmarkMobile -f net10.0-android -c Release -p:AndroidPackageFormats=apk
-```
-
-The APK lands in `src/KeepmarkMobile/bin/Release/net10.0-android/publish/`
-(`com.keepmark.mobile-Signed.apk`). Without the maintainer's upload key it
-is signed with the local debug key, so it cannot update an install from
-Releases or Google Play: uninstall that one first.
-
-More detail (device setup, version bumps): [developer guide](docs/DEVELOPMENT.md).
 
 ## Documentation
 
