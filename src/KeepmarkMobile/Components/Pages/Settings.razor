@@ -147,6 +147,12 @@
         language = AppSettings.Language;
         showRecent = AppSettings.ShowRecent;
         recentCount = AppSettings.RecentCount;
+        if (carry is { } c)
+        {
+            // Language change rebuilt the tree: put back the unsaved edits.
+            (mode, theme, showRecent, recentCount) = c;
+            carry = null;
+        }
     }
 
     protected override async Task OnInitializedAsync()
@@ -165,8 +171,11 @@
 
     /// <summary>The language applies at once: Apply() sets the culture and the
     /// layout redraws its whole tree (no restart, no page reload).</summary>
+    private static (Core.Sync.SyncMode, string, bool, int)? carry;
+
     private void ApplyLanguage()
     {
+        carry = (mode, theme, showRecent, recentCount);
         AppSettings.Language = language is "en" or "it" or "fr" or "es" or "de" or "ja" or "pt" or "ru" or "zh" ? language : "system";
         LangSvc.Apply();
     }

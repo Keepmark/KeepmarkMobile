@@ -338,10 +338,23 @@ else
                 OnMove="t => MoveRow(movingFor, t)" OnCancel="() => movingFor = null" CreateFolderIn="CreateFolderIn" />
 }
 
+@if (confirmDelete is not null)
+{
+    <div class="xbs-sheet-backdrop" data-back="30" @onclick="() => confirmDelete = null">
+        <div class="xbs-sheet" role="dialog" aria-modal="true" @onclick:stopPropagation="true">
+            <ConfirmBlock Message="@L.Get(Str.HomeDeleteFolderMessage, confirmDelete.DisplayTitle ?? L.Get(Str.SheetTypeFolder))"
+                          Implication="@L.Get(Str.HomeDeleteFolderImplication, Loc.Plural(Str.HomeCountBookmarks, folderCounts.GetValueOrDefault(confirmDelete.RowId)))"
+                          ConfirmLabel="@L.Get(Str.CommonYesDelete)"
+                          OnConfirm="() => { var r = confirmDelete; confirmDelete = null; return DeleteRow(r, true); }"
+                          OnCancel="() => confirmDelete = null" />
+        </div>
+    </div>
+}
+
 @if (undo is not null)
 {
     <div class="xbs-undo">
-        <span>@L.Get(Str.HomeDeleted)</span>
+        <span>@L.Get(undo.Value.Subtree is [{ IsFolder: true }, ..] ? Str.HomeFolderDeleted : Str.HomeDeleted)</span>
         <button class="xbs-undo-btn" @onclick="UndoDelete">@L.Get(Str.CommonUndo)</button>
     </div>
 }
@@ -844,11 +857,22 @@ else if (moved is not null)
         Pins.ClearLegacy();
     }
 
-    private async Task DeleteRow(ItemRow? row)
+    /// <summary>Folders holding at least this many bookmarks ask before deleting.</summary>
+    private const int ConfirmDeleteFrom = 5;
+    private ItemRow? confirmDelete;
+
+    private async Task DeleteRow(ItemRow? row, bool confirmed = false)
     {
         menuFor = null;
         if (row is null)
         {
+            return;
+        }
+
+        if (!confirmed && row.IsFolder && folderCounts.GetValueOrDefault(row.RowId) >= ConfirmDeleteFrom)
+        {
+            confirmDelete = row;
+            _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
             return;
         }
 

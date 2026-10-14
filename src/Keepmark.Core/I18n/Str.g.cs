@@ -300,6 +300,7 @@ public static partial class Str
     public const string HomeUnpin = nameof(HomeUnpin);
     public const string HomeGoToLocation = nameof(HomeGoToLocation);
     public const string HomeDeleted = nameof(HomeDeleted);
+    public const string HomeFolderDeleted = nameof(HomeFolderDeleted);
     public const string HomePinnedToast = nameof(HomePinnedToast);
     public const string HomeUnpinnedToast = nameof(HomeUnpinnedToast);
     public const string HomeShareTitle = nameof(HomeShareTitle);
@@ -690,6 +691,10 @@ public static partial class Str
     public const string HelpToolsBody = nameof(HelpToolsBody);
     public const string HelpLockH = nameof(HelpLockH);
     public const string HelpLockBody = nameof(HelpLockBody);
+    public const string HelpOrganizeH = nameof(HelpOrganizeH);
+    public const string HelpOrganizeBody = nameof(HelpOrganizeBody);
+    public const string HomeDeleteFolderMessage = nameof(HomeDeleteFolderMessage);
+    public const string HomeDeleteFolderImplication = nameof(HomeDeleteFolderImplication);
     public const string HomeLocation = nameof(HomeLocation);
     public const string HomeMove = nameof(HomeMove);
     public const string HomeMoveQuick = nameof(HomeMoveQuick);

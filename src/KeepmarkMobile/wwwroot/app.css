@@ -687,7 +687,8 @@ html.xbs-locked, body.xbs-locked {
    ====================================================================== */
 :root { --km-b: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 1rem)); }
 
-.content { padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px)); }
+/* Clears the FAB and the scroll-jump button stacked above it (B + 66px + 56px). */
+.content { padding-bottom: calc(9rem + env(safe-area-inset-bottom, 0px)); }
 
 .xbs-section {
     margin: 0.875rem 0.5rem 0.375rem;
