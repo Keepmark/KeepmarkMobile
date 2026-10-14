@@ -36,11 +36,12 @@ Keepmark opens there, and the other way round. Nothing to migrate.
   Android KeyStore. No telemetry, HTTPS-only services.
 - **Never lose a bookmark silently.** Conflicts are never resolved behind
   your back: you pick download, upload or merge, and merge shows a preview
-  first. Before every destructive step Keepmark saves an encrypted safety
-  backup you can restore.
-- **Made for the phone.** Fast full-text search, pinned bookmarks, a
-  clickable breadcrumb, folders first, swipe for details and one menu for
-  every action.
+  first. Before overwriting your bookmarks Keepmark saves an encrypted
+  safety backup you can restore; single deletes have Undo, and deleting a
+  folder with 5 or more bookmarks asks first.
+- **Made for the phone.** Fast full-text search, pinned bookmarks, recently
+  added bookmarks on Home, a clickable breadcrumb, folders first, swipe for
+  details and one menu for every action.
 - **Share to Keepmark** from any app: the add form opens already filled in.
 - **App lock** with fingerprint or device PIN, with a relock time you choose.
 
@@ -49,10 +50,10 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 | | |
 |---|---|
 | **Sync** | Automatic or manual, with clear status and honest conflict handling |
-| **Browse** | Search, pinned section, breadcrumb, folder tree picker |
-| **Edit** | Add, edit, move and delete bookmarks and folders, with undo |
+| **Browse** | Search, pinned and recently added sections, breadcrumb, folder tree picker |
+| **Edit** | Add, edit, move and delete bookmarks and folders, with undo; new folder right from the picker; "already saved" hint when you add a page you have |
 | **Backup** | Encrypted export and import, compatible with Keepmark for browsers |
-| **Safety backups** | Automatic snapshot before every destructive step (newest 5 kept) |
+| **Safety backups** | Automatic snapshot before every overwrite (newest 5 kept) |
 | **Duplicates** | Find links saved more than once; one copy of each always survives |
 | **Move service** | Move your bookmarks to another service, into a new or existing sync |
 | **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch, 日本語, Português (Brasil), Русский, 简体中文 |
@@ -114,7 +115,8 @@ keepmark@proton.me.
 
 **APK.** Download the APK from the
 [latest release](https://github.com/Keepmark/KeepmarkMobile/releases/latest)
-(all versions: [Releases](https://github.com/Keepmark/KeepmarkMobile/releases)).
+(currently [1.0.190](https://github.com/Keepmark/KeepmarkMobile/releases/tag/v1.0.190);
+all versions: [Releases](https://github.com/Keepmark/KeepmarkMobile/releases)).
 Project home: <https://github.com/Keepmark>.
 
 ## Build from source
