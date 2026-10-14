@@ -479,6 +479,46 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AddFolderWithChild_ReachesPushMirror_WithFreshIds()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        var before = (await _store.GetByNodeIdsAsync([1, 2, 3, 4, 5])).Select(r => r.NodeId).ToHashSet();
+
+        await _store.AddNodeByParentNodeIdAsync(null, new BookmarkNode
+        {
+            Title = "Draft",
+            Children = [new BookmarkNode { Title = "Inside", Url = "https://inside.example" }]
+        });
+
+        // The mirror is what the next push serializes: folder + child, both with
+        // ids that collide with nothing already in the tree.
+        var (roots, _, _, _) = await _store.LoadMirrorAsync();
+        var draft = Assert.Single(roots, n => n.Title == "Draft");
+        var child = Assert.Single(draft.Children!);
+        Assert.Equal("https://inside.example", child.Url);
+        Assert.NotNull(draft.Id);
+        Assert.NotNull(child.Id);
+        Assert.DoesNotContain(draft.Id, before);
+        Assert.DoesNotContain(child.Id, before);
+        Assert.NotEqual(draft.Id, child.Id);
+    }
+
+    [Fact]
+    public async Task FindByNormalizedUrl_HostPrefilter_IsCaseInsensitive_AndToleratesBadInput()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        await _store.AddNodeAsync(null, new BookmarkNode { Title = "Shouty", Url = "HTTPS://SHOUT.EXAMPLE.COM/Path" });
+
+        // Stored upper-case host still passes the SQL host pre-filter.
+        Assert.Single(await _store.FindByNormalizedUrlAsync("https://shout.example.com/Path"));
+        // Path case is significant: a different page is not a duplicate.
+        Assert.Empty(await _store.FindByNormalizedUrlAsync("https://shout.example.com/path"));
+        // Scheme-less / unparsable input takes the full scan and simply finds nothing.
+        Assert.Empty(await _store.FindByNormalizedUrlAsync("github.com"));
+        Assert.Empty(await _store.FindByNormalizedUrlAsync("not a url"));
+    }
+
+    [Fact]
     public async Task NodeIdMutations_SurviveReplaceAll_Rekey()
     {
         await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
