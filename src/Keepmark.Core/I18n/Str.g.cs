@@ -267,6 +267,16 @@ public static partial class Str
     public const string HomeRecent = nameof(HomeRecent);
     public const string HomeRecentAll = nameof(HomeRecentAll);
     public const string HomeRecentNote = nameof(HomeRecentNote);
+    public const string TimeNow = nameof(TimeNow);
+    public const string TimeMinutes_one = nameof(TimeMinutes_one);
+    public const string TimeMinutes_other = nameof(TimeMinutes_other);
+    public const string TimeHours_one = nameof(TimeHours_one);
+    public const string TimeHours_other = nameof(TimeHours_other);
+    public const string TimeYesterday = nameof(TimeYesterday);
+    public const string TimeDays_one = nameof(TimeDays_one);
+    public const string TimeDays_other = nameof(TimeDays_other);
+    public const string TimeWeeks_one = nameof(TimeWeeks_one);
+    public const string TimeWeeks_other = nameof(TimeWeeks_other);
     public const string HomeEmptyRoot = nameof(HomeEmptyRoot);
     public const string HomeEmptyFolder = nameof(HomeEmptyFolder);
     public const string HomeAddAria = nameof(HomeAddAria);
@@ -610,6 +620,14 @@ public static partial class Str
     public const string ConnReviewTitles = nameof(ConnReviewTitles);
     /// <summary>Base for Loc.Plural (ConnUnlinkIntro_one / ConnUnlinkIntro_other).</summary>
     public const string ConnUnlinkIntro = nameof(ConnUnlinkIntro);
+    /// <summary>Base for Loc.Plural (TimeMinutes_one / TimeMinutes_other).</summary>
+    public const string TimeMinutes = nameof(TimeMinutes);
+    /// <summary>Base for Loc.Plural (TimeHours_one / TimeHours_other).</summary>
+    public const string TimeHours = nameof(TimeHours);
+    /// <summary>Base for Loc.Plural (TimeDays_one / TimeDays_other).</summary>
+    public const string TimeDays = nameof(TimeDays);
+    /// <summary>Base for Loc.Plural (TimeWeeks_one / TimeWeeks_other).</summary>
+    public const string TimeWeeks = nameof(TimeWeeks);
     /// <summary>Base for Loc.Plural (HomeResults_one / HomeResults_other).</summary>
     public const string HomeResults = nameof(HomeResults);
     /// <summary>Base for Loc.Plural (HomeCountFolders_one / HomeCountFolders_other).</summary>

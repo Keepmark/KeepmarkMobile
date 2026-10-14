@@ -29,6 +29,12 @@ public sealed class BookmarkNode
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? Tags { get; set; }
 
+    /// <summary>Keepmark extension: creation time in Unix ms (the browser
+    /// bookmarks API's dateAdded). Optional; legacy clients may drop it.</summary>
+    [JsonPropertyName("dateAdded")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? DateAdded { get; set; }
+
     [JsonPropertyName("children")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<BookmarkNode>? Children { get; set; }

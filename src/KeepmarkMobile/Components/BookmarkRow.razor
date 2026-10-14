@@ -32,7 +32,17 @@ else
                         <div class="xbs-row-tags">#@Row.Tags.Replace("\u001F", " #") </div>
                     }
                 }
-                @if (!Row.IsFolder && !string.IsNullOrEmpty(FolderPath))
+                @if (!Row.IsFolder && Added is not null)
+                {
+                    <div class="xbs-row-path xbs-has-when">
+                        @if (!string.IsNullOrEmpty(FolderPath))
+                        {
+                            <span class="xbs-row-path-text"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>@FolderPath</span>
+                        }
+                        <span class="xbs-row-when">@Added</span>
+                    </div>
+                }
+                else if (!Row.IsFolder && !string.IsNullOrEmpty(FolderPath))
                 {
                     <div class="xbs-row-path"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>@FolderPath</div>
                 }
@@ -49,6 +59,8 @@ else
     [Parameter] public bool Flash { get; set; }
     [Parameter] public bool Expanded { get; set; }
     [Parameter] public string? FolderPath { get; set; }
+    /// <summary>Relative "added" label (recent lists only), shown after the folder path.</summary>
+    [Parameter] public string? Added { get; set; }
     /// <summary>Bookmarks inside a folder row (through all subfolders), shown as its subtitle.</summary>
     [Parameter] public int? Count { get; set; }
     [Parameter] public EventCallback<ItemRow> OnOpen { get; set; }

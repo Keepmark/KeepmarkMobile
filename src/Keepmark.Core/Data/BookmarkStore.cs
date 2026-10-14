@@ -35,6 +35,8 @@ public sealed class ItemRow
     public string? Url { get; set; }
     public string? Description { get; set; }
     public string? Tags { get; set; }
+    /// <summary>Synced dateAdded (Unix ms), null when the node carries none.</summary>
+    public long? DateAdded { get; set; }
     public bool IsFolder { get; set; }
     public int SortOrder { get; set; }
 
@@ -203,6 +205,20 @@ public sealed class BookmarkStore : IAsyncDisposable
         }
     }
 
+    /// <summary>New nodes get dateAdded = now; a date already set (e.g. copied
+    /// from another tree) is kept.</summary>
+    private static void StampMissingDates(BookmarkNode node, long nowMs)
+    {
+        node.DateAdded ??= nowMs;
+        if (node.Children is not null)
+        {
+            foreach (var child in node.Children)
+            {
+                StampMissingDates(child, nowMs);
+            }
+        }
+    }
+
     private static void InsertNode(SQLiteConnection tran, BookmarkNode node, int? parentRowId, ref int order)
     {
         var row = new ItemRow
@@ -213,6 +229,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             Url = node.Url,
             Description = string.IsNullOrWhiteSpace(node.Description) ? null : node.Description,
             Tags = node.Tags is { Count: > 0 } ? string.Join(TagSep, node.Tags) : null,
+            DateAdded = node.DateAdded,
             IsFolder = node.Children is not null,
             SortOrder = order++
         };
@@ -248,6 +265,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             Url = r.Url,
             Description = r.Description,
             Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
+            DateAdded = r.DateAdded,
             Children = r.IsFolder ? Build(r.RowId) : null
         };
 
@@ -391,6 +409,7 @@ public sealed class BookmarkStore : IAsyncDisposable
 
             int nextId = (tran.ExecuteScalar<int?>("SELECT MAX(NodeId) FROM Items") ?? 0) + 1;
             AssignMissingIds(node, ref nextId);
+            StampMissingDates(node, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             int order = (tran.ExecuteScalar<int?>(
                 parentRowId is null
                     ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
@@ -469,6 +488,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                     Url = r.Url,
                     Description = r.Description,
                     Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
+                    DateAdded = r.DateAdded,
                     Children = r.IsFolder && kids.TryGetValue(id, out var c)
                         ? c.Select(BuildRow).ToList()
                         : null
@@ -564,6 +584,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         {
             int nextId = (tran.ExecuteScalar<int?>("SELECT MAX(NodeId) FROM Items") ?? 0) + 1;
             AssignMissingIds(node, ref nextId);
+            StampMissingDates(node, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             int order = (tran.ExecuteScalar<int?>(
                 parentRowId is null
                     ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
@@ -701,6 +722,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                     Url = r.Url,
                     Description = r.Description,
                     Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
+                    DateAdded = r.DateAdded,
                     Children = r.IsFolder && kids.TryGetValue(id, out var c)
                         ? c.Select(BuildRow).ToList()
                         : null

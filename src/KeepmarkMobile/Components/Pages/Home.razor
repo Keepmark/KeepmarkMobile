@@ -132,7 +132,7 @@ else
             @foreach (var r in recentAll)
             {
                 <BookmarkRow @key="@("v" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)"
-                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" />
             }
         </div>
     }
@@ -185,7 +185,7 @@ else
                         @foreach (var r in RecentShown)
                         {
                             <BookmarkRow @key="@("n" + r.RowId)" Row="r" Pinned="IsPinned(r.RowId)" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
-                                         FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                                         FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" />
                         }
                     </div>
                     @if (recentAll.Count > RecentShown.Count)
@@ -393,6 +393,8 @@ else if (moved is not null)
     private Dictionary<int, int> folderCounts = new();
     private string sortMode = "Default";
     private CancellationTokenSource? flashTimer;
+    // Re-renders the relative "added" labels of the recent rows once a minute.
+    private Timer? recentClock;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
     private CancellationTokenSource? undoTimer;
 
@@ -420,6 +422,16 @@ else if (moved is not null)
         ready = true;
         SharedImport.Arrived += OnSharedArrived;
         OpenSharedIfPending();
+        recentClock = new Timer(_ => _ = InvokeAsync(TickRecent), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    private void TickRecent()
+    {
+        var visible = recentView || (showRecent && recentOpen && crumbs.Count == 0 && !searchOpen);
+        if (visible && recentAll.Any(r => r.DateAdded is not null))
+        {
+            StateHasChanged();
+        }
     }
 
     private void OnStatus(Core.Sync.SyncStatus s)
@@ -1586,6 +1598,7 @@ else if (moved is not null)
             Session.Engine.DataChanged -= OnData;
         }
 
+        recentClock?.Dispose();
         debounce?.Cancel();
         debounce?.Dispose();
         flashTimer?.Cancel();

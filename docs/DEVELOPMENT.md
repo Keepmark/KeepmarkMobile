@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.180 (181)**,
+v1.2 extended contract when advertised. Current version: **v1.0.181 (182)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -48,9 +48,18 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
 - Home sections (v1.0.180, canvas "R1 + R4"): Pinned and Recently added are
   cards with a hanging ribbon head; closed, a strip of mini ribbons previews
   the items' site colors. Recently added = newest bookmarks by `NodeId`
-  (`BookmarkStore.GetRecentBookmarksAsync`; the sync format has no creation
-  date, ids are MAX+1 on add), with folder path; Settings → Home toggles it
-  and sets 5/10/20; "See all recent" is a virtual crumb level (up to 50).
+  (`BookmarkStore.GetRecentBookmarksAsync`; ids are MAX+1 on add), with
+  folder path; Settings → Home toggles it and sets 5/10/20; "See all recent"
+  is a virtual crumb level (up to 50).
+- `dateAdded` (v1.0.181): optional Keepmark field on synced nodes, Unix ms
+  like the browser bookmarks API, omitted when null. Stored in
+  `ItemRow.DateAdded`, kept through pull/push/merge/backup; nodes added on the
+  device are stamped with now (`StampMissingDates`, an existing value wins).
+  Legacy xBrowserSync clients may drop it: rows without it show no time.
+  Recent rows show `RelativeTime.Format` after the folder path (just now /
+  N min / N hours same day / yesterday / N days / N weeks / date, calendar
+  steps in the device time zone); Home re-renders them every minute while
+  visible. Order stays by `NodeId`.
 - UX: tap opens, ⋮ menu holds all actions, swipe right expands details /
   left collapses, pinned section, clickable breadcrumb, folder-first sorting,
   share-receiving with prefilled form, full-screen folder tree picker with

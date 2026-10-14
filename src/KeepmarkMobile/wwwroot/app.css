@@ -1114,6 +1114,13 @@ html.xbs-under .xbs-crumbbar {
 
 .xbs-row-path .km-ico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
 
+/* Recent lists: folder path, then the relative "added" time (never truncated). */
+.xbs-row-path.xbs-has-when { display: flex; gap: 6px; }
+.xbs-row-path-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.xbs-row-when { flex: none; }
+.xbs-row-path-text + .xbs-row-when::before { content: "·"; margin-right: 6px; }
+.xbs-expanded .xbs-row-path-text { white-space: normal; }
+
 .xbs-row-chev {
     width: 48px;
     height: 48px;

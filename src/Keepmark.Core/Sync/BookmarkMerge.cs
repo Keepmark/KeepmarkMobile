@@ -70,6 +70,7 @@ public static class BookmarkMerge
                 Url = node.Url,
                 Description = node.Description,
                 Tags = node.Tags is null ? null : new List<string>(node.Tags),
+                DateAdded = node.DateAdded,
             };
             if (node.Children is not null)
             {
@@ -128,6 +129,7 @@ public static class BookmarkMerge
                             Url = node.Url,
                             Description = node.Description,
                             Tags = node.Tags is null ? null : new List<string>(node.Tags),
+                            DateAdded = node.DateAdded,
                         });
                         localOnly++;
                     }
@@ -157,6 +159,7 @@ public static class BookmarkMerge
                         Title = node.Title,
                         Description = node.Description,
                         Tags = node.Tags is null ? null : new List<string>(node.Tags),
+                        DateAdded = node.DateAdded,
                         Children = [],
                     };
                     target.Children.Add(created);
@@ -282,6 +285,7 @@ public static class BookmarkMerge
         Url = node.Url,
         Description = node.Description,
         Tags = node.Tags is null ? null : new List<string>(node.Tags),
+        DateAdded = node.DateAdded,
         Children = node.Children is null ? null : node.Children.Select(Clone).ToList(),
     };
 

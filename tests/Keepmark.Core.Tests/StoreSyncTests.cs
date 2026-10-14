@@ -223,6 +223,35 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DateAdded_RoundTrips_AndNewNodesAreStamped()
+    {
+        List<BookmarkNode> tree =
+        [
+            new() { Id = 1, Title = ContainerNames.Other, Children = [
+                new() { Id = 2, Title = "Dated", Url = "https://dated.example.com", DateAdded = 1_700_000_000_000 },
+                new() { Id = 3, Title = "Legacy", Url = "https://legacy.example.com" },
+            ]},
+        ];
+        await _store.ReplaceAllAsync(tree, "blob", "t1", "1.8.0");
+        var other = (await _store.GetByNodeIdsAsync([1])).Single();
+        var before = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        await _store.AddNodeAsync(other.RowId, new BookmarkNode { Title = "New", Url = "https://new.example.com" });
+        await _store.AddNodeAsync(other.RowId, new BookmarkNode { Title = "Copied", Url = "https://c.example.com", DateAdded = 42 });
+
+        var (roots, _, _, _) = await _store.LoadMirrorAsync();
+        var kids = roots[0].Children!;
+        Assert.Equal(1_700_000_000_000, kids[0].DateAdded);
+        Assert.Null(kids[1].DateAdded);
+        Assert.InRange(kids[2].DateAdded!.Value, before, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+        Assert.Equal(42, kids[3].DateAdded);
+
+        // Wire: camelCase number when set, omitted when null.
+        var json = System.Text.Json.JsonSerializer.Serialize(kids.Take(2));
+        Assert.Contains("\"dateAdded\":1700000000000", json);
+        Assert.Equal(1, json.Split("dateAdded").Length - 1);
+    }
+
+    [Fact]
     public async Task Containers_ShowLocalizedNames_ButKeepSyncedTitles()
     {
         List<BookmarkNode> tree =

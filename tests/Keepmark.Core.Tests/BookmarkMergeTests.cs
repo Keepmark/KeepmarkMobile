@@ -158,6 +158,22 @@ public sealed class BookmarkMergeTests
     }
 
     [Fact]
+    public void Merge_KeepsDateAddedOfAdoptedLocalNodes()
+    {
+        List<BookmarkNode> local =
+        [
+            new() { Title = "Other", Children =
+            [
+                new() { Title = "Local only", Url = "https://local.test", DateAdded = 123 },
+                new() { Title = "New folder", DateAdded = 456, Children = [] },
+            ] },
+        ];
+        var other = BookmarkMerge.Merge(local, Remote()).Tree.Single(n => n.Title == "Other").Children!;
+        Assert.Equal(123, other.Single(n => n.Url == "https://local.test").DateAdded);
+        Assert.Equal(456, other.Single(n => n.Title == "New folder").DateAdded);
+    }
+
+    [Fact]
     public void Merge_HandlesEmptySides()
     {
         var onlyRemote = BookmarkMerge.Merge([], Remote());
