@@ -91,4 +91,43 @@ public class I18nTests
             CultureInfo.CurrentUICulture = before;
         }
     }
+
+    [Fact]
+    public void SafetyBackupDescriptionIsLocalizedWithPlurals()
+    {
+        var before = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("it-IT");
+            var one = Keepmark.Core.Safety.SafetyBackupFiles.Describe(new Keepmark.Core.Safety.SafetyBackupEntry(
+                "f.json", DateTime.UtcNow, "take-remote", "local", 1, 10, null, "master"));
+            var many = Keepmark.Core.Safety.SafetyBackupFiles.Describe(new Keepmark.Core.Safety.SafetyBackupEntry(
+                "f.json", DateTime.UtcNow, "take-remote", "server", 5, 10, null));
+
+            Assert.Contains("segnalibri locali · 1 elemento · cifrato", one);
+            Assert.Contains("copia del server · 5 elementi · non cifrato", many);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = before;
+        }
+    }
+
+    [Theory]
+    [InlineData("it-IT", "1 segnato", "5 segnati")]
+    [InlineData("en-US", "1 marked", "5 marked")]
+    public void DuplicateCountersPluralize(string culture, string one, string many)
+    {
+        var before = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(culture);
+            Assert.StartsWith(one, Loc.Plural(Str.DupMarkedLine, 1));
+            Assert.StartsWith(many, Loc.Plural(Str.DupMarkedLine, 5));
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = before;
+        }
+    }
 }

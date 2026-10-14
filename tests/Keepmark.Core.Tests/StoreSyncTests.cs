@@ -223,6 +223,27 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RecentBookmarks_OrderedByDateAdded_UndatedLast()
+    {
+        // Ids out of date order (e.g. seeded by another client): the date wins.
+        var roots = new List<BookmarkNode>
+        {
+            new() { Id = 1, Title = "[xbs] Toolbar", Children =
+            [
+                new() { Id = 2, Title = "Newest", Url = "https://a.example.com", DateAdded = 3_000 },
+                new() { Id = 3, Title = "Undated", Url = "https://b.example.com" },
+                new() { Id = 4, Title = "Oldest", Url = "https://c.example.com", DateAdded = 1_000 },
+                new() { Id = 5, Title = "Middle", Url = "https://d.example.com", DateAdded = 2_000 },
+            ] },
+        };
+        await _store.ReplaceAllAsync(roots, "blob", "t1", "1.8.0");
+
+        var recent = await _store.GetRecentBookmarksAsync(10);
+
+        Assert.Equal(["Newest", "Middle", "Oldest", "Undated"], recent.Select(r => r.Title));
+    }
+
+    [Fact]
     public async Task DateAdded_RoundTrips_AndNewNodesAreStamped()
     {
         List<BookmarkNode> tree =
@@ -280,7 +301,7 @@ public sealed class StoreSyncTests : IAsyncLifetime
         // Only top-level containers are renamed: a nested folder titled "[xbs] Menu" stays as is.
         var paths = await _store.GetFolderPathsAsync();
         var deep = (await _store.SearchAsync("deep")).Single();
-        Assert.Equal($"Menu / {ContainerNames.Menu}", paths[deep.RowId]);
+        Assert.Equal($"Menu › {ContainerNames.Menu}", paths[deep.RowId]);
         Assert.Equal("Other", (await _store.SearchAsync("docs")).Single().FolderPath);
     }
 

@@ -22,7 +22,7 @@ else if (groups.Count == 0)
 }
 else
 {
-    <p class="text-muted" role="status"><small>@L.Get(Str.DupMarkedLine, MarkedCount())</small></p>
+    <p class="text-muted" role="status"><small>@Loc.Plural(Str.DupMarkedLine, MarkedCount())</small></p>
 
     @foreach (var g in groups)
     {
@@ -42,7 +42,7 @@ else
                 else
                 {
                     <button class="btn btn-outline-danger mt-1" disabled="@(busy || markedHere == 0)" @onclick="() => armedGroup = g.Url">
-                        @(markedHere == 0 ? L.Get(Str.DupDeleteWord) + " " + L.Get(Str.DupDeleteMarkedWord) : L.Get(Str.DupDeleteN, markedHere))
+                        @(markedHere == 0 ? L.Get(Str.DupDeleteWord) + " " + L.Get(Str.DupDeleteMarkedWord) : Loc.Plural(Str.DupDeleteN, markedHere))
                     </button>
                 }
             </section>
@@ -53,7 +53,7 @@ else
         <div class="alert alert-danger mt-2" role="alert">@deleteError</div>
     }
     <div class="xbs-dupbar">
-        <span role="status">@L.Get(Str.DupBarMarked, MarkedCount())</span>
+        <span role="status">@Loc.Plural(Str.DupBarMarked, MarkedCount())</span>
         @if (!armedAll)
         {
             <button class="btn btn-outline-danger" disabled="@(busy || MarkedCount() == 0)" @onclick="() => armedAll = true">@L.Get(Str.DupDeleteBtn)</button>
@@ -305,7 +305,14 @@ else
                     aria-pressed="@marked.ToString().ToLowerInvariant()"
                     aria-label="@MarkLabel(marked, locked)"
                     @onclick="() => Toggle(r.RowId)" @onclick:stopPropagation="true">
-                <span aria-hidden="true">@(marked ? "✕" : locked ? "🔒" : string.Empty)</span>
+                @if (marked)
+                {
+                    <span aria-hidden="true">✕</span>
+                }
+                else if (locked)
+                {
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+                }
             </button>
             <button type="button" class="xbs-duptext" aria-label="@L.Get(Str.DupOpenAria, r.Title ?? r.Url ?? string.Empty)" @onclick="() => Open(r)">
                 <span class="xbs-duptext-title">@line1</span>
@@ -321,7 +328,7 @@ else
                     }
                     @if (!string.IsNullOrEmpty(r.Tags))
                     {
-                        <span class="xbs-row-tags">#@r.Tags.Replace(" ", ", ")</span>
+                        <span class="xbs-row-tags">#@r.Tags.Replace("\u001F", " #")</span>
                     }
                     @if (string.IsNullOrEmpty(r.Description) && string.IsNullOrEmpty(r.Tags))
                     {

@@ -35,8 +35,8 @@
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.183</ApplicationDisplayVersion>
-        <ApplicationVersion>184</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.186</ApplicationDisplayVersion>
+        <ApplicationVersion>187</ApplicationVersion>
 
         <!-- monodroid mmaps lib/*.so straight from the APK: those entries MUST
              be STORED, never Deflated, or the app SIGABRTs on startup outside
@@ -94,6 +94,15 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Keepmark.Core\Keepmark.Core.csproj" />
+    </ItemGroup>
+
+    <!-- Network security config: Debug also allows plain HTTP to localhost
+         (local KeepmarkApi via adb reverse); Release stays HTTPS-only. -->
+    <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+        <AndroidResource Include="Platforms\Android\NetworkSecurity\debug.xml" Link="Resources\xml\network_security_config.xml" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+        <AndroidResource Include="Platforms\Android\NetworkSecurity\release.xml" Link="Resources\xml\network_security_config.xml" />
     </ItemGroup>
 
 </Project>

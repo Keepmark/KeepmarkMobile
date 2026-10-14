@@ -141,6 +141,33 @@ body { background: var(--km-ground); }
     --bs-btn-disabled-color: var(--km-ink-2);
 }
 
+/* Outline variants read Bootstrap's own blue/grey otherwise, not the brand tokens. */
+.btn-outline-primary {
+    --bs-btn-color: var(--km-accent);
+    --bs-btn-border-color: var(--km-accent);
+    --bs-btn-hover-bg: var(--km-accent);
+    --bs-btn-hover-border-color: var(--km-accent);
+    --bs-btn-hover-color: var(--km-on-accent);
+    --bs-btn-active-bg: var(--km-accent-hover);
+    --bs-btn-active-border-color: var(--km-accent-hover);
+    --bs-btn-active-color: var(--km-on-accent);
+    --bs-btn-disabled-color: var(--km-accent);
+    --bs-btn-disabled-border-color: var(--km-accent);
+}
+
+.btn-outline-secondary {
+    --bs-btn-color: var(--km-ink);
+    --bs-btn-border-color: var(--km-line-strong);
+    --bs-btn-hover-bg: var(--km-surface-2);
+    --bs-btn-hover-border-color: var(--km-line-strong);
+    --bs-btn-hover-color: var(--km-ink);
+    --bs-btn-active-bg: var(--km-surface-2);
+    --bs-btn-active-border-color: var(--km-line-strong);
+    --bs-btn-active-color: var(--km-ink);
+    --bs-btn-disabled-color: var(--km-ink-2);
+    --bs-btn-disabled-border-color: var(--km-line);
+}
+
 .form-control, .form-select {
     min-height: 48px;
     border-radius: 0.75rem;
@@ -148,6 +175,12 @@ body { background: var(--km-ground); }
     background-color: var(--km-surface);
     color: var(--km-ink);
 }
+
+.form-check-input:checked {
+    background-color: var(--km-accent);
+    border-color: var(--km-accent);
+}
+.form-select { text-overflow: ellipsis; }
 
 .form-control:focus, .form-select:focus {
     border-color: var(--km-accent);
@@ -197,6 +230,9 @@ a, .btn-link {
 h1:focus {
     outline: none;
 }
+
+/* Page titles (Backup, Duplicates, Settings…) sat flush under the top bar. */
+article.content > h1 { margin-top: 0.75rem; }
 
 .valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
@@ -1813,13 +1849,14 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap; /* long labels (de, ru) drop the button below instead of squeezing the ID */
     gap: 0.5rem;
     margin-top: 0.625rem;
 }
 
 .xbs-drawer-svc { min-width: 0; }
 .xbs-drawer-host { font-size: 0.75rem; color: #c3cae6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.xbs-drawer-id { font-family: ui-monospace, 'JetBrains Mono', monospace; font-size: 0.75rem; color: #e8eaf4; }
+.xbs-drawer-id { font-family: ui-monospace, 'JetBrains Mono', monospace; font-size: 0.75rem; color: #e8eaf4; white-space: nowrap; }
 
 .xbs-drawer-syncbtn {
     flex-shrink: 0;
@@ -2117,7 +2154,7 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 
 /* Each level indents 18px with a hairline guide under the parent's chevron. */
 .xbs-tree-kids {
-    margin-left: 18px;
+    margin-left: 14px;
     padding-left: 4px;
     border-left: 1.5px solid var(--km-line);
 }
@@ -2146,7 +2183,7 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
     font-size: 0.72rem;
     font-weight: 700;
 }
-.xbs-tree-draft .xbs-tree-label { font-style: italic; }
+.xbs-tree-draft .xbs-tree-label { font-style: italic; white-space: normal; overflow-wrap: anywhere; }
 
 .xbs-tree-foot {
     flex-shrink: 0;
@@ -2258,6 +2295,7 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 .xbs-verified > .km-ico { color: var(--km-green); stroke-width: 2.25; }
 .xbs-verified-text { display: flex; flex-direction: column; min-width: 0; }
 .xbs-verified-text span { font-size: 0.875rem; color: var(--km-ink-2); }
+.xbs-verified-text code { white-space: nowrap; }
 
 /* Bottom sheets stand out from the list behind them: Vault-style hairline
    border on top and sides, a deeper scrim, and (dark) a lifted surface. */

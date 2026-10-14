@@ -184,11 +184,14 @@ public static partial class Str
     public const string DupTitle = nameof(DupTitle);
     public const string DupIntro = nameof(DupIntro);
     public const string DupClean = nameof(DupClean);
-    public const string DupMarkedLine = nameof(DupMarkedLine);
+    public const string DupMarkedLine_one = nameof(DupMarkedLine_one);
+    public const string DupMarkedLine_other = nameof(DupMarkedLine_other);
     public const string DupDeleteMarkedWord = nameof(DupDeleteMarkedWord);
-    public const string DupDeleteN = nameof(DupDeleteN);
+    public const string DupDeleteN_one = nameof(DupDeleteN_one);
+    public const string DupDeleteN_other = nameof(DupDeleteN_other);
     public const string DupDeleteWord = nameof(DupDeleteWord);
-    public const string DupBarMarked = nameof(DupBarMarked);
+    public const string DupBarMarked_one = nameof(DupBarMarked_one);
+    public const string DupBarMarked_other = nameof(DupBarMarked_other);
     public const string DupDeleteBtn = nameof(DupDeleteBtn);
     public const string DupUnmark = nameof(DupUnmark);
     public const string DupAlwaysKept = nameof(DupAlwaysKept);
@@ -605,6 +608,12 @@ public static partial class Str
     public const string SafetyOpConflictPush = nameof(SafetyOpConflictPush);
     public const string SafetyOpConflictMerge = nameof(SafetyOpConflictMerge);
     public const string SafetyOpLegacy = nameof(SafetyOpLegacy);
+    public const string SafetySideLocal = nameof(SafetySideLocal);
+    public const string SafetySideServer = nameof(SafetySideServer);
+    public const string SafetyItems_one = nameof(SafetyItems_one);
+    public const string SafetyItems_other = nameof(SafetyItems_other);
+    public const string SafetyEncrypted = nameof(SafetyEncrypted);
+    public const string SafetyNotEncrypted = nameof(SafetyNotEncrypted);
     public const string MoveResultNew = nameof(MoveResultNew);
     public const string MoveResultPush = nameof(MoveResultPush);
     public const string MoveResultMerge = nameof(MoveResultMerge);
@@ -701,4 +710,12 @@ public static partial class Str
     public const string MoveTo = nameof(MoveTo);
     public const string MoveSearch = nameof(MoveSearch);
     public const string MoveClose = nameof(MoveClose);
+    /// <summary>Base for Loc.Plural (DupMarkedLine_one / DupMarkedLine_other).</summary>
+    public const string DupMarkedLine = nameof(DupMarkedLine);
+    /// <summary>Base for Loc.Plural (DupDeleteN_one / DupDeleteN_other).</summary>
+    public const string DupDeleteN = nameof(DupDeleteN);
+    /// <summary>Base for Loc.Plural (DupBarMarked_one / DupBarMarked_other).</summary>
+    public const string DupBarMarked = nameof(DupBarMarked);
+    /// <summary>Base for Loc.Plural (SafetyItems_one / SafetyItems_other).</summary>
+    public const string SafetyItems = nameof(SafetyItems);
 }

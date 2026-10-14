@@ -105,13 +105,18 @@ else
                 @($" {L.Get(Str.StatusOf)} {(maxSyncSize is null ? L.Get(Str.StatusUnknownMax) : WorkflowRules.FormatBytes(maxSyncSize.Value))}")
                 @if (maxSyncSize is not null && maxSyncSize.Value > 0)
                 {
-                    @(" ")<text>(@ServerPctText%)</text>
-                    <div class="progress mt-1" role="progressbar" aria-label="@L.Get(Str.StatusSpaceAria)" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
-                        <div class="progress-bar" style="width: @ServerPctText%"></div>
-                    </div>
+                    @(" ")<text>(@ServerPctNow.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture)%)</text>
                 }
             }
-            <small class="text-muted"> @L.Get(Str.StatusExactBytes)</small></li>
+            <small class="text-muted"> @L.Get(Str.StatusExactBytes)</small>
+            @if (serverBytes is not null && maxSyncSize is not null && maxSyncSize.Value > 0)
+            {
+                @* After the note, so the dash follows the figure instead of opening a line under the bar. *@
+                <div class="progress mt-1" role="progressbar" aria-label="@L.Get(Str.StatusSpaceAria)" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar" style="width: @ServerPctText%"></div>
+                </div>
+            }
+        </li>
         <li>@L.Get(Str.StatusPendingLabel) @pending
             @if (pending > 0)
             {

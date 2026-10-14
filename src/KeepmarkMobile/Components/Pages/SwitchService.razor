@@ -152,7 +152,7 @@ else
         <h2 class="xbs-step-title">@L.Get(Str.SwExistingOn, TargetHost)</h2>
         <div class="mb-3">
             <label class="form-label">@L.Get(Str.ConnSyncId)</label>
-            <input class="form-control" @bind="syncId" placeholder="xxxxxxxx-xxxx-…" />
+            <input class="form-control" @bind="syncId" placeholder="a1b2c3d4e5f6…" />
             <label class="form-label mt-2">@L.Get(Str.CommonPassword)</label>
             <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
             <div class="form-text">@L.Get(Str.SwCheckedHint)</div>
@@ -405,7 +405,7 @@ else
     }
 
     private string TargetHost =>
-        Uri.TryCreate(TargetUrlClean, UriKind.Absolute, out var u) ? u.Host : TargetUrlClean;
+        Uri.TryCreate(TargetUrlClean, UriKind.Absolute, out var u) ? (u.IsDefaultPort ? u.Host : $"{u.Host}:{u.Port}") : TargetUrlClean;
 
     /// <summary>The picker speaks download/upload/merge; this page keeps "take" for download.</summary>
     private string PickerValue => direction == "take" ? "download" : direction;

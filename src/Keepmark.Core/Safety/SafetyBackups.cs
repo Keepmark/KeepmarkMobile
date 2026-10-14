@@ -82,8 +82,8 @@ public static class SafetyBackupFiles
 
     public static string Describe(SafetyBackupEntry e) =>
         $"{e.CreatedAtUtc.ToLocalTime():g} · {SafetyOperations.Describe(e.Operation)} · " +
-        $"{(e.Side == "local" ? "local bookmarks" : "server copy")} · {e.Items} items" +
-        (e.Enc == "master" ? " · encrypted" : " · not encrypted");
+        $"{Loc.Get(e.Side == "local" ? Str.SafetySideLocal : Str.SafetySideServer)} · {Loc.Plural(Str.SafetyItems, e.Items)} · " +
+        Loc.Get(e.Enc == "master" ? Str.SafetyEncrypted : Str.SafetyNotEncrypted);
 
     /// <summary>Filenames to delete: everything beyond the newest KeepCount.</summary>
     public static List<string> Prune(IEnumerable<SafetyBackupEntry> entries) =>

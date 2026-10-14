@@ -365,13 +365,14 @@ public sealed class BookmarkStore : IAsyncDisposable
             "SELECT * FROM Items WHERE ParentRowId IS ? ORDER BY SortOrder", parentRowId)
             .ConfigureAwait(false);
 
-    /// <summary>Newest bookmarks first (folders and separators excluded). The
-    /// sync format has no creation date: ids are assigned as MAX+1 when an
-    /// item is added, so the highest NodeId is the most recently added.</summary>
+    /// <summary>Newest bookmarks first (folders and separators excluded), by
+    /// dateAdded. Items without one (older clients) come after the dated ones;
+    /// among them ids are assigned as MAX+1 on add, so the highest NodeId is
+    /// the most recently added.</summary>
     public async Task<List<ItemRow>> GetRecentBookmarksAsync(int limit) =>
         await Db.QueryAsync<ItemRow>(
             "SELECT * FROM Items WHERE IsFolder = 0 AND NodeId IS NOT NULL AND Url IS NOT NULL AND Url != ? " +
-            "ORDER BY NodeId DESC LIMIT ?", Core.XbsConstants.SeparatorUrl, limit)
+            "ORDER BY DateAdded IS NULL, DateAdded DESC, NodeId DESC LIMIT ?", Core.XbsConstants.SeparatorUrl, limit)
             .ConfigureAwait(false);
 
     public async Task<ItemRow?> GetNodeAsync(int rowId) =>
@@ -985,7 +986,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                 cur = p;
             }
 
-            return cache[rowId] = string.Join(" / ", parts);
+            return cache[rowId] = string.Join(" › ", parts);
         }
 
         foreach (var r in paths)

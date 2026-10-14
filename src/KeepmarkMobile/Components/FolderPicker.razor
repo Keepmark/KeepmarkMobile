@@ -262,7 +262,7 @@
             cur = cur.ParentRowId is not null && ById.TryGetValue(cur.ParentRowId.Value, out var q) ? q : null;
         }
 
-        var path = string.Join(" / ", parts);
+        var path = string.Join(" › ", parts);
         return string.IsNullOrEmpty(path) ? L.Get(Str.SheetTopLevel) : path;
     }
 

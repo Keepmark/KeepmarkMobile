@@ -155,10 +155,10 @@
 
     private void OnStatus(Core.Sync.SyncStatus _) => InvokeAsync(StateHasChanged);
 
-    private string ServiceHost => Uri.TryCreate(creds?.ServiceUrl, UriKind.Absolute, out var u) ? u.Host : creds?.ServiceUrl ?? string.Empty;
+    private string ServiceHost => Uri.TryCreate(creds?.ServiceUrl, UriKind.Absolute, out var u) ? (u.IsDefaultPort ? u.Host : $"{u.Host}:{u.Port}") : creds?.ServiceUrl ?? string.Empty;
 
     // Sync IDs are bearer tokens: only ever show a truncated form.
-    private string ShortId => creds is null || creds.Id.Length < 10 ? "…" : $"{creds.Id[..4]}…{creds.Id[^4..]}";
+    private string ShortId => Keepmark.Core.Workflow.WorkflowRules.ShortId(creds?.Id);
 
     private string HeadStatusClass => !linked ? "off" : Session.Engine?.Status switch
     {

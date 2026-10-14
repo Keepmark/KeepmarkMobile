@@ -163,7 +163,7 @@
         {
             var parent = PathParts(draft!.ParentRowId);
             parent.Add(draft.Title);
-            return "\U0001F4C1 " + string.Join(" / ", parent);
+            return string.Join(" › ", parent);
         }
 
         if (selectedFolder is null)
@@ -172,7 +172,7 @@
         }
 
         var parts = PathParts(selectedFolder);
-        return parts.Count == 0 ? null : "\U0001F4C1 " + string.Join(" / ", parts);
+        return parts.Count == 0 ? null : string.Join(" › ", parts);
     }
 
     /// <summary>Folder titles from the top down to <paramref name="rowId"/> (empty when unknown or top level).</summary>
@@ -258,7 +258,7 @@
             title = Existing.Title ?? string.Empty;
             url = Existing.Url ?? string.Empty;
             description = Existing.Description ?? string.Empty;
-            tags = Existing.Tags?.Replace(" ", ", ") ?? string.Empty;
+            tags = Existing.Tags?.Replace("\u001F", ", ") ?? string.Empty;
             selectedFolder = Existing.ParentRowId;
         }
         else
