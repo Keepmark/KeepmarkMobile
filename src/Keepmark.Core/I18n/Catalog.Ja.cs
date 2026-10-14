@@ -107,6 +107,7 @@ internal static partial class Catalogs
         [Str.SheetKeepEditing] = "編集を続ける",
         [Str.SheetChooseFolder] = "フォルダーを選択",
         [Str.SheetSaveIn] = "保存先: {0}",
+        [Str.SheetAdded] = "追加日時: {0}",
         [Str.SheetTitleRequired] = "タイトルは必須です。",
         [Str.SheetUrlRequired] = "URL は必須です。",
         [Str.SheetUrlScheme] = "URL は http:// または https:// で始まる必要があります。",

@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.181 (182)**,
+v1.2 extended contract when advertised. Current version: **v1.0.182 (183)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -58,8 +58,9 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   Legacy xBrowserSync clients may drop it: rows without it show no time.
   Recent rows show `RelativeTime.Format` after the folder path (just now /
   N min / N hours same day / yesterday / N days / N weeks / date, calendar
-  steps in the device time zone); Home re-renders them every minute while
-  visible. Order stays by `NodeId`.
+  steps in the device time zone); the action sheet shows "Added: <date time>
+  · <relative>" (`RelativeTime.Detail`, relative part dropped from 30 days).
+  Home re-renders them every minute while visible. Order stays by `NodeId`.
 - UX: tap opens, ⋮ menu holds all actions, swipe right expands details /
   left collapses, pinned section, clickable breadcrumb, folder-first sorting,
   share-receiving with prefilled form, full-screen folder tree picker with

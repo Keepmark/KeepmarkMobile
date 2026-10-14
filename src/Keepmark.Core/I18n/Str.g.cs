@@ -103,6 +103,7 @@ public static partial class Str
     public const string SheetKeepEditing = nameof(SheetKeepEditing);
     public const string SheetChooseFolder = nameof(SheetChooseFolder);
     public const string SheetSaveIn = nameof(SheetSaveIn);
+    public const string SheetAdded = nameof(SheetAdded);
     public const string SheetTitleRequired = nameof(SheetTitleRequired);
     public const string SheetUrlRequired = nameof(SheetUrlRequired);
     public const string SheetUrlScheme = nameof(SheetUrlScheme);

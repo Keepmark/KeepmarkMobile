@@ -289,6 +289,10 @@ else
                     </div>
                 }
             }
+            @if (RelativeTime.Detail(menuFor.DateAdded) is { } added)
+            {
+                <div class="xbs-sheet-added"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>@L.Get(Str.SheetAdded, added)</div>
+            }
             </div>
             <div class="xbs-action-tiles">
                 <button class="xbs-action-tile primary" @onclick="() => { var r = menuFor; menuFor = null; _ = OpenRow(r); }"><span class="xbs-action-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="@(menuFor.IsFolder ? "M9 6l6 6-6 6" : "M14 4h6v6M20 4l-8 8M10 5H5v14h14v-5")" /></svg></span>@L.Get(Str.HomeOpen)</button>
@@ -393,7 +397,7 @@ else if (moved is not null)
     private Dictionary<int, int> folderCounts = new();
     private string sortMode = "Default";
     private CancellationTokenSource? flashTimer;
-    // Re-renders the relative "added" labels of the recent rows once a minute.
+    // Re-renders the relative "added" labels (recent rows, open sheet) once a minute.
     private Timer? recentClock;
     private (int? Parent, List<Core.Models.BookmarkNode> Subtree)? undo;
     private CancellationTokenSource? undoTimer;
@@ -428,7 +432,7 @@ else if (moved is not null)
     private void TickRecent()
     {
         var visible = recentView || (showRecent && recentOpen && crumbs.Count == 0 && !searchOpen);
-        if (visible && recentAll.Any(r => r.DateAdded is not null))
+        if ((visible && recentAll.Any(r => r.DateAdded is not null)) || menuFor?.DateAdded is not null)
         {
             StateHasChanged();
         }

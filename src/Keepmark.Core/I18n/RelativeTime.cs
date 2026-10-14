@@ -53,6 +53,28 @@ public static class RelativeTime
             : localThen.ToString(culture.DateTimeFormat.ShortDatePattern, culture);
     }
 
+    /// <summary>Exact date + time for details ("g" pattern of the UI language), e.g. "14/10/2026 19:27".</summary>
+    public static string Absolute(long unixMs, TimeZoneInfo zone)
+    {
+        var culture = CultureInfo.GetCultureInfo(Langs.Current);
+        return TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeMilliseconds(unixMs), zone).ToString("g", culture);
+    }
+
+    /// <summary>Details line: exact date + time, then the relative label while
+    /// it is not a plain date yet (under 30 days).</summary>
+    public static string Detail(long unixMs, DateTimeOffset now, TimeZoneInfo zone)
+    {
+        var exact = Absolute(unixMs, zone);
+        var then = TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeMilliseconds(unixMs), zone);
+        return (TimeZoneInfo.ConvertTime(now, zone).Date - then.Date).Days < 30
+            ? $"{exact} · {Format(unixMs, now, zone)}"
+            : exact;
+    }
+
+    /// <summary>Details line for now in the device time zone; null when the node has no date.</summary>
+    public static string? Detail(long? unixMs) =>
+        unixMs is long ms ? Detail(ms, DateTimeOffset.UtcNow, TimeZoneInfo.Local) : null;
+
     /// <summary>Label for now in the device time zone; null when the node has no date.</summary>
     public static string? Format(long? unixMs) =>
         unixMs is long ms ? Format(ms, DateTimeOffset.UtcNow, TimeZoneInfo.Local) : null;

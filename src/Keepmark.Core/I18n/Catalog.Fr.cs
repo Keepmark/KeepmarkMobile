@@ -107,6 +107,7 @@ internal static partial class Catalogs
         [Str.SheetKeepEditing] = "Continuer la modification",
         [Str.SheetChooseFolder] = "Choisir un dossier",
         [Str.SheetSaveIn] = "Enregistrer dans : {0}",
+        [Str.SheetAdded] = "Ajouté : {0}",
         [Str.SheetTitleRequired] = "Le titre est obligatoire.",
         [Str.SheetUrlRequired] = "L'URL est obligatoire.",
         [Str.SheetUrlScheme] = "L'URL doit commencer par http:// ou https://.",

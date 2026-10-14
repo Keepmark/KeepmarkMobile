@@ -1671,6 +1671,8 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 .xbs-sheet-head.ribboned { padding-left: 64px; min-height: 56px; padding-top: 0.75rem; }
 
 .xbs-sheet-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.25rem; }
+.xbs-sheet-added { margin: 0.25rem 0; font-size: 0.78rem; color: var(--km-ink-2); }
+.xbs-sheet-added .km-ico { width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; }
 .xbs-tag {
     height: 26px;
     padding: 0 10px;

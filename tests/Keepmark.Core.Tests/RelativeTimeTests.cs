@@ -40,6 +40,16 @@ public class RelativeTimeTests
     }
 
     [Fact]
+    public void Detail_ExactThenRelative_UntilItIsADate()
+    {
+        var recent = new DateTimeOffset(2026, 10, 14, 16, 5, 0, TimeSpan.Zero).ToUnixTimeMilliseconds();
+        var old = new DateTimeOffset(2026, 9, 1, 12, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds();
+        Assert.Equal("10/14/2026 4:05 PM · 3 hours ago", RelativeTime.Detail(recent, Now, TimeZoneInfo.Utc).Replace('\u202F', ' '));
+        Assert.Equal("9/1/2026 12:00 PM", RelativeTime.Detail(old, Now, TimeZoneInfo.Utc).Replace('\u202F', ' '));
+        Assert.Null(RelativeTime.Detail(null));
+    }
+
+    [Fact]
     public void Italian()
     {
         var saved = CultureInfo.CurrentUICulture;

@@ -108,6 +108,7 @@ internal static partial class Catalogs
         [Str.SheetKeepEditing] = "继续编辑",
         [Str.SheetChooseFolder] = "选择文件夹",
         [Str.SheetSaveIn] = "保存到：{0}",
+        [Str.SheetAdded] = "添加时间：{0}",
         [Str.SheetTitleRequired] = "标题为必填项。",
         [Str.SheetUrlRequired] = "URL 为必填项。",
         [Str.SheetUrlScheme] = "URL 必须以 http:// 或 https:// 开头。",
