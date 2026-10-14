@@ -152,9 +152,10 @@ else
             <section class="xbs-sect">
                 <button class="xbs-sect-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
                     <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#6b4a07" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#b07a12" /><path d="M9.5 12h7l-1 4.5 2.6 2.6v1.6H7.9v-1.6l2.6-2.6z M13 20.7v4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /></svg>
-                    <span class="xbs-sect-label">@L.Get(Str.HomePinned)</span>
-                    <span class="xbs-sect-n">@pinnedRows.Count</span>
-                    @if (!pinnedOpen) { <RibbonFan Colors="FanColors(pinnedRows)" /> }
+                    <span class="xbs-sect-text">
+                        <span class="xbs-sect-line"><span class="xbs-sect-label">@L.Get(Str.HomePinned)</span><span class="xbs-sect-n">@pinnedRows.Count</span></span>
+                        @if (!pinnedOpen) { <span class="xbs-sect-sub"><span class="xbs-sect-peek">@PeekTitles(pinnedRows)</span></span> }
+                    </span>
                     <svg class="km-ico sm chev @(pinnedOpen ? "open" : string.Empty)" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                 </button>
                 @if (pinnedOpen)
@@ -174,9 +175,13 @@ else
             <section class="xbs-sect">
                 <button class="xbs-sect-head" @onclick="ToggleRecent" aria-expanded="@recentOpen.ToString().ToLowerInvariant()">
                     <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#2b3a8c" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#3d4fb0" /><circle cx="13" cy="18" r="5.5" fill="none" stroke="#fff" stroke-width="1.5" /><path d="M13 15v3.2l2 1.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" /></svg>
-                    <span class="xbs-sect-label">@L.Get(Str.HomeRecent)</span>
-                    <span class="xbs-sect-n">@RecentShown.Count</span>
-                    @if (!recentOpen) { <RibbonFan Colors="FanColors(RecentShown)" /> }
+                    <span class="xbs-sect-text">
+                        <span class="xbs-sect-line"><span class="xbs-sect-label">@L.Get(Str.HomeRecent)</span><span class="xbs-sect-n">@RecentShown.Count</span></span>
+                        @if (!recentOpen && recentAll.Count > 0)
+                        {
+                            <span class="xbs-sect-sub"><span class="xbs-sect-peek">@PeekTitle(recentAll[0])</span>@if (RelativeTime.Format(recentAll[0].DateAdded) is { } when) { <span class="xbs-sect-when">· @when</span> }</span>
+                        }
+                    </span>
                     <svg class="km-ico sm chev @(recentOpen ? "open" : string.Empty)" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                 </button>
                 @if (recentOpen)
@@ -1466,9 +1471,15 @@ else if (moved is not null)
         _ = JS.InvokeVoidAsync("scrollTo", 0, 0);
     }
 
-    /// <summary>Site colors for the closed-section ribbon strip (folders navy), at most six.</summary>
-    private static List<string> FanColors(IEnumerable<ItemRow> items) =>
-        items.Take(6).Select(r => r.IsFolder ? "#273f85" : RowTile.ColorFor(r)).ToList();
+    // Closed-section preview (canvas "F2"): Pinned lists its titles, Recently
+    // added shows the newest one with its relative time.
+    private string PeekTitle(ItemRow r) =>
+        !string.IsNullOrWhiteSpace(r.DisplayTitle) ? r.DisplayTitle
+        : r.Url is { Length: > 0 } u ? u.Replace("https://", string.Empty).Replace("http://", string.Empty).TrimEnd('/')
+        : L.Get(r.IsFolder ? Str.SheetTypeFolder : Str.RowNoTitle);
+
+    private string PeekTitles(IEnumerable<ItemRow> items) =>
+        string.Join(" · ", items.Take(6).Select(PeekTitle));
 
     private static string SortTitle(Core.Data.ItemRow r) => r.DisplayTitle ?? r.Url ?? string.Empty;
 

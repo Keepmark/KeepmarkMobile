@@ -1234,12 +1234,15 @@ html.xbs-under .xbs-crumbbar {
 .xbs-sect-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .xbs-sect-n { flex: none; font-size: 0.875rem; font-weight: 500; color: var(--km-ink-2); }
 .xbs-sect-head .chev { flex: none; margin-left: auto; color: var(--km-ink-2); transition: transform 0.15s; }
-.xbs-sect-head .xbs-fan + .chev { margin-left: 0; }
 .xbs-sect-head .chev.open { transform: rotate(90deg); }
 
-.xbs-fan { flex: none; margin-left: auto; display: flex; height: 24px; padding-left: 7px; }
-.xbs-fan svg { width: 18px; height: 24px; margin-left: -7px; overflow: visible; filter: drop-shadow(0 1px 1.2px rgba(20, 27, 56, 0.35)); }
-.xbs-fan path { stroke: var(--km-surface); stroke-width: 1.5px; }
+/* Closed section (canvas "F2"): a muted line under the label with the
+   pinned titles, or the newest recent bookmark and when it was added. */
+.xbs-sect-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 10px 0; }
+.xbs-sect-line { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.xbs-sect-sub { display: flex; gap: 6px; min-width: 0; font-size: 0.8125rem; font-weight: 400; color: var(--km-ink-2); }
+.xbs-sect-peek { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.xbs-sect-when { flex: none; font-weight: 500; color: var(--km-accent); }
 
 .xbs-list.xbs-sect-body {
     margin: 0;

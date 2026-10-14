@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.187 (188)**,
+v1.2 extended contract when advertised. Current version: **v1.0.188 (189)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -46,9 +46,11 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.
 - Home sections (v1.0.180, canvas "R1 + R4"): Pinned and Recently added are
-  cards with a hanging ribbon head; closed, a strip of mini ribbons previews
-  the items' site colors. Recently added = newest bookmarks by `NodeId`
-  (`BookmarkStore.GetRecentBookmarksAsync`; ids are MAX+1 on add), with
+  cards with a hanging ribbon head; closed, a muted line under the label
+  previews them (canvas "F2"): Pinned lists its titles, Recently added shows
+  the newest title + its relative time. Recently added = newest bookmarks by `dateAdded`,
+  undated ones after them by `NodeId` (`BookmarkStore.GetRecentBookmarksAsync`;
+  ids are MAX+1 on add), with
   folder path; Settings → Home toggles it and sets 5/10/20; "See all recent"
   is a virtual crumb level (up to 50).
 - `dateAdded` (v1.0.181): optional Keepmark field on synced nodes, Unix ms
@@ -60,7 +62,7 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   N min / N hours same day / yesterday / N days / N weeks / date, calendar
   steps in the device time zone); the action sheet shows "Added: <date time>
   · <relative>" (`RelativeTime.Detail`, relative part dropped from 30 days).
-  Home re-renders them every minute while visible. Order stays by `NodeId`.
+  Home re-renders them every minute while visible.
 - UX: tap opens, ⋮ menu holds all actions, swipe right expands details /
   left collapses, pinned section, clickable breadcrumb, folder-first sorting,
   share-receiving with prefilled form, full-screen folder tree picker with
