@@ -321,6 +321,15 @@ public sealed class BookmarkStore : IAsyncDisposable
             "SELECT * FROM Items WHERE ParentRowId IS ? ORDER BY SortOrder", parentRowId)
             .ConfigureAwait(false);
 
+    /// <summary>Newest bookmarks first (folders and separators excluded). The
+    /// sync format has no creation date: ids are assigned as MAX+1 when an
+    /// item is added, so the highest NodeId is the most recently added.</summary>
+    public async Task<List<ItemRow>> GetRecentBookmarksAsync(int limit) =>
+        await Db.QueryAsync<ItemRow>(
+            "SELECT * FROM Items WHERE IsFolder = 0 AND NodeId IS NOT NULL AND Url IS NOT NULL AND Url != ? " +
+            "ORDER BY NodeId DESC LIMIT ?", Core.XbsConstants.SeparatorUrl, limit)
+            .ConfigureAwait(false);
+
     public async Task<ItemRow?> GetNodeAsync(int rowId) =>
         await Db.FindAsync<ItemRow>(rowId).ConfigureAwait(false);
 

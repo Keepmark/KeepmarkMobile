@@ -70,6 +70,27 @@ public sealed class XbsSettings
         set => Preferences.Set(KOpenMode, value);
     }
 
+    /// <summary>Home shows the "Recently added" section. Default on.</summary>
+    public bool ShowRecent
+    {
+        get => Preferences.Get("home_show_recent", true);
+        set => Preferences.Set("home_show_recent", value);
+    }
+
+    /// <summary>Bookmarks in the Home "Recently added" section: 5, 10 or 20. Default 5.</summary>
+    public int RecentCount
+    {
+        get => Preferences.Get("home_recent_count", 5) is var n && n is 5 or 10 or 20 ? n : 5;
+        set => Preferences.Set("home_recent_count", value is 5 or 10 or 20 ? value : 5);
+    }
+
+    /// <summary>Last open/closed state of the Home "Recently added" section. Default open.</summary>
+    public bool RecentOpen
+    {
+        get => Preferences.Get("home_recent_open", true);
+        set => Preferences.Set("home_recent_open", value);
+    }
+
     /// <summary>List order: Default (server order), Asc, Desc.</summary>
     public string ListSort
     {

@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.179 (180)**,
+v1.2 extended contract when advertised. Current version: **v1.0.180 (181)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -45,6 +45,12 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
 - Sync: auto default + manual mode; **409 conflict never silently merged**;
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.
+- Home sections (v1.0.180, canvas "R1 + R4"): Pinned and Recently added are
+  cards with a hanging ribbon head; closed, a strip of mini ribbons previews
+  the items' site colors. Recently added = newest bookmarks by `NodeId`
+  (`BookmarkStore.GetRecentBookmarksAsync`; the sync format has no creation
+  date, ids are MAX+1 on add), with folder path; Settings → Home toggles it
+  and sets 5/10/20; "See all recent" is a virtual crumb level (up to 50).
 - UX: tap opens, ⋮ menu holds all actions, swipe right expands details /
   left collapses, pinned section, clickable breadcrumb, folder-first sorting,
   share-receiving with prefilled form, full-screen folder tree picker with

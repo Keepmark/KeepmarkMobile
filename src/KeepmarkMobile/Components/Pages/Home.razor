@@ -41,14 +41,31 @@ else
             <BrandMark Class="xbs-bar-mark" />
             <span class="xbs-barpath"><span class="xbs-barpath-name">Keepmark</span></span>
             <button class="xbs-barbtn" @onclick="OpenSearch" aria-label="@L.Get(Str.HomeSearchPlaceholder)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg></button>
-            <button class="xbs-barbtn" @onclick="ToggleSortMenu" aria-label="@L.Get(Str.HomeSortAria, SortLabel)" aria-expanded="@sortMenuOpen.ToString().ToLowerInvariant()">
-                <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M4 16l3 3 3-3M14 7h6M14 12h4M14 17h2" /></svg>
-                @if (sortMode != "Default") { <span class="xbs-barbtn-dot" aria-hidden="true"></span> }
-            </button>
+            @if (!recentView)
+            {
+                <button class="xbs-barbtn" @onclick="ToggleSortMenu" aria-label="@L.Get(Str.HomeSortAria, SortLabel)" aria-expanded="@sortMenuOpen.ToString().ToLowerInvariant()">
+                    <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M4 16l3 3 3-3M14 7h6M14 12h4M14 17h2" /></svg>
+                    @if (sortMode != "Default") { <span class="xbs-barbtn-dot" aria-hidden="true"></span> }
+                </button>
+            }
         }
     </header>
 
-    @if (crumbs.Count > 0 && !searchOpen)
+    @if (recentView && !searchOpen)
+    {
+        @* "See all recent" is a virtual level: the root ribbon, then one lilac
+           ribbon with the clock. Back (data-back) returns to the root. *@
+        <div class="xbs-crumbbar">
+            <button class="xbs-crumb-home" data-back="5" @onclick="CloseRecentView" aria-label="@L.Get(Str.HomeAllBookmarks)">
+                <span><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5M6.5 9.5V19h11V9.5" /></svg></span>
+            </button>
+            <nav class="xbs-crumbs" aria-label="@L.Get(Str.HomeFolderPathMenu)">
+                <button class="xbs-crumb" style="z-index: 1" aria-current="location"><span><svg class="km-ico sm xbs-crumb-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 7.5V12l3 2" /></svg>@L.Get(Str.HomeRecent)</span></button>
+            </nav>
+        </div>
+        <div class="xbs-crumbbar-space" aria-hidden="true"></div>
+    }
+    else if (crumbs.Count > 0 && !searchOpen)
     {
         <div class="xbs-crumbbar">
             <button class="xbs-crumb-home" @onclick="GoRoot" aria-label="@L.Get(Str.HomeAllBookmarks)">
@@ -108,6 +125,17 @@ else
             </div>
         }
     }
+    else if (recentView)
+    {
+        <h2 class="xbs-section">@L.Get(Str.HomeRecentNote)</h2>
+        <div class="xbs-list">
+            @foreach (var r in recentAll)
+            {
+                <BookmarkRow @key="@("v" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)"
+                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+            }
+        </div>
+    }
     else
     {
         <div class="xbs-browse">
@@ -116,18 +144,22 @@ else
             <div class="xbs-bigtitle-sub">@CountLabel</div>
         </div>
         <div class="xbs-browse-body">
+        @* Canvas "R1 + R4": each section is a card with a ribbon hanging from
+           its top edge (folded flap above, like the action sheet); closed, the
+           head shows a strip of mini ribbons in the items' site colors. *@
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
-            <div class="xbs-pinned-box">
-                <button class="xbs-pinned-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
-                    <svg class="km-ico sm xbs-pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg>
-                    <span class="xbs-pinned-label">@L.Get(Str.HomePinned)</span>
-                    <span class="xbs-count">@pinnedRows.Count</span>
+            <section class="xbs-sect">
+                <button class="xbs-sect-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
+                    <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#6b4a07" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#b07a12" /><path d="M9.5 12h7l-1 4.5 2.6 2.6v1.6H7.9v-1.6l2.6-2.6z M13 20.7v4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /></svg>
+                    <span class="xbs-sect-label">@L.Get(Str.HomePinned)</span>
+                    <span class="xbs-sect-n">@pinnedRows.Count</span>
+                    @if (!pinnedOpen) { <RibbonFan Colors="FanColors(pinnedRows)" /> }
                     <svg class="km-ico sm chev @(pinnedOpen ? "open" : string.Empty)" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                 </button>
                 @if (pinnedOpen)
                 {
-                    <div class="xbs-list xbs-pinned-list">
+                    <div class="xbs-list xbs-sect-body">
                         @foreach (var r in pinnedRows)
                         {
                             <BookmarkRow @key="@("p" + r.RowId)" Row="r" Pinned="true" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
@@ -135,7 +167,33 @@ else
                         }
                     </div>
                 }
-            </div>
+            </section>
+        }
+        @if (showRecent && recentAll.Count > 0 && crumbs.Count == 0)
+        {
+            <section class="xbs-sect">
+                <button class="xbs-sect-head" @onclick="ToggleRecent" aria-expanded="@recentOpen.ToString().ToLowerInvariant()">
+                    <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#2b3a8c" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#3d4fb0" /><circle cx="13" cy="18" r="5.5" fill="none" stroke="#fff" stroke-width="1.5" /><path d="M13 15v3.2l2 1.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" /></svg>
+                    <span class="xbs-sect-label">@L.Get(Str.HomeRecent)</span>
+                    <span class="xbs-sect-n">@RecentShown.Count</span>
+                    @if (!recentOpen) { <RibbonFan Colors="FanColors(RecentShown)" /> }
+                    <svg class="km-ico sm chev @(recentOpen ? "open" : string.Empty)" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                </button>
+                @if (recentOpen)
+                {
+                    <div class="xbs-list xbs-sect-body">
+                        @foreach (var r in RecentShown)
+                        {
+                            <BookmarkRow @key="@("n" + r.RowId)" Row="r" Pinned="IsPinned(r.RowId)" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
+                                         FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                        }
+                    </div>
+                    @if (recentAll.Count > RecentShown.Count)
+                    {
+                        <button class="xbs-sect-more" @onclick="OpenRecentView">@L.Get(Str.HomeRecentAll)<svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+                    }
+                }
+            </section>
         }
         @if (rows.Count > 0)
         {
@@ -319,6 +377,15 @@ else if (moved is not null)
     // Last move, for the undo bar: the row, where it came from (RowId and stable NodeId) and the bar text.
     private (ItemRow Row, int? FromRowId, int? FromNodeId, string Text)? moved;
     private bool pinnedOpen = false;
+    // "Recently added": newest bookmarks by NodeId (RecentLimit for the full
+    // view); Home shows the first recentCount, the full view all of them.
+    private const int RecentLimit = 50;
+    private List<ItemRow> recentAll = [];
+    private bool showRecent;
+    private int recentCount = 5;
+    private bool recentOpen = true;
+    private bool recentView;
+    private List<ItemRow> RecentShown => recentAll.Count <= recentCount ? recentAll : recentAll.GetRange(0, recentCount);
     private int? flashRowId;
     private int? flashNodeId;
     private readonly HashSet<int> expandedRows = new();
@@ -348,6 +415,7 @@ else if (moved is not null)
 
         pinned = Pins.Load();
         sortMode = AppSettings.ListSort;
+        recentOpen = AppSettings.RecentOpen;
         await RefreshAsync();
         ready = true;
         SharedImport.Arrived += OnSharedArrived;
@@ -527,10 +595,14 @@ else if (moved is not null)
             allFolders = await Session.Store.GetAllFoldersAsync();
             await MigrateLegacyPinsAsync();
             (pinnedRows, pinKeyByRow) = await Session.Store.GetPinnedAsync(pinned);
+            showRecent = AppSettings.ShowRecent;
+            recentCount = AppSettings.RecentCount;
+            recentAll = showRecent ? await Session.Store.GetRecentBookmarksAsync(RecentLimit) : [];
+            if (recentAll.Count == 0) recentView = false;
             pinPaths = await Session.Store.GetFolderPathsAsync();
             folderCounts = await Session.Store.GetFolderBookmarkCountsAsync();
             byRow.Clear();
-            foreach (var r in rows.Concat(pinnedRows)) byRow[r.RowId] = r;
+            foreach (var r in rows.Concat(pinnedRows).Concat(recentAll)) byRow[r.RowId] = r;
             foreach (var h in hits)
             {
                 var node = await Session.Store.GetNodeAsync(h.RowId);
@@ -766,6 +838,7 @@ else if (moved is not null)
         // reconcile with the store right after.
         rows.RemoveAll(r => r.RowId == row.RowId);
         pinnedRows.RemoveAll(r => r.RowId == row.RowId);
+        recentAll.RemoveAll(r => r.RowId == row.RowId);
         hits.RemoveAll(h => h.RowId == row.RowId);
         hitRows.Remove(row.RowId);
         expandedRows.Remove(row.RowId);
@@ -1217,6 +1290,7 @@ else if (moved is not null)
     {
         ClearFlash();
         crumbs.Clear();
+        recentView = false;
         query = string.Empty;
         isSearch = false;
         searchOpen = false;
@@ -1246,6 +1320,7 @@ else if (moved is not null)
         var chain = await Session.Store.GetAncestorChainAsync(row.RowId);
         ClearFlash();
         crumbs.Clear();
+        recentView = false;
         foreach (var folder in chain)
         {
             crumbs.Push(folder);
@@ -1311,6 +1386,32 @@ else if (moved is not null)
     }
 
     private void TogglePinned() => pinnedOpen = !pinnedOpen;
+
+    private void ToggleRecent()
+    {
+        recentOpen = !recentOpen;
+        AppSettings.RecentOpen = recentOpen;
+    }
+
+    private void OpenRecentView()
+    {
+        ClearFlash();
+        ClosePops();
+        recentView = true;
+        Session.Log.Info("ui", "Opened recently added");
+        _ = JS.InvokeVoidAsync("scrollTo", 0, 0);
+    }
+
+    private void CloseRecentView()
+    {
+        ClearFlash();
+        recentView = false;
+        _ = JS.InvokeVoidAsync("scrollTo", 0, 0);
+    }
+
+    /// <summary>Site colors for the closed-section ribbon strip (folders navy), at most six.</summary>
+    private static List<string> FanColors(IEnumerable<ItemRow> items) =>
+        items.Take(6).Select(r => r.IsFolder ? "#273f85" : RowTile.ColorFor(r)).ToList();
 
     private static string SortTitle(Core.Data.ItemRow r) => r.DisplayTitle ?? r.Url ?? string.Empty;
 

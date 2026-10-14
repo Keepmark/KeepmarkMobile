@@ -264,6 +264,9 @@ public static partial class Str
     public const string HomeCountBookmarks_other = nameof(HomeCountBookmarks_other);
     public const string HomeNoMatches = nameof(HomeNoMatches);
     public const string HomePinned = nameof(HomePinned);
+    public const string HomeRecent = nameof(HomeRecent);
+    public const string HomeRecentAll = nameof(HomeRecentAll);
+    public const string HomeRecentNote = nameof(HomeRecentNote);
     public const string HomeEmptyRoot = nameof(HomeEmptyRoot);
     public const string HomeEmptyFolder = nameof(HomeEmptyFolder);
     public const string HomeAddAria = nameof(HomeAddAria);
@@ -376,6 +379,10 @@ public static partial class Str
     public const string SettingsLogVerbosity = nameof(SettingsLogVerbosity);
     public const string SettingsVerbosityHint = nameof(SettingsVerbosityHint);
     public const string SettingsTheme = nameof(SettingsTheme);
+    public const string SettingsHome = nameof(SettingsHome);
+    public const string SettingsShowRecent = nameof(SettingsShowRecent);
+    public const string SettingsShowRecentHint = nameof(SettingsShowRecentHint);
+    public const string SettingsRecentCount = nameof(SettingsRecentCount);
     public const string SettingsThemeSystem = nameof(SettingsThemeSystem);
     public const string SettingsThemeLight = nameof(SettingsThemeLight);
     public const string SettingsThemeDark = nameof(SettingsThemeDark);

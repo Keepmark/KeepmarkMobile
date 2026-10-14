@@ -58,6 +58,27 @@
 </div>
 
 <div class="mb-3">
+    <label class="form-label">@L.Get(Str.SettingsHome)</label>
+    <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="km-show-recent" @bind="showRecent" />
+        <label class="form-check-label" for="km-show-recent">@L.Get(Str.SettingsShowRecent)</label>
+    </div>
+    <div class="form-text">@L.Get(Str.SettingsShowRecentHint)</div>
+</div>
+
+@if (showRecent)
+{
+    <div class="mb-3">
+        <label class="form-label" for="km-recent-count">@L.Get(Str.SettingsRecentCount)</label>
+        <select id="km-recent-count" class="form-select" @bind="recentCount">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+        </select>
+    </div>
+}
+
+<div class="mb-3">
     <label class="form-label">@L.Get(Str.SettingsSecurity)</label>
     <a class="xbs-setting-link" href="settings/security">
         <span>
@@ -107,6 +128,8 @@
     private Core.Logging.XbsLogLevel verbosity;
     private string theme = "System";
     private string language = "system";
+    private bool showRecent = true;
+    private int recentCount = 5;
     private string? linkedUrl;
     private string pwCurrent = string.Empty;
     private string pwNew = string.Empty;
@@ -122,6 +145,8 @@
         verbosity = AppSettings.Verbosity;
         theme = AppSettings.Theme;
         language = AppSettings.Language;
+        showRecent = AppSettings.ShowRecent;
+        recentCount = AppSettings.RecentCount;
     }
 
     protected override async Task OnInitializedAsync()
@@ -152,6 +177,8 @@
         AppSettings.Verbosity = verbosity;
         AppSettings.Theme = theme is "Light" or "Dark" ? theme : "System";
         theme = AppSettings.Theme;
+        AppSettings.ShowRecent = showRecent;
+        AppSettings.RecentCount = recentCount;
         Session.NotifySettingsChanged();
         try { await JS.InvokeVoidAsync("xbsSetTheme", theme); } catch { }
         try { StatusBar.ApplyTheme(theme); } catch { }

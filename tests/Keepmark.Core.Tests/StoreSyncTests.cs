@@ -209,6 +209,20 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RecentBookmarks_NewestNodeIdFirst_BookmarksOnly()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+        var dev = (await _store.GetByNodeIdsAsync([1])).Single();
+        await _store.AddNodeAsync(dev.RowId, new BookmarkNode { Title = "Added", Url = "https://added.example.com" });
+
+        var recent = await _store.GetRecentBookmarksAsync(10);
+
+        // Folder "Dev" and the separator are skipped; the new item got MAX+1.
+        Assert.Equal(["Added", "News", "Caffè", "GitHub"], recent.Select(r => r.Title));
+        Assert.Equal(["Added", "News"], (await _store.GetRecentBookmarksAsync(2)).Select(r => r.Title));
+    }
+
+    [Fact]
     public async Task Containers_ShowLocalizedNames_ButKeepSyncedTitles()
     {
         List<BookmarkNode> tree =
