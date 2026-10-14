@@ -316,6 +316,32 @@ public sealed class BookmarkStore : IAsyncDisposable
         public string? Value { get; set; }
     }
 
+    /// <summary>Bookmarks whose URL matches <paramref name="url"/> once both are
+    /// normalized (<see cref="Sync.BookmarkMerge.NormalizeUrl"/>: scheme/host
+    /// case, default port, fragment, tracking params, trailing slash). For the
+    /// "already saved" hint in the edit sheet; display order.</summary>
+    public async Task<List<ItemRow>> FindByNormalizedUrlAsync(string url)
+    {
+        var raw = url.Trim();
+        if (raw.Length == 0)
+        {
+            return [];
+        }
+
+        var key = Sync.BookmarkMerge.NormalizeUrl(raw);
+        // Pre-filter on the host (case-insensitive LIKE) so a large tree is not
+        // normalized row by row; unparsable input scans every bookmark.
+        var host = Uri.TryCreate(raw, UriKind.Absolute, out var u) ? u.Host : null;
+        var rows = host is { Length: > 0 }
+            ? await Db.QueryAsync<ItemRow>(
+                "SELECT * FROM Items WHERE Url IS NOT NULL AND Url != ? AND Url LIKE ? ORDER BY SortOrder",
+                Core.XbsConstants.SeparatorUrl, "%" + host + "%").ConfigureAwait(false)
+            : await Db.QueryAsync<ItemRow>(
+                "SELECT * FROM Items WHERE Url IS NOT NULL AND Url != ? ORDER BY SortOrder",
+                Core.XbsConstants.SeparatorUrl).ConfigureAwait(false);
+        return rows.Where(r => Sync.BookmarkMerge.NormalizeUrl(r.Url!) == key).ToList();
+    }
+
     public async Task<List<ItemRow>> GetChildrenAsync(int? parentRowId) =>
         await Db.QueryAsync<ItemRow>(
             "SELECT * FROM Items WHERE ParentRowId IS ? ORDER BY SortOrder", parentRowId)

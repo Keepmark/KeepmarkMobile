@@ -29,8 +29,27 @@
             {
                 <div class="mb-2">
                     <label class="form-label" for="xbs-f-url">@L.Get(Str.SheetUrl)</label>
-                    <input id="xbs-f-url" class="form-control" @bind="url" inputmode="url"
+                    <input id="xbs-f-url" class="form-control" @bind="url" @bind:after="CheckDuplicates" inputmode="url"
+                           autocapitalize="off" autocorrect="off" spellcheck="false"
                            aria-invalid="@((fieldError == "url").ToString().ToLowerInvariant())" aria-describedby="@(fieldError is null ? null : "xbs-form-error")" />
+                    @if (dups.Count > 0)
+                    {
+                        @* Informative only: saving another copy stays allowed. *@
+                        <div class="xbs-dup" role="status">
+                            <div class="xbs-dup-head">
+                                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z" /><path d="M12 10v4M12 17v.01" /></svg>
+                                <span>@L.Get(Str.SheetDupFound, dups[0].Path)</span>
+                            </div>
+                            @foreach (var d in dups.Skip(1).Take(2))
+                            {
+                                <div class="xbs-dup-also">@L.Get(Str.SheetDupAlso, d.Path)</div>
+                            }
+                            <div class="xbs-dup-actions">
+                                <button type="button" class="btn btn-sm btn-secondary" @onclick="() => OnOpenExisting.InvokeAsync(dups[0].Row)">@L.Get(Str.HomeOpen)</button>
+                                <button type="button" class="btn btn-sm btn-secondary" @onclick="() => OnEditExisting.InvokeAsync(dups[0].Row)">@L.Get(Str.HomeEdit)</button>
+                            </div>
+                        </div>
+                    }
                 </div>
                 <div class="mb-2">
                     <label class="form-label" for="xbs-f-desc">@L.Get(Str.SheetDescription)</label>
@@ -97,6 +116,16 @@
     [Parameter] public List<ItemRow> Folders { get; set; } = [];
     [Parameter] public EventCallback<BookmarkEdit> OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
+
+    /// <summary>Saved bookmarks with the same normalized URL (folder path for display).</summary>
+    [Parameter] public Func<string, Task<List<DupHit>>>? FindDuplicates { get; set; }
+    [Parameter] public EventCallback<ItemRow> OnOpenExisting { get; set; }
+    [Parameter] public EventCallback<ItemRow> OnEditExisting { get; set; }
+
+    public sealed record DupHit(ItemRow Row, string Path);
+
+    private List<DupHit> dups = [];
+    private int dupCheck;
 
     private string title = string.Empty;
     private string url = string.Empty;
@@ -248,6 +277,36 @@
         initTags = tags;
         initIsFolder = EffectiveIsFolder;
         initFolder = selectedFolder;
+        dups = [];
+        _ = CheckDuplicates();
+    }
+
+    /// <summary>Looks the URL up after each change; a newer check wins over a slower older one.</summary>
+    private async Task CheckDuplicates()
+    {
+        var check = ++dupCheck;
+        var current = url.Trim();
+        List<DupHit> found = [];
+        if (FindDuplicates is not null && !EffectiveIsFolder && current.Length > 0)
+        {
+            try
+            {
+                found = (await FindDuplicates(current)).Where(d => d.Row.RowId != Existing?.RowId).ToList();
+            }
+            catch (Exception ex)
+            {
+                // Only a hint: a failed lookup must never block editing.
+                System.Diagnostics.Debug.WriteLine($"Duplicate check failed: {ex.GetType().Name}");
+            }
+        }
+
+        if (check != dupCheck)
+        {
+            return;
+        }
+
+        dups = found;
+        await InvokeAsync(StateHasChanged);
     }
 
     private bool IsDirty() =>

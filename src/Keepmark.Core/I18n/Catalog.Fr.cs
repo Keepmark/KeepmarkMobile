@@ -98,6 +98,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "L'URL, la description et les étiquettes sont masquées pour les dossiers — revenez à Favori pour les revoir. Rien n'est perdu.",
         [Str.SheetTitle] = "Titre",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "Déjà enregistré dans {0}",
+        [Str.SheetDupAlso] = "Aussi dans {0}",
         [Str.SheetDescription] = "Description",
         [Str.SheetTags] = "Étiquettes (séparées par des virgules)",
         [Str.SheetFolderLabel] = "Dossier",

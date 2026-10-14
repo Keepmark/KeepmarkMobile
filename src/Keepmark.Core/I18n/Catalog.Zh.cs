@@ -99,6 +99,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "文件夹不显示 URL、描述和标签——切换回“书签”即可再次看到。不会丢失任何内容。",
         [Str.SheetTitle] = "标题",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "已保存在 {0}",
+        [Str.SheetDupAlso] = "也在 {0}",
         [Str.SheetDescription] = "描述",
         [Str.SheetTags] = "标签（用逗号分隔）",
         [Str.SheetFolderLabel] = "文件夹",

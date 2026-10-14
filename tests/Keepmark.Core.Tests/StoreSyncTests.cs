@@ -435,6 +435,25 @@ public sealed class StoreSyncTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task FindByNormalizedUrl_MatchesVariants_SkipsOthers()
+    {
+        await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");
+
+        // Host case, trailing slash, fragment and tracking params are ignored.
+        var hit = Assert.Single(await _store.FindByNormalizedUrlAsync("https://GitHub.com/#top"));
+        Assert.Equal("GitHub", hit.Title);
+        Assert.Single(await _store.FindByNormalizedUrlAsync("https://example.com/caffe/?utm_source=x"));
+
+        Assert.Empty(await _store.FindByNormalizedUrlAsync("https://example.com/other"));
+        Assert.Empty(await _store.FindByNormalizedUrlAsync("   "));
+        // Separators never count as a saved link.
+        Assert.Empty(await _store.FindByNormalizedUrlAsync("xbs:separator"));
+
+        await _store.AddNodeAsync(null, new BookmarkNode { Title = "Copy", Url = "https://github.com/" });
+        Assert.Equal(2, (await _store.FindByNormalizedUrlAsync("https://github.com")).Count);
+    }
+
+    [Fact]
     public async Task AddFolderWithChild_AssignsDistinctNodeIds()
     {
         await _store.ReplaceAllAsync(Sample(), "blob", "t1", "1.8.0");

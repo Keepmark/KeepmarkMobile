@@ -98,6 +98,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "URL, description and tags are hidden for folders — switch back to Bookmark to see them again. Nothing is lost.",
         [Str.SheetTitle] = "Title",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "Already saved in {0}",
+        [Str.SheetDupAlso] = "Also in {0}",
         [Str.SheetDescription] = "Description",
         [Str.SheetTags] = "Tags (comma separated)",
         [Str.SheetFolderLabel] = "Folder",

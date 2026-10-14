@@ -192,7 +192,9 @@ else
 {
     <BookmarkSheet Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
                    PresetUrl="@sheetFor.PresetUrl" PresetTitle="@sheetFor.PresetTitle"
-                   Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null" />
+                   Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null"
+                   FindDuplicates="FindDuplicates" OnOpenExisting="OpenExisting"
+                   OnEditExisting="r => sheetFor = new SheetTarget(r, null)" />
 }
 
 @if (menuFor is not null)
@@ -875,6 +877,21 @@ else if (moved is not null)
     }
 
     /// <summary>Folder path as "Work › Dev"; top level when null.</summary>
+    private async Task<List<BookmarkSheet.DupHit>> FindDuplicates(string url)
+    {
+        if (Session.Store is null) return [];
+        var rows = await Session.Store.FindByNormalizedUrlAsync(url);
+        return rows.Select(r => new BookmarkSheet.DupHit(r, FolderPath(r.ParentRowId))).ToList();
+    }
+
+    private async Task OpenExisting(ItemRow row)
+    {
+        if (string.IsNullOrWhiteSpace(row.Url)) return;
+        Session.Log.Info("ui", "Opened bookmark (already saved hint)");
+        try { await Launcher.OpenAsync(row.Url); }
+        catch (Exception ex) { Session.Log.Warn("ui", $"Open failed: {ex.GetType().Name}"); }
+    }
+
     private string FolderPath(int? rowId)
     {
         var parts = new Stack<string>();

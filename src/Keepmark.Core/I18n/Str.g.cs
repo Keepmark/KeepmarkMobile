@@ -94,6 +94,8 @@ public static partial class Str
     public const string SheetFolderHidden = nameof(SheetFolderHidden);
     public const string SheetTitle = nameof(SheetTitle);
     public const string SheetUrl = nameof(SheetUrl);
+    public const string SheetDupFound = nameof(SheetDupFound);
+    public const string SheetDupAlso = nameof(SheetDupAlso);
     public const string SheetDescription = nameof(SheetDescription);
     public const string SheetTags = nameof(SheetTags);
     public const string SheetFolderLabel = nameof(SheetFolderLabel);

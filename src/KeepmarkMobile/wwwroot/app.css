@@ -2069,6 +2069,20 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
     border-left: 1.5px solid var(--km-line);
 }
 
+.xbs-dup {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: var(--km-tint);
+    color: var(--km-tint-ink);
+    font-size: 0.85rem;
+}
+.xbs-dup-head { display: flex; align-items: flex-start; gap: 6px; font-weight: 600; }
+.xbs-dup-head .km-ico { flex: none; margin-top: 2px; }
+.xbs-dup-head span, .xbs-dup-also { min-width: 0; overflow-wrap: anywhere; }
+.xbs-dup-also { margin-left: 22px; opacity: 0.85; }
+.xbs-dup-actions { display: flex; gap: 8px; margin: 6px 0 0 22px; }
+
 .xbs-tree-new { margin: 10px 0 4px; }
 .xbs-tree-badge {
     flex: none;
