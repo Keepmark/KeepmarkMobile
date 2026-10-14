@@ -90,3 +90,6 @@ yarn-error.log*
 
 ## Local agent settings
 .claude/
+
+# Signed release outputs (dotnet publish -o dist/<version>)
+/dist/
