@@ -97,15 +97,15 @@
     <p class="text-muted">@L.Get(Str.SettingsChangePasswordHint)</p>
     <div class="mb-3">
         <label class="form-label">@L.Get(Str.CommonCurrentPassword)</label>
-        <input type="password" class="form-control" @bind="pwCurrent" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />
+        <input type="password" class="form-control" @bind="pwCurrent" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />
     </div>
     <div class="mb-3">
         <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
-        <input type="password" class="form-control" @bind="pwNew" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
+        <input type="password" class="form-control" @bind="pwNew" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
     </div>
     <div class="mb-3">
         <label class="form-label">@L.Get(Str.CommonConfirmNewPassword)</label>
-        <input type="password" class="form-control" @bind="pwConfirm" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
+        <input type="password" class="form-control" @bind="pwConfirm" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
     </div>
     <button class="btn btn-warning" @onclick="ArmChangePassword" disabled="@(pwBusy || armedPw)">@L.Get(Str.SettingsChangePasswordBtn)</button>
     @if (armedPw)
@@ -245,6 +245,13 @@
         }
 
         armedPw = true;
+    }
+
+    /// <summary>An old error (or success) goes away once a field is edited.</summary>
+    private void ClearPwError()
+    {
+        pwError = string.Empty;
+        pwDone = false;
     }
 
     private async Task ChangePassword()
