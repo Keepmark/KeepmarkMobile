@@ -98,6 +98,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "URL, descrição e tags ficam ocultos em pastas — volte para Favorito para vê-los de novo. Nada é perdido.",
         [Str.SheetTitle] = "Título",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "Já salvo em {0}",
+        [Str.SheetDupAlso] = "Também em {0}",
         [Str.SheetDescription] = "Descrição",
         [Str.SheetTags] = "Tags (separadas por vírgula)",
         [Str.SheetFolderLabel] = "Pasta",

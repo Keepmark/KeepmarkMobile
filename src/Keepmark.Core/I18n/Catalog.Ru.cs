@@ -100,6 +100,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "URL, описание и теги у папок скрыты — переключитесь обратно на «Закладка», чтобы снова их увидеть. Ничего не теряется.",
         [Str.SheetTitle] = "Название",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "Уже сохранено в {0}",
+        [Str.SheetDupAlso] = "Также в {0}",
         [Str.SheetDescription] = "Описание",
         [Str.SheetTags] = "Теги (через запятую)",
         [Str.SheetFolderLabel] = "Папка",

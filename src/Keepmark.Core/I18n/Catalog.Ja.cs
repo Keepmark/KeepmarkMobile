@@ -98,6 +98,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "フォルダーでは URL、説明、タグは非表示になります。ブックマークに戻すと再び表示されます。何も失われません。",
         [Str.SheetTitle] = "タイトル",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "{0} に保存済み",
+        [Str.SheetDupAlso] = "{0} にもあります",
         [Str.SheetDescription] = "説明",
         [Str.SheetTags] = "タグ（カンマ区切り）",
         [Str.SheetFolderLabel] = "フォルダー",

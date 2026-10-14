@@ -98,6 +98,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "La URL, la descripción y las etiquetas se ocultan en las carpetas: vuelve a Marcador para verlas de nuevo. No se pierde nada.",
         [Str.SheetTitle] = "Título",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "Ya guardado en {0}",
+        [Str.SheetDupAlso] = "También en {0}",
         [Str.SheetDescription] = "Descripción",
         [Str.SheetTags] = "Etiquetas (separadas por comas)",
         [Str.SheetFolderLabel] = "Carpeta",

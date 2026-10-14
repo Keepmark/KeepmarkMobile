@@ -98,6 +98,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "URL, descrizione e tag sono nascosti per le cartelle — torna a Segnalibro per rivederli. Non si perde nulla.",
         [Str.SheetTitle] = "Titolo",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "Già salvato in {0}",
+        [Str.SheetDupAlso] = "Anche in {0}",
         [Str.SheetDescription] = "Descrizione",
         [Str.SheetTags] = "Tag (separati da virgola)",
         [Str.SheetFolderLabel] = "Cartella",

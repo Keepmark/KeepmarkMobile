@@ -98,6 +98,8 @@ internal static partial class Catalogs
         [Str.SheetFolderHidden] = "URL, Beschreibung und Tags sind bei Ordnern ausgeblendet — wechsle zurück zu Lesezeichen, um sie wieder zu sehen. Nichts geht verloren.",
         [Str.SheetTitle] = "Titel",
         [Str.SheetUrl] = "URL",
+        [Str.SheetDupFound] = "Bereits gespeichert in {0}",
+        [Str.SheetDupAlso] = "Auch in {0}",
         [Str.SheetDescription] = "Beschreibung",
         [Str.SheetTags] = "Tags (durch Komma getrennt)",
         [Str.SheetFolderLabel] = "Ordner",
