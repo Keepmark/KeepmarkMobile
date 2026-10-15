@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.193 (194)**,
+v1.2 extended contract when advertised. Current version: **v1.0.198 (199)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -46,9 +46,15 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
 - Sync: auto default + manual mode; **409 conflict never silently merged**;
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.
-- Home sections (v1.0.180, canvas "R1 + R4"): Pinned and Recently added are
-  cards with a hanging ribbon head; closed, a muted line under the label
-  previews them (canvas "F2"): Pinned lists its titles, Recently added shows
+- Home sections (v1.0.198, canvas "Filo di colore"): Pinned and Recently added
+  keep their hanging ribbon heads (amber / forest green), also when open.
+  Open cards have a 3px side accent (opacity 0% → 100% at midpoint → 0%), starting exactly at the
+  perforated divider (grid body row, following the real header height), without
+  decorations, plus a visible neutral outline. Rows and "See all recent" use the full card width;
+  the previous 44px solid ticket gutter is removed. Light and
+  dark themes have separate neutral panel/border colors. Closed cards retain
+  their original layout: a muted line under the label previews them (canvas
+  "F2"): Pinned lists its titles, Recently added shows
   the newest title + its relative time. Recently added = newest bookmarks by `dateAdded`,
   undated ones after them by `NodeId` (`BookmarkStore.GetRecentBookmarksAsync`;
   ids are MAX+1 on add), with
@@ -156,9 +162,14 @@ The ORM is `sqlite-net-base` 1.9.172 with `SQLitePCLRaw.provider.sqlcipher`
 closed if the loaded library does not report `cipher_version`. Do not restore
 `sqlite-net-pcl`, `bundle_green` or the deprecated `bundle_e_sqlcipher`.
 
-Android uses the official SQLCipher Community Android 4.19.1 AAR binaries:
+Android uses the official SQLCipher Community Android 4.19.1 AAR runtime:
 SQLCipher 4.19.0 / SQLite 3.53.4, arm64-v8a and x86_64. Binaries, SHA-256 pins,
-source URLs and third-party licenses live in `native/sqlcipher/`; the notices
+source URLs and third-party licenses live in `native/sqlcipher/`. Since v1.0.195,
+the unchanged `classes.jar` is packaged with `AndroidLibrary Bind="false"`:
+`JNI_OnLoad` requires Java classes even when .NET only uses the C API.
+`Xamarin.AndroidX.Sqlite` 2.6.2 supplies its Java interfaces (no SQLite engine).
+SQLCipher ProGuard rules preserve these native registration roots in shrunk
+builds. Omitting them aborts startup with `SQLiteCustomFunction` missing. The notices
 are included as an APK asset. See [native setup](../native/sqlcipher/README.md).
 
 Linux x64 tests and benchmarks use the same SQLCipher source release, built
@@ -175,9 +186,13 @@ by the new engine; unkeyed reads fail. `scripts/verify-sqlcipher-compat.py --old
 application/provider/native stack without rewriting databases.
 
 `python3 scripts/verify-native-sqlcipher.py --apk /path/to/app.apk` verifies
+the pinned Java runtime hash and all its class definitions in APK DEX, plus
 both official binary hashes, ABI, 16 KiB ELF/ZIP alignment, uncompressed storage
-and absence of legacy/plain SQLite libraries. Actual Android runtime and battery
-measurements still require a device. Query/code benchmark improvements in
+and absence of legacy/plain SQLite libraries. Use `--abi arm64-v8a` for a
+device-specific Debug APK; the default requires both supported ABIs. Android 15
+arm64 startup and the existing encrypted store were verified on-device with
+v1.0.195 Debug (2026-10-16); Release shrinking and battery remain unverified.
+Query/code benchmark improvements in
 PERFORMANCE.md are independent of this engine migration.
 
 ## Architecture map

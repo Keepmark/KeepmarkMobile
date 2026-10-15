@@ -35,6 +35,13 @@ def download(spec, name):
 def android():
     archive = download(SOURCES['android'], 'sqlcipher-android.aar')
     with zipfile.ZipFile(archive) as source:
+        classes = source.read('classes.jar')
+        if hashlib.sha256(classes).hexdigest() != SOURCES['android']['classesJarSha256']:
+            raise SystemExit('Unexpected SQLCipher Java runtime')
+        java_path = NATIVE / 'android' / 'sqlcipher-android.jar'
+        java_path.parent.mkdir(parents=True, exist_ok=True)
+        java_path.write_bytes(classes)
+        print(f'Verified official Android JNI runtime: {java_path}')
         for abi, expected in SOURCES['android']['libraries'].items():
             data = source.read(f'jni/{abi}/libsqlcipher.so')
             if hashlib.sha256(data).hexdigest() != expected:

@@ -1189,17 +1189,90 @@ html.xbs-under .xbs-crumbbar {
 
 .xbs-row-inner.xbs-flash { animation: xbs-flash 0.7s ease-in-out 3; }
 
-/* ---- Home sections, Pinned + Recently added (canvas "R1 + R4", v1.0.180):
-   a card with a ribbon hanging from its top edge (darker folded flap above
-   the edge, like the action sheet ribbon); the head is the toggle; closed,
-   a strip of mini ribbons previews the items' site colors. The card is not
-   clipped (the flap sits above it), so the row list clips itself. ---- */
+/* ---- Home sections (canvas "Filo di colore", v1.0.198): hanging ribbons and
+   closed title previews; open cards add a thin fading accent. Keep the
+   card unclipped for the ribbon flap; only the row list clips itself. ---- */
 .xbs-sect {
+    --sect-panel: #ffffff;
+    --sect-edge: #bdc6ce;
+    --sect-rule: #e0e5e7;
+    --sect-thread: var(--km-gold);
     position: relative;
     margin: 1.125rem 0 0.875rem;
     background: var(--km-surface);
     border-radius: 20px;
     box-shadow: var(--km-shadow);
+}
+
+.xbs-sect-recent { --sect-thread: var(--km-green); }
+
+[data-bs-theme="dark"] .xbs-sect {
+    --sect-panel: #232a35;
+    --sect-edge: #677481;
+    --sect-rule: #3c4651;
+}
+
+.xbs-sect.is-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    background: var(--sect-panel);
+}
+
+/* Paint above the row backgrounds without shifting the card or clipping
+   ribbons. Ignore pointer events so row actions and swipes still work. */
+.xbs-sect.is-open::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--sect-edge);
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.xbs-sect.is-open::before {
+    content: "";
+    position: absolute;
+    /* Start at the body/divider row, following the actual header height. */
+    grid-area: 2 / 1 / 4 / 2;
+    inset: 0 auto 18px 1px;
+    width: 3px;
+    border-radius: 0 0 3px 0;
+    background: linear-gradient(180deg, transparent 0%, var(--sect-thread) 50%, transparent 100%);
+    pointer-events: none;
+    z-index: 3;
+}
+
+.xbs-sect.is-open .xbs-sect-head { border-radius: 20px 20px 0 0; }
+.xbs-sect.is-open .xbs-sect-head .chev { color: var(--km-ink); }
+
+.xbs-sect.is-open .xbs-list.xbs-sect-body {
+    margin-left: 0;
+    border-top: 1px dashed var(--sect-edge);
+    border-radius: 0 0 20px 20px;
+    background: var(--sect-panel);
+}
+
+.xbs-sect.is-open .xbs-list.xbs-sect-body:not(:last-child) { border-radius: 0; }
+.xbs-sect.is-open .xbs-row-inner {
+    grid-template-columns: 32px minmax(0, 1fr) 48px;
+    gap: 9px;
+    padding-left: 16px;
+    background: var(--sect-panel);
+}
+.xbs-sect.is-open .xbs-tile { width: 32px; height: 36px; }
+.xbs-sect.is-open .xbs-row-sep .xbs-row-inner { grid-template-columns: 1fr; }
+.xbs-sect.is-open .xbs-list > .xbs-row + .xbs-row::before { left: 57px; background: var(--sect-rule); }
+.xbs-sect.is-open .xbs-row[role="button"]:active .xbs-row-inner { background: var(--km-surface-2); }
+
+.xbs-sect.is-open .xbs-sect-more {
+    position: relative;
+    margin-left: 0;
+    width: 100%;
+    border-color: var(--sect-rule);
+    border-radius: 0 0 20px 20px;
+    color: var(--km-green);
 }
 
 .xbs-sect-head {

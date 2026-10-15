@@ -145,12 +145,11 @@ else
             <div class="xbs-bigtitle-sub">@CountLabel</div>
         </div>
         <div class="xbs-browse-body">
-        @* Canvas "R1 + R4": each section is a card with a ribbon hanging from
-           its top edge (folded flap above, like the action sheet); closed, the
-           head shows a strip of mini ribbons in the items' site colors. *@
+        @* Preserve hanging ribbons and closed title previews; open panels add
+           a thin fading side accent and a perforated divider. *@
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
-            <section class="xbs-sect">
+            <section class="xbs-sect xbs-sect-pinned @(pinnedOpen ? "is-open" : string.Empty)">
                 <button class="xbs-sect-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
                     <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#6b4a07" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#b07a12" /><path d="M9.5 12h7l-1 4.5 2.6 2.6v1.6H7.9v-1.6l2.6-2.6z M13 20.7v4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /></svg>
                     <span class="xbs-sect-text">
@@ -173,9 +172,9 @@ else
         }
         @if (showRecent && recentAll.Count > 0 && crumbs.Count == 0)
         {
-            <section class="xbs-sect">
+            <section class="xbs-sect xbs-sect-recent @(recentOpen ? "is-open" : string.Empty)">
                 <button class="xbs-sect-head" @onclick="ToggleRecent" aria-expanded="@recentOpen.ToString().ToLowerInvariant()">
-                    <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#2b3a8c" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#3d4fb0" /><circle cx="13" cy="18" r="5.5" fill="none" stroke="#fff" stroke-width="1.5" /><path d="M13 15v3.2l2 1.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" /></svg>
+                    <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#144b3e" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#1f6f5c" /><circle cx="13" cy="18" r="5.5" fill="none" stroke="#fff" stroke-width="1.5" /><path d="M13 15v3.2l2 1.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" /></svg>
                     <span class="xbs-sect-text">
                         <span class="xbs-sect-line"><span class="xbs-sect-label">@L.Get(Str.HomeRecent)</span><span class="xbs-sect-n">@RecentShown.Count</span></span>
                         @if (!recentOpen && recentAll.Count > 0)
