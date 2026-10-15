@@ -51,13 +51,17 @@ internal static class LzUtf8
         }
 
         var output = new List<byte>(input.Length);
-        var buckets = new Dictionary<int, List<int>>();
+        // A hash chain over the 32 KiB history window has fixed memory (384 KiB),
+        // unlike thousands of growing per-hash List allocations.
+        var heads = new int[Math.Min(HashSize, Math.Max(16, input.Length))];
+        var previous = new int[System.Numerics.BitOperations.RoundUpToPowerOf2((uint)Math.Min(MaxDistance + 1, input.Length))];
+        Array.Fill(heads, -1);
 
         int n = input.Length;
         int pos = 0;
         while (pos < n)
         {
-            if (pos <= n - MinMatch && TryFindMatch(input, buckets, pos, out int length, out int distance))
+            if (pos <= n - MinMatch && TryFindMatch(input, heads, previous, pos, out int length, out int distance))
             {
                 if (distance < 128)
                 {
@@ -75,7 +79,7 @@ internal static class LzUtf8
                 // mirroring the JS scanner which hashes every position.
                 for (int k = 1; k < length && pos + k <= n - MinMatch; k++)
                 {
-                    AddPosition(buckets, input, pos + k);
+                    AddPosition(heads, previous, input, pos + k);
                 }
 
                 pos += length;
@@ -85,7 +89,7 @@ internal static class LzUtf8
                 output.Add(input[pos]);
                 if (pos <= n - MinMatch)
                 {
-                    AddPosition(buckets, input, pos);
+                    AddPosition(heads, previous, input, pos);
                 }
 
                 pos++;
@@ -95,34 +99,40 @@ internal static class LzUtf8
         return output.ToArray();
     }
 
-    public static byte[] Decompress(byte[] input)
+    // Determine the exact output size before allocating it. Besides rejecting
+    // compressed bombs early, this avoids List growth and its final full copy.
+    public static byte[] Decompress(byte[] input, int maxOutputBytes = XCryptoService.MaxPlaintextBytes)
     {
-        var output = new List<byte>(Math.Max(input.Length * 2, 64));
+        ArgumentOutOfRangeException.ThrowIfNegative(maxOutputBytes);
+        int length = Decode(input, null, maxOutputBytes);
+        var output = new byte[length];
+        Decode(input, output, maxOutputBytes);
+        return output;
+    }
 
+    private static int Decode(byte[] input, byte[]? output, int maxOutputBytes)
+    {
+        int count = 0;
         int pos = 0;
         while (pos < input.Length)
         {
             byte b = input[pos];
-            if (b < 0xC0)
+            if (b < 0xC0 || (pos + 1 < input.Length && input[pos + 1] >= 0x80))
             {
-                output.Add(b);
+                if (count == maxOutputBytes)
+                {
+                    throw new PayloadTooLargeException();
+                }
+                if (output is not null) output[count] = b;
+                count++;
                 pos++;
                 continue;
             }
 
-            int id = b >> 5; // 6 (0xC0-0xDF) or 7 (0xE0-0xFF)
-            bool atEnd = pos == input.Length - 1 || (pos == input.Length - 2 && id == 7);
-            if (atEnd)
+            int id = b >> 5;
+            if (pos + (id == 6 ? 1 : 2) >= input.Length)
             {
                 throw new InvalidDataException("Truncated LZUTF8 stream.");
-            }
-
-            if (input[pos + 1] >= 0x80)
-            {
-                // UTF-8 multibyte lead byte: verbatim.
-                output.Add(b);
-                pos++;
-                continue;
             }
 
             int length = b & 31;
@@ -131,53 +141,38 @@ internal static class LzUtf8
                 throw new InvalidDataException("Invalid LZUTF8 match length.");
             }
 
-            int distance;
-            if (id == 6)
-            {
-                distance = input[pos + 1];
-                pos += 2;
-            }
-            else
-            {
-                distance = (input[pos + 1] << 8) | input[pos + 2];
-                pos += 3;
-            }
-
-            int matchPos = output.Count - distance;
-            if (matchPos < 0 || distance <= 0)
+            int distance = id == 6 ? input[pos + 1] : (input[pos + 1] << 8) | input[pos + 2];
+            pos += id == 6 ? 2 : 3;
+            if (distance <= 0 || distance > count)
             {
                 throw new InvalidDataException("Invalid LZUTF8 match distance.");
             }
-
-            for (int k = 0; k < length; k++)
+            if (length > maxOutputBytes - count)
             {
-                output.Add(output[matchPos + k]);
+                throw new PayloadTooLargeException();
             }
+            if (output is not null)
+            {
+                // Matches may overlap: subsequent bytes reference newly decoded bytes.
+                for (int k = 0; k < length; k++) output[count + k] = output[count - distance + k];
+            }
+            count += length;
         }
-
-        return output.ToArray();
+        return count;
     }
 
     private static bool TryFindMatch(
-        byte[] input, Dictionary<int, List<int>> buckets, int pos, out int length, out int distance)
+        byte[] input, int[] heads, int[] previous, int pos, out int length, out int distance)
     {
         length = 0;
         distance = 0;
 
-        if (!buckets.TryGetValue(HashPrefix(input, pos), out var bucket))
-        {
-            return false;
-        }
-
         int n = input.Length;
-        for (int i = bucket.Count - 1; i >= 0; i--)
+        int cand = heads[HashPrefix(input, pos, heads.Length)];
+        for (int examined = 0; cand >= 0 && examined < MaxBucketEntries; examined++)
         {
-            int cand = bucket[i];
             int dist = pos - cand;
-            if (dist <= 0 || dist > MaxDistance)
-            {
-                continue;
-            }
+            if (dist <= 0 || dist > MaxDistance) break;
 
             int maxLen = Math.Min(MaxMatch, n - pos);
             int len = 0;
@@ -195,27 +190,20 @@ internal static class LzUtf8
                     break;
                 }
             }
+            cand = previous[cand & (previous.Length - 1)];
         }
 
         return length >= MinMatch;
     }
 
-    private static void AddPosition(Dictionary<int, List<int>> buckets, byte[] input, int pos)
+    private static void AddPosition(int[] heads, int[] previous, byte[] input, int pos)
     {
-        int h = HashPrefix(input, pos);
-        if (!buckets.TryGetValue(h, out var bucket))
-        {
-            buckets[h] = bucket = new List<int>(4);
-        }
-        else if (bucket.Count == MaxBucketEntries - 1)
-        {
-            bucket.RemoveRange(0, MaxBucketEntries / 2);
-        }
-
-        bucket.Add(pos);
+        int h = HashPrefix(input, pos, heads.Length);
+        previous[pos & (previous.Length - 1)] = heads[h];
+        heads[h] = pos;
     }
 
-    private static int HashPrefix(byte[] input, int pos) =>
+    private static int HashPrefix(byte[] input, int pos, int hashSize) =>
         (int)(((long)input[pos] * 7880599 + (long)input[pos + 1] * 39601 +
-               (long)input[pos + 2] * 199 + input[pos + 3]) % HashSize);
+               (long)input[pos + 2] * 199 + input[pos + 3]) % hashSize);
 }

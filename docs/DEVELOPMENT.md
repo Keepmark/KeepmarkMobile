@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.190 (191)**,
+v1.2 extended contract when advertised. Current version: **v1.0.193 (194)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -132,7 +132,8 @@ adb disconnect; adb connect <device-ip>:<port>; adb devices
 ## Commands (from `KeepmarkMobile/`)
 
 ```sh
-dotnet test                                            # Core unit + interop (189 tests)
+python3 scripts/prepare-sqlcipher.py --linux            # once: Linux x64 native prerequisites below
+dotnet test                                            # Core unit + crypto/lifecycle regression tests
 dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
 dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug  # deploy+launch
 # add "-p:AdbTarget=-s IP:PORT" when several adb entries are listed. A Debug APK
@@ -148,6 +149,37 @@ M in `src/KeepmarkMobile/KeepmarkMobile.csproj`; CSS/JS releases also bump
 `?v=` cache-buster in `wwwroot/index.html`. Commit message format:
 `v1.0.N (M): short description`.
 
+## Native SQLCipher migration (v1.0.193)
+
+The ORM is `sqlite-net-base` 1.9.172 with `SQLitePCLRaw.provider.sqlcipher`
+3.0.5. `SqlCipherRuntime` initializes the provider once; database startup fails
+closed if the loaded library does not report `cipher_version`. Do not restore
+`sqlite-net-pcl`, `bundle_green` or the deprecated `bundle_e_sqlcipher`.
+
+Android uses the official SQLCipher Community Android 4.19.1 AAR binaries:
+SQLCipher 4.19.0 / SQLite 3.53.4, arm64-v8a and x86_64. Binaries, SHA-256 pins,
+source URLs and third-party licenses live in `native/sqlcipher/`; the notices
+are included as an APK asset. See [native setup](../native/sqlcipher/README.md).
+
+Linux x64 tests and benchmarks use the same SQLCipher source release, built
+with system OpenSSL. Run `python3 scripts/prepare-sqlcipher.py --linux` before
+`dotnet test` on a new checkout (Python 3.12+, GCC, make, Tcl, pkg-config and
+OpenSSL development files required). Generated output stays in ignored
+`artifacts/native/`; Android builds use the checked-in official binaries.
+
+No database format conversion, rekey or credential change is performed.
+The synthetic original 2.1.10 fixture is opened, searched, modified and reopened
+by the new engine; unkeyed reads fail. `scripts/verify-sqlcipher-compat.py --old
+/path/to/old/libe_sqlcipher.so` additionally proves new-write → old-read/write
+→ new-read, including FTS, in isolated processes. Rollback restores the previous
+application/provider/native stack without rewriting databases.
+
+`python3 scripts/verify-native-sqlcipher.py --apk /path/to/app.apk` verifies
+both official binary hashes, ABI, 16 KiB ELF/ZIP alignment, uncompressed storage
+and absence of legacy/plain SQLite libraries. Actual Android runtime and battery
+measurements still require a device. Query/code benchmark improvements in
+PERFORMANCE.md are independent of this engine migration.
+
 ## Architecture map
 
 - `src/Keepmark.Core/Api/` — XSyncApiClient, API v1.1.13, `Accept-Version` header.
@@ -155,11 +187,16 @@ M in `src/KeepmarkMobile/KeepmarkMobile.csproj`; CSS/JS releases also bump
   internal LzUtf8 port of lzutf8@0.6.0. **Never change without running both:**
   Node vectors in `tests/.../TestData/vectors.json` (generated with the
   original xBrowserSync JS logic, `crypto.service.ts` + lzutf8@0.6.0) +
-  the reverse check (C# blobs decrypted by that same JS logic).
+  the reverse check (`tools/Keepmark.Benchmarks --interop` then
+  `scripts/verify-csharp-blobs.cjs`, lzutf8@0.6.0).
   Backup envelope: PBKDF2-SHA256/250k (random 16B salt stored in the file) +
   AES-128-GCM over lzutf8 payload; all import/export params validated via
   `BackupGuard` (password ≥8, path present, .json only, 50MB cap, base64
-  pre-checks, tree validated ≤200k nodes, tmp cache cleaned).
+  allocation-free base64 pre-checks, tree validated ≤200k nodes, tmp cache cleaned).
+  Device memory limits: encrypted envelope ≤50 MiB; decompressed UTF-8 ≤256 MiB.
+  HTTP JSON streams are capped at 72 MiB (including base64 overhead); error bodies
+  at 64 KiB. Limits reject extreme payloads with a localized device-limit error.
+  See [performance notes](PERFORMANCE.md) for measurements and commands.
 - `src/Keepmark.Core/Sync/SyncEngine.cs` — gated push/pull, background
   push, conflict logic, `DeleteBookmarkAsync`.
 - `src/Keepmark.Core/Sync/BookmarkMerge.cs` — pure two-way union by URL
@@ -167,8 +204,10 @@ M in `src/KeepmarkMobile/KeepmarkMobile.csproj`; CSS/JS releases also bump
   never merged) + `NormalizeUrl`; same function serves preview and apply.
   `MoveResult.cs` — contextual wizard success text (mode + direction + target).
 - `src/Keepmark.Core/Data/BookmarkStore.cs` — SQLCipher store, FTS5,
-  duplicates query, `RestoreLocalAsync`. Rows rekeyed by every push/pull
-  `ReplaceAll`: UI crumbs/expansions rebase on stable `NodeId`.
+  duplicates query, `RestoreLocalAsync`. Pull/restore replacements rekey rows;
+  ordinary pushes acknowledge blob/meta and normalize changed descriptions in
+  place, preserving RowIds/FTS. UI crumbs/expansions rebase on stable `NodeId`.
+  `ContentVersion` invalidates component-local derived data after mutations.
 - `src/KeepmarkMobile/Services/XbsSession.cs` — session, backup export/import,
   create+upload. Connect = link/create + unlink; SwitchService = move-service
   wizard (`/switch-service`, alias `/migrate`); Backup = encrypted backup
@@ -208,7 +247,20 @@ M in `src/KeepmarkMobile/KeepmarkMobile.csproj`; CSS/JS releases also bump
   the visible update by the toast duration).
 - Share consume: peek-before-consume in `Home.OpenSharedIfPending` via
   `ShareIntake` choke point (limbo for cold start).
-- Auto-mode push runs fire-and-forget; UI closes sheets right after local write.
+- Auto-mode push uses one worker with 250 ms coalescing and dirty/conflict/mode
+  checks under the engine gate; UI closes sheets right after the durable local write.
+- `XbsSession.InitAsync` shares one initialization task. Components await it with
+  their lifetime token; never register singleton events or create timers after disposal.
+- `Window.Activated/Resumed/Stopped/Destroying` control visibility. Auto polling
+  runs only while foreground + Auto, first after 500 ms, then 15 minutes after the
+  previous tick completes. Stop cancels reads/retries and drains the worker.
+  Already-started edit uploads may finish and acknowledge their outcome.
+- Home's relative-time clock stops in background. Global folder/count/pin data is
+  refreshed only after `ContentVersion`, language, pins or relevant settings change.
+  Uniform collapsed folder lists over 100 rows virtualize; duplicate groups page in batches of 100; explicit location jumps
+  temporarily reveal all rows until the next navigation to preserve DOM anchors.
+- Gesture registrations are owner-keyed and released with their component;
+  layout measurements are coalesced into one animation frame.
 
 ## Engineering rules (non-negotiable)
 

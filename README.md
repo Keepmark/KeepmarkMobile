@@ -139,7 +139,9 @@ Independent implementation, written from scratch; compatible with the
 xBrowserSync protocol. Not affiliated with or endorsed by xBrowserSync.
 
 Third-party notices: `Crypto/LzUtf8.cs` is a C# port of `lzutf8` (MIT,
-© Rotem Dan, notice kept in the file); BouncyCastle (MIT).
+© Rotem Dan, notice kept in the file); BouncyCastle (MIT); SQLCipher Community
+(BSD-style), SQLite (public domain), LibTomCrypt (public-domain option). See
+[SQLCipher notices](native/sqlcipher/THIRD-PARTY-NOTICES.txt), also bundled in the app.
 
 ## Disclaimer
 

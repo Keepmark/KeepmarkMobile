@@ -1,0 +1,17 @@
+{
+  "engineVersion": "4.19.0",
+  "sqliteVersion": "3.53.4",
+  "android": {
+    "version": "4.19.1",
+    "url": "https://repo.maven.apache.org/maven2/net/zetetic/sqlcipher-android/4.19.1/sqlcipher-android-4.19.1.aar",
+    "sha256": "43fc10cae8f1f1059f0933e8942a1eb328989d13426378597cd4add1b34a34fd",
+    "libraries": {
+      "arm64-v8a": "32d4c1bb89a90b59a3d6be950bbc36c133f8762f627b333a3512205c8037a48b",
+      "x86_64": "81b98e79ea7176482daf40497f34fc7eb701c661d13c09dada66a1a51e8d9561"
+    }
+  },
+  "source": {
+    "url": "https://codeload.github.com/sqlcipher/sqlcipher/tar.gz/refs/tags/v4.19.0",
+    "sha256": "7075f96cbabe45b4ecfc2e6b1745a625f856f695b0827a5506ce9ed85b906aa0"
+  }
+}

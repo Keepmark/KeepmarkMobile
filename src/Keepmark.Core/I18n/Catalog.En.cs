@@ -7,6 +7,7 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> En => _en ??= new()
     {
+        [Str.ErrEncryptedDatabaseRequired] = "The encrypted database engine is unavailable.",
         [Str.AboutCompat] = "Compatibility",
         [Str.AboutFmtA] = "Sync format",
         [Str.AboutFmtB] = ": syncs created here open in the official xBrowserSync apps, and vice versa.",
@@ -209,6 +210,7 @@ internal static partial class Catalogs
         [Str.ErrNotAcceptingNewSyncs] = "This service is not accepting new syncs right now. You can still connect an existing sync ID.",
         [Str.ErrDailyNewSyncLimit] = "Daily new-sync limit reached on this service. Try again tomorrow.",
         [Str.ErrDataOutOfSync] = "The server copy changed since your last sync. Download the latest version before uploading.",
+        [Str.ErrPayloadTooLarge] = "Data exceeds the supported size limit on this device.",
         [Str.ErrSyncTooLarge] = "Sync data exceeds the service size limit. Remove some bookmarks and retry.",
         [Str.ErrThrottled] = "Too many requests. The service asked us to slow down — retry in a few minutes.",
         [Str.ErrServiceOffline] = "Cannot reach the service. Check your connection and the service URL.",
@@ -493,6 +495,8 @@ internal static partial class Catalogs
         [Str.RelMinutes] = "{0} min ago",
         [Str.RelHours] = "{0} h ago",
         [Str.RelDays] = "{0} d ago",
+        [Str.CommonPreviousPage] = "Previous page",
+        [Str.CommonNextPage] = "Next page",
         [Str.CommonNext] = "Next",
         [Str.CommonYesMove] = "Yes, move",
         [Str.SwH1] = "Move to another service",

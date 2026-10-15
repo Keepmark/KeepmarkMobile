@@ -34,6 +34,10 @@ public interface ICryptoService
 /// </summary>
 public sealed class XCryptoService(IXbsLocalizer str, IXbsLogger log) : ICryptoService
 {
+    /// <summary>Independent of the 50 MiB backup-file cap: bounds expanded UTF-8 data.</summary>
+    public const int MaxPlaintextBytes = 256 * 1024 * 1024;
+    public const int MaxEnvelopeBytes = 50 * 1024 * 1024;
+
     private static readonly Encoding StrictUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     public string DeriveKey(string password, string syncId, string? syncVersion)
@@ -61,20 +65,22 @@ public sealed class XCryptoService(IXbsLocalizer str, IXbsLogger log) : ICryptoS
             return string.Empty;
         }
 
-        _log.Debug("crypto", $"Encrypting {StrictUtf8.GetByteCount(plain)}B plaintext");
+        int plainBytes = StrictUtf8.GetByteCount(plain);
+        if (plainBytes > MaxPlaintextBytes) throw new PayloadTooLargeException();
+        _log.Debug("crypto", $"Encrypting {plainBytes}B plaintext");
         byte[] key = Convert.FromBase64String(derivedKeyB64);
         byte[] nonce = RandomNumberGenerator.GetBytes(XbsConstants.GcmNonceLength);
         byte[] compressed = LzUtf8.Compress(StrictUtf8.GetBytes(plain));
 
         var cipher = new GcmBlockCipher(new AesEngine());
         cipher.Init(forEncryption: true, new AeadParameters(new KeyParameter(key), 128, nonce));
-        byte[] outBuf = new byte[cipher.GetOutputSize(compressed.Length)];
-        int len = cipher.ProcessBytes(compressed, 0, compressed.Length, outBuf, 0);
-        cipher.DoFinal(outBuf, len);
-
-        byte[] combined = new byte[nonce.Length + outBuf.Length];
-        Buffer.BlockCopy(nonce, 0, combined, 0, nonce.Length);
-        Buffer.BlockCopy(outBuf, 0, combined, nonce.Length, outBuf.Length);
+        // Write ciphertext directly after the nonce, avoiding a second ciphertext buffer.
+        int envelopeLength = nonce.Length + cipher.GetOutputSize(compressed.Length);
+        if (envelopeLength > MaxEnvelopeBytes) throw new PayloadTooLargeException();
+        byte[] combined = new byte[envelopeLength];
+        nonce.CopyTo(combined, 0);
+        int len = cipher.ProcessBytes(compressed, 0, compressed.Length, combined, nonce.Length);
+        cipher.DoFinal(combined, nonce.Length + len);
         return Convert.ToBase64String(combined);
     }
 
@@ -88,6 +94,10 @@ public sealed class XCryptoService(IXbsLocalizer str, IXbsLogger log) : ICryptoS
         try
         {
             byte[] key = Convert.FromBase64String(derivedKeyB64);
+            if (blob.Length > ((MaxEnvelopeBytes + 2L) / 3) * 4) throw new PayloadTooLargeException();
+            if (!System.Buffers.Text.Base64.IsValid(blob, out int envelopeBytes))
+                throw new FormatException("Invalid base64 envelope.");
+            if (envelopeBytes > MaxEnvelopeBytes) throw new PayloadTooLargeException();
             byte[] combined = Convert.FromBase64String(blob);
             if (combined.Length < XbsConstants.GcmNonceLength + 16 + 1)
             {
@@ -95,16 +105,20 @@ public sealed class XCryptoService(IXbsLocalizer str, IXbsLogger log) : ICryptoS
             }
 
             byte[] nonce = combined[..XbsConstants.GcmNonceLength];
-            byte[] ct = combined[XbsConstants.GcmNonceLength..];
+            int ctLength = combined.Length - nonce.Length;
 
             var cipher = new GcmBlockCipher(new AesEngine());
             cipher.Init(forEncryption: false, new AeadParameters(new KeyParameter(key), 128, nonce));
-            byte[] outBuf = new byte[cipher.GetOutputSize(ct.Length)];
-            int len = cipher.ProcessBytes(ct, 0, ct.Length, outBuf, 0);
+            byte[] outBuf = new byte[cipher.GetOutputSize(ctLength)];
+            int len = cipher.ProcessBytes(combined, nonce.Length, ctLength, outBuf, 0);
             cipher.DoFinal(outBuf, len);
 
             byte[] decompressed = LzUtf8.Decompress(outBuf);
             return StrictUtf8.GetString(decompressed);
+        }
+        catch (PayloadTooLargeException)
+        {
+            throw;
         }
         catch (InvalidCredentialsException)
         {
@@ -119,4 +133,9 @@ public sealed class XCryptoService(IXbsLocalizer str, IXbsLogger log) : ICryptoS
 
     private readonly IXbsLocalizer _str = str;
     private readonly IXbsLogger _log = log;
+}
+
+/// <summary>Authenticated payload exceeds the mobile memory budget.</summary>
+public sealed class PayloadTooLargeException() : XbsException(Loc.Get(Str.ErrPayloadTooLarge))
+{
 }

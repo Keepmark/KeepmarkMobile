@@ -3,6 +3,7 @@ namespace Keepmark.Core.I18n;
 
 public static partial class Str
 {
+    public const string ErrEncryptedDatabaseRequired = nameof(ErrEncryptedDatabaseRequired);
     public const string AboutCompat = nameof(AboutCompat);
     public const string AboutFmtA = nameof(AboutFmtA);
     public const string AboutFmtB = nameof(AboutFmtB);
@@ -205,6 +206,7 @@ public static partial class Str
     public const string ErrNotAcceptingNewSyncs = nameof(ErrNotAcceptingNewSyncs);
     public const string ErrDailyNewSyncLimit = nameof(ErrDailyNewSyncLimit);
     public const string ErrDataOutOfSync = nameof(ErrDataOutOfSync);
+    public const string ErrPayloadTooLarge = nameof(ErrPayloadTooLarge);
     public const string ErrSyncTooLarge = nameof(ErrSyncTooLarge);
     public const string ErrThrottled = nameof(ErrThrottled);
     public const string ErrServiceOffline = nameof(ErrServiceOffline);
@@ -489,6 +491,8 @@ public static partial class Str
     public const string RelMinutes = nameof(RelMinutes);
     public const string RelHours = nameof(RelHours);
     public const string RelDays = nameof(RelDays);
+    public const string CommonPreviousPage = nameof(CommonPreviousPage);
+    public const string CommonNextPage = nameof(CommonNextPage);
     public const string CommonNext = nameof(CommonNext);
     public const string CommonYesMove = nameof(CommonYesMove);
     public const string SwH1 = nameof(SwH1);

@@ -1,3 +1,4 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
 @page "/duplicates"
 @using System.Linq
 @using Keepmark.Core.Workflow
@@ -29,9 +30,17 @@ else
             var markedHere = g.Rows.Count(r => selected.Contains(r.RowId));
             <section class="xbs-dupgroup">
                 <div class="xbs-duptext-sub text-break">@g.Url <span class="badge text-bg-secondary">@g.Rows.Count</span></div>
-                @foreach (var r in g.Rows)
+                @foreach (var r in g.Rows.Skip(PageOf(g) * 100).Take(100))
                 {
                     @DupRow(r, r.Title ?? r.Url ?? string.Empty, PathOf(r.RowId))
+                }
+                @if (g.Rows.Count > 100)
+                {
+                    <div class="d-flex gap-2 align-items-center my-2">
+                        <button class="btn btn-outline-secondary" disabled="@(PageOf(g) == 0)" aria-label="@L.Get(Str.CommonPreviousPage)" @onclick="() => ChangePage(g, -1)">←</button>
+                        <span role="status">@($"{PageOf(g) * 100 + 1}–{Math.Min((PageOf(g) + 1) * 100, g.Rows.Count)} / {g.Rows.Count}")</span>
+                        <button class="btn btn-outline-secondary" disabled="@((PageOf(g) + 1) * 100 >= g.Rows.Count)" aria-label="@L.Get(Str.CommonNextPage)" @onclick="() => ChangePage(g, 1)">→</button>
+                    </div>
                 }
                 @if (armedGroup == g.Url)
                 {
@@ -70,6 +79,14 @@ else
 }
 
 @code {
+    private readonly string gestureOwner = Guid.NewGuid().ToString("N");
+    private readonly Dictionary<string, int> pages = new();
+    private int PageOf(Core.Data.DuplicateGroup group) => Math.Min(pages.GetValueOrDefault(group.Url), (group.Rows.Count - 1) / 100);
+    private void ChangePage(Core.Data.DuplicateGroup group, int delta)
+    {
+        pages[group.Url] = Math.Clamp(PageOf(group) + delta, 0, (group.Rows.Count - 1) / 100);
+        expandedDup.Clear();
+    }
     private bool ready;
     private List<Core.Data.DuplicateGroup> groups = [];
     private Dictionary<int, string> paths = new();
@@ -84,10 +101,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        for (int i = 0; i < 100 && !Session.Ready; i++)
-        {
-            await Task.Delay(100);
-        }
+        if (!await WaitForSessionAsync(Session)) return;
 
         if (Session.Engine is not null)
         {
@@ -95,6 +109,7 @@ else
         }
 
         await ReloadAsync();
+        if (IsDisposed) return;
         ready = true;
     }
 
@@ -120,7 +135,7 @@ else
         }
 
         groups = await Session.Store.GetDuplicateUrlsAsync();
-        paths = await Session.Store.GetFolderPathsAsync();
+        paths = await Session.Store.GetFolderPathsAsync(groups.SelectMany(g => g.Rows).Select(r => r.RowId));
         groupOf = groups.SelectMany(g => g.Rows.Select(r => (r.RowId, g)))
             .ToDictionary(x => x.RowId, x => x.g);
         // Default: everything marked but the first occurrence of each link.
@@ -361,17 +376,19 @@ else
         if (firstRender)
         {
             dotNet = DotNetObjectReference.Create(this);
-            try { await JS.InvokeVoidAsync("xbsGestures.initDup", dotNet); } catch { }
+            try { await JS.InvokeVoidAsync("xbsGestures.initDup", dotNet, gestureOwner); } catch { }
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         if (Session.Engine is not null)
         {
             Session.Engine.DataChanged -= OnData;
         }
 
+        _ = JS.InvokeVoidAsync("xbsGestures.release", gestureOwner);
         dotNet?.Dispose();
     }
 }

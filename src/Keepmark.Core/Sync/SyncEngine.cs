@@ -58,7 +58,8 @@ public sealed class SyncEngine(
     IXbsLogger log,
     Func<string, string, string, int, string?, Task>? saveSafetyBackup = null,
     Action? suspendAutoSync = null,
-    Action? resumeAutoSync = null)
+    Action? resumeAutoSync = null,
+    TimeProvider? timeProvider = null)
 {
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -66,6 +67,35 @@ public sealed class SyncEngine(
     };
 
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _backgroundLock = new();
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private Task _backgroundPush = Task.CompletedTask;
+    private bool _backgroundRunning;
+    private long _editGeneration;
+    private volatile bool _autoSyncEnabled = true;
+
+    /// <summary>Platform visibility gate. Pausing preserves durable dirty edits;
+    /// an upload already sent is allowed to finish and record its outcome.</summary>
+    public bool AutoSyncEnabled
+    {
+        get => _autoSyncEnabled;
+        set => _autoSyncEnabled = value;
+    }
+
+    /// <summary>Drain before closing the session's store or API clients.</summary>
+    public async Task WaitForBackgroundPushAsync()
+    {
+        while (true)
+        {
+            Task current;
+            lock (_backgroundLock) current = _backgroundPush;
+            await current.ConfigureAwait(false);
+            lock (_backgroundLock)
+            {
+                if (ReferenceEquals(current, _backgroundPush)) return;
+            }
+        }
+    }
 
     /// <summary>v1.2 capability per service URL (null = not probed yet).
     /// Probed via /info capabilities; legacy servers stay on the 1.1 contract.</summary>
@@ -134,7 +164,7 @@ public sealed class SyncEngine(
         }
     }
 
-    private async Task<bool> PullCoreAsync(CancellationToken ct)
+    private async Task<bool> PullCoreAsync(CancellationToken ct, string? knownRemoteLastUpdated = null)
     {
         var c = await RequireCredsAsync().ConfigureAwait(false);
         SetStatus(SyncStatus.Syncing);
@@ -152,10 +182,10 @@ public sealed class SyncEngine(
             }
 
             var api = apiFor(c.ServiceUrl);
-            var remote = await api.GetLastUpdatedAsync(c.Id, ct).ConfigureAwait(false);
+            var remote = knownRemoteLastUpdated ?? (await api.GetLastUpdatedAsync(c.Id, ct).ConfigureAwait(false)).LastUpdated;
             var local = await store.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
-            log.Debug("sync", $"Pull: remote={remote.LastUpdated} local={local}");
-            if (remote.LastUpdated == local)
+            log.Debug("sync", $"Pull: remote={remote} local={local}");
+            if (remote == local)
             {
                 log.Info("sync", "Pull: already up to date");
                 LastSyncAt = DateTimeOffset.UtcNow;
@@ -188,6 +218,11 @@ public sealed class SyncEngine(
         catch (DataOutOfSyncException)
         {
             SetStatus(SyncStatus.Conflict);
+            throw;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            SetStatus(SyncStatus.Idle);
             throw;
         }
         catch (XbsException ex)
@@ -329,7 +364,7 @@ public sealed class SyncEngine(
         {
             List<BookmarkNode> loaded;
             string? lastUpdated;
-            (loaded, _, lastUpdated, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+            (loaded, _, lastUpdated, _) = await store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
             roots = loaded;
             var dirty = await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false);
             if (baseOverride is not null)
@@ -367,7 +402,7 @@ public sealed class SyncEngine(
                 res = await api.UpdateBookmarksAsync(c.Id, blob, lastUpdated, updateVersion, ct).ConfigureAwait(false);
             }
 
-            await store.ReplaceAllAsync(roots, blob, res.LastUpdated!,
+            var rowsChanged = await store.AcknowledgePushAsync(blob, res.LastUpdated!,
                 updateVersion ? XbsConstants.SyncClientVersion : c.Version,
                 res.Meta?.Revision, res.Meta?.Hash).ConfigureAwait(false);
             if (updateVersion)
@@ -378,7 +413,7 @@ public sealed class SyncEngine(
             Interlocked.Exchange(ref _pendingEdits, 0);
             LastSyncAt = DateTimeOffset.UtcNow;
             SetStatus(SyncStatus.Idle);
-            DataChanged?.Invoke();
+            if (rowsChanged) DataChanged?.Invoke();
             log.Info("sync", $"Push: uploaded, new lastUpdated={res.LastUpdated} (was dirty={dirty})");
         }
         catch (DataOutOfSyncException)
@@ -393,7 +428,7 @@ public sealed class SyncEngine(
                 {
                     var remote = await apiFor(c.ServiceUrl).GetBookmarksAsync(c.Id, ct).ConfigureAwait(false);
                     ThrowIfVersionUnsupported(remote.Version);
-                    await store.ReplaceAllAsync(roots, blob, remote.LastUpdated!,
+                    var rowsChanged = await store.AcknowledgePushAsync(blob, remote.LastUpdated!,
                         updateVersion ? XbsConstants.SyncClientVersion : c.Version,
                         remote.Meta?.Revision, remote.Meta?.Hash).ConfigureAwait(false);
                     if (updateVersion)
@@ -404,7 +439,7 @@ public sealed class SyncEngine(
                     Interlocked.Exchange(ref _pendingEdits, 0);
                     LastSyncAt = DateTimeOffset.UtcNow;
                     SetStatus(SyncStatus.Idle);
-                    DataChanged?.Invoke();
+                    if (rowsChanged) DataChanged?.Invoke();
                     return;
                 }
                 catch (XbsException ex)
@@ -422,6 +457,11 @@ public sealed class SyncEngine(
             SetStatus(SyncStatus.Conflict);
             throw;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            SetStatus(SyncStatus.Idle);
+            throw;
+        }
         catch (XbsException ex)
         {
             SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
@@ -432,7 +472,7 @@ public sealed class SyncEngine(
     /// <summary>Auto tick: pull if remote is newer, else push if local is dirty.</summary>
     public async Task ExecuteAutoSyncAsync(CancellationToken ct = default)
     {
-        if (Mode != SyncMode.Auto)
+        if (Mode != SyncMode.Auto || !AutoSyncEnabled)
         {
             return;
         }
@@ -450,7 +490,7 @@ public sealed class SyncEngine(
 
         try
         {
-            if (_resolvingConflict)
+            if (_resolvingConflict || !AutoSyncEnabled || Mode != SyncMode.Auto)
             {
                 log.Warn("sync", "Auto-sync aborted: conflict resolution in progress");
                 return;
@@ -525,7 +565,7 @@ public sealed class SyncEngine(
             }
 
             log.Debug("sync", "ForceSync: pulling remote");
-            await PullCoreAsync(ct).ConfigureAwait(false);
+            await PullCoreAsync(ct, remote).ConfigureAwait(false);
         }
         else if (dirty)
         {
@@ -552,28 +592,80 @@ public sealed class SyncEngine(
     {
         Interlocked.Increment(ref _pendingEdits);
         await store.SetMetaAsync(BookmarkStore.MetaDirty, "1").ConfigureAwait(false);
-        if (Mode == SyncMode.Auto)
+        lock (_backgroundLock)
         {
-            // Fire-and-forget: overlapping pushes serialize on _gate.
-            _ = PushInBackgroundAsync();
+            _editGeneration++;
+            if (Mode == SyncMode.Auto && AutoSyncEnabled && !_backgroundRunning)
+            {
+                _backgroundRunning = true;
+                _backgroundPush = Task.Run(PushInBackgroundAsync);
+            }
         }
     }
 
     private async Task PushInBackgroundAsync()
     {
-        // Skip background push if conflict resolution is in progress.
-        if (_resolvingConflict)
-        {
-            log.Debug("sync", "Background push skipped: conflict resolution in progress");
-            return;
-        }
+        long processed = -1;
+        var failed = false;
         try
         {
-            await PushAsync().ConfigureAwait(false);
+            while (true)
+            {
+                // Wait for a quiet batch without a timer/task per edit. If an
+                // edit arrived during the delay, restart it before serializing.
+                long observed;
+                lock (_backgroundLock) observed = _editGeneration;
+                await Task.Delay(TimeSpan.FromMilliseconds(250), _timeProvider).ConfigureAwait(false);
+                await AcquireGateAsync("Background push", TimeSpan.FromSeconds(30), CancellationToken.None).ConfigureAwait(false);
+                try
+                {
+                    lock (_backgroundLock) processed = _editGeneration;
+                    if (_resolvingConflict || Status == SyncStatus.Conflict ||
+                        !AutoSyncEnabled || Mode != SyncMode.Auto)
+                    {
+                        return;
+                    }
+
+                    if (processed != observed) continue;
+
+                    // A manual push/pull may already have consumed this burst
+                    // while this worker waited for the gate.
+                    if (await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1")
+                        await PushCoreAsync(false, CancellationToken.None).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _gate.Release();
+                }
+
+                lock (_backgroundLock)
+                {
+                    if (_editGeneration == processed)
+                    {
+                        return;
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {
+            failed = true;
+            // Dirty remains durable; retry on the next edit or foreground poll,
+            // never spin/retry on a failing network in the background.
             log.Warn("sync", $"Background push failed: {ex.Message}");
+        }
+        finally
+        {
+            lock (_backgroundLock)
+            {
+                _backgroundRunning = false;
+                if (!failed && _editGeneration != processed && AutoSyncEnabled && Mode == SyncMode.Auto &&
+                    Status != SyncStatus.Conflict && !_resolvingConflict)
+                {
+                    _backgroundRunning = true;
+                    _backgroundPush = Task.Run(PushInBackgroundAsync);
+                }
+            }
         }
     }
 
@@ -929,7 +1021,7 @@ public sealed class SyncEngine(
     public Task ResolveConflictPullAsync(CancellationToken ct = default) =>
         RunConflictResolutionAsync("pull", async c =>
         {
-            var (localRoots, _, _, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+            var (localRoots, _, _, _) = await store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
             await SnapshotAsync("local", localRoots, SafetyOperations.ConflictPull, c.Id).ConfigureAwait(false);
             var full = await GetFullAsync(c, ct).ConfigureAwait(false);
             await ApplyPulledAsync(full, c, ct).ConfigureAwait(false);
@@ -953,7 +1045,7 @@ public sealed class SyncEngine(
     public Task ResolveConflictMergeAsync(CancellationToken ct = default) =>
         RunConflictResolutionAsync("merge", async c =>
         {
-            var (localRoots, _, _, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+            var (localRoots, _, _, _) = await store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
             const int maxAttempts = 3;
             for (int attempt = 1; ; attempt++)
             {
@@ -985,7 +1077,7 @@ public sealed class SyncEngine(
     {
         var c = await RequireCredsAsync().ConfigureAwait(false);
         var (res, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
-        var (localRoots, _, _, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
+        var (localRoots, _, _, _) = await store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         var stats = BookmarkMerge.Merge(localRoots, remoteRoots).Stats;
         return stats with { RemoteLastUpdated = res.LastUpdated };
     }

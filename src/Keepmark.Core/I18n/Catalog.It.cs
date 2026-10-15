@@ -7,6 +7,7 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> It => _it ??= new()
     {
+        [Str.ErrEncryptedDatabaseRequired] = "Il motore del database crittografato non è disponibile.",
         [Str.AboutCompat] = "Compatibilità",
         [Str.AboutFmtA] = "Formato di sincronizzazione",
         [Str.AboutFmtB] = ": le sincronizzazioni create qui si aprono nelle app ufficiali di xBrowserSync, e viceversa.",
@@ -209,6 +210,7 @@ internal static partial class Catalogs
         [Str.ErrNotAcceptingNewSyncs] = "Questo servizio al momento non accetta nuove sincronizzazioni. Puoi comunque collegare un ID di sincronizzazione esistente.",
         [Str.ErrDailyNewSyncLimit] = "Raggiunto il limite giornaliero di nuove sincronizzazioni su questo servizio. Riprova domani.",
         [Str.ErrDataOutOfSync] = "La copia sul server è cambiata dall'ultima sincronizzazione. Scarica l'ultima versione prima di caricare.",
+        [Str.ErrPayloadTooLarge] = "I dati superano il limite di dimensione supportato su questo dispositivo.",
         [Str.ErrSyncTooLarge] = "I dati di sincronizzazione superano il limite di dimensione del servizio. Rimuovi alcuni segnalibri e riprova.",
         [Str.ErrThrottled] = "Troppe richieste. Il servizio ci ha chiesto di rallentare — riprova tra qualche minuto.",
         [Str.ErrServiceOffline] = "Impossibile raggiungere il servizio. Controlla la connessione e l'URL del servizio.",
@@ -493,6 +495,8 @@ internal static partial class Catalogs
         [Str.RelMinutes] = "{0} min fa",
         [Str.RelHours] = "{0} h fa",
         [Str.RelDays] = "{0} g fa",
+        [Str.CommonPreviousPage] = "Pagina precedente",
+        [Str.CommonNextPage] = "Pagina successiva",
         [Str.CommonNext] = "Avanti",
         [Str.CommonYesMove] = "Sì, sposta",
         [Str.SwH1] = "Passa a un altro servizio",

@@ -76,6 +76,10 @@ public sealed class BookmarkStore : IAsyncDisposable
     private readonly string _keyHex;
     private readonly IXbsLogger _log;
     private SQLiteAsyncConnection? _db;
+    private long _contentVersion;
+
+    /// <summary>Changes whenever item content changes; consumers may invalidate derived UI data.</summary>
+    public long ContentVersion => Interlocked.Read(ref _contentVersion);
 
     public BookmarkStore(string dbPath, string keyHex, IXbsLogger log)
     {
@@ -86,15 +90,26 @@ public sealed class BookmarkStore : IAsyncDisposable
 
     public async Task InitializeAsync()
     {
-        SQLitePCL.Batteries_V2.Init();
+        SqlCipherRuntime.Initialize();
         var db = new SQLiteAsyncConnection(_dbPath);
         // NOTE: PRAGMA key returns a row under SQLCipher, so ExecuteScalar (not Execute)
         // must be used — sqlite-net throws "not an error" on row-returning pragmas.
         await db.ExecuteScalarAsync<int>($"PRAGMA key = \"x'{_keyHex}'\"").ConfigureAwait(false);
+        // Fail closed if a mispackaged native lacks encryption; PRAGMA key alone
+        // is silently ignored by plaintext SQLite.
+        var cipherVersion = await db.ExecuteScalarAsync<string>("PRAGMA cipher_version").ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(cipherVersion))
+        {
+            await db.CloseAsync().ConfigureAwait(false);
+            throw new InvalidOperationException(Loc.Get(Str.ErrEncryptedDatabaseRequired));
+        }
         // Verify key: unreadable DB throws here on first real access.
         await db.ExecuteScalarAsync<int>("SELECT count(*) FROM sqlite_master").ConfigureAwait(false);
 
         await db.CreateTablesAsync<MetaRow, BlobRow, ItemRow>().ConfigureAwait(false);
+        await db.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Items_NodeId ON Items(NodeId)").ConfigureAwait(false);
+        await db.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Items_Parent_Order ON Items(ParentRowId, SortOrder)").ConfigureAwait(false);
+        await db.ExecuteAsync("CREATE INDEX IF NOT EXISTS IX_Items_Url_Order ON Items(Url, SortOrder)").ConfigureAwait(false);
         await db.ExecuteAsync(
             "CREATE VIRTUAL TABLE IF NOT EXISTS ItemsFts USING fts5(Title, Url, Description, Tags, content='Items', content_rowid='RowId')")
             .ConfigureAwait(false);
@@ -136,6 +151,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         var db = Db;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             tran.Execute("DELETE FROM Items");
             int order = 0;
             foreach (var root in roots)
@@ -170,6 +186,59 @@ public sealed class BookmarkStore : IAsyncDisposable
         _log.Info("store", $"Mirror replaced: {CountNodes(roots)} nodes, lastUpdated={lastUpdated}");
     }
 
+    /// <summary>Acknowledges an upload of the gated local tree without rewriting Items/FTS.
+    /// The sync engine must serialize edits until this transaction completes.</summary>
+    public async Task<bool> AcknowledgePushAsync(string encryptedBlob, string lastUpdated, string? version,
+        long? revision = null, string? hash = null)
+    {
+        bool changed = false;
+        await Db.RunInTransactionAsync(tran =>
+        {
+            foreach (var row in tran.Query<ItemRow>("SELECT RowId, Description FROM Items WHERE Description IS NOT NULL"))
+            {
+                var description = string.IsNullOrWhiteSpace(row.Description) ? null : row.Description;
+                if (description?.Length > XbsConstants.DescriptionMaxLength)
+                {
+                    description = description[..XbsConstants.DescriptionMaxLength];
+                }
+
+                if (description != row.Description)
+                {
+                    tran.Execute("UPDATE Items SET Description = ? WHERE RowId = ?", description, row.RowId);
+                    changed = true;
+                }
+            }
+
+            tran.InsertOrReplace(new BlobRow { Key = BlobBookmarks, Value = encryptedBlob });
+            tran.InsertOrReplace(new MetaRow { Key = MetaLastUpdated, Value = lastUpdated });
+            tran.InsertOrReplace(new MetaRow { Key = MetaVersion, Value = version });
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "0" });
+            if (revision.HasValue)
+            {
+                tran.InsertOrReplace(new MetaRow { Key = MetaRevision, Value = revision.Value.ToString() });
+            }
+            else
+            {
+                tran.Execute("DELETE FROM Meta WHERE Key = ?", MetaRevision);
+            }
+
+            if (hash is not null)
+            {
+                tran.InsertOrReplace(new MetaRow { Key = MetaHash, Value = hash });
+            }
+            else
+            {
+                tran.Execute("DELETE FROM Meta WHERE Key = ?", MetaHash);
+            }
+
+            if (changed)
+            {
+                Interlocked.Increment(ref _contentVersion);
+            }
+        }).ConfigureAwait(false);
+        return changed;
+    }
+
     /// <summary>Replaces local rows with a backup tree. Mirror meta (lastUpdated/version)
     /// is kept and the mirror is marked dirty, so the next auto sync pushes the
     /// restored tree (or surfaces a real conflict) instead of pulling over it.</summary>
@@ -178,6 +247,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         var db = Db;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             tran.Execute("DELETE FROM Items");
             int order = 0;
             foreach (var root in roots)
@@ -243,7 +313,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         }
     }
 
-    public async Task<(List<BookmarkNode> Roots, string? Blob, string? LastUpdated, string? Version)> LoadMirrorAsync()
+    public async Task<(List<BookmarkNode> Roots, string? Blob, string? LastUpdated, string? Version)> LoadMirrorAsync(bool includeBlob = true)
     {
         var db = Db;
         var rows = await db.Table<ItemRow>().OrderBy(r => r.SortOrder).ToListAsync().ConfigureAwait(false);
@@ -269,7 +339,7 @@ public sealed class BookmarkStore : IAsyncDisposable
             Children = r.IsFolder ? Build(r.RowId) : null
         };
 
-        var blob = (await db.FindAsync<BlobRow>(BlobBookmarks).ConfigureAwait(false))?.Value;
+        var blob = includeBlob ? (await db.FindAsync<BlobRow>(BlobBookmarks).ConfigureAwait(false))?.Value : null;
         var meta = await db.Table<MetaRow>().ToListAsync().ConfigureAwait(false);
         string? Get(string k) => meta.FirstOrDefault(m => m.Key == k)?.Value;
         return (Build(null), blob, Get(MetaLastUpdated), Get(MetaVersion));
@@ -301,7 +371,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                 .Take(limit).ToListAsync().ConfigureAwait(false);
         }
 
-        var paths = await GetFolderPathsAsync().ConfigureAwait(false);
+        var paths = await GetFolderPathsAsync(rows.Select(r => r.RowId)).ConfigureAwait(false);
         return rows.Select((r, i) => new SearchHit(
             r.RowId, r.NodeId, r.Title, r.Url, r.Description, r.Tags?.Replace($"{TagSep}", ", "),
             r.IsFolder, paths.GetValueOrDefault(r.RowId, string.Empty), i)).ToList();
@@ -311,28 +381,19 @@ public sealed class BookmarkStore : IAsyncDisposable
     /// each with its rows in display order. For the duplicates cleanup page.</summary>
     public async Task<List<DuplicateGroup>> GetDuplicateUrlsAsync()
     {
-        var dup = await Db.QueryAsync<DupUrlRow>(
-            "SELECT Url AS Value FROM Items WHERE Url IS NOT NULL AND Url != ? GROUP BY Url HAVING COUNT(*) > 1",
-            Core.XbsConstants.SeparatorUrl).ConfigureAwait(false);
-        var urls = dup.Select(d => d.Value).Where(u => u is not null).Cast<string>().ToList();
-        if (urls.Count == 0)
-        {
-            return [];
-        }
-
-        var placeholders = string.Join(",", Enumerable.Repeat("?", urls.Count));
         var rows = await Db.QueryAsync<ItemRow>(
-            $"SELECT * FROM Items WHERE Url IN ({placeholders}) ORDER BY Url, SortOrder",
-            urls.Cast<object>().ToArray()).ConfigureAwait(false);
+            "SELECT * FROM Items WHERE Url IN (SELECT Url FROM Items WHERE Url IS NOT NULL AND Url != ? " +
+            "GROUP BY Url HAVING COUNT(*) > 1) ORDER BY Url, SortOrder",
+            Core.XbsConstants.SeparatorUrl).ConfigureAwait(false);
         return rows.GroupBy(r => r.Url!)
             .Select(g => new DuplicateGroup(g.Key, g.ToList()))
             .ToList();
     }
 
-    private sealed class DupUrlRow
-    {
-        public string? Value { get; set; }
-    }
+    /// <summary>Number of redundant bookmark copies, excluding the survivor of each duplicate group.</summary>
+    public Task<int> CountDuplicateBookmarksAsync() => Db.ExecuteScalarAsync<int>(
+        "SELECT COALESCE(SUM(n - 1), 0) FROM (SELECT COUNT(*) AS n FROM Items " +
+        "WHERE Url IS NOT NULL AND Url != ? GROUP BY Url HAVING COUNT(*) > 1)", XbsConstants.SeparatorUrl);
 
     /// <summary>Bookmarks whose URL matches <paramref name="url"/> once both are
     /// normalized (<see cref="Sync.BookmarkMerge.NormalizeUrl"/>: scheme/host
@@ -427,6 +488,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         int rowId = 0;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             int? parentRowId = null;
             if (parentNodeId is not null)
             {
@@ -457,6 +519,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         var db = Db;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             var row = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId).FirstOrDefault()
                 ?? throw new InvalidOperationException($"Bookmark node {nodeId} not found.");
             row.Title = title;
@@ -477,6 +540,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         List<BookmarkNode> subtree = [];
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             var target = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId).FirstOrDefault()
                 ?? throw new InvalidOperationException($"Bookmark node {nodeId} not found.");
             var rowId = target.RowId;
@@ -484,7 +548,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                 ? null
                 : tran.Find<ItemRow>(target.ParentRowId.Value)?.NodeId;
 
-            var rows = tran.Query<ItemRow>("SELECT * FROM Items");
+            var rows = LoadSubtrees(tran, [rowId]);
             var kids = rows.Where(r => r.ParentRowId is not null)
                 .GroupBy(r => r.ParentRowId!.Value)
                 .ToDictionary(g => g.Key, g => g.Select(r => r.RowId).ToList());
@@ -516,18 +580,15 @@ public sealed class BookmarkStore : IAsyncDisposable
                     Description = r.Description,
                     Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
                     DateAdded = r.DateAdded,
-                    Children = r.IsFolder && kids.TryGetValue(id, out var c)
-                        ? c.Select(BuildRow).ToList()
+                    Children = r.IsFolder
+                        ? kids.TryGetValue(id, out var c) ? c.Select(BuildRow).ToList() : []
                         : null
                 };
             }
 
             subtree = [BuildRow(rowId)];
 
-            foreach (var id in doomed)
-            {
-                tran.Execute("DELETE FROM Items WHERE RowId = ?", id);
-            }
+            DeleteRows(tran, doomed);
 
             tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
             _log.Debug("store", $"Deleted node {nodeId} (+{doomed.Count - 1} descendants)");
@@ -543,6 +604,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         var db = Db;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             var node = tran.Query<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId).FirstOrDefault()
                 ?? throw new InvalidOperationException($"Bookmark node {nodeId} not found.");
             int? newParentRowId = null;
@@ -583,6 +645,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         var db = Db;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             int? parentRowId = null;
             if (parentNodeId is not null)
             {
@@ -609,6 +672,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         int rowId = 0;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             int nextId = (tran.ExecuteScalar<int?>("SELECT MAX(NodeId) FROM Items") ?? 0) + 1;
             AssignMissingIds(node, ref nextId);
             StampMissingDates(node, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
@@ -631,6 +695,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         var db = Db;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             var node = tran.Find<ItemRow>(rowId)
                 ?? throw new InvalidOperationException($"Bookmark row {rowId} not found.");
             node.Title = title;
@@ -658,6 +723,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         int deleted = 0;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             var placeholders = string.Join(",", Enumerable.Repeat("?", ids.Count));
             var targets = tran.Query<ItemRow>(
                 $"SELECT * FROM Items WHERE NodeId IN ({placeholders})", ids.Cast<object>().ToArray());
@@ -666,7 +732,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                 return;
             }
 
-            var rows = tran.Query<ItemRow>("SELECT * FROM Items");
+            var rows = LoadSubtrees(tran, targets.Select(r => r.RowId));
             var kids = rows.Where(r => r.ParentRowId is not null)
                 .GroupBy(r => r.ParentRowId!.Value)
                 .ToDictionary(g => g.Key, g => g.Select(r => r.RowId).ToList());
@@ -690,10 +756,7 @@ public sealed class BookmarkStore : IAsyncDisposable
                 }
             }
 
-            foreach (var id in doomed)
-            {
-                tran.Execute("DELETE FROM Items WHERE RowId = ?", id);
-            }
+            DeleteRows(tran, doomed);
 
             deleted = doomed.Count;
             if (deleted > 0)
@@ -714,11 +777,12 @@ public sealed class BookmarkStore : IAsyncDisposable
         List<BookmarkNode> subtree = [];
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             var target = tran.Find<ItemRow>(rowId)
                 ?? throw new InvalidOperationException($"Bookmark row {rowId} not found.");
             parentRowId = target.ParentRowId;
 
-            var rows = tran.Query<ItemRow>("SELECT * FROM Items");
+            var rows = LoadSubtrees(tran, [rowId]);
             var kids = rows.Where(r => r.ParentRowId is not null)
                 .GroupBy(r => r.ParentRowId!.Value)
                 .ToDictionary(g => g.Key, g => g.Select(r => r.RowId).ToList());
@@ -750,18 +814,15 @@ public sealed class BookmarkStore : IAsyncDisposable
                     Description = r.Description,
                     Tags = r.Tags is null ? null : r.Tags.Split(TagSep).ToList(),
                     DateAdded = r.DateAdded,
-                    Children = r.IsFolder && kids.TryGetValue(id, out var c)
-                        ? c.Select(BuildRow).ToList()
+                    Children = r.IsFolder
+                        ? kids.TryGetValue(id, out var c) ? c.Select(BuildRow).ToList() : []
                         : null
                 };
             }
 
             subtree = [BuildRow(rowId)];
 
-            foreach (var id in doomed)
-            {
-                tran.Execute("DELETE FROM Items WHERE RowId = ?", id);
-            }
+            DeleteRows(tran, doomed);
 
             tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
             _log.Debug("store", $"Deleted node {rowId} (+{doomed.Count - 1} descendants)");
@@ -775,6 +836,7 @@ public sealed class BookmarkStore : IAsyncDisposable
         var db = Db;
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             int order = (tran.ExecuteScalar<int?>(
                 parentRowId is null
                     ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
@@ -812,6 +874,7 @@ public sealed class BookmarkStore : IAsyncDisposable
 
         await db.RunInTransactionAsync(tran =>
         {
+            Interlocked.Increment(ref _contentVersion);
             int order = (tran.ExecuteScalar<int?>(
                 newParentRowId is null
                     ? "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL"
@@ -832,18 +895,35 @@ public sealed class BookmarkStore : IAsyncDisposable
         var urls = rows.Where(r => !r.IsFolder && r.Url is not null && r.Url != XbsConstants.SeparatorUrl)
             .GroupBy(r => r.Url).Count(g => g.Count() > 1);
 
-        int Depth(ItemRow r, Dictionary<int, ItemRow> byId, int d)
+        var byId = rows.ToDictionary(r => r.RowId);
+        var depths = new Dictionary<int, int>();
+        foreach (var row in rows)
         {
-            if (r.ParentRowId is null || !byId.TryGetValue(r.ParentRowId.Value, out var p))
+            if (depths.ContainsKey(row.RowId))
             {
-                return d;
+                continue;
             }
 
-            return Depth(p, byId, d + 1);
+            var chain = new List<int>();
+            var visiting = new HashSet<int>();
+            var cur = row;
+            while (!depths.ContainsKey(cur.RowId) && visiting.Add(cur.RowId))
+            {
+                chain.Add(cur.RowId);
+                if (cur.ParentRowId is not int parent || !byId.TryGetValue(parent, out cur))
+                {
+                    break;
+                }
+            }
+
+            var depth = cur is not null && depths.TryGetValue(cur.RowId, out var known) ? known + 1 : 0;
+            for (int i = chain.Count - 1; i >= 0; i--)
+            {
+                depths[chain[i]] = depth++;
+            }
         }
 
-        var byId = rows.ToDictionary(r => r.RowId);
-        int maxDepth = rows.Count == 0 ? 0 : rows.Max(r => Depth(r, byId, 0));
+        int maxDepth = depths.Count == 0 ? 0 : depths.Values.Max();
 
         return new ContentStats(
             rows.Count(r => r.IsFolder),
@@ -858,27 +938,46 @@ public sealed class BookmarkStore : IAsyncDisposable
     /// </summary>
     public async Task<Dictionary<int, int>> GetFolderBookmarkCountsAsync()
     {
-        var rows = await Db.QueryAsync<ItemRow>(
-            "SELECT RowId, ParentRowId, IsFolder, Url FROM Items").ConfigureAwait(false);
+        var rows = await Db.QueryAsync<BookmarkCountRow>(
+            "SELECT RowId, ParentRowId, IsFolder, " +
+            "CASE WHEN IsFolder = 0 AND (Url IS NULL OR Url != ?) THEN 1 ELSE 0 END AS Bookmarks FROM Items",
+            XbsConstants.SeparatorUrl).ConfigureAwait(false);
         var byId = rows.ToDictionary(r => r.RowId);
-        var counts = rows.Where(r => r.IsFolder).ToDictionary(r => r.RowId, _ => 0);
-        foreach (var r in rows)
+        foreach (var row in rows)
         {
-            if (r.IsFolder || r.Url == XbsConstants.SeparatorUrl)
+            if (row.ParentRowId is int parent && byId.TryGetValue(parent, out var parentRow))
             {
-                continue;
-            }
-
-            // Walk up the ancestors; the hop limit guards against a corrupt cycle.
-            var parent = r.ParentRowId;
-            for (var hops = 0; parent is int p && byId.TryGetValue(p, out var f) && hops < 1024; hops++)
-            {
-                counts[p] = counts.GetValueOrDefault(p) + 1;
-                parent = f.ParentRowId;
+                parentRow.PendingChildren++;
             }
         }
 
+        // Leaf-to-root aggregation visits each edge once, independent of depth.
+        // Corrupt cycles never reach the queue, so they cannot loop indefinitely.
+        var queue = new Queue<BookmarkCountRow>(rows.Where(r => r.PendingChildren == 0));
+        while (queue.TryDequeue(out var row))
+        {
+            if (row.ParentRowId is int parent && byId.TryGetValue(parent, out var parentRow))
+            {
+                parentRow.Bookmarks += row.Bookmarks;
+                if (--parentRow.PendingChildren == 0)
+                {
+                    queue.Enqueue(parentRow);
+                }
+            }
+        }
+
+        var counts = rows.Where(r => r.IsFolder).ToDictionary(r => r.RowId, r => r.Bookmarks);
         return counts;
+    }
+
+    private sealed class BookmarkCountRow
+    {
+        public int RowId { get; set; }
+        public int? ParentRowId { get; set; }
+        public bool IsFolder { get; set; }
+        public int Bookmarks { get; set; }
+        [Ignore]
+        public int PendingChildren { get; set; }
     }
 
     public async Task<string?> GetMetaAsync(string key) =>
@@ -886,6 +985,10 @@ public sealed class BookmarkStore : IAsyncDisposable
 
     public async Task SetMetaAsync(string key, string? value) =>
         await Db.InsertOrReplaceAsync(new MetaRow { Key = key, Value = value }).ConfigureAwait(false);
+
+    /// <summary>Encrypted sync blobs are base64 ASCII, so character length equals byte length.</summary>
+    public Task<int> GetStoredBlobLengthAsync() => Db.ExecuteScalarAsync<int>(
+        "SELECT COALESCE((SELECT LENGTH(Value) FROM Blob WHERE Key = ?), 0)", BlobBookmarks);
 
     public long GetFileSize() => new FileInfo(_dbPath).Length;
 
@@ -906,23 +1009,12 @@ public sealed class BookmarkStore : IAsyncDisposable
 
     internal static Dictionary<int, string> PinKeys(List<ItemRow> all)
     {
-        var byId = all.ToDictionary(r => r.RowId);
+        var folderPaths = BuildPaths(all.Where(r => r.IsFolder).ToList(), rawTitles: true, includeSelf: true);
         var keys = new Dictionary<int, string>();
         foreach (var r in all)
         {
-            if (!r.IsFolder)
-            {
-                keys[r.RowId] = r.Url is { Length: > 0 } url ? "u:" + url + PinTitleSep + r.Title : "n:" + r.RowId;
-                continue;
-            }
-
-            var parts = new Stack<string>();
-            for (ItemRow? cur = r; cur is not null; cur = cur.ParentRowId is int pid && byId.TryGetValue(pid, out var p) ? p : null)
-            {
-                parts.Push(cur.Title ?? string.Empty);
-            }
-
-            keys[r.RowId] = "f:" + string.Join("\u001f", parts);
+            keys[r.RowId] = r.IsFolder ? "f:" + folderPaths[r.RowId]
+                : r.Url is { Length: > 0 } url ? "u:" + url + PinTitleSep + r.Title : "n:" + r.RowId;
         }
 
         return keys;
@@ -935,6 +1027,11 @@ public sealed class BookmarkStore : IAsyncDisposable
     /// <summary>Rows for the given pin keys, in key order; one row per key (first copy).</summary>
     public async Task<(List<ItemRow> Rows, Dictionary<int, string> KeyByRow)> GetPinnedAsync(IReadOnlyList<string> pinKeys)
     {
+        if (pinKeys.Count == 0)
+        {
+            return ([], []);
+        }
+
         var all = await Db.Table<ItemRow>().OrderBy(r => r.RowId).ToListAsync().ConfigureAwait(false);
         var keyByRow = PinKeys(all);
         var firstByKey = new Dictionary<string, ItemRow>();
@@ -961,40 +1058,132 @@ public sealed class BookmarkStore : IAsyncDisposable
         return (rows, keyByRow);
     }
 
-    public async Task<Dictionary<int, string>> GetFolderPathsAsync()
-    {
-        var paths = await Db.Table<ItemRow>().ToListAsync().ConfigureAwait(false);
-        var byId = paths.ToDictionary(r => r.RowId);
-        var cache = new Dictionary<int, string>();
+    public async Task<Dictionary<int, string>> GetFolderPathsAsync() =>
+        BuildPaths(await Db.QueryAsync<ItemRow>("SELECT RowId, ParentRowId, Title FROM Items").ConfigureAwait(false));
 
-        string PathOf(int rowId)
+    /// <summary>Loads only requested rows and their shared ancestors, never the complete archive.</summary>
+    public async Task<Dictionary<int, string>> GetFolderPathsAsync(IEnumerable<int> rowIds)
+    {
+        var ids = rowIds.Distinct().ToArray();
+        if (ids.Length == 0)
         {
-            if (cache.TryGetValue(rowId, out var cached))
+            return [];
+        }
+
+        var all = new Dictionary<int, ItemRow>();
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var marks = string.Join(",", Enumerable.Repeat("?", chunk.Length));
+            // UNION (rather than UNION ALL) bounds even corrupt ancestor cycles.
+            var ancestors = await Db.QueryAsync<ItemRow>(
+                $"WITH RECURSIVE ancestors AS (SELECT RowId, ParentRowId, Title FROM Items WHERE RowId IN ({marks}) " +
+                "UNION SELECT i.RowId, i.ParentRowId, i.Title FROM Items i JOIN ancestors a ON i.RowId = a.ParentRowId) " +
+                "SELECT * FROM ancestors", chunk.Cast<object>().ToArray()).ConfigureAwait(false);
+            foreach (var row in ancestors)
             {
-                return cached;
+                all.TryAdd(row.RowId, row);
+            }
+        }
+
+        var paths = BuildPaths(all.Values.ToList());
+        return ids.Where(paths.ContainsKey).ToDictionary(id => id, id => paths[id]);
+    }
+
+    public async Task<List<ItemRow>> GetNodesAsync(IEnumerable<int> rowIds)
+    {
+        var result = new List<ItemRow>();
+        foreach (var chunk in rowIds.Distinct().Chunk(500))
+        {
+            var marks = string.Join(",", Enumerable.Repeat("?", chunk.Length));
+            result.AddRange(await Db.QueryAsync<ItemRow>($"SELECT * FROM Items WHERE RowId IN ({marks})",
+                chunk.Cast<object>().ToArray()).ConfigureAwait(false));
+        }
+
+        return result;
+    }
+
+    private static Dictionary<int, string> BuildPaths(List<ItemRow> rows, bool rawTitles = false, bool includeSelf = false)
+    {
+        var byId = rows.ToDictionary(r => r.RowId);
+        var fullPaths = new Dictionary<int, string>();
+        var result = new Dictionary<int, string>();
+        var hasParts = new Dictionary<int, bool>();
+        var separator = rawTitles ? "\u001f" : " › ";
+        foreach (var row in rows)
+        {
+            var start = includeSelf ? row
+                : row.ParentRowId is int parentId && byId.TryGetValue(parentId, out var parentRow) ? parentRow : null;
+            if (start is null)
+            {
+                result[row.RowId] = "";
+                continue;
             }
 
-            var parts = new Stack<string>();
-            var cur = byId[rowId];
-            while (cur.ParentRowId is not null && byId.TryGetValue(cur.ParentRowId.Value, out var p))
+            if (fullPaths.TryGetValue(start.RowId, out var existing))
             {
-                if (p.DisplayTitle is { } name)
+                result[row.RowId] = existing;
+                continue;
+            }
+
+            var chain = new List<ItemRow>();
+            var visiting = new HashSet<int>();
+            var cur = start;
+            while (!fullPaths.ContainsKey(cur.RowId) && visiting.Add(cur.RowId))
+            {
+                chain.Add(cur);
+                if (cur.ParentRowId is not int parent || !byId.TryGetValue(parent, out cur))
                 {
-                    parts.Push(name);
+                    break;
+                }
+            }
+
+            var path = cur is not null && fullPaths.TryGetValue(cur.RowId, out var cached) ? cached : "";
+            var hasPart = cur is not null && hasParts.GetValueOrDefault(cur.RowId);
+            for (int i = chain.Count - 1; i >= 0; i--)
+            {
+                var item = chain[i];
+                var title = rawTitles ? item.Title ?? "" : item.DisplayTitle;
+                if (title is not null)
+                {
+                    path = hasPart ? path + separator + title : title;
+                    hasPart = true;
                 }
 
-                cur = p;
+                fullPaths[item.RowId] = path;
+                hasParts[item.RowId] = hasPart;
             }
 
-            return cache[rowId] = string.Join(" › ", parts);
+            result[row.RowId] = fullPaths.GetValueOrDefault(start.RowId, "");
         }
 
-        foreach (var r in paths)
+        return result;
+    }
+
+    private static List<ItemRow> LoadSubtrees(SQLiteConnection tran, IEnumerable<int> roots)
+    {
+        var rows = new Dictionary<int, ItemRow>();
+        foreach (var chunk in roots.Distinct().Chunk(500))
         {
-            PathOf(r.RowId);
+            var marks = string.Join(",", Enumerable.Repeat("?", chunk.Length));
+            foreach (var row in tran.Query<ItemRow>(
+                $"WITH RECURSIVE subtree AS (SELECT * FROM Items WHERE RowId IN ({marks}) " +
+                "UNION SELECT i.* FROM Items i JOIN subtree s ON i.ParentRowId = s.RowId) " +
+                "SELECT * FROM subtree ORDER BY SortOrder", chunk.Cast<object>().ToArray()))
+            {
+                rows.TryAdd(row.RowId, row);
+            }
         }
 
-        return cache;
+        return rows.Values.ToList();
+    }
+
+    private static void DeleteRows(SQLiteConnection tran, IEnumerable<int> ids)
+    {
+        foreach (var chunk in ids.Chunk(500))
+        {
+            var marks = string.Join(",", Enumerable.Repeat("?", chunk.Length));
+            tran.Execute($"DELETE FROM Items WHERE RowId IN ({marks})", chunk.Cast<object>().ToArray());
+        }
     }
 
     private static int CountNodes(List<BookmarkNode> roots)

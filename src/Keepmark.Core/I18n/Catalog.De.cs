@@ -7,6 +7,7 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> De => _de ??= new()
     {
+        [Str.ErrEncryptedDatabaseRequired] = "Die verschlüsselte Datenbank-Engine ist nicht verfügbar.",
         [Str.AboutCompat] = "Kompatibilität",
         [Str.AboutFmtA] = "Synchronisierungsformat",
         [Str.AboutFmtB] = ": Hier erstellte Synchronisierungen lassen sich in den offiziellen xBrowserSync-Apps öffnen und umgekehrt.",
@@ -209,6 +210,7 @@ internal static partial class Catalogs
         [Str.ErrNotAcceptingNewSyncs] = "Dieser Dienst nimmt derzeit keine neuen Synchronisierungen an. Du kannst weiterhin eine bestehende Sync-ID verbinden.",
         [Str.ErrDailyNewSyncLimit] = "Das tägliche Limit für neue Synchronisierungen auf diesem Dienst ist erreicht. Versuche es morgen erneut.",
         [Str.ErrDataOutOfSync] = "Die Serverkopie hat sich seit deiner letzten Synchronisierung geändert. Lade die neueste Version herunter, bevor du hochlädst.",
+        [Str.ErrPayloadTooLarge] = "Die Daten überschreiten die auf diesem Gerät unterstützte Größenbegrenzung.",
         [Str.ErrSyncTooLarge] = "Die Synchronisierungsdaten überschreiten die Größenbeschränkung des Dienstes. Entferne einige Lesezeichen und versuche es erneut.",
         [Str.ErrThrottled] = "Zu viele Anfragen. Der Dienst hat uns gebeten, langsamer zu machen – versuche es in ein paar Minuten erneut.",
         [Str.ErrServiceOffline] = "Der Dienst ist nicht erreichbar. Prüfe deine Verbindung und die Dienst-URL.",
@@ -493,6 +495,8 @@ internal static partial class Catalogs
         [Str.RelMinutes] = "vor {0} Min.",
         [Str.RelHours] = "vor {0} Std.",
         [Str.RelDays] = "vor {0} T.",
+        [Str.CommonPreviousPage] = "Vorherige Seite",
+        [Str.CommonNextPage] = "Nächste Seite",
         [Str.CommonNext] = "Weiter",
         [Str.CommonYesMove] = "Ja, wechseln",
         [Str.SwH1] = "Zu einem anderen Dienst wechseln",

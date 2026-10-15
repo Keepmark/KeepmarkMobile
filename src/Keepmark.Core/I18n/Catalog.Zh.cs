@@ -8,6 +8,7 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Zh => _zh ??= new()
     {
+        [Str.ErrEncryptedDatabaseRequired] = "加密数据库引擎不可用。",
         [Str.AboutCompat] = "兼容性",
         [Str.AboutFmtA] = "同步格式",
         [Str.AboutFmtB] = "：在这里创建的同步可以在官方 xBrowserSync 应用中打开，反之亦然。",
@@ -210,6 +211,7 @@ internal static partial class Catalogs
         [Str.ErrNotAcceptingNewSyncs] = "此服务目前不接受新的同步。您仍然可以连接现有的同步 ID。",
         [Str.ErrDailyNewSyncLimit] = "已达到此服务每日新建同步的上限。请明天再试。",
         [Str.ErrDataOutOfSync] = "服务器副本在您上次同步后已更改。请先下载最新版本再上传。",
+        [Str.ErrPayloadTooLarge] = "数据超出了此设备支持的大小限制。",
         [Str.ErrSyncTooLarge] = "同步数据超出服务的大小限制。请删除部分书签后重试。",
         [Str.ErrThrottled] = "请求过多。服务要求降低频率——请几分钟后重试。",
         [Str.ErrServiceOffline] = "无法连接服务。请检查网络连接和服务 URL。",
@@ -494,6 +496,8 @@ internal static partial class Catalogs
         [Str.RelMinutes] = "{0} 分钟前",
         [Str.RelHours] = "{0} 小时前",
         [Str.RelDays] = "{0} 天前",
+        [Str.CommonPreviousPage] = "上一页",
+        [Str.CommonNextPage] = "下一页",
         [Str.CommonNext] = "下一步",
         [Str.CommonYesMove] = "是，迁移",
         [Str.SwH1] = "迁移到其他服务",

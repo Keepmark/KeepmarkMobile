@@ -1,3 +1,4 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
 @page "/status"
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
@@ -207,12 +208,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        for (int i = 0; i < 100 && !Session.Ready; i++)
-        {
-            await Task.Delay(100);
-        }
+        if (!await WaitForSessionAsync(Session)) return;
 
         serviceUrl = (await Creds.GetAsync())?.ServiceUrl;
+        if (IsDisposed) return;
         if (Session.Engine is not null)
         {
             Session.Engine.StatusChanged += OnEngine;
@@ -234,8 +233,7 @@ else
             dbSize = Session.Store.GetFileSize();
             // The service stores exactly this blob: base64 ASCII, so chars == bytes.
             // It reflects the last sync (see Pending edits above).
-            var (_, blob, _, _) = await Session.Store.LoadMirrorAsync();
-            serverBytes = blob is null ? null : (long?)blob.Length;
+            serverBytes = await Session.Store.GetStoredBlobLengthAsync();
             stats = await Session.Store.GetStatsAsync();
 
             // If in conflict, load merge preview for the resolution UI
@@ -363,8 +361,9 @@ else
             : Math.Min(100.0, 100.0 * serverBytes.Value / maxSyncSize.Value);
 
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         if (Session.Engine is not null)
         {
             Session.Engine.StatusChanged -= OnEngine;

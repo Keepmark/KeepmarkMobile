@@ -135,6 +135,7 @@ public interface IXSyncApiClient
 /// </summary>
 public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 {
+    public const long MaxResponseBytes = 72L * 1024 * 1024;
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
     private readonly HttpClient _http;
@@ -228,10 +229,13 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         _log.Info("net", $"→ START {label} (If-None-Match)");
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (_http.Timeout != Timeout.InfiniteTimeSpan) timeout.CancelAfter(_http.Timeout);
+            var requestToken = timeout.Token;
             using var req = new HttpRequestMessage(HttpMethod.Get, $"bookmarks/{syncId}");
             req.Headers.TryAddWithoutValidation("Accept-Version", XbsConstants.ApiVersion12);
             req.Headers.TryAddWithoutValidation("If-None-Match", $"\"{knownHash}\"");
-            using var res = await _http.SendAsync(req, ct).ConfigureAwait(false);
+            using var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
             sw.Stop();
             _log.Info("net", $"← END {label} {(int)res.StatusCode} in {sw.ElapsedMilliseconds}ms");
             if (res.StatusCode == HttpStatusCode.NotModified)
@@ -241,10 +245,10 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 
             if (!res.IsSuccessStatusCode)
             {
-                throw MapError(res.StatusCode, await ReadMessageAsync(res, ct).ConfigureAwait(false), res);
+                throw MapError(res.StatusCode, await ReadMessageAsync(res, requestToken).ConfigureAwait(false), res);
             }
 
-            var dto = await res.Content.ReadFromJsonAsync<GetBookmarksResponse>(Json, ct).ConfigureAwait(false);
+            var dto = await ReadResponseAsync<GetBookmarksResponse>(res, requestToken).ConfigureAwait(false);
             if (dto is null || dto.LastUpdated is null)
             {
                 throw new UnexpectedResponseException(_str.Get(Str.ErrUnexpectedResponse));
@@ -256,7 +260,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         {
             throw;
         }
-        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             sw.Stop();
             _log.Warn("net", $"← TIMEOUT {label} after {sw.ElapsedMilliseconds}ms");
@@ -318,6 +322,9 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         _log.Info("net", $"→ START {label}");
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (_http.Timeout != Timeout.InfiniteTimeSpan) timeout.CancelAfter(_http.Timeout);
+            var requestToken = timeout.Token;
             using var req = new HttpRequestMessage(method, path);
             req.Headers.TryAddWithoutValidation("Accept-Version", apiVersion ?? XbsConstants.ApiVersion);
             if (body is not null)
@@ -325,7 +332,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
                 req.Content = JsonContent.Create(body);
             }
 
-            using var res = await _http.SendAsync(req, ct).ConfigureAwait(false);
+            using var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
             var bytes = res.Content.Headers.ContentLength;
             sw.Stop();
             _log.Info("net", $"← END {label} {(int)res.StatusCode} in {sw.ElapsedMilliseconds}ms" +
@@ -333,10 +340,10 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
 
             if (!res.IsSuccessStatusCode)
             {
-                throw MapError(res.StatusCode, await ReadMessageAsync(res, ct).ConfigureAwait(false), res);
+                throw MapError(res.StatusCode, await ReadMessageAsync(res, requestToken).ConfigureAwait(false), res);
             }
 
-            var dto = await res.Content.ReadFromJsonAsync<T>(Json, ct).ConfigureAwait(false);
+            var dto = await ReadResponseAsync<T>(res, requestToken).ConfigureAwait(false);
             if (dto is null || !valid(dto))
             {
                 throw new UnexpectedResponseException(_str.Get(Str.ErrUnexpectedResponse));
@@ -348,7 +355,7 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         {
             throw;
         }
-        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
         {
             sw.Stop();
             _log.Warn("net", $"← TIMEOUT {label} after {sw.ElapsedMilliseconds}ms");
@@ -362,15 +369,57 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         }
     }
 
+    private static async Task<T?> ReadResponseAsync<T>(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.Content.Headers.ContentLength > MaxResponseBytes)
+            throw new SyncTooLargeException(Loc.Get(Str.ErrPayloadTooLarge));
+        await using var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var limited = new LimitedReadStream(source, MaxResponseBytes);
+        return await JsonSerializer.DeserializeAsync<T>(limited, Json, ct).ConfigureAwait(false);
+    }
+
+    // Count actual bytes too: Content-Length may be absent, inaccurate or refer
+    // to compressed data. Never buffer a full response before enforcing the cap.
+    private sealed class LimitedReadStream(Stream source, long limit) : Stream
+    {
+        private long _remaining = limit;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        private int Budget(int requested) => (int)Math.Min(requested, _remaining + 1);
+        private int Count(int read)
+        {
+            _remaining -= read;
+            if (_remaining < 0) throw new SyncTooLargeException(Loc.Get(Str.ErrPayloadTooLarge));
+            return read;
+        }
+        public override int Read(byte[] buffer, int offset, int count) =>
+            Count(source.Read(buffer, offset, Budget(count)));
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            Count(await source.ReadAsync(buffer[..Budget(buffer.Length)], cancellationToken).ConfigureAwait(false));
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+    }
+
     private static async Task<string> ReadMessageAsync(HttpResponseMessage res, CancellationToken ct)
     {
         try
         {
-            using var doc = await res.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: ct).ConfigureAwait(false);
+            using var doc = await ReadErrorDocumentAsync(res, ct).ConfigureAwait(false);
             if (doc is not null && doc.RootElement.TryGetProperty("message", out var msg))
             {
                 return msg.GetString() ?? string.Empty;
             }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
@@ -378,6 +427,15 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
         }
 
         return string.Empty;
+    }
+
+    private static async Task<JsonDocument?> ReadErrorDocumentAsync(HttpResponseMessage res, CancellationToken ct)
+    {
+        const int maxErrorBytes = 64 * 1024;
+        if (res.Content.Headers.ContentLength > maxErrorBytes) return null;
+        await using var source = await res.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var limited = new LimitedReadStream(source, maxErrorBytes);
+        return await JsonSerializer.DeserializeAsync<JsonDocument>(limited, cancellationToken: ct).ConfigureAwait(false);
     }
 
     private XbsException MapError(HttpStatusCode status, string serverMessage, HttpResponseMessage? res = null) => status switch

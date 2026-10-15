@@ -1,4 +1,4 @@
-﻿namespace KeepmarkMobile;
+namespace KeepmarkMobile;
 
 public partial class App : Application
 {
@@ -16,7 +16,12 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        return new Window(new MainPage()) { Title = "Keepmark" };
+        var window = new Window(new MainPage()) { Title = "Keepmark" };
+        window.Activated += (_, _) => _session.SetForeground(true);
+        window.Resumed += (_, _) => _session.SetForeground(true);
+        window.Stopped += (_, _) => _session.SetForeground(false);
+        window.Destroying += (_, _) => _session.SetForeground(false);
+        return window;
     }
 
     protected override async void OnStart()

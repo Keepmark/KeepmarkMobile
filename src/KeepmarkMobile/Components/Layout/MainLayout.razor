@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.AppLockState LockState
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
@@ -63,6 +63,8 @@
 @code {
     private string lockError = string.Empty;
     private bool syncing;
+    private bool disposed;
+    private readonly CancellationTokenSource lifetime = new();
 
     protected override void OnInitialized()
     {
@@ -121,10 +123,9 @@
 
     private async Task WatchSessionAsync()
     {
-        for (int i = 0; i < 200 && !Session.Ready; i++)
-        {
-            await Task.Delay(100);
-        }
+        try { await Session.InitAsync().WaitAsync(lifetime.Token); }
+        catch (OperationCanceledException) when (disposed) { return; }
+        if (disposed) return;
 
         if (Session.Engine is not null)
         {
@@ -162,7 +163,7 @@
                 return;
             }
 
-            await InvokeAsync(() => Nav.NavigateTo("/connect"));
+            await InvokeAsync(() => { if (!disposed) Nav.NavigateTo("/connect"); });
         }
         catch
         {
@@ -226,6 +227,9 @@
 
     public void Dispose()
     {
+        disposed = true;
+        lifetime.Cancel();
+        lifetime.Dispose();
         LockState.Changed -= OnLockChanged;
         LockState.PromptRequested -= OnPromptRequested;
         Toast.Changed -= OnToast;

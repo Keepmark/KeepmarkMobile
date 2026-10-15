@@ -1,3 +1,4 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
 @page "/backup"
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
@@ -128,10 +129,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        for (int i = 0; i < 100 && !Session.Ready; i++)
-        {
-            await Task.Delay(100);
-        }
+        if (!await WaitForSessionAsync(Session)) return;
 
         await RefreshCountsAsync();
         await RefreshSafetyListAsync();

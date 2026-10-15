@@ -7,6 +7,7 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Ja => _ja ??= new()
     {
+        [Str.ErrEncryptedDatabaseRequired] = "暗号化データベースエンジンを利用できません。",
         [Str.AboutCompat] = "互換性",
         [Str.AboutFmtA] = "同期形式",
         [Str.AboutFmtB] = ": ここで作成した同期は公式 xBrowserSync アプリで開くことができ、その逆も可能です。",
@@ -209,6 +210,7 @@ internal static partial class Catalogs
         [Str.ErrNotAcceptingNewSyncs] = "このサービスは現在、新しい同期を受け付けていません。既存の同期 ID は接続できます。",
         [Str.ErrDailyNewSyncLimit] = "このサービスの 1 日あたりの新規同期の上限に達しました。明日もう一度お試しください。",
         [Str.ErrDataOutOfSync] = "前回の同期以降にサーバーのコピーが変更されました。アップロードの前に最新版をダウンロードしてください。",
+        [Str.ErrPayloadTooLarge] = "データがこのデバイスでサポートされるサイズの上限を超えています。",
         [Str.ErrSyncTooLarge] = "同期データがサービスのサイズ上限を超えています。ブックマークをいくつか削除して再試行してください。",
         [Str.ErrThrottled] = "リクエストが多すぎます。サービスから速度を落とすよう求められました。数分後に再試行してください。",
         [Str.ErrServiceOffline] = "サービスに接続できません。接続とサービス URL を確認してください。",
@@ -493,6 +495,8 @@ internal static partial class Catalogs
         [Str.RelMinutes] = "{0} 分前",
         [Str.RelHours] = "{0} 時間前",
         [Str.RelDays] = "{0} 日前",
+        [Str.CommonPreviousPage] = "前のページ",
+        [Str.CommonNextPage] = "次のページ",
         [Str.CommonNext] = "次へ",
         [Str.CommonYesMove] = "はい、移行",
         [Str.SwH1] = "別のサービスへ移行",

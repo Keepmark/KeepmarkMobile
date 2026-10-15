@@ -22,12 +22,19 @@ public sealed class XbsSession : IAsyncDisposable
     private readonly IXbsLocalizer _str;
     private readonly InMemoryLogger _log = new();
     private readonly XCryptoService _crypto;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, XSyncApiClient> _apiClients = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<XSyncApiClient>> _apiClients = new();
     /// <summary>Serializes the whole safety subsystem (master rotation, backup
     /// writes, index rewrites) so a rotation can never interleave a write.</summary>
     private readonly SemaphoreSlim _safetyGate = new(1, 1);
-    private PeriodicTimer? _pollTimer;
-    private CancellationTokenSource? _pollCts;
+    private readonly object _initGate = new();
+    private readonly ForegroundPoller _poller;
+    private Task? _initTask;
+    private volatile bool _foreground;
+    private bool _disposed;
+
+    public bool Foreground => _foreground;
+    private bool ShouldPoll => _foreground && !_disposed && Engine?.Mode == SyncMode.Auto;
+    public event Action? ForegroundChanged;
 
     public BookmarkStore? Store { get; private set; }
     public SyncEngine? Engine { get; private set; }
@@ -42,9 +49,22 @@ public sealed class XbsSession : IAsyncDisposable
         _str = str;
         _log.MinLevel = settings.Verbosity;
         _crypto = new XCryptoService(str, _log);
+        _poller = new ForegroundPoller(Core.XbsConstants.SyncPollInterval,
+            ct => Engine is not null && !_autoSyncSuspended && _foreground
+                ? Engine.ExecuteAutoSyncAsync(ct) : Task.CompletedTask,
+            ex => _log.Warn("session", $"Automatic sync failed: {ex.GetType().Name}"));
     }
 
-    public async Task InitAsync()
+    public Task InitAsync()
+    {
+        lock (_initGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _initTask ??= InitializeCoreAsync();
+        }
+    }
+
+    private async Task InitializeCoreAsync()
     {
         var dbKey = await _creds.GetOrCreateDbKeyAsync().ConfigureAwait(false);
         var store = new BookmarkStore(
@@ -62,30 +82,24 @@ public sealed class XbsSession : IAsyncDisposable
         Engine = engine;
         Ready = true;
         _log.Info("session", $"Log started (level {_log.MinLevel}, mode {_settings.Mode})");
-        StartPollTimer();
+        engine.AutoSyncEnabled = _foreground;
+        await _poller.SetActiveAsync(ShouldPoll).ConfigureAwait(false);
+    }
 
-        // Cold-start background sync (auto mode only, credentials present).
-        // The UI shows a top loader while Engine.Status == Syncing.
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                if (await _creds.GetAsync().ConfigureAwait(false) is not null)
-                {
-                    await engine.ExecuteAutoSyncAsync().ConfigureAwait(false);
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.Warn("session", $"Cold-start sync failed: {ex.GetType().Name}");
-            }
-        });
+    public void SetForeground(bool foreground)
+    {
+        if (_disposed || _foreground == foreground) return;
+        _foreground = foreground;
+        if (Engine is not null) Engine.AutoSyncEnabled = foreground;
+        if (Ready) _ = _poller.SetActiveAsync(ShouldPoll);
+        ForegroundChanged?.Invoke();
     }
 
     public XSyncApiClient ApiFor(string serviceUrl)
     {
         // Called from the poll timer and the UI concurrently.
-        return _apiClients.GetOrAdd(serviceUrl, url => XSyncApiClient.ForService(url, _str, _log));
+        return _apiClients.GetOrAdd(serviceUrl.TrimEnd('/'), url => new Lazy<XSyncApiClient>(
+            () => XSyncApiClient.ForService(url, _str, _log))).Value;
     }
 
     public async Task<ServiceInfoResponse> CheckServiceAsync(string serviceUrl, CancellationToken ct = default)
@@ -135,7 +149,7 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task ApplyRemoteAsync(ReconcileInfo info, string operation = SafetyOperations.TakeRemote, CancellationToken ct = default)
     {
         // Safety backup of the discarded local side (live tree as plaintext JSON).
-        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local",
             System.Text.Json.JsonSerializer.Serialize(localRoots), operation,
             CountBackupNodes(localRoots), info.Candidate.Id).ConfigureAwait(false);
@@ -168,7 +182,7 @@ public sealed class XbsSession : IAsyncDisposable
         await SaveSafetyBackupAsync("remote", remoteJson, operation, info.RemoteCount, info.Candidate.Id).ConfigureAwait(false);
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         _log.Info("session", "Link: uploading local tree");
-        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         // Base = the remote lastUpdated read at probe time (R6.4), never the
         // previous link's mirror base; a 409 leaves the old link intact.
         await Engine!.LinkUploadAsync(info.Candidate, roots, info.RemoteLastUpdated ?? string.Empty, ct).ConfigureAwait(false);
@@ -181,7 +195,7 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task<MergeStats> GetMergePreviewAsync(ReconcileInfo info, CancellationToken ct = default)
     {
         var remoteRoots = DecryptTree(info);
-        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         _ = ct;
         return BookmarkMerge.Merge(localRoots, remoteRoots).Stats;
     }
@@ -193,7 +207,7 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task ApplyMergeAsync(ReconcileInfo info, string operation, CancellationToken ct = default)
     {
         var remoteRoots = DecryptTree(info);
-        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         var merged = BookmarkMerge.Merge(localRoots, remoteRoots);
 
         await SaveSafetyBackupAsync("local",
@@ -236,7 +250,7 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
         // Safety backup: the local tree is about to be replaced by an empty sync.
-        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
             SafetyOperations.CreateEmpty, CountBackupNodes(roots)).ConfigureAwait(false);
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
@@ -257,7 +271,7 @@ public sealed class XbsSession : IAsyncDisposable
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
         var candidate = new SyncCredentials(created.Id!, serviceUrl, derived, created.Version);
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
-        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         // Fresh sync: its own creation timestamp is the only valid base.
         await Engine!.LinkUploadAsync(candidate, roots, created.LastUpdated!, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
@@ -312,6 +326,7 @@ public sealed class XbsSession : IAsyncDisposable
         if (Engine is not null)
         {
             Engine.Mode = _settings.Mode;
+            _ = _poller.SetActiveAsync(ShouldPoll);
         }
     }
 
@@ -321,7 +336,7 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task<string> ExportBackupAsync(string password, CancellationToken ct = default)
     {
         BackupGuard.RequirePassword(password);
-        var (roots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         BackupGuard.ValidateTree(roots);
         var json = System.Text.Json.JsonSerializer.Serialize(roots);
         var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
@@ -351,7 +366,7 @@ public sealed class XbsSession : IAsyncDisposable
         BackupGuard.RequirePassword(password);
         var roots = await OpenBackupAsync(path, password, ct).ConfigureAwait(false);
         var count = BackupGuard.ValidateTree(roots);
-        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(localRoots),
             SafetyOperations.ImportBackup, CountBackupNodes(localRoots)).ConfigureAwait(false);
         await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
@@ -372,20 +387,19 @@ public sealed class XbsSession : IAsyncDisposable
                 Loc.Get(Str.ErrBackupFileTooLarge, BackupGuard.MaxBytes / 1024 / 1024));
         }
 
-        string raw;
+        BackupEnvelope? envelope;
         try
         {
-            raw = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+            // Deserialize directly from the file instead of retaining its complete JSON text.
+            await using var input = File.OpenRead(path);
+            if (input.Length > BackupGuard.MaxBytes)
+                throw new InvalidOperationException(Loc.Get(Str.ErrBackupFileTooLarge, BackupGuard.MaxBytes / 1024 / 1024));
+            envelope = await System.Text.Json.JsonSerializer.DeserializeAsync<BackupEnvelope>(input,
+                cancellationToken: ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new InvalidOperationException(Loc.Get(Str.ErrBackupUnreadable), ex);
-        }
-
-        BackupEnvelope? envelope;
-        try
-        {
-            envelope = System.Text.Json.JsonSerializer.Deserialize<BackupEnvelope>(raw);
         }
         catch (System.Text.Json.JsonException ex)
         {
@@ -400,15 +414,9 @@ public sealed class XbsSession : IAsyncDisposable
 
         // Damaged file vs wrong password: base64 must parse before GCM runs,
         // otherwise every corruption looks like bad credentials.
-        try
-        {
-            _ = Convert.FromBase64String(envelope.Salt);
-            _ = Convert.FromBase64String(envelope.Blob);
-        }
-        catch (FormatException ex)
-        {
-            throw new InvalidOperationException(Loc.Get(Str.ErrBackupDamaged), ex);
-        }
+        if (!System.Buffers.Text.Base64.IsValid(envelope.Salt, out var saltBytes) || saltBytes != 16 ||
+            !System.Buffers.Text.Base64.IsValid(envelope.Blob, out var blobBytes) || blobBytes < 33)
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupDamaged));
 
         var derived = _crypto.DeriveKey(password, envelope.Salt, Core.XbsConstants.SyncClientVersion);
         // Wrong password: GCM authentication fails here with an invalid-credentials error.
@@ -710,7 +718,7 @@ public sealed class XbsSession : IAsyncDisposable
         var count = BackupGuard.ValidateTree(roots);
         if (entry.Side == "local")
         {
-            var (localRoots, _, _, _) = await Store!.LoadMirrorAsync().ConfigureAwait(false);
+            var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
             await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(localRoots),
                 SafetyOperations.PreRestore, CountBackupNodes(localRoots)).ConfigureAwait(false);
             await Store.RestoreLocalAsync(roots).ConfigureAwait(false);
@@ -792,7 +800,7 @@ public sealed class XbsSession : IAsyncDisposable
             return 0;
         }
 
-        var (roots, _, _, _) = await Store.LoadMirrorAsync().ConfigureAwait(false);
+        var (roots, _, _, _) = await Store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
             SafetyOperations.DuplicatesCleanup, CountBackupNodes(roots)).ConfigureAwait(false);
         return await Engine.DeleteBookmarksByNodeIdsAsync(ids, ct).ConfigureAwait(false);
@@ -875,35 +883,6 @@ public sealed class XbsSession : IAsyncDisposable
     private static string? ShortSyncId(string? id) =>
         id is null ? null : id.Length <= 8 ? id : $"{id[..4]}…{id[^2..]}";
 
-    private void StartPollTimer()
-    {
-        _pollCts = new CancellationTokenSource();
-        _pollTimer = new PeriodicTimer(Core.XbsConstants.SyncPollInterval);
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                while (await _pollTimer.WaitForNextTickAsync(_pollCts.Token).ConfigureAwait(false))
-                {
-                    try
-                    {
-                        if (Engine is not null && !_autoSyncSuspended)
-                        {
-                            await Engine.ExecuteAutoSyncAsync().ConfigureAwait(false);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.Warn("session", $"Background poll failed: {ex.GetType().Name}");
-                    }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        });
-    }
-
     /// <summary>Suspends the auto-sync background timer.
     /// Called when conflict resolution starts to prevent interference.</summary>
     public void SuspendAutoSync()
@@ -924,12 +903,20 @@ public sealed class XbsSession : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _pollCts?.Cancel();
-        _pollTimer?.Dispose();
-        _pollCts?.Dispose();
+        _disposed = true;
+        _foreground = false;
+        if (Engine is not null) Engine.AutoSyncEnabled = false;
+        await _poller.SetActiveAsync(false).ConfigureAwait(false);
+        if (_initTask is not null)
+        {
+            try { await _initTask.ConfigureAwait(false); }
+            catch (Exception ex) { _log.Warn("session", $"Initialization ended during disposal: {ex.GetType().Name}"); }
+        }
+        await _poller.DisposeAsync().ConfigureAwait(false);
+        if (Engine is not null) await Engine.WaitForBackgroundPushAsync().ConfigureAwait(false);
         foreach (var c in _apiClients.Values)
         {
-            c.Dispose();
+            if (c.IsValueCreated) c.Value.Dispose();
         }
 
         if (Store is not null)

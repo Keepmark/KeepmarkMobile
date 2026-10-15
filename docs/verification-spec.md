@@ -8,7 +8,9 @@ requirement, it is marked **[KNOWN GAP]** instead of being silently adjusted.
 Conventions: `Rxx` = requirement IDs. "Must" = fail the review if violated.
 File paths are relative to `KeepmarkMobile/`. Commands run from `KeepmarkMobile/` with
 `ANDROID_HOME=$HOME/android-sdk`, `JAVA_HOME=$HOME/jdk-21`
-(JDK 21; system JDK is rejected): `dotnet test` (xUnit, no device),
+(JDK 21; system JDK is rejected). On Linux x64 first run
+`python3 scripts/prepare-sqlcipher.py --linux` (prerequisites in DEVELOPMENT.md),
+then `dotnet test` (xUnit, no device),
 Android build `dotnet build src/KeepmarkMobile -f net10.0-android -c Debug`.
 
 Global rules (verify everywhere): UI strings in en/it/fr/es/de/ja/pt/ru/zh via `Loc`/`IXbsLocalizer` (log strings stay English); no telemetry;
@@ -29,7 +31,7 @@ only as method arguments, never stored, never logged.
 | R1.7 | `GcmNonceLength` | `16` bytes, prepended to ciphertext (NOT the 12-byte .NET default) |
 | R1.8 | `DescriptionMaxLength` | `300` chars, enforced on push (truncate) |
 | R1.9 | `SeparatorUrl` | `xbs:separator` |
-| R1.10 | `SyncPollInterval` / `ServiceProbeTimeout` / `DefaultHttpTimeout` | 15 min / 3 s / 12 s |
+| R1.10 | `SyncPollInterval` / `ServiceProbeTimeout` / `DefaultHttpTimeout` | 15 min after completed foreground tick (Auto only) / 3 s / 12 s |
 | R1.11 | `CompareVersions` | numeric dotted compare, tolerates leading `v` (`1.1.13` > `1.1.9`); unit-pinned in `VersionCompareTests.cs` |
 
 ## 2. Crypto (`src/Keepmark.Core/Crypto/`)
@@ -40,7 +42,7 @@ only as method arguments, never stored, never logged.
 | R2.2 | Byte-interop BOTH directions with `lzutf8@0.6.0` + original JS client | `CryptoInteropTests.cs` + `TestData/vectors.json` green; never change `Crypto/` without running both Node directions |
 | R2.3 | Legacy sync without version rejected ("open once in the official xBrowserSync client") | `DeriveKey` throws `UnsupportedSyncVersionException` on empty version |
 | R2.4 | Decrypt failure (wrong password / corrupt) surfaces as `InvalidCredentialsException`, never as generic error | Code + wrong-password tests |
-| R2.5 | Encrypted backup envelope `{App:"xBrowserSyncNg", Format:1, Salt:Base64(16B random), Blob}`; password ≥ 8, file ≤ 50 MB, tree ≤ 200k nodes (`BackupGuard`) | `BackupGuardTests.cs`; damaged-file vs wrong-password distinguished (base64 pre-check) |
+| R2.5 | Encrypted backup envelope `{App:"xBrowserSyncNg", Format:1, Salt:Base64(16B random), Blob}`; password ≥ 8, file ≤ 50 MiB, decoded envelope ≤ 50 MiB, decompressed UTF-8 ≤ 256 MiB, tree ≤ 200k nodes (`BackupGuard`) | `BackupGuardTests.cs`; damaged-file vs wrong-password distinguished (base64 pre-check) |
 
 ## 3. API client (`src/Keepmark.Core/Api/XSyncApiClient.cs`)
 
@@ -56,7 +58,7 @@ only as method arguments, never stored, never logged.
 
 | R | Requirement |
 |---|---|
-| R4.1 | Whole-blob only (API has no deltas). `Mode` Auto (poll + push-on-edit) / Manual (explicit only). Statuses: Idle/Syncing/Offline/Conflict/Error/NoCredentials + `DataChanged`/`StatusChanged` events; UI preserves scroll/query across events. |
+| R4.1 | Whole-blob only (API has no deltas). `Mode` Auto (foreground-only polling + one coalesced push worker with 250 ms grouping) / Manual (explicit only). Statuses: Idle/Syncing/Offline/Conflict/Error/NoCredentials + `DataChanged`/`StatusChanged` events; UI preserves scroll/query across events. |
 | R4.2 | v1.2 capability probed via `/info` capabilities per service URL, cached; legacy → timestamp path. Conditional GET (304) skips download when hash known. Revision CAS on push when revision stored; 409 on races, never overwrite. |
 | R4.3 | v1.2 capability probed on the 1.2.0 contract (`GetInfoV12Async` — the legacy contract strips capabilities, so probing there could never succeed), cached per service URL; 412 / missing capabilities = legacy. A service older than MinApiVersion throws instead of being silently used. Verifier: against a v1.2 server, conditional GET and revision CAS must be observed in logs. |
 | R4.3b | `capabilities.syncExpiryDays` (v1.2 `/info`) is display only: integer ≥ 0 shown on Status and Switch service (`0` = kept forever), anything else ignored. A malformed value MUST NOT fail the capability probe (`ApiClientTests.SyncExpiryDays_MalformedNeverBreaksTheProbe`). |
@@ -199,7 +201,16 @@ fails the review.
   2. Reset `_resolvingConflict = false` in `finally` (after `_gate.Release()`)
   3. Never call other public sync methods that might re-acquire the gate (avoid deadlock)
 - **`ForceSyncAsync` and `PushInBackgroundAsync`** MUST check `_resolvingConflict` **after** acquiring `_gate` and return early if true. This prevents false Conflict status during resolution.
-- **Background timers** (poll, native debounce) MUST NOT fire sync logic while `_resolvingConflict` is true.
+- **Background timers** MUST NOT fire sync logic while `_resolvingConflict` is true.
+- **Foreground lifecycle**: no periodic poll or Home clock while stopped. Rapid
+  stop/resume never creates overlapping workers; cancellation/disposal drains work.
+- **Push acknowledgement**: ordinary push preserves RowIds and FTS; normalizes only
+  changed descriptions; blob/revision/hash/dirty are updated transactionally. An
+  edit arriving during upload is never lost. Redundant queued pushes skip clean data.
+- **UI lifetime**: dispose during initialization cannot create later timers or
+  event subscriptions. A late gesture release cannot detach a newer component.
+- **Resource bounds**: HTTP JSON ≤72 MiB, error body ≤64 KiB, encrypted envelope
+  ≤50 MiB, decompressed UTF-8 ≤256 MiB; no device limit is mislabeled as a server limit.
 
 ### 13.1b Push-base rule (review 2026-10-08)
 
@@ -239,8 +250,21 @@ fails the review.
 
 ### 13.5 Release checklist (Keepmark Android)
 
-- [ ] `dotnet test` green (131+ Core tests)
+- [ ] `dotnet test` green (254 Core tests)
 - [ ] `dotnet build -f net10.0-android` 0 errors
 - [ ] Device deploy: `dotnet build -t:Run` or `adb install`
 - [ ] Manual device QA: conflict → merge → safety backup visible
 - [ ] Version bump in `KeepmarkMobile.csproj` (`ApplicationDisplayVersion`, `ApplicationVersion`)
+
+
+## Native database engine verification
+
+- Load SQLCipher 4.19.0 / SQLite 3.53.4 through the sqlcipher provider; refuse
+  startup when `cipher_version` is absent. Never fall back to plaintext SQLite.
+- Preserve the original encrypted fixture and database key/format. Verify
+  old/new engine reads and writes in both directions, including FTS.
+- Final APK must contain the pinned official arm64-v8a and x86_64 libraries,
+  stored uncompressed with 16 KiB ELF and ZIP alignment. Run
+  `python3 scripts/verify-native-sqlcipher.py --apk /path/to/app.apk`.
+- Bundle SQLCipher and crypto third-party notices. Device runtime and battery
+  validation remain separate from host tests and APK inspection.

@@ -13,6 +13,8 @@ function str(key, fallback) {
 window.xbsGestures = (() => {
     let dotNet = null;
     let dupRef = null;
+    let homeOwner = null, dupOwner = null;
+    let layoutFrame = 0;
     const locks = {};
     let listenersAttached = false;
     let state = null;
@@ -25,7 +27,7 @@ window.xbsGestures = (() => {
     // The live pages may be replaced at any moment (old ref disposed, new one
     // not yet registered): never let a gesture crash on a dead reference.
     function call(ref, method, id) {
-        try { if (ref) ref.invokeMethodAsync(method, id); } catch { /* noop */ }
+        try { if (ref) ref.invokeMethodAsync(method, id)?.catch(() => {}); } catch { /* disposed page */ }
     }
 
     function onDown(e) {
@@ -531,16 +533,27 @@ window.xbsGestures = (() => {
     });
 
     return {
-        init(ref) {
+        init(ref, owner) {
+            homeOwner = owner;
             // Home instances come and go with navigation (and the old one
             // disposes its reference): always point at the live instance.
             dotNet = ref;
             attach();
         },
-        initDup(ref) {
+        initDup(ref, owner) {
+            dupOwner = owner;
             // Duplicates page instances come and go like Home's.
             dupRef = ref;
             attach();
+        },
+        release(owner) {
+            const home = homeOwner === owner, dup = dupOwner === owner;
+            if ((home && state && state.kind !== 'dup') || (dup && state && state.kind === 'dup')) {
+                if (state.timer) clearTimeout(state.timer);
+                state = null;
+            }
+            if (home) { dotNet = null; homeOwner = null; }
+            if (dup) { dupRef = null; dupOwner = null; }
         },
         closeAll() { /* kept for Blazor callers; no snapped rows anymore */ },
         lockScroll(on, owner) {
@@ -572,8 +585,12 @@ window.xbsGestures = (() => {
             if (el && el.focus) el.focus();
         },
         layoutBrowse() {
-            fitCrumbs();
-            fitBrowse();
+            if (layoutFrame) return;
+            layoutFrame = requestAnimationFrame(() => {
+                layoutFrame = 0;
+                fitCrumbs();
+                fitBrowse();
+            });
         },
         scrollToRow(rowId) {
             const el = document.querySelector(`.xbs-row[data-rowid="${rowId}"]`);

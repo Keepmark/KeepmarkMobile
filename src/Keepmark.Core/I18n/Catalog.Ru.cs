@@ -9,6 +9,7 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Ru => _ru ??= new()
     {
+        [Str.ErrEncryptedDatabaseRequired] = "Модуль зашифрованной базы данных недоступен.",
         [Str.AboutCompat] = "Совместимость",
         [Str.AboutFmtA] = "Формат синхронизации",
         [Str.AboutFmtB] = ": синхронизации, созданные здесь, открываются в официальных приложениях xBrowserSync, и наоборот.",
@@ -211,6 +212,7 @@ internal static partial class Catalogs
         [Str.ErrNotAcceptingNewSyncs] = "Сейчас этот сервис не принимает новые синхронизации. Вы по-прежнему можете подключить существующий ID синхронизации.",
         [Str.ErrDailyNewSyncLimit] = "Достигнут дневной лимит новых синхронизаций на этом сервисе. Попробуйте завтра.",
         [Str.ErrDataOutOfSync] = "Копия на сервере изменилась после вашей последней синхронизации. Скачайте последнюю версию перед отправкой.",
+        [Str.ErrPayloadTooLarge] = "Данные превышают допустимый размер для этого устройства.",
         [Str.ErrSyncTooLarge] = "Данные синхронизации превышают лимит размера сервиса. Удалите часть закладок и попробуйте снова.",
         [Str.ErrThrottled] = "Слишком много запросов. Сервис попросил снизить частоту — попробуйте через несколько минут.",
         [Str.ErrServiceOffline] = "Не удаётся связаться с сервисом. Проверьте подключение и URL сервиса.",
@@ -495,6 +497,8 @@ internal static partial class Catalogs
         [Str.RelMinutes] = "{0} мин назад",
         [Str.RelHours] = "{0} ч назад",
         [Str.RelDays] = "{0} дн. назад",
+        [Str.CommonPreviousPage] = "Предыдущая страница",
+        [Str.CommonNextPage] = "Следующая страница",
         [Str.CommonNext] = "Далее",
         [Str.CommonYesMove] = "Да, перенести",
         [Str.SwH1] = "Перейти на другой сервис",

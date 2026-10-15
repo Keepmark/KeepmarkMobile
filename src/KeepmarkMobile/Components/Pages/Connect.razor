@@ -1,3 +1,4 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
 @page "/connect"
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
@@ -290,10 +291,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        for (int i = 0; i < 100 && !Session.Ready; i++)
-        {
-            await Task.Delay(100);
-        }
+        if (!await WaitForSessionAsync(Session)) return;
 
         await RefreshStateAsync();
     }

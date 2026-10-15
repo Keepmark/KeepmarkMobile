@@ -1,4 +1,5 @@
-﻿@inject KeepmarkMobile.Services.XbsSession Session
+@inherits KeepmarkMobile.Components.SessionComponentBase
+@inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject IJSRuntime JS
@@ -76,10 +77,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        for (int i = 0; i < 100 && !Session.Ready; i++)
-        {
-            await Task.Delay(100);
-        }
+        if (!await WaitForSessionAsync(Session)) return;
 
         if (Session.Engine is not null)
         {
@@ -107,6 +105,8 @@
         }
     }
 
+    private long dupVersion = -1;
+
     private async Task RefreshDupCountAsync()
     {
         if (Session.Store is null)
@@ -114,9 +114,12 @@
             return;
         }
 
+        var version = Session.Store.ContentVersion;
+        if (dupVersion == version) return;
         try
         {
-            dupCount = (await Session.Store.GetDuplicateUrlsAsync()).Sum(g => g.Rows.Count - 1);
+            dupCount = await Session.Store.CountDuplicateBookmarksAsync();
+            dupVersion = version;
         }
         catch
         {
@@ -134,6 +137,7 @@
         if (!collapseNavMenu)
         {
             await RefreshLinkedAsync();
+            await RefreshDupCountAsync();
         }
     }
 
@@ -143,8 +147,9 @@
         try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", false, "nav"); } catch { }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         _ = JS.InvokeVoidAsync("xbsGestures.lockScroll", false, "nav");
         if (Session.Engine is not null)
         {

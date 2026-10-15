@@ -7,6 +7,7 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Fr => _fr ??= new()
     {
+        [Str.ErrEncryptedDatabaseRequired] = "Le moteur de base de données chiffrée est indisponible.",
         [Str.AboutCompat] = "Compatibilité",
         [Str.AboutFmtA] = "Format de synchronisation",
         [Str.AboutFmtB] = " : les synchronisations créées ici s'ouvrent dans les applications officielles xBrowserSync, et inversement.",
@@ -209,6 +210,7 @@ internal static partial class Catalogs
         [Str.ErrNotAcceptingNewSyncs] = "Ce service n'accepte pas de nouvelles synchronisations pour le moment. Vous pouvez toujours connecter un ID de synchronisation existant.",
         [Str.ErrDailyNewSyncLimit] = "Limite quotidien de nouvelles synchronisations atteinte sur ce service. Réessayez demain.",
         [Str.ErrDataOutOfSync] = "La copie du serveur a changé depuis votre dernière synchronisation. Téléchargez la dernière version avant d'envoyer.",
+        [Str.ErrPayloadTooLarge] = "Les données dépassent la taille maximale prise en charge sur cet appareil.",
         [Str.ErrSyncTooLarge] = "Les données de synchronisation dépassent la taille maximale du service. Supprimez des favoris et réessayez.",
         [Str.ErrThrottled] = "Trop de requêtes. Le service nous a demandé de ralentir — réessayez dans quelques minutes.",
         [Str.ErrServiceOffline] = "Impossible de joindre le service. Vérifiez votre connexion et l'URL du service.",
@@ -493,6 +495,8 @@ internal static partial class Catalogs
         [Str.RelMinutes] = "il y a {0} min",
         [Str.RelHours] = "il y a {0} h",
         [Str.RelDays] = "il y a {0} j",
+        [Str.CommonPreviousPage] = "Page précédente",
+        [Str.CommonNextPage] = "Page suivante",
         [Str.CommonNext] = "Suivant",
         [Str.CommonYesMove] = "Oui, déplacer",
         [Str.SwH1] = "Passer à un autre service",

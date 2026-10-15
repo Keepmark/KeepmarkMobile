@@ -68,52 +68,44 @@ else
 
     private string SizeClass => Large ? "lg" : string.Empty;
 
-    private string Host
-    {
-        get
-        {
-            if (Uri.TryCreate(Row.Url, UriKind.Absolute, out var u) && !string.IsNullOrEmpty(u.Host))
-            {
-                return u.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? u.Host[4..] : u.Host;
-            }
+    private string? cachedUrl;
+    private string? cachedTitle;
+    private bool cached;
+    private string Initial = "•";
+    private string Color = Palette[0];
 
-            return Row.Url ?? Row.Title ?? string.Empty;
+    protected override void OnParametersSet()
+    {
+        if (cached && cachedUrl == Row.Url && cachedTitle == Row.Title) return;
+        cached = true;
+        cachedUrl = Row.Url;
+        cachedTitle = Row.Title;
+        var host = HostFor(Row);
+        Color = HostColor(host);
+        Initial = "•";
+        foreach (var ch in (Row.Title ?? string.Empty) + host)
+        {
+            if (!char.IsLetterOrDigit(ch)) continue;
+            Initial = char.ToUpperInvariant(ch).ToString();
+            break;
         }
     }
 
-    private string Initial
+    private static string HostFor(ItemRow row)
     {
-        get
-        {
-            foreach (var ch in (Row.Title ?? string.Empty) + Host)
-            {
-                if (char.IsLetterOrDigit(ch))
-                {
-                    return char.ToUpperInvariant(ch).ToString();
-                }
-            }
-
-            return "•";
-        }
+        if (Uri.TryCreate(row.Url, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host))
+            return uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host;
+        return row.Url ?? row.Title ?? string.Empty;
     }
 
-    private string Color
+    private static string HostColor(string host)
     {
-        get
-        {
-            // Stable across runs (string.GetHashCode is randomized per process).
-            uint h = 2166136261;
-            foreach (var ch in Host.ToLowerInvariant())
-            {
-                h = (h ^ ch) * 16777619;
-            }
-
-            return Palette[h % (uint)Palette.Length];
-        }
+        uint hash = 2166136261;
+        foreach (var ch in host.ToLowerInvariant()) hash = (hash ^ ch) * 16777619;
+        return Palette[hash % (uint)Palette.Length];
     }
 
-    // The site color outside the tile (action sheet accents).
-    public static string ColorFor(ItemRow row) => new RowTile { Row = row }.Color;
+    public static string ColorFor(ItemRow row) => HostColor(HostFor(row));
 
     // Site color mixed 30% toward black: the ribbon's folded flap.
     private string Shade

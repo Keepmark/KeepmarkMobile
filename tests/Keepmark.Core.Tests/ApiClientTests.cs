@@ -340,4 +340,89 @@ public sealed class ApiClientTests
         Assert.True(info.Capabilities?.Revision); // a bad optional field never downgrades to v1.1
         Assert.Equal(expected, info.Capabilities?.SyncExpiryDays);
     }
+    [Fact]
+    public async Task OversizedContentLength_RejectedWithoutReading_AndNotRetried()
+    {
+        var (client, handler, _) = Create();
+        int calls = 0;
+        handler.Responder = _ =>
+        {
+            calls++;
+            var response = Json(new { lastUpdated = "t" });
+            response.Content.Headers.ContentLength = XSyncApiClient.MaxResponseBytes + 1;
+            return response;
+        };
+        await Assert.ThrowsAsync<SyncTooLargeException>(() => client.GetBookmarksAsync("id"));
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task ChunkedOversizedBody_IsStoppedAtByteBudget()
+    {
+        var (client, handler, _) = Create();
+        var source = new WhitespaceStream(XSyncApiClient.MaxResponseBytes + 100_000);
+        handler.Responder = _ => new(HttpStatusCode.OK) { Content = new StreamContent(source) };
+        await Assert.ThrowsAsync<SyncTooLargeException>(() => client.GetBookmarksIfChangedAsync("id", "hash"));
+        Assert.Equal(XSyncApiClient.MaxResponseBytes + 1, source.BytesRead);
+    }
+
+    [Fact]
+    public async Task StreamingResponse_PreservesTimeoutForBodyReads()
+    {
+        var handler = new FakeHandler
+        {
+            Responder = _ => new(HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()) }
+        };
+        var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.test/"), Timeout = TimeSpan.FromMilliseconds(50) };
+        using var client = new XSyncApiClient(http, new XbsLocalizer(), new InMemoryLogger());
+        await Assert.ThrowsAsync<ServiceOfflineException>(() => client.UpdateBookmarksAsync("id", "blob", "t"));
+    }
+
+    [Fact]
+    public async Task StreamingResponse_PropagatesCallerCancellation()
+    {
+        var (client, handler, _) = Create();
+        handler.Responder = _ => new(HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()) };
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GetInfoAsync(cancellation.Token));
+    }
+
+    private sealed class StalledStream() : MemoryStream(new byte[1])
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return 0;
+        }
+    }
+
+    private sealed class WhitespaceStream(long length) : Stream
+    {
+        public long BytesRead { get; private set; }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => BytesRead; set => throw new NotSupportedException(); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int read = (int)Math.Min(count, length - BytesRead);
+            buffer.AsSpan(offset, read).Fill(32);
+            BytesRead += read;
+            return read;
+        }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int read = (int)Math.Min(buffer.Length, length - BytesRead);
+            buffer.Span[..read].Fill(32);
+            BytesRead += read;
+            return ValueTask.FromResult(read);
+        }
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
 }

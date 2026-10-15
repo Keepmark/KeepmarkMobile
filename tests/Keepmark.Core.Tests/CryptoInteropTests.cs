@@ -89,4 +89,42 @@ public sealed class CryptoInteropTests
 
         Assert.Equal(bytes, LzUtf8.Decompress(LzUtf8.Compress(bytes)));
     }
+    [Fact]
+    public void LzUtf8_ExpandedLimit_CheckedBeforeAllocation()
+    {
+        var compressed = LzUtf8.Compress(System.Text.Encoding.UTF8.GetBytes(new string('a', 10_000)));
+        Assert.Throws<PayloadTooLargeException>(() => LzUtf8.Decompress(compressed, 9_999));
+        Assert.Equal(10_000, LzUtf8.Decompress(compressed, 10_000).Length);
+        Assert.Throws<PayloadTooLargeException>(() => LzUtf8.Decompress([65], 0));
+        Assert.Empty(LzUtf8.Decompress([], 0));
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0xC4 })]
+    [InlineData(new byte[] { 0xE4, 1 })]
+    [InlineData(new byte[] { 0xC4, 0 })]
+    [InlineData(new byte[] { 0xC4, 1 })]
+    public void LzUtf8_InvalidPointers_AreRejected(byte[] input) =>
+        Assert.Throws<InvalidDataException>(() => LzUtf8.Decompress(input));
+
+    [Fact]
+    public void LzUtf8_OverlappingMatches_AndUtf8_RoundTrip()
+    {
+        var plain = System.Text.Encoding.UTF8.GetBytes("日本語🎉" + new string('a', 10_000));
+        Assert.Equal(plain, LzUtf8.Decompress(LzUtf8.Compress(plain), plain.Length));
+    }
+
+    [Fact]
+    public void LzUtf8_CompressionHistory_HasBoundedAllocations()
+    {
+        var plain = new byte[512 * 1024];
+        var random = new Random(8675309);
+        for (int i = 0; i < plain.Length; i++) plain[i] = (byte)random.Next(32, 127);
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        var compressed = LzUtf8.Compress(plain);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(allocated < 2 * 1024 * 1024, $"Compression allocated {allocated:N0} bytes.");
+        Assert.Equal(plain, LzUtf8.Decompress(compressed));
+    }
+
 }
