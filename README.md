@@ -83,7 +83,7 @@ server. On other services Keepmark falls back automatically.
 | | |
 |---|---|
 | **Keepmark for Android** | This app (Android 10+) |
-| **Keepmark for browsers** | Extension for Firefox and Chromium-based browsers (Chrome, Edge, Brave) |
+| **Keepmark for browsers** | Extension for Firefox and Chromium-based browsers (Chrome, Edge, Brave): [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/keepmark/), [Chrome Web Store](https://chromewebstore.google.com/detail/jaaekkbgpeiikepahjelfbkfgpjphbhb) |
 | **Keepmark Server** | Drop-in xBrowserSync-compatible sync service with opt-in extended features |
 
 All three share the same encryption, the same backup format and the same
