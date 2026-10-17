@@ -81,6 +81,9 @@
         checking = true;
         try
         {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
+                !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+                throw new InvalidOperationException(L.Get(Str.ServiceUnavailable));
             var result = await Session.CheckServiceAsync(url, token);
             if (IsDisposed || attempt != generation) return;
             if (result.Status != Core.Models.ServiceStatus.Online && result.Status != Core.Models.ServiceStatus.NoNewSyncs)
