@@ -81,8 +81,9 @@ enough:
 
 1. In the Keepmark browser manager, the Android card says **Connect Keepmark on
    your phone**; choose **Show connection QR** and verify the sync password there.
-2. On Android, open **Connect → Existing sync → Scan QR from browser** (the same
-   QR button is in **Move service**, before the manual target credentials).
+2. On Android, open **Connect → Link an existing sync → Scan QR from browser**
+   (the same QR button is in **Move service**, before the manual target
+   credentials).
 3. Check the service and abbreviated sync ID the review shows, tap **Connect**,
    wait for verification, then choose the direction.
 
