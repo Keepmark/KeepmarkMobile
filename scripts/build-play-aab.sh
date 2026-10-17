@@ -57,7 +57,10 @@ if (( ! DRY_RUN )) && [[ -z "${KEEPMARK_KEY_PASS:-}" ]]; then
   export KEEPMARK_KEY_PASS
 fi
 
-cmd=(dotnet build "$PROJECT" -f "$FRAMEWORK" -c Release -t:SignAndroidPackage)
+cmd=(dotnet build "$PROJECT" -f "$FRAMEWORK" -c Release -t:SignAndroidPackage
+     -p:AndroidKeyStore=true
+     -p:AndroidSigningKeyStore="$KEYSTORE"
+     -p:AndroidSigningKeyAlias="$ALIAS")
 
 if (( DRY_RUN )); then
   echo "${cmd[*]}"
@@ -66,10 +69,13 @@ if (( DRY_RUN )); then
   exit 0
 fi
 
+start=$(date +%s)
 "${cmd[@]}"
 
 echo
 [[ -f "$OUT" ]] || fail "Expected artifact missing: $OUT"
+[[ $(stat -c %Y "$OUT") -ge $start ]] || \
+  fail "Stale artifact: $OUT was not rewritten by this build (a failed signing keeps the previous file)"
 ls -l "$OUT"
 sha256sum "$OUT"
 keytool -printcert -jarfile "$OUT" | grep -E "Owner|Valid from|SHA256" | head -4 || true
