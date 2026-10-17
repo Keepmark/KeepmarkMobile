@@ -7,6 +7,12 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Fr => _fr ??= new()
     {
+        [Str.ServiceCountryGB] = "Royaume-Uni",
+        [Str.ServiceCountryCA] = "Canada",
+        [Str.ServiceCountryDE] = "Allemagne",
+        [Str.ServiceCountryIT] = "Italie",
+
+        [Str.ServiceNoNew] = "Seules les synchronisations existantes sont acceptées.",
         [Str.ServiceCustom] = "URL personnalisée…",
         [Str.ServiceSaved] = "Enregistré",
         [Str.ServiceChecking] = "Vérification de la connexion…",

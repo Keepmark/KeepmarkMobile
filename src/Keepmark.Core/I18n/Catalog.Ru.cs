@@ -9,6 +9,12 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Ru => _ru ??= new()
     {
+        [Str.ServiceCountryGB] = "Великобритания",
+        [Str.ServiceCountryCA] = "Канада",
+        [Str.ServiceCountryDE] = "Германия",
+        [Str.ServiceCountryIT] = "Италия",
+
+        [Str.ServiceNoNew] = "Принимаются только существующие синхронизации.",
         [Str.ServiceCustom] = "Свой URL…",
         [Str.ServiceSaved] = "Сохранено",
         [Str.ServiceChecking] = "Проверка подключения…",

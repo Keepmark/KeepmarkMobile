@@ -24,16 +24,39 @@ public sealed class XbsSettings
     {
         get
         {
-            try { return System.Text.Json.JsonSerializer.Deserialize<string[]>(Preferences.Get("saved_services", "[]")) ?? []; }
+            try { return (System.Text.Json.JsonSerializer.Deserialize<string[]>(Preferences.Get("saved_services", "[]")) ?? []).Select(Core.Workflow.ServiceCatalog.Normalize).Where(x => !Core.Workflow.ServiceCatalog.IsPublic(x)).Distinct(StringComparer.Ordinal).ToArray(); }
             catch (System.Text.Json.JsonException) { return []; }
         }
     }
 
+    public Core.Api.ServiceInfoResponse? SavedServiceInfo(string url)
+    {
+        try
+        {
+            var info = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Core.Api.ServiceInfoResponse>>(Preferences.Get("saved_service_info", "{}"));
+            return info?.GetValueOrDefault(Core.Workflow.ServiceCatalog.Normalize(url));
+        }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    public void UpdateSavedServiceInfo(string url, Core.Api.ServiceInfoResponse info)
+    {
+        url = Core.Workflow.ServiceCatalog.Normalize(url);
+        if (!SavedServices.Contains(url)) return;
+        Dictionary<string, Core.Api.ServiceInfoResponse> values;
+        try { values = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Core.Api.ServiceInfoResponse>>(Preferences.Get("saved_service_info", "{}")) ?? []; }
+        catch (System.Text.Json.JsonException) { values = []; }
+        // Only endpoint metadata, never server messages or account credentials.
+        values[url] = new() { Location = info.Location, MaxSyncSize = info.MaxSyncSize, Version = info.Version };
+        Preferences.Set("saved_service_info", System.Text.Json.JsonSerializer.Serialize(values));
+    }
+
     // Called only after an actual successful link/create/move, never a connectivity probe.
-    public void RememberService(string url)
+    public void RememberService(string url, Core.Api.ServiceInfoResponse? info = null)
     {
         Preferences.Set("saved_services", System.Text.Json.JsonSerializer.Serialize(Core.Workflow.ServiceCatalog.Remember(SavedServices, url)));
         ServiceUrl = Core.Workflow.ServiceCatalog.Normalize(url);
+        if (info is not null) UpdateSavedServiceInfo(url, info);
     }
 
     public SyncMode Mode

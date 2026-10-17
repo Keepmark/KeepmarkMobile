@@ -7,6 +7,12 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Ja => _ja ??= new()
     {
+        [Str.ServiceCountryGB] = "イギリス",
+        [Str.ServiceCountryCA] = "カナダ",
+        [Str.ServiceCountryDE] = "ドイツ",
+        [Str.ServiceCountryIT] = "イタリア",
+
+        [Str.ServiceNoNew] = "既存の同期のみ利用できます。",
         [Str.ServiceCustom] = "カスタムURL…",
         [Str.ServiceSaved] = "保存済み",
         [Str.ServiceChecking] = "接続を確認中…",

@@ -3,6 +3,12 @@ namespace Keepmark.Core.I18n;
 
 public static partial class Str
 {
+    public const string ServiceCountryGB = nameof(ServiceCountryGB);
+    public const string ServiceCountryCA = nameof(ServiceCountryCA);
+    public const string ServiceCountryDE = nameof(ServiceCountryDE);
+    public const string ServiceCountryIT = nameof(ServiceCountryIT);
+
+    public const string ServiceNoNew = nameof(ServiceNoNew);
     public const string ServiceCustom = nameof(ServiceCustom);
     public const string ServiceSaved = nameof(ServiceSaved);
     public const string ServiceChecking = nameof(ServiceChecking);

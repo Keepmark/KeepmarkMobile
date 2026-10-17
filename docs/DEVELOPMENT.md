@@ -134,6 +134,12 @@ adb disconnect; adb connect <device-ip>:<port>; adb devices
 # pairing port ≠ service port: `adb pair IP:PAIRPORT` (code), then `adb connect IP:SVCPORT`
 # mDNS ghosts cause XA0010: `adb disconnect <ghost>` or `adb disconnect` (all), use explicit `-s IP:port`
 # device offline on deploy: disconnect ghost entries, reconnect explicit
+# connection refused: the wireless-debug port rotated — find the open one with
+#   nmap -p 30000-49999 -T4 --open <device-ip>
+# with the "Wireless debugging" screen open, mDNS advertises the device under a
+# stable serial `adb-<id>._adb-tls-connect._tcp`; pass that to `-p:AdbTarget` too
+# reach a local KeepmarkApi from the device (Debug builds allow loopback HTTP):
+adb reverse tcp:8090 tcp:8090; curl -s localhost:8090/info   # then use http://localhost:8090 in-app
 ```
 
 ## Commands (from `KeepmarkMobile/`)
@@ -152,6 +158,13 @@ dotnet build src/KeepmarkMobile -f net10.0-android -c Release -t:SignAndroidPack
 adb -s IP:PORT shell "dumpsys package com.keepmark.mobile | grep -m1 versionName"
 adb -s IP:PORT exec-out screencap -p > /tmp/x.png     # screenshot
 adb -s IP:PORT shell input tap 540 1200               # tap (device 1080x2412)
+# workloads: MissingWorkloadPack / workloadset mismatch (SDK 10.0.x vs manifest) is fixed with
+#   sudo dotnet workload repair   (fallback: update + install maui-android wasm-tools)
+# verify with `dotnet workload list`; never paper over it with DOTNETSDK_WORKLOAD_* overrides.
+# QA quirks: `input text` drops characters on WebView inputs — type one char at a time (~0.3s);
+# `screencap` can return a corrupted frame (duplicated glyphs) right after the keyboard hides —
+# just re-capture (use `dumpsys input_method | grep mInputShown` before sending BACK, which
+# closes the keyboard first and only then navigates back).
 ```
 
 Version bump (manual): `ApplicationDisplayVersion` 1.0.N and `ApplicationVersion`
@@ -596,7 +609,15 @@ sync limits and API versions are advertised reference data. Selection probes onl
 the chosen endpoint; automatic checks gate continuation and unavailable or
 incompatible services cannot advance. NoNewSyncs permits existing links only.
 Custom URLs expose manual verification, with inline live server metadata. Input
-changes invalidate results; cancellation/generation guards reject stale responses.
-`XbsSettings.SavedServices` remembers custom HTTPS endpoints only from successful
+changes invalidate results; `Workflow/ServiceCheckState.cs` (generation,
+readiness, create permission) rejects stale responses, and the scoped
+`ServiceSelector.razor.css` styles the collapsed button and the expanded choice
+list. `XbsSettings.SavedServices` remembers custom HTTPS endpoints only from successful
 session apply/create methods, never probes or reconciliation previews. Saved
 entries remain selectable across flows even after temporary outages.
+
+Saved service rows retain verified location, limit and API version after a
+successful pairing. Subsequent checks may refresh this endpoint metadata only
+for already-saved URLs. Legacy saved entries show unknown metadata until their
+next check. URL identities canonicalize host case/default ports while retaining
+path case, so equivalent addresses cannot create duplicate entries.

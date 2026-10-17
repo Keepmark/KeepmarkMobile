@@ -428,22 +428,17 @@ else
     }
 
     private Task ServiceChanged(string url) { targetUrl = url; Unverify(); checkedUrl = null; serviceInfo = null; targetExpiryDays = null; return Task.CompletedTask; }
-    private Task ServiceChecked(Core.Api.ServiceInfoResponse? info) { serviceInfo = info; checkedUrl = info is null ? null : TargetUrlClean; return Task.CompletedTask; }
-
-    private async Task CheckService()
+    private async Task ServiceChecked(Core.Api.ServiceInfoResponse? info)
     {
-        serviceInfo = null;
-        checkedUrl = null;
-        targetExpiryDays = null;
-        await RunStepAsync(async () =>
-        {
-            serviceInfo = await Session.CheckServiceAsync(TargetUrlClean);
-            checkedUrl = TargetUrlClean;
-            targetExpiryDays = await Session.GetSyncExpiryDaysAsync(checkedUrl);
-            resumed = false;
-            SaveDraft();
-        }, err => checkError = err, "switch-check");
+        serviceInfo = info;
+        checkedUrl = info is null ? null : TargetUrlClean;
+        targetExpiryDays = info?.Capabilities?.SyncExpiryDays;
+        if (info is null) return;
+        var url = TargetUrlClean;
+        var expiry = await Session.GetSyncExpiryDaysAsync(url, Lifetime);
+        if (!IsDisposed && checkedUrl == url && ReferenceEquals(serviceInfo, info)) targetExpiryDays = expiry;
     }
+
 
     private Task VerifyExisting() => VerifyExistingCredentials(TargetUrlClean, syncId.Trim(), password);
 
@@ -554,7 +549,7 @@ else
             try { WorkflowRules.RequireNewPassword(newPassword, confirmPassword); }
             catch (Exception ex) { verifyError = ex.Message; return; }
         }
-        if (!serviceOk || !string.IsNullOrEmpty(checkError)) return;
+        if (!serviceOk || !string.IsNullOrEmpty(checkError) || (slot == "new" && serviceInfo?.Status != Core.Models.ServiceStatus.Online)) return;
         if (slot == "existing" && !VerifiedExisting)
         {
             await VerifyExisting();

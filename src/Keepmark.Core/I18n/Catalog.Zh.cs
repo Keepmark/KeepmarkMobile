@@ -8,6 +8,12 @@ internal static partial class Catalogs
 
     private static Dictionary<string, string> Zh => _zh ??= new()
     {
+        [Str.ServiceCountryGB] = "英国",
+        [Str.ServiceCountryCA] = "加拿大",
+        [Str.ServiceCountryDE] = "德国",
+        [Str.ServiceCountryIT] = "意大利",
+
+        [Str.ServiceNoNew] = "仅接受现有同步。",
         [Str.ServiceCustom] = "自定义网址…",
         [Str.ServiceSaved] = "已保存",
         [Str.ServiceChecking] = "正在检查连接…",

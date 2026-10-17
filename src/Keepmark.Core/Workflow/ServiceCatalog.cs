@@ -14,7 +14,12 @@ public static class ServiceCatalog
         new("https://xbs.25mb.co.uk", "GB", "1 MB"),
         new("https://sync.marksync.org", "IT", "1 MB")
     ];
-    public static string Normalize(string url) => WorkflowRules.NormalizeServiceUrl(url).TrimEnd('/');
+    public static string Normalize(string url)
+    {
+        var normalized = WorkflowRules.NormalizeServiceUrl(url);
+        if (!Uri.TryCreate(normalized, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http")) return normalized;
+        return uri.AbsoluteUri.TrimEnd('/');
+    }
     public static bool IsPublic(string url) => Public.Any(x => x.Url == Normalize(url));
     public static IReadOnlyList<string> Remember(IEnumerable<string> previous, string successfulUrl)
     {

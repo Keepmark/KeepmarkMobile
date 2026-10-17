@@ -5,17 +5,25 @@
 
 <div class="mb-3 km-service-picker">
     <label class="form-label" for="@id">@L.Get(Str.ConnService)</label>
-    <select id="@id" class="form-select" value="@selection" @onchange="Select" disabled="@Disabled">
-        @foreach (var item in ServiceCatalog.Public)
-        {
-            <option value="@item.Url">@($"{new Uri(item.Url).Host} · {item.Location} · {item.Limit} · API {item.Version}")</option>
-        }
-        @foreach (var url in Settings.SavedServices)
-        {
-            <option value="@url">@($"{url} · {L.Get(Str.ServiceSaved)}")</option>
-        }
-        <option value="custom">@L.Get(Str.ServiceCustom)</option>
-    </select>
+    <button id="@id" type="button" class="km-service-current" @onclick="() => expanded = !expanded" disabled="@Disabled" aria-expanded="@expanded.ToString().ToLowerInvariant()" aria-controls="@(id + "-choices")">
+        <span><strong>@SelectedTitle</strong><small>@SelectedDetail</small></span><span aria-hidden="true">⌄</span>
+    </button>
+    @if (expanded && !Disabled)
+    {
+        <div id="@(id + "-choices")" class="km-service-choices" role="group" aria-label="@L.Get(Str.ConnService)">
+            @foreach (var item in ServiceCatalog.Public)
+            {
+                <button type="button" class="km-service-option" aria-pressed="@((selection == item.Url).ToString().ToLowerInvariant())" @onclick="() => SelectValue(item.Url)">
+                    <strong>@(new Uri(item.Url).Host)</strong><small>@Detail(item)</small>
+                </button>
+            }
+            @foreach (var url in Settings.SavedServices)
+            {
+                <button type="button" class="km-service-option" aria-pressed="@((selection == url).ToString().ToLowerInvariant())" @onclick="() => SelectValue(url)"><strong>@url</strong><small>@SavedDetail(url)</small></button>
+            }
+            <button type="button" class="km-service-option" @onclick='() => SelectValue("custom")'>@L.Get(Str.ServiceCustom)</button>
+        </div>
+    }
     @if (selection == "custom")
     {
         <label class="form-label mt-2" for="@(id + "-url")">@L.Get(Str.ConnServiceUrl)</label>
@@ -26,6 +34,8 @@
         @if (checking) { @L.Get(Str.ServiceChecking) }
         else if (info is not null) { @L.Get(Str.ServiceReady, info.Version, (info.MaxSyncSize / 1048576d).ToString("0.##"), info.Location) }
     </div>
+    @if (info?.Status == Core.Models.ServiceStatus.NoNewSyncs) { <p class="form-text">@L.Get(Str.ServiceNoNew)</p> }
+    @if (!string.IsNullOrWhiteSpace(info?.Message)) { <p class="form-text">@info.Message</p> }
     @if (!string.IsNullOrEmpty(error)) { <div class="alert alert-danger mt-2" role="alert">@error</div> }
 </div>
 
@@ -38,28 +48,46 @@
     private string? observed;
     private string selection = string.Empty;
     private bool checking;
+    private bool expanded;
+    private string SelectedTitle => selection == "custom" ? L.Get(Str.ServiceCustom) : Uri.TryCreate(Value, UriKind.Absolute, out var uri) ? uri.Host : Value;
+    private string SelectedDetail => ServiceCatalog.Public.FirstOrDefault(x => x.Url == selection) is { } item ? Detail(item) : selection == "custom" ? string.Empty : SavedDetail(selection);
+    private string Detail(ServiceChoice item) => $"{L.Get("ServiceCountry" + item.Location)} · {item.Limit} · API {item.Version}";
+    private string SavedDetail(string url)
+    {
+        var metadata = ServiceCatalog.Normalize(Value) == url && info is not null ? info : Settings.SavedServiceInfo(url);
+        return $"{L.Get(Str.ServiceSaved)} · {metadata?.Location ?? "—"} · {(metadata is null ? "—" : (metadata.MaxSyncSize / 1048576d).ToString("0.##") + " MB")} · API {metadata?.Version ?? "—"}";
+    }
     private string error = string.Empty;
     private Core.Api.ServiceInfoResponse? info;
-    private int generation;
+    private readonly ServiceCheckState checkState = new();
+    private int generation => checkState.Generation;
     private CancellationTokenSource? request;
 
     protected override async Task OnParametersSetAsync()
     {
-        if (observed == Value) return;
+        var normalized = ServiceCatalog.Normalize(Value);
+        if (observed == Value)
+        {
+            // A successful pairing may save the current custom URL without
+            // changing the value. Preserve its already-verified result.
+            if (selection == "custom" && Settings.SavedServices.Contains(normalized)) selection = normalized;
+            return;
+        }
+        selection = ServiceCatalog.IsPublic(normalized) || Settings.SavedServices.Contains(normalized) ? normalized : "custom";
         observed = Value;
-        selection = ServiceCatalog.IsPublic(Value) || Settings.SavedServices.Contains(Value) ? Value : "custom";
         await Invalidate();
         if (selection != "custom") await Check();
     }
     private async Task Invalidate()
     {
-        generation++; request?.Cancel(); request?.Dispose(); request = null;
+        checkState.Invalidate(); request?.Cancel(); request?.Dispose(); request = null;
         checking = false; info = null; error = string.Empty;
         await Checked.InvokeAsync(null);
     }
-    private async Task Select(ChangeEventArgs e)
+    private async Task SelectValue(string value)
     {
-        selection = e.Value?.ToString() ?? "custom";
+        expanded = false;
+        selection = value;
         Value = selection == "custom" ? string.Empty : selection;
         observed = Value;
         await Invalidate();
@@ -81,19 +109,25 @@
         checking = true;
         try
         {
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
+            var allowLoopback = false;
+#if DEBUG
+            allowLoopback = Uri.TryCreate(url, UriKind.Absolute, out var local) && local.IsLoopback && local.Scheme == "http";
+#endif
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && !allowLoopback) ||
                 !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
                 throw new InvalidOperationException(L.Get(Str.ServiceUnavailable));
             var result = await Session.CheckServiceAsync(url, token);
             if (IsDisposed || attempt != generation) return;
-            if (result.Status != Core.Models.ServiceStatus.Online && result.Status != Core.Models.ServiceStatus.NoNewSyncs)
+            if (!checkState.Complete(attempt, result.Status))
                 throw new InvalidOperationException(L.Get(Str.ServiceUnavailable));
             info = result;
+            if (ServiceCatalog.IsPublic(url)) selection = url;
+            Settings.UpdateSavedServiceInfo(url, result);
             await Checked.InvokeAsync(result);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex) { if (!IsDisposed && attempt == generation) error = ex.Message; }
         finally { if (attempt == generation) checking = false; }
     }
-    public override void Dispose() { generation++; request?.Cancel(); request?.Dispose(); base.Dispose(); }
+    public override void Dispose() { checkState.Invalidate(); request?.Cancel(); request?.Dispose(); base.Dispose(); }
 }

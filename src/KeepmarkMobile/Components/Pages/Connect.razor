@@ -205,7 +205,6 @@ else
     private bool busy;
     private string message = string.Empty;
     private bool isError;
-    private string checkError = string.Empty;
     private string linkError = string.Empty;
     private string applyError = string.Empty;
     private string unlinkError = string.Empty;
@@ -227,8 +226,6 @@ else
 
     /// <summary>First-run choice: null = pick, "existing" = link, "new" = create.</summary>
     private string? mode;
-    private bool showService;
-    private bool ServiceOpen => showService || !string.IsNullOrEmpty(checkError);
     private string ServiceUrlClean => WorkflowRules.NormalizeServiceUrl(serviceUrl);
     // A stale "fill in both fields" error must not linger once the user edits them.
     private void ClearLinkError() { linkError = string.Empty; ClearQr(); }
@@ -342,11 +339,11 @@ else
 #endif
             if (!ConnectQrPayload.TryParse(text, out var candidate, allowLocal))
             { qrError = L.Get(Str.ConnQrInvalid); return; }
-            serviceInfo = null; checkError = linkError = applyError = message = string.Empty;
+            serviceInfo = null; linkError = applyError = message = string.Empty;
             reconcile = null; mergeStats = null; mergeStatsFor = null;
             armed = null;
             password = newPassword = confirmPassword = string.Empty;
-            mode = "existing"; showService = false;
+            mode = "existing";
             qrServiceUrl = candidate!.ServiceUrl; qrSyncId = candidate.Id;
             if (!qrState.Offer(candidate, generation)) return;
             qrExpiry = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
@@ -461,14 +458,6 @@ else
     private Task ServiceChecked(Core.Api.ServiceInfoResponse? info) { serviceInfo = info; return Task.CompletedTask; }
     private Task ServiceChanged(string url) { serviceUrl = url; ClearQr(); reconcile = null; linkError = string.Empty; armed = null; return Task.CompletedTask; }
 
-    private async Task CheckService()
-    {
-        await RunStepAsync(async () =>
-        {
-            serviceInfo = await Session.CheckServiceAsync(ServiceUrlClean);
-
-        }, err => checkError = err, "connect-check");
-    }
 
     private Task LinkExisting() => serviceInfo is null ? Task.CompletedTask : LinkExistingCredentials(ServiceUrlClean, syncId.Trim(), password);
 
