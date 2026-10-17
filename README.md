@@ -150,3 +150,28 @@ implied, including the implied warranties of merchantability and fitness for
 a particular purpose. Use it at your own risk: the authors are not liable for
 any loss of data (including bookmarks), damage or other consequences arising
 from its use. See `LICENSE.md`. Keep your own backups.
+
+### Connect from your browser
+
+In the Keepmark browser manager, open **Link a phone**, verify your current
+password and scan the QR from Android's **Connect → Link existing** screen.
+The QR review shows only the service, abbreviated sync ID and clearly spaced
+**Connect** / **Cancel** actions. Manual fields and later wizard steps stay
+hidden while you review and verify the QR. Tap **Connect**, wait for verification,
+then choose the existing sync direction. Camera permission is requested only when scanning; no images
+are saved. The same QR button is available before manual target credentials in **Move
+service**, followed by the usual review and confirmation. Manual connection
+remains available.
+
+The QR contains your sync credentials, including your password. Show it only
+to your own device. The browser hides it after 60 seconds or loss of focus;
+a captured copy still works. Android clears an unused candidate after 60
+seconds. The password is never sent to the server or persisted by this flow.
+
+
+### Organize several items on Android
+
+Hold an item to select it, then tap others or choose All. Move them together to an
+existing or newly created folder, with a short Undo window. Delete shows the affected
+folder contents before confirmation and keeps a safety backup in Backup → Safety
+backups. A brief touch response and visible checkboxes confirm selection.

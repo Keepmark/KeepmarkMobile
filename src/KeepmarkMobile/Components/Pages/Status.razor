@@ -55,26 +55,16 @@ else
                 {
                     <p class="xbs-hint">@MergeHint()</p>
                 }
-                <DirectionPicker Name="conflictDirection" Value="@choice" ValueChanged="v => { choice = v; armedDirection = null; }"
+                <DirectionPicker Name="conflictDirection" Value="@choice" ValueChanged="v => { choice = v; conflictError = null; }"
                                  LocalCount="conflictPreview.LocalCount" RemoteCount="conflictPreview.RemoteCount"
-                                 Disabled="@(busy || armedDirection is not null)" />
-                @if (armedDirection is null)
+                                 Disabled="@busy" />
+                <p class="text-muted">@Keepmark.Core.Workflow.WorkflowTexts.DirectionConfirm(choice).Implication</p>
+                <div class="d-grid">
+                    <button class="btn btn-primary" @onclick="() => ResolveConflict(ChoiceDirection)" disabled="@busy">@ChoiceLabel</button>
+                </div>
+                @if (busy)
                 {
-                    <div class="d-grid">
-                        <button class="btn btn-primary" @onclick="() => Arm(ChoiceDirection)" disabled="@busy">@ChoiceLabel</button>
-                    </div>
-                }
-                else
-                {
-                    var confirm = Keepmark.Core.Workflow.WorkflowTexts.DirectionConfirm(choice);
-                    <ConfirmBlock Message="@confirm.Message" Implication="@confirm.Implication"
-                                  ConfirmLabel="@confirm.ConfirmLabel" Danger="@(armedDirection != Core.Sync.ConflictResolutionDirection.Merge)"
-                                  Busy="busy" OnConfirm="() => ResolveConflict(armedDirection.Value)" OnCancel="() => armedDirection = null">
-                        @if (busy)
-                        {
-                            <p class="mt-2 mb-0" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.StatusResolving)</p>
-                        }
-                    </ConfirmBlock>
+                    <p class="mt-2 mb-0" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.StatusResolving)</p>
                 }
                 @if (!string.IsNullOrEmpty(conflictError))
                 {
@@ -162,10 +152,6 @@ else
     private bool busy;
     private string? conflictError;
     private string? conflictResult;
-    /// <summary>Armed destructive choice (R8.2): first tap arms, the inline
-    /// confirm button runs it.</summary>
-    private Core.Sync.ConflictResolutionDirection? armedDirection;
-
     /// <summary>Picker choice (download/upload/merge); merge first because it never deletes.</summary>
     private string choice = "merge";
 
@@ -192,12 +178,6 @@ else
             ? Loc.Plural(Str.StatusMergeWouldTitles, p.TitleConflicts, p.LocalOnly, p.RemoteOnly)
             : L.Get(Str.StatusMergeWould, p.LocalOnly, p.RemoteOnly))
         : string.Empty;
-
-    private void Arm(Core.Sync.ConflictResolutionDirection d)
-    {
-        armedDirection = d;
-        conflictError = null;
-    }
 
     private string ResultText(Core.Sync.ConflictResolutionDirection d) => d switch
     {
@@ -269,7 +249,7 @@ else
 
     private async Task ResolveConflict(Core.Sync.ConflictResolutionDirection direction)
     {
-        if (Session.Engine is null) return;
+        if (busy || Session.Engine is null || conflictPreview is null) return;
         busy = true;
         conflictError = null;
         conflictResult = null;
@@ -289,14 +269,12 @@ else
                     break;
             }
             conflictPreview = null;
-            armedDirection = null;
             conflictResult = ResultText(direction);
             await LoadAsync(); // Refresh status
         }
         catch (Exception ex)
         {
             conflictError = ex.Message;
-            armedDirection = null;
             Session.Log.Error("status", $"Conflict resolution failed: {ex.GetType().Name}");
         }
         finally

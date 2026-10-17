@@ -38,7 +38,7 @@
             <div class="xbs-tree-row @(Selected == f.RowId ? "selected" : string.Empty)">
                 <button type="button" role="treeitem" aria-level="2" aria-selected="@((Selected == f.RowId).ToString().ToLowerInvariant())"
                         class="xbs-tree-node" @onclick="() => Highlight(f.RowId)">
-                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg></span>
+                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z" /><path d="M2 10h20" /></svg></span>
                     <span class="xbs-tree-label">@(f.DisplayTitle ?? L.Get(Str.SheetTypeFolder))<small>@PathOf(f)</small></span>
                     @if (Selected == f.RowId) { <svg class="km-ico xbs-tree-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }
                 </button>
@@ -320,7 +320,7 @@
                         aria-expanded="@NodeExpanded(hasKids, isCollapsed)" aria-level="@(Level + 1)"
                         class="xbs-tree-node"
                         @onclick="() => Highlight(Node.RowId)" @onclick:stopPropagation="true">
-                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg></span>
+                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z" /><path d="M2 10h20" /></svg></span>
                     <span class="xbs-tree-label">@(Node.DisplayTitle ?? L.Get(Str.SheetTypeFolder))</span>
                     @if (hasKids)
                     {
@@ -357,7 +357,7 @@
                 <span class="xbs-tree-exp xbs-tree-exp-ph" aria-hidden="true"></span>
                 <button type="button" role="treeitem" aria-selected="@(isSelected.ToString().ToLowerInvariant())" aria-level="@(Level + 1)"
                         class="xbs-tree-node" @onclick="() => Highlight(DraftRowId)" @onclick:stopPropagation="true">
-                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg></span>
+                    <span class="xbs-tree-ico" aria-hidden="true"><svg class="km-ico" viewBox="0 0 24 24"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z" /><path d="M2 10h20" /></svg></span>
                     <span class="xbs-tree-label">@Draft!.Title</span>
                     <span class="xbs-tree-badge">@L.Get(Str.PickerNewBadge)</span>
                     @if (isSelected) { <svg class="km-ico xbs-tree-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> }

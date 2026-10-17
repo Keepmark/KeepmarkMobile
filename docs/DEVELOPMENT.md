@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.198 (199)**,
+v1.2 extended contract when advertised. Current version: **v1.0.208 (209)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -70,9 +70,10 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   steps in the device time zone); the action sheet shows "Added: <date time>
   · <relative>" (`RelativeTime.Detail`, relative part dropped from 30 days).
   Home re-renders them every minute while visible.
-- UX: tap opens, ⋮ menu holds all actions, swipe right expands details /
+- UX: tap opens; long press enters context-local multi-selection with native haptics; ⋮ keeps single-item actions plus Select; swipe right expands details /
   left collapses, pinned section, clickable breadcrumb, folder-first sorting,
-  share-receiving with prefilled form, full-screen folder tree picker with
+  share-receiving with prefilled form (incoming shares close single-item action,
+  move and delete panels and replace any open edit form; selection/batch flows defer intake), full-screen folder tree picker with
   explicit Select/Cancel.
 - Top bar: single fixed bar with brand mark left + hamburger right (fixed, not
   sticky: the `.sidebar` parent is only as tall as the bar, so sticky had zero
@@ -144,7 +145,10 @@ dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
 dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug  # deploy+launch
 # add "-p:AdbTarget=-s IP:PORT" when several adb entries are listed. A Debug APK
 # installed with plain `adb install` aborts ("No assemblies found … Fast Deployment"):
-# deploy Debug only via -t:Run, or build Release for a self-contained APK.
+# deploy Debug only via -t:Run. For a self-contained test APK, package Release:
+dotnet build src/KeepmarkMobile -f net10.0-android -c Release -t:SignAndroidPackage -p:AndroidKeyStore=false -p:AndroidPackageFormats=apk
+# AndroidKeyStore=false uses the local debug key for testing only. Check the
+# APK manifest version before install; plain build may leave an older APK.
 adb -s IP:PORT shell "dumpsys package com.keepmark.mobile | grep -m1 versionName"
 adb -s IP:PORT exec-out screencap -p > /tmp/x.png     # screenshot
 adb -s IP:PORT shell input tap 540 1200               # tap (device 1080x2412)
@@ -482,3 +486,117 @@ instead of a file (documented, no snapshot required).
 ## License and notices
 
 License, third-party notices and disclaimer: see the [README](../README.md#license).
+
+## Browser QR connection (v1.0.200)
+
+Connect → Link existing and Move service → target service / existing target
+place a QR icon and Scan QR from browser before the manual credential fields.
+Both flows use the native
+`IQrScanner` / `QrScanner` modal, pinned `ZXing.Net.Maui.Controls` **0.10.4**
+(net10.0-android). CAMERA is requested only on the scan action; camera hardware
+is optional. No photographs, gallery, clipboard or image import are used.
+The scanner only decodes QR, with UTF-8; DisconnectHandler stops detection,
+unsubscribes events, disconnects/disposes CameraManager and unbinds CameraX.
+Cancellation, Android Back, modal disappearance, app lock/background and page
+disposal release the session. `AppLockState.Changed` now includes foreground
+transitions, so native content cannot remain over the lock overlay.
+
+`Workflow/ConnectQrPayload` validates the Keepmark JSON v1 allowlist before
+network access: 1,800 UTF-8 bytes, strict markers/types/duplicate names/depth,
+safe ID, supported numeric sync version, HTTPS URL without credentials,
+query/fragment/backslash/controls. Debug alone accepts HTTP localhost/127.0.0.1.
+Its representation is redacted; passwords remain literal and are never stored.
+A valid scan only produces an in-memory candidate. Both pages render the
+shared `QrCredentialReview` exclusively while `ConnectQrCandidateState.ShowReview`
+is pending or verifying: service URL and abbreviated sync ID, acquired-credentials
+message, and separate, spaced primary/cancel actions. Manual credentials,
+service controls and subsequent wizard headings (including “Where?”) stay
+hidden. Explicit verification switches the same review to the localized
+“Verifying sync…” status; `BeginVerification` consumes the raw secret without
+removing the review, so no manual form or next-stage heading flashes during
+the probe. Reconciliation/direction controls appear only after verification
+succeeds; failures return to a cleared candidate and adjacent safe error. Connect explicitly calls the same ProbeLinkAsync/reconcile/apply path as
+manual entry, including backups and the final informed action. SwitchService similarly uses
+its existing VerifyExistingCredentials/probe and service-check path, then its
+normal direction/review/confirmed move. A scan never bypasses the linked-user
+gate or commits a move. The pending secret clears
+on consumption, failure, edits, cancellation, background, lock or 60-second
+local timeout. This timeout does not expire credentials or invalidate copies.
+
+Core parser and `ConnectQrCandidateState` tests run without Android. The
+shared candidate state rejects stale/duplicate scans, expires against monotonic
+time at consumption and removes its secret before probing. Debug and Release builds cannot verify
+camera permission, real UTF-8 decoding, rotation, camera-indicator shutdown,
+biometrics or device shrinking behavior: those require a real device.
+
+
+## Multiple selection (v1.0.201)
+
+Long press (500 ms) or ⋮ → Select captures the current list and content version.
+Checkboxes replace icons; tap/Enter/Space toggles selection. All/None applies to
+loaded logical candidates, including virtualized rows; search is limited to the
+50 returned results. Pinned/recent aliases deduplicate by NodeId. Folder selection
+includes its subtree; overlapping search descendants are covered, not counted twice.
+Top-level system containers and separators cannot be selected directly.
+Attempting to start selection on them shows an immediate informational toast,
+without leaving a persistent error below the list.
+
+The contextual pagebar and bottom Move/Delete actions freeze folder/search navigation.
+Back exits without mutation; Back in a destination picker/confirmation closes only
+that layer. Background/lock cancels pending interaction. Shared intake remains pending.
+A content change invalidates selection before it can act on stale row identities.
+The gesture captures NodeId and version at pointerdown; accepted long press triggers
+Android native LongPress haptics respecting system settings plus a visual checkbox
+transition. Reduced motion disables the transition; vertical scrolling stays available.
+
+`Home.Selection.cs` coordinates `SelectionController`, store `SelectionPlan`, and
+gated engine batch APIs. IDs are resolved and validated inside the same SQLite
+transaction as the mutation; one engine notification follows the batch. Move appends
+roots in captured display order and skips roots already in the destination. No-op
+batches create no backup and do not notify sync. Undo lasts six seconds and restores
+only the batch positions; any intervening content change refuses the whole undo.
+Delete has one confirmation with separate selected-root and contained-item counts;
+it offers persistent safety backup recovery rather than a global-tree undo.
+
+MovePicker is shared by single and batch flows. Single and batch moves save successful folder destinations in the same persistent
+six-entry history (stable NodeIds, most recent first). Both pickers show up to
+four valid recent destinations, excluding no-op and forbidden destinations;
+tapping a recent destination moves directly, while the tree requires confirmation.
+The batch summary appears only when some or all items are already at the target.
+One source folder is shown by path. Move results omit zero counts and show the
+destination, with Undo instead of a redundant backup reminder. Select a destination, then New folder
+in that path; enter name and Create. The folder is saved immediately and selected.
+Canceling the picker leaves a created folder intact. Move remains disabled while the
+name is a draft. Batch folder creation is gated against the expected version and
+returns the new version explicitly, preserving selection without ignoring external
+sync changes. Selected folder subtrees are excluded from destinations.
+
+Move/delete snapshot the local tree under the engine gate, write and read-verify the
+safety backup before mutation (`selection-move`, `selection-delete`; undo uses
+`selection-move-undo`). Backup failure leaves the batch untouched. A successful local
+write does not claim the network is synchronized. Test coverage: SelectionBatchTests,
+SelectionControllerTests and `node tests/js/gestures.test.cjs`. TalkBack, physical
+haptic perception, font scaling and rotation require device QA.
+
+Move-picker layout: original tree layout retained, with the approved “Cartella incisa” icon
+(closed folder pocket and fine outline on the existing tinted tile).
+Single and batch flows share wrapping names, capped visual nesting, 44px expand
+targets, explicit Cancel/Move actions and a separate wrapping destination path.
+New-folder entry uses a full-width field above Create/Cancel; destination/search
+controls pause while a folder-name draft is open, preventing accidental draft loss.
+
+The incised folder icon is shared visually by FolderPicker (including search and
+drafts), MovePicker, recent move shortcuts and the bookmark form folder button.
+
+## Service selection (v1.0.208)
+
+Connect (existing/new) and Switch service share `ServiceSelector`. The bundled
+eight-service catalog keeps api.xbrowsersync.org first and default; country codes,
+sync limits and API versions are advertised reference data. Selection probes only
+the chosen endpoint; automatic checks gate continuation and unavailable or
+incompatible services cannot advance. NoNewSyncs permits existing links only.
+Custom URLs expose manual verification, with inline live server metadata. Input
+changes invalidate results; cancellation/generation guards reject stale responses.
+`XbsSettings.SavedServices` remembers custom HTTPS endpoints only from successful
+session apply/create methods, never probes or reconciliation previews. Saved
+entries remain selectable across flows even after temporary outages.

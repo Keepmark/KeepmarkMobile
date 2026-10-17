@@ -82,6 +82,61 @@ public sealed class ConflictResolutionTests : IAsyncLifetime
     private static IEnumerable<BookmarkNode> Flatten(IEnumerable<BookmarkNode> nodes) =>
         nodes.SelectMany(n => new[] { n }.Concat(Flatten(n.Children ?? [])));
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConflictPreview_IsReadOnlyAndMatchesTheEventualMerge(bool v12)
+    {
+        await SetupConflictAsync(v12);
+        var localRoots = new List<BookmarkNode> { new() { Id = 10, Title = "Menu", Children = (await _store.LoadMirrorAsync()).Roots } };
+        var remoteRoots = new List<BookmarkNode> { new() { Id = 10, Title = "Menu", Children = JsonSerializer.Deserialize<List<BookmarkNode>>(_crypto.Decrypt(_api.Blob, Key))! } };
+        await _store.ReplaceAllAsync(localRoots, Enc(localRoots), "2024-01-01T00:00:00.000Z", "1.8.0");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+        _api.Blob = Enc(remoteRoots);
+        var before = await _store.LoadMirrorAsync();
+        var remoteBlob = _api.Blob;
+        var credentials = await _creds.GetAsync();
+
+        var preview = await _engine.GetConflictMergePreviewAsync();
+
+        Assert.Equal(2, preview.LocalCount);
+        Assert.Equal(2, preview.RemoteCount);
+        Assert.Equal(1, preview.LocalOnly);
+        Assert.Equal(1, preview.RemoteOnly);
+        Assert.Equal(await LocalUrlsAsync(), Flatten(before.Roots).Select(n => n.Url).ToList());
+        Assert.Equal(remoteBlob, _api.Blob);
+        Assert.Equal(credentials, await _creds.GetAsync());
+        Assert.Equal(0, _api.PushCount);
+        Assert.Empty(_snapshots);
+
+        await _engine.ResolveConflictMergeAsync();
+
+        Assert.Equal(3, (await LocalUrlsAsync()).Count(url => url is not null));
+        Assert.Equal(1, _api.PushCount);
+    }
+
+    [Fact]
+    public async Task LinkVerification_DoesNotLinkOrOverwriteBeforeTheUserChooses()
+    {
+        await _store.ReplaceAllAsync(Tree((1, "Local", "https://local.example")), "old-blob", "old-base", "1.8.0");
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
+        _api.Blob = Enc(Tree((9, "Remote", "https://remote.example")), OtherKey);
+        var remoteBlob = _api.Blob;
+        var candidate = new SyncCredentials("new-sync", "https://example.test", OtherKey, "1.8.0");
+
+        var comparison = await _engine.CompareAsync(candidate);
+
+        Assert.Equal(1, comparison.Local);
+        Assert.Equal(1, comparison.Remote);
+        Assert.Equal("sync-id", (await _creds.GetAsync())!.Id);
+        Assert.Equal(["https://local.example"], await LocalUrlsAsync());
+        Assert.Equal("old-base", (await _store.LoadMirrorAsync()).LastUpdated);
+        Assert.Equal("1", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
+        Assert.Equal(remoteBlob, _api.Blob);
+        Assert.Equal(0, _api.PushCount);
+        Assert.Empty(_snapshots);
+    }
+
     [Fact]
     public async Task ForceSync_Clean_DoesNotThrow_AndReleasesGateOnce()
     {

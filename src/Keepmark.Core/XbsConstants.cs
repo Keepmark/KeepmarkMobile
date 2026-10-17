@@ -36,7 +36,7 @@ public static class XbsConstants
     /// <summary>Separator bookmark marker (bookmarks with this URL render as separators).</summary>
     public const string SeparatorUrl = "xbs:separator";
 
-    /// <summary>Delimiter used in QR payloads joining sync fields.</summary>
+    /// <summary>Unused legacy delimiter; Keepmark connection QR uses explicit JSON v1.</summary>
     public const string QrDelimiter = "|$$|";
 
     /// <summary>Default auto-sync poll interval, mirrors the 15-minute background alarm.</summary>

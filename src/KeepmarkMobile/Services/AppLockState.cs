@@ -62,6 +62,7 @@ public sealed class AppLockState
     public void OnPaused(XbsSettings settings)
     {
         Foreground = false;
+        Changed?.Invoke();
         if (AuthInProgress)
         {
             return;
@@ -78,6 +79,7 @@ public sealed class AppLockState
     public void OnResumed(XbsSettings settings)
     {
         Foreground = true;
+        Changed?.Invoke();
         if (AuthInProgress)
         {
             return;

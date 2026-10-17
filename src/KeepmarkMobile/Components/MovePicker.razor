@@ -1,21 +1,23 @@
 @using Keepmark.Core.Data
+@implements IDisposable
 
-@* Move picker (canvas "PickSheet", T2): a tall bottom sheet over the list.
-   Header names the item and where it is now; recent destinations as chips;
-   then a compact collapsible tree where the current folder is marked
-   "here now" and disabled. A sticky footer states the full destination.
-   The moved folder's own subtree is hidden (cannot move into itself). *@
+@* Shared single/batch destination picker. Source folders remain selectable
+   for creating a child; a total no-op cannot be confirmed. Selected folder
+   subtrees are hidden, and creation requires an explicit destination. *@
 <div class="xbs-sheet-backdrop" data-back="35" @onclick="Cancel">
-    <div class="xbs-sheet xbs-move" role="dialog" aria-modal="true" aria-label="@L.Get(Str.MoveTitle, Name)" @onclick:stopPropagation="true">
+    <div class="xbs-sheet xbs-move" role="dialog" aria-modal="true" aria-label="@Title" @onclick:stopPropagation="true">
         <div class="xbs-sheet-handle" aria-hidden="true"></div>
         <div class="xbs-move-head">
-            <RowTile Row="Row" />
+            @if (Row is not null && !IsBatch)
+            {
+                <RowTile Row="Row" />
+            }
             <div class="xbs-move-headtext">
-                <h2 class="xbs-move-title">@L.Get(Str.MoveTitle, Name)</h2>
-                <div class="xbs-move-sub">@L.Get(Str.MoveFrom, PathOf(Row.ParentRowId))</div>
+                <h2 class="xbs-move-title">@Title</h2>
+                <div class="xbs-move-sub">@SourceDescription</div>
             </div>
             <button type="button" class="xbs-move-iconbtn @(searchOpen ? "on" : string.Empty)" aria-label="@L.Get(Str.MoveSearch)"
-                    aria-pressed="@searchOpen.ToString().ToLowerInvariant()" @onclick="ToggleSearch">
+                    aria-pressed="@searchOpen.ToString().ToLowerInvariant()" disabled="@(busy || creating)" @onclick="ToggleSearch">
                 <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg>
             </button>
         </div>
@@ -24,7 +26,7 @@
         {
             <div class="xbs-move-search">
                 <input class="form-control" placeholder="@L.Get(Str.MoveSearch)" aria-label="@L.Get(Str.MoveSearch)"
-                       @oninput="OnFilter" value="@filter" />
+                       @oninput="OnFilter" value="@filter" disabled="@(busy || creating)" />
             </div>
         }
 
@@ -39,8 +41,9 @@
                         {
                             var on = selected == f.RowId;
                             <button type="button" class="xbs-move-chip @(on ? "on" : string.Empty)" aria-pressed="@on.ToString().ToLowerInvariant()"
-                                    @onclick="() => Select(f.RowId)">
-                                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
+                                    title="@L.Get(Str.MoveTo, PathOf(f.RowId))" aria-label="@L.Get(Str.MoveTo, PathOf(f.RowId))"
+                                    disabled="@(busy || creating)" @onclick="() => QuickMove(f.RowId)">
+                                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z" /><path d="M2 10h20" /></svg>
                                 <span>@(f.DisplayTitle ?? L.Get(Str.SheetTypeFolder))</span>
                             </button>
                         }
@@ -74,29 +77,50 @@
             {
                 <form class="xbs-move-new" @onsubmit="CreateFolder" @onsubmit:preventDefault="true">
                     <input class="form-control" placeholder="@L.Get(Str.MoveFolderName)" aria-label="@L.Get(Str.MoveFolderName)"
-                           @bind="newName" @bind:event="oninput" @ref="newInput" />
+                           @bind="newName" @bind:event="oninput" @ref="newInput" disabled="@busy" />
                     <button type="submit" class="btn btn-primary" disabled="@(string.IsNullOrWhiteSpace(newName) || busy)">@L.Get(Str.MoveCreate)</button>
+                    <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="CancelCreate">@L.Get(Str.CommonCancel)</button>
                 </form>
             }
             else
             {
-                <button type="button" class="xbs-move-newbtn" @onclick="StartCreate">
+                <button type="button" class="xbs-move-newbtn" disabled="@(!hasSelection || busy || CreateFolderIn is null)" @onclick="StartCreate">
                     <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-                    <span>@L.Get(Str.MoveNewFolderIn, NameOf(hasSelection ? selected : Row.ParentRowId))</span>
+                    <span>@L.Get(Str.MoveNewFolderIn, PathOf(selected))</span>
                 </button>
             }
         </div>
 
         <div class="xbs-move-foot">
-            <button type="button" class="btn btn-primary" disabled="@(!CanMove || busy)" @onclick="Confirm">
-                @L.Get(Str.MoveTo, CanMove ? PathOf(selected) : "…")
-            </button>
+            @if (IsBatch && hasSelection && SourceParentRowIds.Any(id => id == selected))
+            {
+                var alreadyHere = SourceParentRowIds.Count(id => id == selected);
+                <p role="status">@(IsCurrentParent(selected) ? L.Get(Str.SelectionAlreadyHere)
+                    : L.Get(Str.SelectionMoveSummary, BatchCount - alreadyHere, alreadyHere))</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                <p class="alert alert-danger" role="alert">@ErrorMessage</p>
+            }
+            @if (hasSelection)
+            {
+                <p class="xbs-move-destination">@PathOf(selected)</p>
+            }
+            <div class="xbs-move-actions">
+                <button type="button" class="btn btn-outline-secondary" disabled="@busy" @onclick="Cancel">@L.Get(Str.CommonCancel)</button>
+                <button type="button" class="btn btn-primary" disabled="@(!CanMove || busy)" @onclick="Confirm"
+                        aria-label="@(hasSelection ? L.Get(Str.MoveTo, PathOf(selected)) : L.Get(Str.HomeMove))">@L.Get(Str.HomeMove)</button>
+            </div>
         </div>
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public ItemRow? Row { get; set; }
+    [Parameter] public int BatchCount { get; set; }
+    [Parameter] public IReadOnlyCollection<int> ExcludedNodeIds { get; set; } = [];
+    [Parameter] public IReadOnlyCollection<int?> SourceParentRowIds { get; set; } = [];
     [Parameter, EditorRequired] public List<ItemRow> Folders { get; set; } = [];
 
     /// <summary>Recent destinations as RowIds, most recent first.</summary>
@@ -127,19 +151,36 @@
     private string newName = string.Empty;
     private ElementReference newInput;
     private bool focusNew;
+    private bool disposed;
 
-    private string Name => Row.DisplayTitle ?? Row.Url ?? L.Get(Str.HomeItemWord);
-    private bool CanMove => hasSelection && selected != Row.ParentRowId;
+    public void Dispose() => disposed = true;
+
+    private bool IsBatch => BatchCount > 0;
+    private string Name => Row?.DisplayTitle ?? Row?.Url ?? L.Get(Str.HomeItemWord);
+    private string Title => IsBatch ? L.Get(Str.MoveBatchTitle, BatchCount) : L.Get(Str.MoveTitle, Name);
+    private string SourceDescription => IsBatch
+        ? SourceParentRowIds.Distinct().Count() == 1
+            ? L.Get(Str.MoveFrom, PathOf(SourceParentRowIds.First()))
+            : L.Get(Str.MoveBatchFrom, SourceParentRowIds.Distinct().Count())
+        : L.Get(Str.MoveFrom, PathOf(Row?.ParentRowId));
+    private bool IsCurrentParent(int? rowId) => IsBatch
+        ? SourceParentRowIds.Count > 0 && SourceParentRowIds.All(id => id == rowId)
+        : Row?.ParentRowId == rowId;
+    private bool CanMove => hasSelection && !creating && !IsCurrentParent(selected)
+        && (selected is null || ById.ContainsKey(selected.Value));
 
     protected override void OnParametersSet()
     {
         var excluded = new HashSet<int>();
-        if (Row.IsFolder)
+        if (Row is { IsFolder: true } || ExcludedNodeIds.Count > 0)
         {
             var childrenOf = Folders.Where(f => f.ParentRowId is not null)
                 .GroupBy(f => f.ParentRowId!.Value)
                 .ToDictionary(g => g.Key, g => g.Select(f => f.RowId).ToList());
-            var queue = new Queue<int>([Row.RowId]);
+            var excludedNodes = ExcludedNodeIds.ToHashSet();
+            var seeds = Folders.Where(f => f.NodeId is int id && excludedNodes.Contains(id)).Select(f => f.RowId);
+            if (Row is { IsFolder: true }) seeds = seeds.Append(Row.RowId);
+            var queue = new Queue<int>(seeds);
             while (queue.Count > 0)
             {
                 var cur = queue.Dequeue();
@@ -160,8 +201,9 @@
         ByParent = visible.Where(f => f.ParentRowId is not null)
             .GroupBy(f => f.ParentRowId!.Value)
             .ToDictionary(g => g.Key, g => g.OrderBy(f => f.SortOrder).ToList());
-        RecentRows = Recents.Where(id => id != Row.ParentRowId && ById.ContainsKey(id))
+        RecentRows = Recents.Where(id => !IsCurrentParent(id) && ById.ContainsKey(id))
             .Select(id => ById[id]).Take(4).ToList();
+        UpdateFiltered();
 
         // Collapsed once: a folder created here must not fold the tree back.
         if (!collapsedReady)
@@ -172,13 +214,17 @@
                 collapsed.Add(id);
             }
 
-            Reveal(Row.ParentRowId);
+            if (IsBatch)
+            {
+                foreach (var parent in SourceParentRowIds) Reveal(parent);
+            }
+            else Reveal(Row?.ParentRowId);
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (focusNew)
+        if (focusNew && !disposed)
         {
             focusNew = false;
             try { await newInput.FocusAsync(); } catch { }
@@ -201,19 +247,23 @@
 
     private void Select(int? rowId)
     {
-        if (rowId == Row.ParentRowId)
-        {
-            return;
-        }
-
+        if (disposed || busy || creating || (rowId is int id && !ById.ContainsKey(id))) return;
         selected = rowId;
         hasSelection = true;
         creating = false;
         Reveal(rowId);
     }
 
+    private async Task QuickMove(int rowId)
+    {
+        if (disposed || busy || creating) return;
+        Select(rowId);
+        await Confirm();
+    }
+
     private void Toggle(int rowId)
     {
+        if (disposed || busy || creating) return;
         if (!collapsed.Remove(rowId))
         {
             collapsed.Add(rowId);
@@ -222,6 +272,7 @@
 
     private void ToggleSearch()
     {
+        if (disposed || busy || creating) return;
         searchOpen = !searchOpen;
         if (!searchOpen)
         {
@@ -232,7 +283,13 @@
 
     private void OnFilter(ChangeEventArgs e)
     {
+        if (disposed || busy || creating) return;
         filter = e.Value?.ToString() ?? string.Empty;
+        UpdateFiltered();
+    }
+
+    private void UpdateFiltered()
+    {
         Filtered = string.IsNullOrWhiteSpace(filter)
             ? []
             : ById.Values
@@ -243,54 +300,61 @@
 
     private void StartCreate()
     {
+        if (disposed || !hasSelection || busy || CreateFolderIn is null) return;
         creating = true;
         newName = string.Empty;
         focusNew = true;
     }
 
+    private void CancelCreate()
+    {
+        creating = false;
+        newName = string.Empty;
+    }
+
     private async Task CreateFolder()
     {
         var title = newName.Trim();
-        if (title.Length == 0 || CreateFolderIn is null || busy)
+        if (disposed || !hasSelection || title.Length == 0 || CreateFolderIn is null || busy)
         {
             return;
         }
 
         busy = true;
-        // The new folder goes under the highlighted destination (or where the item is now).
-        var parent = hasSelection ? selected : Row.ParentRowId;
-        var created = await CreateFolderIn(parent, title);
-        busy = false;
-        creating = false;
-        if (created is not null)
+        var parent = selected;
+        try
         {
-            if (parent is not null)
+            var created = await CreateFolderIn(parent, title);
+            if (!disposed && created is not null)
             {
-                collapsed.Remove(parent.Value);
+                if (parent is not null) collapsed.Remove(parent.Value);
+                selected = created;
+                hasSelection = true;
+                creating = false;
+                filter = string.Empty;
+                searchOpen = false;
+                newName = string.Empty;
             }
-
-            selected = created;
-            hasSelection = true;
+        }
+        finally
+        {
+            busy = false;
         }
     }
 
     private async Task Confirm()
     {
-        if (!CanMove || busy)
+        if (disposed || !CanMove || busy)
         {
             return;
         }
 
         busy = true;
-        await OnMove.InvokeAsync(selected);
+        try { await OnMove.InvokeAsync(selected); }
+        finally { busy = false; }
     }
 
-    private Task Cancel() => OnCancel.InvokeAsync();
-
-    private string NameOf(int? rowId) =>
-        rowId is not null && ById.TryGetValue(rowId.Value, out var f)
-            ? f.DisplayTitle ?? L.Get(Str.SheetTypeFolder)
-            : L.Get(Str.SheetTopLevel);
+    private Task Cancel() => disposed || busy ? Task.CompletedTask : OnCancel.InvokeAsync();
 
     /// <summary>Full path of a folder ("Work › Dev"); top level when null.</summary>
     private string PathOf(int? rowId)
@@ -309,14 +373,14 @@
     private RenderFragment RowFor(int? rowId, string label, int level, bool hasKids, bool isCollapsed,
         bool home = false, string? sub = null) => __builder =>
     {
-        var isHere = rowId == Row.ParentRowId;
+        var isHere = IsCurrentParent(rowId);
         var isSelected = hasSelection && selected == rowId;
         <div class="xbs-move-row @(isSelected ? "selected" : string.Empty) @(isHere ? "here" : string.Empty)">
             @if (hasKids)
             {
                 <button type="button" class="xbs-move-exp" aria-expanded="@((!isCollapsed).ToString().ToLowerInvariant())"
                         aria-label="@L.Get(isCollapsed ? Str.PickerExpand : Str.PickerCollapse, label)"
-                        @onclick="() => Toggle(rowId!.Value)">
+                        disabled="@(busy || creating)" @onclick="() => Toggle(rowId!.Value)">
                     <svg class="km-ico sm xbs-expand-chev @(isCollapsed ? string.Empty : "open")" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                 </button>
             }
@@ -325,9 +389,9 @@
                 <span class="xbs-move-exp ph" aria-hidden="true"></span>
             }
             <button type="button" role="treeitem" class="xbs-move-node" aria-level="@(level + 1)"
-                    aria-selected="@isSelected.ToString().ToLowerInvariant()" aria-disabled="@(isHere ? "true" : null)"
+                    aria-selected="@isSelected.ToString().ToLowerInvariant()"
                     aria-expanded="@(hasKids ? (!isCollapsed).ToString().ToLowerInvariant() : null)"
-                    disabled="@isHere" @onclick="() => Select(rowId)">
+                    disabled="@(busy || creating)" @onclick="() => Select(rowId)">
                 <span class="xbs-move-ico @(home ? "home" : string.Empty)" aria-hidden="true">
                     @if (home)
                     {
@@ -335,7 +399,7 @@
                     }
                     else
                     {
-                        <svg class="km-ico" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
+                        <svg class="km-ico" viewBox="0 0 24 24"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z" /><path d="M2 10h20" /></svg>
                     }
                 </span>
                 <span class="xbs-tree-label">

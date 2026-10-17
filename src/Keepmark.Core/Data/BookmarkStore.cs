@@ -61,7 +61,7 @@ public sealed record DuplicateGroup(string Url, List<ItemRow> Rows);
 /// The encryption key (64 hex chars) is supplied by the platform layer
 /// (Android KeyStore); Core never stores it.
 /// </summary>
-public sealed class BookmarkStore : IAsyncDisposable
+public sealed partial class BookmarkStore : IAsyncDisposable
 {
     public const string MetaLastUpdated = "lastUpdated";
     public const string MetaVersion = "syncVersion";

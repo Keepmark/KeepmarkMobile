@@ -1,0 +1,96 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
+@inject KeepmarkMobile.Services.XbsSession Session
+@inject KeepmarkMobile.Services.XbsSettings Settings
+@using Keepmark.Core.Workflow
+
+<div class="mb-3 km-service-picker">
+    <label class="form-label" for="@id">@L.Get(Str.ConnService)</label>
+    <select id="@id" class="form-select" value="@selection" @onchange="Select" disabled="@Disabled">
+        @foreach (var item in ServiceCatalog.Public)
+        {
+            <option value="@item.Url">@($"{new Uri(item.Url).Host} · {item.Location} · {item.Limit} · API {item.Version}")</option>
+        }
+        @foreach (var url in Settings.SavedServices)
+        {
+            <option value="@url">@($"{url} · {L.Get(Str.ServiceSaved)}")</option>
+        }
+        <option value="custom">@L.Get(Str.ServiceCustom)</option>
+    </select>
+    @if (selection == "custom")
+    {
+        <label class="form-label mt-2" for="@(id + "-url")">@L.Get(Str.ConnServiceUrl)</label>
+        <input id="@(id + "-url")" class="form-control" value="@Value" @oninput="Edit" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <button class="btn btn-secondary mt-2" disabled="@(Disabled || checking || string.IsNullOrWhiteSpace(Value))" @onclick="Check">@L.Get(Str.ConnCheckService)</button>
+    }
+    <div class="form-text mt-2" role="status" aria-live="polite">
+        @if (checking) { @L.Get(Str.ServiceChecking) }
+        else if (info is not null) { @L.Get(Str.ServiceReady, info.Version, (info.MaxSyncSize / 1048576d).ToString("0.##"), info.Location) }
+    </div>
+    @if (!string.IsNullOrEmpty(error)) { <div class="alert alert-danger mt-2" role="alert">@error</div> }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = Core.XbsConstants.DefaultServiceUrl;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public EventCallback<Core.Api.ServiceInfoResponse?> Checked { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    private readonly string id = "service-" + Guid.NewGuid().ToString("N");
+    private string? observed;
+    private string selection = string.Empty;
+    private bool checking;
+    private string error = string.Empty;
+    private Core.Api.ServiceInfoResponse? info;
+    private int generation;
+    private CancellationTokenSource? request;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (observed == Value) return;
+        observed = Value;
+        selection = ServiceCatalog.IsPublic(Value) || Settings.SavedServices.Contains(Value) ? Value : "custom";
+        await Invalidate();
+        if (selection != "custom") await Check();
+    }
+    private async Task Invalidate()
+    {
+        generation++; request?.Cancel(); request?.Dispose(); request = null;
+        checking = false; info = null; error = string.Empty;
+        await Checked.InvokeAsync(null);
+    }
+    private async Task Select(ChangeEventArgs e)
+    {
+        selection = e.Value?.ToString() ?? "custom";
+        Value = selection == "custom" ? string.Empty : selection;
+        observed = Value;
+        await Invalidate();
+        await ValueChanged.InvokeAsync(Value);
+        if (selection != "custom") await Check();
+    }
+    private async Task Edit(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? string.Empty; observed = Value;
+        await Invalidate(); await ValueChanged.InvokeAsync(Value);
+    }
+    private async Task Check()
+    {
+        await Invalidate();
+        var attempt = generation;
+        var url = ServiceCatalog.Normalize(Value);
+        request = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
+        var token = request.Token;
+        checking = true;
+        try
+        {
+            var result = await Session.CheckServiceAsync(url, token);
+            if (IsDisposed || attempt != generation) return;
+            if (result.Status != Core.Models.ServiceStatus.Online && result.Status != Core.Models.ServiceStatus.NoNewSyncs)
+                throw new InvalidOperationException(L.Get(Str.ServiceUnavailable));
+            info = result;
+            await Checked.InvokeAsync(result);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) { if (!IsDisposed && attempt == generation) error = ex.Message; }
+        finally { if (attempt == generation) checking = false; }
+    }
+    public override void Dispose() { generation++; request?.Cancel(); request?.Dispose(); base.Dispose(); }
+}

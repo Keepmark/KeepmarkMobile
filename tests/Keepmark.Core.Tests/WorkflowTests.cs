@@ -73,8 +73,8 @@ public class WorkflowTests
     [Fact]
     public void UnlinkTextSaysWhatIsNeededToLinkAgain()
     {
-        Assert.Contains("sync ID and its password", WorkflowTexts.UnlinkImplication);
-        Assert.Contains("not yet synced", WorkflowTexts.UnlinkImplication);
+        Assert.Contains("sync ID and password", WorkflowTexts.UnlinkImplication);
+        Assert.Contains("Unsynced edits stay only here", WorkflowTexts.UnlinkImplication);
     }
 
     [Fact]
@@ -83,8 +83,11 @@ public class WorkflowTests
         Assert.Equal(["download", "merge", "upload"], WorkflowTexts.DirectionOrder);
         Assert.Equal(["Yes, download", "Yes, merge", "Yes, upload"],
             WorkflowTexts.DirectionOrder.Select(d => WorkflowTexts.DirectionConfirm(d).ConfirmLabel));
-        Assert.Contains("not yet synced are lost", WorkflowTexts.DirectionConfirm("download").Implication);
-        Assert.Contains("other devices", WorkflowTexts.DirectionConfirm("upload").Implication);
+        Assert.Contains("bookmarks will be replaced", WorkflowTexts.DirectionConfirm("download").Implication);
+        Assert.Contains("Other linked devices", WorkflowTexts.DirectionConfirm("upload").Implication);
+        Assert.Contains("only one copy may return", WorkflowTexts.DirectionConfirm("merge").Implication);
+        foreach (var direction in WorkflowTexts.DirectionOrder)
+            Assert.Contains("Backup → Safety backups", WorkflowTexts.DirectionConfirm(direction).Implication);
     }
 
     [Fact]
@@ -98,8 +101,8 @@ public class WorkflowTests
     [Fact]
     public void MoveTextsSayWhatStaysBehind()
     {
-        Assert.Contains("old sync stays on the old service", WorkflowTexts.MoveImplication);
-        Assert.Contains("other devices stay linked", WorkflowTexts.MoveImplication);
+        Assert.Contains("old sync stays available", WorkflowTexts.MoveImplication);
+        Assert.Contains("Other devices keep using it until you move them", WorkflowTexts.MoveImplication);
         Assert.Equal("Create a new sync on example.org and upload 12 bookmarks?", WorkflowTexts.MoveNewConfirm("example.org", 12));
     }
 

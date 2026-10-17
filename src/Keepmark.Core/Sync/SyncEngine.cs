@@ -49,7 +49,7 @@ public interface ICredentialStore
 /// Auto mode: pull-on-resume/poll + push on every edit. Manual: everything explicit.
 /// UI preserves scroll/query across DataChanged; engine never touches UI state.
 /// </summary>
-public sealed class SyncEngine(
+public sealed partial class SyncEngine(
     Func<string, IXSyncApiClient> apiFor,
     ICryptoService crypto,
     BookmarkStore store,

@@ -2742,3 +2742,66 @@ a.xbs-back { text-decoration: none; }
 .xbs-undo > span { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xbs-undo-btn { flex: none; }
 .xbs-undo-btn.ghost { background: transparent; color: #c9d0ff; padding: 0 0.625rem; }
+
+/* QR acquisition is a complete wizard phase, shared by connect and move. */
+.xbs-qr-review { margin-block: 1.25rem; }
+.xbs-qr-review-summary { padding: 1.25rem; border: 1px solid var(--km-line); border-radius: 1rem; background: var(--km-surface); }
+.xbs-qr-review-summary > .km-ico { margin-bottom: .75rem; color: var(--km-accent); }
+.xbs-qr-review-summary dl { margin: 1rem 0 0; }
+.xbs-qr-review-summary dt { font-size: .85rem; color: var(--km-ink-2); font-weight: 500; margin-top: .75rem; }
+.xbs-qr-review-summary dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.xbs-qr-review-actions { display: grid; gap: .75rem; margin-top: 1.5rem; }
+.xbs-qr-review-actions .btn { width: 100%; white-space: normal; }
+
+/* Context-local multiple selection. Row dimensions remain unchanged. */
+.xbs-selection-title { flex: 1; min-width: 0; font-weight: 600; }
+.xbs-selection-all { width: auto; min-width: 48px; padding-inline: 12px; }
+.xbs-selection-row { transition: background-color 150ms ease; }
+.xbs-row.xbs-pressing .xbs-row-inner { background: color-mix(in srgb, var(--km-accent, #919cf3) 12%, transparent); }
+.xbs-selection-row.xbs-selected { background: color-mix(in srgb, var(--km-accent, #919cf3) 16%, transparent); }
+.xbs-selection-check { width: 48px; min-width: 48px; height: 48px; display: grid; place-items: center; color: var(--km-ink); }
+.xbs-selection-check svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; }
+.xbs-selection-check.checked svg rect { fill: var(--km-accent); stroke: var(--km-accent); }
+.xbs-selection-check.checked svg path { stroke: var(--km-on-accent); stroke-width: 2.5; }
+.xbs-selection-row[aria-disabled=true] { opacity: .65; }
+.xbs-selection-actions { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; display: flex; gap: 12px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--km-surface); box-shadow: 0 -2px 12px #0002; }
+.xbs-selection-actions button { flex: 1; min-height: 48px; white-space: normal; }
+.xbs-selection-space { height: calc(96px + env(safe-area-inset-bottom)); }
+.xbs-selection-notice { padding: 8px 16px; }
+.xbs-move-new { flex-wrap: wrap; }
+.xbs-move-new input { flex: 1 1 100%; min-width: 0; }
+.xbs-move-new button { min-height: 48px; }
+@media (prefers-reduced-motion: reduce) { .xbs-selection-row { transition: none; } }
+
+.xbs-batch-undo > span { white-space: normal; overflow: visible; font-size: .85rem; }
+.xbs-move-foot > p { margin: 0 0 8px; color: var(--km-ink-2); font-size: .85rem; }
+
+.xbs-batch-undo .xbs-undo-btn { min-width: 48px; min-height: 48px; }
+
+/* Move picker: same tree for one or many items, including narrow screens. */
+.xbs-move-title { white-space: normal; overflow-wrap: anywhere; }
+.xbs-move-exp { width: 44px; }
+.xbs-move-node .xbs-tree-label { white-space: normal; overflow-wrap: anywhere; }
+.xbs-move-node .xbs-tree-label small { white-space: normal; overflow-wrap: anywhere; }
+/* Deep paths remain readable without pushing the destination off-screen. */
+.xbs-move-kids .xbs-move-kids .xbs-move-kids .xbs-move-kids {
+    margin-left: 0; padding-left: 0; border-left: 0;
+}
+.xbs-move-new { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.xbs-move-new .form-control { grid-column: 1 / -1; min-width: 0; width: 100%; }
+.xbs-move-new .btn { min-width: 0; padding: 0.5rem; white-space: normal; overflow-wrap: anywhere; }
+.xbs-move-foot > p { margin: 0 0 0.625rem; overflow-wrap: anywhere; }
+.xbs-move-destination { color: var(--km-ink-2); font-size: 0.8125rem; }
+.xbs-move-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px; }
+.xbs-move-actions .btn { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+/* A very long path must not consume the footer or hide its actions. */
+.xbs-move-destination { max-height: 4.2em; line-height: 1.4; overflow-y: auto; }
+.xbs-move-title { max-height: 4.05em; line-height: 1.35; overflow-y: auto; }
+@media (max-height: 500px) {
+    .xbs-sheet.xbs-move { height: calc(100dvh - 24px); max-height: calc(100dvh - 24px); }
+    .xbs-move-title { max-height: 2.7em; }
+    .xbs-move-destination { max-height: 2.8em; }
+}
+
+/* “Cartella incisa”: closed pocket, fine outline and the original tinted tile. */
+.xbs-tree-ico .km-ico, .xbs-move-ico .km-ico { width: 20px; height: 20px; stroke-width: 1.7; }

@@ -3,6 +3,52 @@ namespace Keepmark.Core.I18n;
 
 public static partial class Str
 {
+    public const string ServiceCustom = nameof(ServiceCustom);
+    public const string ServiceSaved = nameof(ServiceSaved);
+    public const string ServiceChecking = nameof(ServiceChecking);
+    public const string ServiceReady = nameof(ServiceReady);
+    public const string ServiceUnavailable = nameof(ServiceUnavailable);
+
+    public const string SelectionSearchContext = nameof(SelectionSearchContext);
+    public const string SelectionUndoFailed = nameof(SelectionUndoFailed);
+    public const string SelectionAlreadyHere = nameof(SelectionAlreadyHere);
+    public const string SelectionMoveSummary = nameof(SelectionMoveSummary);
+
+    public const string SelectionContained = nameof(SelectionContained);
+    public const string SelectionPrompt = nameof(SelectionPrompt);
+    public const string SelectionCount = nameof(SelectionCount);
+    public const string SelectionAll = nameof(SelectionAll);
+    public const string SelectionNone = nameof(SelectionNone);
+    public const string SelectionSelect = nameof(SelectionSelect);
+    public const string SelectionChanged = nameof(SelectionChanged);
+    public const string SelectionUnavailable = nameof(SelectionUnavailable);
+    public const string SelectionDeleteQuestion = nameof(SelectionDeleteQuestion);
+    public const string SelectionDeleteBackup = nameof(SelectionDeleteBackup);
+    public const string SelectionSyncLater = nameof(SelectionSyncLater);
+    public const string SelectionApplying = nameof(SelectionApplying);
+    public const string SelectionDeleted = nameof(SelectionDeleted);
+    public const string SelectionMoved = nameof(SelectionMoved);
+    public const string SelectionBackupAvailable = nameof(SelectionBackupAvailable);
+    public const string SelectionFailed = nameof(SelectionFailed);
+    public const string MoveBatchTitle = nameof(MoveBatchTitle);
+    public const string MoveBatchFrom = nameof(MoveBatchFrom);
+    public const string SelectionCovered = nameof(SelectionCovered);
+    public const string SelectionRowFolder = nameof(SelectionRowFolder);
+    public const string SelectionRowBookmark = nameof(SelectionRowBookmark);
+    public const string SafetyOpSelectionDelete = nameof(SafetyOpSelectionDelete);
+    public const string SafetyOpSelectionMove = nameof(SafetyOpSelectionMove);
+    public const string SafetyOpSelectionUndo = nameof(SafetyOpSelectionUndo);
+
+    public const string ConnQrVerifying = nameof(ConnQrVerifying);
+    public const string ConnQrHint = nameof(ConnQrHint);
+    public const string ConnQrScan = nameof(ConnQrScan);
+    public const string ConnQrAcquired = nameof(ConnQrAcquired);
+    public const string ConnQrInvalid = nameof(ConnQrInvalid);
+    public const string ConnQrPermission = nameof(ConnQrPermission);
+    public const string ConnQrUnavailable = nameof(ConnQrUnavailable);
+    public const string ConnQrCleared = nameof(ConnQrCleared);
+    public const string ConnQrConnect = nameof(ConnQrConnect);
+
     public const string ErrEncryptedDatabaseRequired = nameof(ErrEncryptedDatabaseRequired);
     public const string AboutCompat = nameof(AboutCompat);
     public const string AboutFmtA = nameof(AboutFmtA);
@@ -156,6 +202,9 @@ public static partial class Str
     public const string ConnItemsCounts = nameof(ConnItemsCounts);
     public const string ConnSyncId = nameof(ConnSyncId);
     public const string ConnPasswordHint = nameof(ConnPasswordHint);
+    public const string ConnApplyServer = nameof(ConnApplyServer);
+    public const string ConnApplyMerge = nameof(ConnApplyMerge);
+    public const string ConnApplyDevice = nameof(ConnApplyDevice);
     public const string ConnOpenSync = nameof(ConnOpenSync);
     public const string ConnConfirmPassword = nameof(ConnConfirmPassword);
     public const string ConnPwNewHint = nameof(ConnPwNewHint);

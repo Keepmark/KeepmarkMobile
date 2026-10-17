@@ -6,6 +6,8 @@
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject NavigationManager Nav
+@inject KeepmarkMobile.Services.IQrScanner QrScanner
+@inject KeepmarkMobile.Services.AppLockState AppLock
 @using Keepmark.Core.Workflow
 
 <PageTitle>@L.Get(Str.NavMoveService)</PageTitle>
@@ -58,7 +60,7 @@ else if (step == 4)
 }
 else
 {
-    @* One question per screen, one primary action at the bottom, Back at the top. *@
+    @* Destination and credentials, then one review with the definitive action. *@
     <div class="xbs-wizard-head">
         @if (step > 1)
         {
@@ -68,120 +70,73 @@ else
         {
             <span></span>
         }
-        <span class="xbs-stepcount">@L.Get(Str.SwStep, step)</span>
+        @if (!qrState.ShowReview)
+        {
+            <span class="xbs-stepcount">@L.Get(Str.SwStep, step == 3 ? 2 : 1)</span>
+        }
     </div>
-    @if (resumed)
+    @if (resumed && !qrState.ShowReview)
     {
         <div class="alert alert-info" role="status">
             @L.Get(Str.SwResumed)
         </div>
     }
 
+    @if (qrState.ShowReview)
+    {
+        <QrCredentialReview ServiceUrl="@qrServiceUrl" SyncId="@qrSyncId" Busy="@(busy || qrState.IsVerifying)"
+                            OnVerify="VerifyQr" OnCancel="CancelQr" />
+    }
+    else
+    {
+    @if (step == 1)
+    {
+        <button class="btn btn-secondary mb-2" @onclick="ScanQr" disabled="@busy"><svg class="km-ico sm me-2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM19 15h2v6h-2zM15 19h2v2h-2z" /></svg>@L.Get(Str.ConnQrScan)</button>
+            <div class="form-text mb-3">@L.Get(Str.ConnQrHint)</div>
+        @if (!string.IsNullOrEmpty(qrError))
+        {
+            <div class="alert alert-danger" role="alert">@qrError</div>
+        }
+    }
     @if (step == 1)
     {
         <h2 class="xbs-step-title">@L.Get(Str.SwWhere)</h2>
+        <ServiceSelector Value="@targetUrl" ValueChanged="ServiceChanged" Checked="ServiceChecked" Disabled="@busy" />
         <div class="mb-3">
-            <label class="form-label">@L.Get(Str.SwTargetUrl)</label>
-            <input class="form-control" @bind="targetUrl" @bind:event="oninput" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
-            <div class="form-text">@L.Get(Str.SwTargetHint)</div>
+            <label class="form-label">@L.Get(Str.SwIntoWhich)</label>
+            <select class="form-select" disabled="@busy" @bind="slot" @bind:after="Unverify">
+                <option value="new">@L.Get(Str.SwANew)</option>
+                <option value="existing">@L.Get(Str.SwExisting)</option>
+            </select>
         </div>
-        @if (!serviceOk)
+        @if (slot == "new")
         {
-            @* The next step unlocks only for the exact URL that answered: editing it brings the check back. *@
-            <div class="d-grid">
-                <button class="btn btn-primary" @onclick="CheckService" disabled="@busy">@L.Get(Str.ConnCheckService)</button>
-            </div>
-            @if (!string.IsNullOrEmpty(checkError))
-            {
-                <div class="alert alert-danger mt-2" role="alert">@checkError</div>
-            }
-        }
-        else
-        {
-            <div class="xbs-verified" role="status">
-                <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-                <div class="xbs-verified-text">
-                    <strong>@L.Get(Str.SwServiceReady)</strong>
-                    <span>@L.Get(Str.SwServiceLine, serviceInfo!.Status, serviceInfo.Version)</span>
-                    @if (targetExpiryDays is not null)
-                    {
-                        <span>@L.Get(Str.StatusSyncExpiryLine, WorkflowRules.DescribeSyncExpiry(targetExpiryDays))</span>
-                    }
-                </div>
-            </div>
-            <div class="d-grid">
-                <button class="btn btn-primary" @onclick="() => step = 2" disabled="@busy">@L.Get(Str.CommonNext)</button>
-            </div>
-        }
-    }
-    else if (step == 2 && !slotChosen)
-    {
-        <h2 class="xbs-step-title">@L.Get(Str.SwIntoWhich)</h2>
-        <div class="xbs-choices">
-            <button class="xbs-choice" @onclick='() => ChooseSlot("new")'>
-                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></span>
-                <span class="xbs-choice-text"><strong>@L.Get(Str.SwANew)</strong><span>@Loc.Plural(Str.SwANewText, localCount, TargetHost)</span></span>
-                <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-            </button>
-            <button class="xbs-choice" @onclick='() => ChooseSlot("existing")'>
-                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
-                <span class="xbs-choice-text"><strong>@L.Get(Str.SwExisting)</strong><span>@L.Get(Str.SwExistingText, TargetHost)</span></span>
-                <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-            </button>
-        </div>
-    }
-    else if (step == 2 && slot == "new")
-    {
-        <h2 class="xbs-step-title">@L.Get(Str.SwNewOn, TargetHost)</h2>
-        <div class="mb-3">
             <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
-            <input type="password" class="form-control" @bind="newPassword" @bind:event="oninput" autocomplete="new-password" />
+            <input disabled="@busy" type="password" class="form-control" @bind="newPassword" @bind:event="oninput" autocomplete="new-password" />
             <label class="form-label mt-2">@L.Get(Str.ConnConfirmPassword)</label>
-            <input type="password" class="form-control" @bind="confirmPassword" @bind:event="oninput" autocomplete="new-password" />
-            <div class="form-text">@L.Get(Str.SwPwHint)</div>
-        </div>
-        <div class="d-grid">
-            <button class="btn btn-primary" @onclick="GoReview" disabled="@(busy || !CanReview())">@L.Get(Str.SwReview)</button>
-        </div>
-        @if (!string.IsNullOrEmpty(verifyError))
-        {
-            <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+            <input disabled="@busy" type="password" class="form-control" @bind="confirmPassword" @bind:event="oninput" autocomplete="new-password" />
+            <div class="form-text mb-3">@L.Get(Str.SwPwHint)</div>
         }
-    }
-    else if (step == 2 && !VerifiedExisting)
-    {
-        <h2 class="xbs-step-title">@L.Get(Str.SwExistingOn, TargetHost)</h2>
-        <div class="mb-3">
+        else if (!VerifiedExisting)
+        {
             <label class="form-label">@L.Get(Str.ConnSyncId)</label>
-            <input class="form-control" @bind="syncId" placeholder="a1b2c3d4e5f6…" />
+            <input disabled="@busy" class="form-control" @bind="syncId" @bind:after="ClearQr" />
             <label class="form-label mt-2">@L.Get(Str.CommonPassword)</label>
-            <input type="password" class="form-control" @bind="password" autocomplete="current-password" />
-            <div class="form-text">@L.Get(Str.SwCheckedHint)</div>
-        </div>
-        <div class="d-grid">
-            <button class="btn btn-primary" @onclick="VerifyExisting" disabled="@busy">@L.Get(Str.ConnOpenSync)</button>
-        </div>
-        @if (!string.IsNullOrEmpty(verifyError))
-        {
-            <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
+            <input disabled="@busy" type="password" class="form-control mb-3" @bind="password" @bind:after="ClearQr" autocomplete="current-password" />
         }
-    }
-    else if (step == 2)
-    {
-        <h2 class="xbs-step-title">@L.Get(Str.SwExistingOn, TargetHost)</h2>
-        <div class="xbs-verified" role="status">
-            <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-            <div class="xbs-verified-text">
-                <strong>@L.Get(Str.ConnSyncOpenedA) <code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code> @L.Get(Str.ConnSyncOpenedB)</strong>
-                <span>@L.Get(Str.ConnItemsCounts, probe!.RemoteCount, localCount)</span>
-            </div>
-            <button class="xbs-link-btn" @onclick="Unverify" disabled="@busy">@L.Get(Str.CommonChange)</button>
-        </div>
-        <DirectionPicker Name="migdir" Value="@PickerValue" ValueChanged="OnPickerChanged"
-                         LocalCount="localCount" RemoteCount="probe.RemoteCount" Disabled="busy" />
+        @if (slot == "existing" && VerifiedExisting)
+        {
+            <p><code>@WorkflowRules.ShortId(probe?.Candidate.Id)</code>
+                <button class="xbs-link-btn" @onclick="Unverify" disabled="@busy">@L.Get(Str.CommonChange)</button>
+            </p>
+        }
         <div class="d-grid">
-            <button class="btn btn-primary" @onclick="GoReview" disabled="@busy">@L.Get(Str.SwReview)</button>
+            <button class="btn btn-primary" @onclick="ContinueToReview" disabled="@(busy || !serviceOk || (slot == "new" && serviceInfo?.Status != Core.Models.ServiceStatus.Online))">@L.Get(Str.CommonNext)</button>
         </div>
+        @if (!string.IsNullOrEmpty(checkError))
+        {
+            <div class="alert alert-danger mt-2" role="alert">@checkError</div>
+        }
         @if (!string.IsNullOrEmpty(verifyError))
         {
             <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
@@ -190,16 +145,20 @@ else
     else
     {
         <h2 class="xbs-step-title">@L.Get(Str.SwReview)</h2>
+        @if (slot == "existing" && probe is not null)
+        {
+            <DirectionPicker Name="migdir" Value="@PickerValue" ValueChanged="OnPickerChanged"
+                             LocalCount="localCount" RemoteCount="probe.RemoteCount" Disabled="busy" />
+        }
         <div class="xbs-review">
             @if (slot == "new")
             {
                 <p>@Loc.Plural(Str.SwRevNew, localCount, TargetHost)</p>
-                <p class="text-muted mb-0">@L.Get(Str.SwRevNewNote)</p>
+
             }
             else if (direction == "upload")
             {
                 <p>@L.Get(Str.SwRevUpload, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost, localCount)</p>
-                <p class="text-muted mb-0">@L.Get(Str.SwRevUploadNote)</p>
             }
             else if (direction == "merge")
             {
@@ -215,25 +174,23 @@ else
                         }
                     </ul>
                 }
-                <p class="text-muted mb-0">@L.Get(Str.SwRevMergeNote)</p>
             }
             else
             {
                 <p>@L.Get(Str.SwRevDownload, localCount, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost)</p>
-                <p class="text-muted mb-0">@L.Get(Str.SwRevDownloadNote)</p>
             }
         </div>
-        @if (!armedMove)
+        <p class="text-muted">@MoveConfirm.Implication</p>
+        @if (targetExpiryDays is not null)
         {
-            <div class="d-grid">
-                <button class="btn @(ReplacesSomething ? "btn-danger" : "btn-primary")" @onclick="ArmMove" disabled="@busy">@L.Get(Str.SwMoveNow)</button>
-            </div>
+            <p class="form-text">@L.Get(Str.StatusSyncExpiryLine, WorkflowRules.DescribeSyncExpiry(targetExpiryDays))</p>
         }
-        else
+        <div class="d-grid">
+            <button class="btn @(ReplacesSomething ? "btn-danger" : "btn-primary")" @onclick="Execute" disabled="@(busy || (slot == "existing" && direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, probe))))">@(busy ? L.Get(Str.SwMoving) : L.Get(Str.SwMoveNow))</button>
+        </div>
+        @if (!string.IsNullOrEmpty(verifyError))
         {
-            <ConfirmBlock Message="@MoveConfirm.Message" Implication="@MoveConfirm.Implication"
-                          ConfirmLabel="@(busy ? L.Get(Str.SwMoving) : MoveConfirm.ConfirmLabel)" Danger="ReplacesSomething" Busy="busy"
-                          OnConfirm="Execute" OnCancel="() => armedMove = false" />
+            <div class="alert alert-danger mt-2" role="alert">@verifyError</div>
         }
         @if (!string.IsNullOrEmpty(reviewError))
         {
@@ -242,6 +199,7 @@ else
         <div class="text-center mt-3">
             <button class="xbs-link-btn" @onclick="StartOver" disabled="@busy">@L.Get(Str.SwStartOver)</button>
         </div>
+    }
     }
 }
 
@@ -254,8 +212,6 @@ else
     private int? targetExpiryDays;
     private string? checkedUrl;
     private string slot = "new";
-    /// <summary>Step 2 first asks new vs existing; false shows that choice.</summary>
-    private bool slotChosen;
     private string newPassword = string.Empty;
     private string confirmPassword = string.Empty;
     private string syncId = string.Empty;
@@ -276,11 +232,132 @@ else
     private string reviewError = string.Empty;
     private bool linked;
     private bool resumed;
-    /// <summary>"Move now…" arms the inline confirm; "Yes, …" runs it.</summary>
-    private bool armedMove;
+
 
     private bool serviceOk =>
         serviceInfo is not null && checkedUrl == TargetUrlClean;
+
+    protected override void OnInitialized() => AppLock.Changed += LockChanged;
+
+    private readonly ConnectQrCandidateState qrState = new();
+    private ConnectQrPayload? pendingQr => qrState.Payload;
+    private CancellationTokenSource? qrExpiry;
+    private int qrGeneration => qrState.Generation;
+    private string qrError = string.Empty;
+    private string qrServiceUrl = string.Empty;
+    private string qrSyncId = string.Empty;
+
+    private void ClearQr()
+    {
+        qrState.Clear();
+        qrServiceUrl = qrSyncId = string.Empty;
+        StopQrExpiry();
+    }
+
+    private void CancelQr()
+    {
+        ClearQr();
+        qrError = string.Empty;
+    }
+
+    private void StopQrExpiry()
+    {
+        qrExpiry?.Cancel();
+        qrExpiry?.Dispose();
+        qrExpiry = null;
+    }
+
+    private void LockChanged()
+    {
+        if (AppLock.Locked || !AppLock.Foreground)
+            _ = InvokeAsync(() =>
+            {
+                // The permission dialog can pause the activity before any camera
+                // session exists. The scanner rechecks lock/foreground after it.
+                // Native active sessions cancel themselves on this event.
+                if (qrState.ShowReview) ClearQr();
+                if (!IsDisposed) StateHasChanged();
+            });
+    }
+
+    private async Task ScanQr()
+    {
+        if (busy || !linked || AppLock.Locked || !AppLock.Foreground) return;
+        ClearQr();
+        var generation = qrGeneration;
+        busy = true; qrError = string.Empty;
+        try
+        {
+            var text = await QrScanner.ScanAsync(Lifetime);
+            if (IsDisposed || Lifetime.IsCancellationRequested || generation != qrGeneration || AppLock.Locked || !AppLock.Foreground) return;
+            if (text is null) return;
+            var allowLocal = false;
+#if DEBUG
+            allowLocal = true;
+#endif
+            if (!ConnectQrPayload.TryParse(text, out var candidate, allowLocal))
+            { qrError = L.Get(Str.ConnQrInvalid); return; }
+            serviceInfo = null; checkedUrl = null; targetExpiryDays = null;
+            checkError = verifyError = reviewError = string.Empty;
+            probe = null; verifiedFor = null; mergeStats = null; mergeStatsFor = null;
+            resumed = false;
+            password = newPassword = confirmPassword = string.Empty;
+            qrServiceUrl = candidate!.ServiceUrl; qrSyncId = candidate.Id;
+            Session.PendingSwitch = null;
+            if (!qrState.Offer(candidate, generation)) return;
+            qrExpiry = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
+            _ = ExpireQr(generation, qrExpiry.Token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (!IsDisposed && generation == qrGeneration)
+                qrError = ex is Services.QrScanException scanError ? L.Get(scanError.MessageKey) : L.Get(Str.ConnQrUnavailable);
+            Session.Log.Warn("switch", $"QR scanner failed: {ex.GetType().Name}");
+        }
+        finally { if (!IsDisposed) busy = false; }
+    }
+
+    private async Task ExpireQr(int generation, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(60), ct);
+            await InvokeAsync(() =>
+            {
+                if (IsDisposed || generation != qrGeneration) return;
+                ClearQr(); qrError = L.Get(Str.ConnQrCleared); StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task VerifyQr()
+    {
+        if (busy || !linked || pendingQr is null || AppLock.Locked || !AppLock.Foreground) return;
+        var candidate = qrState.BeginVerification();
+        StopQrExpiry();
+        if (candidate is null) { qrError = L.Get(Str.ConnQrCleared); return; }
+        var generation = qrGeneration;
+        var targetUrl = candidate.ServiceUrl;
+        var targetId = candidate.Id;
+        var secret = candidate.Password;
+        candidate = null;
+        var task = VerifyExistingCredentials(targetUrl, targetId, secret, checkTarget: true, qrAttempt: generation);
+        secret = string.Empty;
+        try { await task; }
+        finally { if (generation == qrGeneration) ClearQr(); }
+    }
+
+    private bool CurrentQrAttempt(int generation) => !IsDisposed && generation == qrGeneration
+        && qrState.IsVerifying && !AppLock.Locked && AppLock.Foreground;
+
+    public override void Dispose()
+    {
+        AppLock.Changed -= LockChanged;
+        ClearQr();
+        base.Dispose();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -304,12 +381,11 @@ else
             direction = draft.Direction is "upload" or "merge" ? draft.Direction : "take";
             probe = draft.Probe;
             verifiedFor = draft.VerifiedFor;
-            // Resume on step 2, never on the review: a new sync needs its
+            // Resume on the form, never on the review: a new sync needs its
             // password again (never stored), a merge its preview again, and
             // the service its check again. "Review the move" redoes them.
-            step = 2;
+            step = 1;
             resumed = true;
-            slotChosen = true;
             try
             {
                 serviceInfo = await Session.CheckServiceAsync(TargetUrlClean);
@@ -336,10 +412,6 @@ else
         verifyError = string.Empty;
     }
 
-    private bool CanReview() => slot == "new"
-        ? newPassword.Length > 0 && confirmPassword.Length > 0
-        : probe is not null && verifiedFor == $"{TargetUrlClean}|{syncId.Trim()}";
-
     /// <summary>An existing sync stays verified only for the exact ID it was
     /// verified with: editing the ID (or URL) brings the credential inputs
     /// back automatically.</summary>
@@ -348,14 +420,21 @@ else
 
     private void Unverify()
     {
+        ClearQr();
         probe = null;
         verifiedFor = null;
         mergeStats = null;
         mergeStatsFor = null;
     }
 
+    private Task ServiceChanged(string url) { targetUrl = url; Unverify(); checkedUrl = null; serviceInfo = null; targetExpiryDays = null; return Task.CompletedTask; }
+    private Task ServiceChecked(Core.Api.ServiceInfoResponse? info) { serviceInfo = info; checkedUrl = info is null ? null : TargetUrlClean; return Task.CompletedTask; }
+
     private async Task CheckService()
     {
+        serviceInfo = null;
+        checkedUrl = null;
+        targetExpiryDays = null;
         await RunStepAsync(async () =>
         {
             serviceInfo = await Session.CheckServiceAsync(TargetUrlClean);
@@ -366,26 +445,47 @@ else
         }, err => checkError = err, "switch-check");
     }
 
-    private async Task VerifyExisting()
+    private Task VerifyExisting() => VerifyExistingCredentials(TargetUrlClean, syncId.Trim(), password);
+
+    private async Task VerifyExistingCredentials(string url, string id, string secret, bool checkTarget = false, int? qrAttempt = null)
     {
         await RunStepAsync(async () =>
         {
-            if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
+            if (string.IsNullOrWhiteSpace(id) || string.IsNullOrEmpty(secret))
             {
                 throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
             }
 
-            probe = await Session.ProbeLinkAsync(TargetUrlClean, syncId.Trim(), password);
+            // Capture the probe task, then release our raw secret before awaiting it.
+            var probeTask = Session.ProbeLinkAsync(url, id, secret, Lifetime);
+            secret = string.Empty;
+            var result = await probeTask;
+            if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;
+            if (checkTarget)
+            {
+                // Explicit Open sync is the first network action for a QR.
+                serviceInfo = await Session.CheckServiceAsync(url);
+                if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;
+                checkedUrl = url;
+                targetExpiryDays = await Session.GetSyncExpiryDaysAsync(url);
+                if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;
+                targetUrl = url; syncId = id; slot = "existing"; step = 3;
+            }
+            probe = result;
             // Consumed: the probe carries the key; a failed check keeps it for a retry.
             password = string.Empty;
-            verifiedFor = $"{TargetUrlClean}|{syncId.Trim()}";
+            verifiedFor = $"{url}|{id}";
             direction = "take";
             mergeStats = null;
             mergeStatsFor = null;
             tookRemote = false;
             resumed = false;
             SaveDraft();
-        }, err => verifyError = err, "switch-verify");
+        }, err =>
+        {
+            if (!checkTarget) verifyError = err;
+            else if (!qrAttempt.HasValue || CurrentQrAttempt(qrAttempt.Value)) qrError = err;
+        }, "switch-verify");
     }
 
     private async Task PreviewMerge()
@@ -397,8 +497,11 @@ else
                 throw new InvalidOperationException(L.Get(Str.SwOpenFirst));
             }
 
-            mergeStats = await Session.GetMergePreviewAsync(probe);
-            mergeStatsFor = probe;
+            var target = probe;
+            var preview = await Session.GetMergePreviewAsync(target);
+            if (IsDisposed || !ReferenceEquals(target, probe) || direction != "merge") return;
+            mergeStats = preview;
+            mergeStatsFor = target;
         }, err => verifyError = err, "switch-merge-preview");
     }
 
@@ -408,13 +511,17 @@ else
     /// <summary>The picker speaks download/upload/merge; this page keeps "take" for download.</summary>
     private string PickerValue => direction == "take" ? "download" : direction;
 
-    private void OnPickerChanged(string value) => SetDirection(value == "download" ? "take" : value);
+    private async Task OnPickerChanged(string value)
+    {
+        if (busy) return;
+        SetDirection(value == "download" ? "take" : value);
+        if (direction == "merge") await PreviewMerge();
+    }
 
     /// <summary>Upload and download overwrite one side: the final button is red.</summary>
     private bool ReplacesSomething => slot == "existing" && direction != "merge";
 
-    /// <summary>The confirm for the final step: new sync, or the chosen
-    /// direction plus what the move leaves behind on the old service.</summary>
+    /// <summary>Consequences displayed before the definitive move action.</summary>
     private WorkflowTexts.Confirm MoveConfirm
     {
         get
@@ -429,38 +536,31 @@ else
         }
     }
 
-    private void ArmMove()
-    {
-        reviewError = string.Empty;
-        armedMove = true;
-    }
-
-    private void ChooseSlot(string value)
-    {
-        slot = value;
-        slotChosen = true;
-        verifyError = string.Empty;
-    }
-
-    /// <summary>Back walks the screens in reverse: review → step 2 form →
-    /// new/existing choice → service.</summary>
+    /// <summary>Return to the destination form; the next Continue revalidates it.</summary>
     private void GoBack()
     {
+        if (qrState.ShowReview) { CancelQr(); return; }
+        ClearQr();
         verifyError = string.Empty;
         reviewError = string.Empty;
-        armedMove = false;
-        if (step == 3)
+        step = 1;
+    }
+
+    private async Task ContinueToReview()
+    {
+        if (busy) return;
+        if (slot == "new")
         {
-            step = 2;
+            try { WorkflowRules.RequireNewPassword(newPassword, confirmPassword); }
+            catch (Exception ex) { verifyError = ex.Message; return; }
         }
-        else if (step == 2 && slotChosen)
+        if (!serviceOk || !string.IsNullOrEmpty(checkError)) return;
+        if (slot == "existing" && !VerifiedExisting)
         {
-            slotChosen = false;
+            await VerifyExisting();
+            if (!VerifiedExisting) return;
         }
-        else
-        {
-            step = 1;
-        }
+        await GoReview();
     }
 
     private async Task GoReview()
@@ -485,7 +585,6 @@ else
             verifyError = string.Empty;
             reviewError = string.Empty;
             resumed = false;
-            armedMove = false;
             step = 3;
             SaveDraft();
         }
@@ -506,10 +605,10 @@ else
 
     private void StartOver()
     {
+        ClearQr();
         Session.PendingSwitch = null;
         step = 1;
         slot = "new";
-        slotChosen = false;
         syncId = string.Empty;
         password = string.Empty;
         newPassword = string.Empty;
@@ -525,7 +624,6 @@ else
         targetExpiryDays = null;
         checkedUrl = null;
         resumed = false;
-        armedMove = false;
         checkError = string.Empty;
         verifyError = string.Empty;
         reviewError = string.Empty;
@@ -533,6 +631,7 @@ else
 
     private async Task Execute()
     {
+        if (busy || step != 3) return;
         await RunStepAsync(async () =>
         {
             if (!serviceOk)
@@ -578,7 +677,6 @@ else
             AppSettings.ServiceUrl = TargetUrlClean;
             newPassword = string.Empty;
             confirmPassword = string.Empty;
-            armedMove = false;
             step = 4;
             Session.PendingSwitch = null;
             Session.Log.Info("switch", createdId is not null
@@ -622,8 +720,10 @@ else
             await action();
             Session.Log.Debug("switch", $"{op}: ok");
         }
+        catch (OperationCanceledException) when (Lifetime.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (IsDisposed) return;
             setError(ex.Message);
             Session.Log.Warn("switch", $"{op} failed: {ex.GetType().Name}");
         }

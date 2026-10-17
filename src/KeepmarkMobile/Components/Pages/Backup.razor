@@ -29,7 +29,6 @@ else
 
     <div class="mb-3">
         <h4>@L.Get(Str.BackupRestoreH)</h4>
-        <p class="text-muted">@WorkflowTexts.ImportImplication(linked)</p>
         <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">@L.Get(Str.BackupChooseFile)</button>
         @if (impPath is not null)
         {
@@ -43,17 +42,9 @@ else
             else
             {
                 <p class="text-muted mb-1">@WorkflowTexts.ImportChecked(impFileName ?? L.Get(Str.BackupFallbackName), impCount.Value)</p>
-                @if (armedImp)
-                {
-                    <ConfirmBlock Message="@L.Get(Str.BackupReplaceMessage, localCount, impCount)"
-                                  Implication="@WorkflowTexts.ImportImplication(linked)"
-                                  ConfirmLabel="@L.Get(Str.CommonYesRestore)" Busy="busy"
-                                  OnConfirm="ExecuteImport" OnCancel="() => armedImp = false" />
-                }
-                else
-                {
-                    <button class="btn btn-danger mt-1" @onclick="() => armedImp = true" disabled="@busy">@L.Get(Str.BackupReplaceBtn)</button>
-                }
+                <p>@L.Get(Str.BackupReplaceMessage, localCount, impCount)</p>
+                <p class="text-muted">@WorkflowTexts.ImportImplication(linked)</p>
+                <button class="btn btn-danger mt-1" @onclick="ExecuteImport" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
             }
         }
         <StepMessage Text="@impMessage" Error="impError" />
@@ -120,7 +111,6 @@ else
     private string? impFileName;
     private string impPassword = string.Empty;
     private int? impCount;
-    private bool armedImp;
     private List<SafetyBackupEntry> safetyList = new();
     private string? armedRestore;
     private string? armedDelete;
@@ -227,7 +217,6 @@ else
         impFileName = null;
         impPassword = string.Empty;
         impCount = null;
-        armedImp = false;
     }
 
     private static async Task CopyCappedAsync(Stream src, Stream dst, long maxBytes)
@@ -274,7 +263,6 @@ else
                 throw;
             }
 
-            armedImp = false;
             return string.Empty;
         }, (text, error) => (impMessage, impError) = (text, error));
     }
@@ -283,6 +271,7 @@ else
     /// password step with the file kept, never to a half-checked state.</summary>
     private async Task ExecuteImport()
     {
+        if (busy) return;
         await RunAsync(async () =>
         {
             if (impPath is null || impCount is null)
@@ -299,7 +288,6 @@ else
             {
                 impPassword = string.Empty;
                 impCount = null;
-                armedImp = false;
                 throw;
             }
 

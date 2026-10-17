@@ -90,7 +90,7 @@ Each flow states preconditions, mutations in order, and the REQUIRED user-visibl
 | R6.4b | Link existing, merge (`GetMergePreviewAsync` + `ApplyMergeAsync`, `connect-merge`) | Same verify-first. Preview is a dry-run of the same pure union (`BookmarkMerge`): local-only upload / remote-only download / title-conflict (server wins) / folders-created / separators counts. Preview is locked: changing direction or re-verifying invalidates it. Apply snapshots BOTH sides first (fail closed), then writes the union locally and pushes (409 honest, both snapshots intact). Merge never deletes. |
 | R6.5 | Switch service (wizard: new / existing-pull / existing-push / existing-merge) | Nothing syncs before explicit confirm; safety-backup of the scrapped side first (merge: both sides, `switch-merge`); password verified by decrypt before mutation; wizard never deletes local data; draft survives navigation (no secrets in draft), cleared on complete/start-over. |
 | R6.6 | Unlink | Clears credentials ONLY; local items stay; sync stops. Requires explicit confirm. |
-| R6.7 | Backup export/import/preview | Envelope R2.5; import = preview (count) → two-step confirm → safety-backup local → dirty mirror (auto-push/conflict, never pull-over). 50 MB stream cap, tmp cleanup. |
+| R6.7 | Backup export/import/preview | Envelope R2.5; import = preview (count and consequences) → Restore backup → safety-backup local → dirty mirror (auto-push/conflict, never pull-over). 50 MB stream cap, tmp cleanup. |
 | R6.8 | Change password (`ChangePasswordAsync`) | Guards: current required, new required; current derived key MUST equal stored (else `InvalidCredentials`, zero mutations/downloads/queue). Then, in ONE engine gate hold (`SyncEngine.ChangeKeyAsync`): download the server copy (remote moved since the last sync → `DataOutOfSync`, zero mutations) → safety-backup of the REAL server copy → push re-encrypted under the new key on that remote base → store the new derived key ONLY after the PUT landed (a failed push keeps the old password working) → rotate safety master (R7.3, best-effort). Old password stops working everywhere. |
 | R6.9 | Duplicates bulk delete (`DeleteBookmarksAsync`) | Safety backup (local, `duplicates-cleanup`) BEFORE delete; one transaction + one push; result toast names the backup location. Last-copy-locked plan (never wipe a group). |
 |---|---|---|
@@ -134,7 +134,7 @@ the applied result. Rules:
 | R | Requirement |
 |---|---|
 | R8.1 | Validation catalog (exact strings): "Current password is required.", "A new password is required.", "The new password must be different from the current one.", "New passwords do not match.", "Use a password of at least 8 characters.", "Passwords do not match — retype the confirmation.", "Enter both the sync ID and its password.", "Sync ID is required for an existing sync.", "Choose the sync direction above." (reconcile), "Verify the existing sync first.", "Re-check the target service first.", "Preview the merge first — counts must match the verified sync." (switch), "Preview the merge first — counts must match the linked sync." (connect) |
-| R8.2 | Destructive confirms: unlink (1), delete server-side n/a (no client), create-empty (armed), import (two-step), switch (Review + Switch now), merge (Preview + explicit merge confirm, preview-locked), bulk delete (armed), safety restore/delete (armed inline). |
+| R8.2 | Destructive confirms: unlink (1), delete server-side n/a (no client), create-empty (armed), import (preview with consequences + Restore backup), switch (review + Move and connect), merge (automatic preview + direct apply, preview-locked), bulk delete (armed), safety restore/delete (armed inline). |
 | R8.3 | Secrets hygiene: password fields cleared on success AND failure (keep-new convenience only where stated); password never in logs, toasts, or backup filenames. |
 | R8.4 | Gating matrix: Switch-service menu + page require an existing link (disabled + guard page); Sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty; merge disabled unless both sides hold items); danger buttons outline-first/solid-confirm. |
 | R8.5 | Status page: mode/state/last-sync/service (+version) / local DB bytes / server copy bytes + max + % + bar (one `/info` probe per visit, offline = "unknown") / content stats / app + sync-format + API versions. |
@@ -171,13 +171,13 @@ fails the review.
 
 | View | Checks |
 |---|---|
-| `Connect.razor` (R6.1–R6.4b, R8.1–R8.4, R8.7) | Check service ok/offline (error box by the button). Link existing: wrong password → `InvalidCredentials`, zero mutations; `0/0` → auto-apply. Direction pull/push/merge each applied once: success restates mode+direction+target (`MoveResult`), safety row appears. Merge: preview counts = applied result; change direction → preview invalidated, apply refuses; merge radio disabled when either side is empty. Create new + create-with-upload: new ID shown + Copy. Unlink: confirm armed, creds cleared, local kept. Each step's error appears in ITS box (`role="alert"`), never a shared one. |
+| `Connect.razor` (R6.1–R6.4b, R8.1–R8.4, R8.7) | Check service ok/offline (error box by the button). Link existing: wrong password → `InvalidCredentials`, zero mutations; `0/0` → auto-apply. Direction pull/push/merge each applied once: success restates mode+direction+target (`MoveResult`), safety row appears. Merge: preview counts = applied result; change direction → preview invalidated and recomputed automatically for Merge; apply waits for a current preview; merge radio disabled when either side is empty. Create new + create-with-upload: new ID shown + Copy. Unlink: confirm armed, creds cleared, local kept. Each step's error appears in ITS box (`role="alert"`), never a shared one. |
 | `SwitchService.razor` (R6.5, R8.1–R8.4, R8.7) | Unlinked → guard page. Step 1 check error by the button. Step 2 new-mode passwords mismatch/short → verify-box error (no navigation); existing-mode verify wrong password → zero mutations. All 3 directions reviewed in step 3 with counts; merge requires fresh preview. Execute → step 4 success names outcome + safety location; draft cleared (navigate away/back → wizard reset). Start over resets everything incl. errors. |
-| `Backup.razor` (R6.7, R7) | Export → file created, envelope `{App:"xBrowserSyncNg",Format:1}`. Preview with wrong password vs damaged file → distinct errors. Import → two-step confirm, safety row first, count matches. Safety list shows all `connect-merge`/`switch-merge` rows (both sides). Restore local → pre-restore row; restore remote unlinked → refused; delete → file + index row gone. |
+| `Backup.razor` (R6.7, R7) | Export → file created, envelope `{App:"xBrowserSyncNg",Format:1}`. Preview with wrong password vs damaged file → distinct errors. Import → preview and consequences → Restore backup executes directly, safety row first, count matches. Safety list shows all `connect-merge`/`switch-merge` rows (both sides). Restore local → pre-restore row; restore remote unlinked → refused; delete → file + index row gone. |
 | `Duplicates.razor` (R6.9) | Groups listed; last copy locked (never deletable); per-group + global delete armed; ONE safety row per cleanup; ONE push (no sync storm — check logs); toast names backup location. |
 | `Status.razor` (R8.5) | Mode/state/last-sync/service + version, DB bytes, server bytes + max + % + bar (one `/info` per visit; offline = "unknown"), content stats, app + sync-format + API versions. No `.ToString("0.#")` leaks into percents. |
 | `Settings.razor` (R6.8) | Change password: empty current/new, new == current, wrong current → exact R8.1 strings, zero mutations; success → old password dead everywhere, safety row `change-password`, master re-wrapped. Theme/mode/verbosity persist. |
-| `Home.razor` (R4.1, R4.4, R4.5) | Tap opens, ⋮ menu actions, swipe expand/collapse, pinned section, breadcrumb, folder-first sort, share-receive prefill, folder picker Select/Cancel. Edit in Auto → background push; conflicting remote → Conflict status, never silent merge/discard. Scroll/query preserved across `DataChanged`. Single delete → 6 s undo, no safety file. |
+| `Home.razor` (R4.1, R4.4, R4.5) | Tap opens, ⋮ menu actions, swipe expand/collapse, pinned section, breadcrumb, folder-first sort, share-receive prefill (also with ⋮ actions, edit, move picker or delete confirmation already open: only the new prefilled add form remains; repeat sharing the same URL resets the form), folder picker Select/Cancel. Edit in Auto → background push; conflicting remote → Conflict status, never silent merge/discard. Scroll/query preserved across `DataChanged`. Single delete → 6 s undo, no safety file. |
 | `Logs.razor` (R9) | 200-entry viewer, level filter, share export. No bodies/passwords/keys/full sync IDs in any row (spot-check after a sync + a merge). |
 | `About.razor` (R8.6) | Declares v1.1 + v1.2 extended contract with fallback, encryption, independence, proprietary license. Bug-report mail carries app + API versions. |
 | Cross-view | R4.2 live v1.2 against a v1.2 server (conditional GET 304 + revision CAS in logs). R7.4 restore against real server. Uninstall/reinstall data-loss behavior. |
@@ -268,3 +268,77 @@ fails the review.
   `python3 scripts/verify-native-sqlcipher.py --apk /path/to/app.apk`.
 - Bundle SQLCipher and crypto third-party notices. Device runtime and battery
   validation remain separate from host tests and APK inspection.
+
+### QR connection regression (v1.0.200)
+
+- Pure parser: strict Keepmark JSON v1, Unicode and short existing passwords,
+  1,800-byte cap before parsing, duplicates/depth/type/ID/URL/version rejection,
+  unknown fields ignored, representation redacted (`ConnectQrTests`). Candidate
+  tests use a fake clock and delayed scanner: 59/60 seconds, duplicate/late
+  generations, cancellation and consume-before-probe (including failed probe).
+- Connect and Move service show a QR icon with scan action and translated
+  helper before service/ID/password entry. Move retains its existing
+  linked-user gate, combined destination/credentials verification, direction and review.
+  Move and connect executes directly from the review.
+- QR review is exclusive in Connect and Move: only service URL, abbreviated
+  sync ID, acquired-credentials summary and spaced actions. Manual inputs,
+  service controls and later wizard headings stay hidden while pending and
+  verifying. `BeginVerification` consumes the secret but keeps `ShowReview`
+  active with localized progress; no “Where?” or manual form flashes before
+  the probe succeeds. Failure clears the candidate and shows the adjacent error.
+- Scan alone performs no probe/settings/credential/bookmark writes; service
+  and abbreviated ID are reviewed before Connect. The native scanner requests
+  CAMERA on demand, decodes only QR and releases its handler in every exit.
+- QR Connect enters the existing ProbeLink/reconcile/apply path; no bypass of
+  preview, direction consequences or safety backups. Both-empty auto-apply is
+  unchanged. Manual retry preserves its original behavior.
+- Device QA required: denied/revoked permission, Back, Home/resume, rotation,
+  biometric lock, repeated callbacks, Unicode QR and camera indicator off,
+  with a Release APK as well as Debug. No connected device was available during
+  implementation, so these hardware cases are not recorded as passed.
+
+
+## Multiple selection — v1.0.201
+
+- Long press selects once with native haptic feedback; ⋮ still opens single-item actions.
+- Select All means current logical candidates, not only DOM rows or unseen search results.
+- Folder/descendant overlap normalizes to roots, with covered descendant state.
+- Selection disables row opening/swipes and context navigation; Back restores the list.
+- Move picker supports immediate folder creation with explicit parent and final Move;
+  draft blocks Move, cancel preserves created folders. The intentional create advances
+  the selection version only through the gated result; external changes invalidate it.
+- Move/delete uses strict NodeId + content version, one atomic mutation, one notification,
+  verified safety backup before mutation, and no-op skips backup/notification.
+- Delete confirmation separates selected roots from descendants. Backup recovery only;
+  no global restore undo. Move undo restores original positions or refuses atomically.
+- Background/lock closes interaction, cancels before mutation when possible, and never
+  reverses a completed local commit. Pending shares do not open over selection/results.
+
+Selection feedback regression: long press a top-level system container → immediate
+informational toast, selection stays inactive; opening the folder afterward must
+not reveal a stale red selection error below the list.
+
+Move recents regression: complete a single or batch move to a folder, reopen
+either picker → destination is first in Recent (also after restarting). Failed
+or no-op moves do not update history. Deleted/forbidden folders and destinations
+containing all selected items are omitted. Tap a recent chip → direct move through
+the usual validated flow; Undo still works. No zero “already here” summary or
+duplicate count below the tree; successful batch move shows nonzero item counts
+and destination.
+
+Move-picker spacing regression: check single/batch, no destination, partially
+already-here, long bookmark title, deep destination path and new-folder form at
+320/360/412px widths, both themes, 100%/140% text scale and reduced height
+(keyboard/landscape).
+Cancel and Move must stay visible; the name field uses a full row with Create
+and Cancel beneath it. Recent/tree/search controls pause during a folder-name
+draft; cancel the draft to resume destination selection. Long paths can scroll
+within their footer area without displacing the actions. Original tree styling
+is retained with the approved “Cartella incisa” outlined closed-pocket icon.
+
+2026-10-17: actual MovePicker/RowTile compiled and rendered in an isolated
+ASP.NET HtmlRenderer host (no Android workload required). Thirteen focused
+interaction checks passed; headless Chromium checked 144 layout combinations
+(six scenarios × three widths × two heights × two themes × two text scales),
+with no horizontal overflow or hidden footer actions. This is layout/component
+evidence; native keyboard, TalkBack and device behavior still require Android QA.

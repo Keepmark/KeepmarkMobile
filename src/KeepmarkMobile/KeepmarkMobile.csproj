@@ -35,8 +35,8 @@
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.198</ApplicationDisplayVersion>
-        <ApplicationVersion>199</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.208</ApplicationDisplayVersion>
+        <ApplicationVersion>209</ApplicationVersion>
 
         <!-- monodroid mmaps lib/*.so straight from the APK: those entries MUST
              be STORED, never Deflated, or the app SIGABRTs on startup outside
@@ -88,6 +88,7 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
+        <PackageReference Include="ZXing.Net.Maui.Controls" Version="0.10.4" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
         <PackageReference Include="Xamarin.AndroidX.Biometric" Version="1.1.0.33" />
         <!-- Java interfaces implemented by SQLCipher's required JNI classes. -->

@@ -159,6 +159,7 @@ public sealed class XbsSession : IAsyncDisposable
         // the local side is snapshotted), then switches credentials.
         await Engine!.LinkAdoptRemoteAsync(info.Candidate, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
+        _settings.RememberService(info.Candidate.ServiceUrl);
     }
 
     public async Task ApplyLocalAsync(ReconcileInfo info, string operation = SafetyOperations.UploadLocal, CancellationToken ct = default)
@@ -187,6 +188,7 @@ public sealed class XbsSession : IAsyncDisposable
         // previous link's mirror base; a 409 leaves the old link intact.
         await Engine!.LinkUploadAsync(info.Candidate, roots, info.RemoteLastUpdated ?? string.Empty, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
+        _settings.RememberService(info.Candidate.ServiceUrl);
     }
 
     /// <summary>Merge preview (dry-run): union counts without mutating
@@ -223,6 +225,7 @@ public sealed class XbsSession : IAsyncDisposable
         // credentials switch only after the server accepted it.
         await Engine!.LinkUploadAsync(info.Candidate, merged.Tree, info.RemoteLastUpdated ?? string.Empty, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
+        _settings.RememberService(info.Candidate.ServiceUrl);
     }
 
     /// <summary>Decrypts the verified remote blob into a tree. Throws on a
@@ -260,6 +263,7 @@ public sealed class XbsSession : IAsyncDisposable
         await _creds.SetAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version)).ConfigureAwait(false);
         await Store.ReplaceAllAsync([], string.Empty, created.LastUpdated!, created.Version).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
+        _settings.RememberService(serviceUrl);
         Engine!.Mode = _settings.Mode;
     }
 
@@ -275,6 +279,7 @@ public sealed class XbsSession : IAsyncDisposable
         // Fresh sync: its own creation timestamp is the only valid base.
         await Engine!.LinkUploadAsync(candidate, roots, created.LastUpdated!, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
+        _settings.RememberService(serviceUrl);
         Engine!.Mode = _settings.Mode;
         _log.Info("session", "Created new sync and uploaded local tree");
         return created.Id!;
@@ -792,6 +797,17 @@ public sealed class XbsSession : IAsyncDisposable
     }
 
     /// <summary>Bulk delete with a safety backup first (duplicates cleanup).</summary>
+    public async Task SaveSelectionBackupAsync(List<BookmarkNode> roots, string operation)
+    {
+        var path = await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
+            operation, CountBackupNodes(roots)).ConfigureAwait(false);
+        // Verify durable payload and manifest before authorizing a batch mutation.
+        var entry = (await ListSafetyBackupsAsync().ConfigureAwait(false)).Single(e => e.FileName == Path.GetFileName(path));
+        var restored = await OpenSafetyBackupAsync(entry, CancellationToken.None).ConfigureAwait(false);
+        if (System.Text.Json.JsonSerializer.Serialize(restored) != System.Text.Json.JsonSerializer.Serialize(roots))
+            throw new IOException("Selection safety backup verification failed.");
+    }
+
     public async Task<int> DeleteBookmarksAsync(IEnumerable<int> nodeIds, CancellationToken ct = default)
     {
         var ids = nodeIds.Distinct().ToList();

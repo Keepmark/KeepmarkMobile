@@ -1,4 +1,5 @@
 using Keepmark.Core.I18n;
+using ZXing.Net.Maui.Controls;
 using KeepmarkMobile.Services;
 
 namespace KeepmarkMobile;
@@ -10,6 +11,7 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
+            .UseBarcodeReader()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -23,8 +25,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<SecureCredentialStore>();
         builder.Services.AddSingleton<PinnedStore>();
         builder.Services.AddSingleton<ToastState>();
+        builder.Services.AddSingleton<ISelectionFeedback, SelectionFeedback>();
         builder.Services.AddSingleton<SharedImportService>();
         builder.Services.AddSingleton<AppLockState>();
+        builder.Services.AddSingleton<IQrScanner, QrScanner>();
         builder.Services.AddSingleton<XbsSession>();
 #if ANDROID
         builder.Services.AddSingleton<IAppLockService, Platforms.Android.Services.AndroidAppLockService>();

@@ -12,12 +12,21 @@
 }
 else
 {
-    <div class="xbs-row" data-rowid="@Row.RowId" @onclick="() => OnOpen.InvokeAsync(Row)"
-         role="button" tabindex="0" aria-expanded="@RowExpanded"
+    <div class="xbs-row @(SelectionMode ? "xbs-selection-row" : null) @(Selected || SelectionCovered ? "xbs-selected" : null)" data-rowid="@Row.RowId" data-nodeid="@Row.NodeId" data-content-version="@ContentVersion" data-selection="@(SelectionMode ? "1" : null)" @onclick="Activate"
+         role="@(SelectionMode ? "checkbox" : "button")" tabindex="0" aria-expanded="@RowExpanded"
+         aria-checked="@(SelectionMode ? (Selected || SelectionCovered).ToString().ToLowerInvariant() : null)"
+         aria-disabled="@(SelectionMode && (!SelectionAvailable || SelectionCovered) ? "true" : null)"
          aria-label="@RowLabel"
          @onkeydown="OnKey">
         <div class="xbs-row-inner @(Flash ? "xbs-flash" : string.Empty) @(Expanded ? "xbs-expanded" : string.Empty)">
-            <RowTile Row="Row" />
+            @if (SelectionMode)
+            {
+                <span class="xbs-selection-check @(Selected || SelectionCovered ? "checked" : null)" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" />@if (Selected || SelectionCovered) { <path d="m7 12 3 3 7-7" /> }</svg></span>
+            }
+            else
+            {
+                <RowTile Row="Row" />
+            }
             <div class="xbs-row-text">
                 <div class="xbs-row-title">@if (Pinned) { <svg class="km-ico xbs-pin-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z M12 14v6" /></svg><span class="visually-hidden">@L.Get(Str.RowPinned)</span> }@PlainTitle</div>
                 <div class="xbs-row-sub">@Sub</div>
@@ -47,14 +56,23 @@ else
                     <div class="xbs-row-path"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>@FolderPath</div>
                 }
             </div>
+            @if (!SelectionMode)
+            {
             <button type="button" class="xbs-row-chev" @onclick="OnMenu" @onclick:stopPropagation="true"
                     @onkeydown:stopPropagation="true" aria-label="@L.Get(Str.RowActionsFor, PlainTitle)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5.5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="18.5" r="1.6" /></svg></button>
+            }
         </div>
     </div>
 }
 
 @code {
     [Parameter, EditorRequired] public ItemRow Row { get; set; } = null!;
+    [Parameter] public bool SelectionMode { get; set; }
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public bool SelectionCovered { get; set; }
+    [Parameter] public bool SelectionAvailable { get; set; } = true;
+    [Parameter] public long ContentVersion { get; set; }
+    [Parameter] public EventCallback<ItemRow> OnToggle { get; set; }
     [Parameter] public bool Pinned { get; set; }
     [Parameter] public bool Flash { get; set; }
     [Parameter] public bool Expanded { get; set; }
@@ -67,8 +85,11 @@ else
     [Parameter] public EventCallback<(ItemRow Row, RowAction Action)> OnAction { get; set; }
 
     private bool IsSeparator => !Row.IsFolder && Row.Url == Core.XbsConstants.SeparatorUrl;
-    private string? RowExpanded => Row.IsFolder ? null : Expanded.ToString().ToLowerInvariant();
-    private string RowLabel => L.Get(Row.IsFolder ? Str.RowOpenFolder : Str.RowOpenBookmark, PlainTitle);
+    private string? RowExpanded => SelectionMode || Row.IsFolder ? null : Expanded.ToString().ToLowerInvariant();
+    private string RowLabel => SelectionMode
+        ? $"{PlainTitle}, {L.Get(Row.IsFolder ? Str.SheetTypeFolder : Str.SheetTypeBookmark)}" +
+            (SelectionCovered ? $", {L.Get(Str.SelectionCovered)}" : !SelectionAvailable ? $", {L.Get(Str.SelectionUnavailable)}" : string.Empty)
+        : L.Get(Row.IsFolder ? Str.RowOpenFolder : Str.RowOpenBookmark, PlainTitle);
     private string PlainTitle => Row.IsFolder
         ? (string.IsNullOrWhiteSpace(Row.DisplayTitle) ? L.Get(Str.SheetTypeFolder) : Row.DisplayTitle)
         : (string.IsNullOrWhiteSpace(Row.DisplayTitle) ? ShortUrl(Row.Url) is { Length: > 0 } u ? u : L.Get(Str.RowNoTitle) : Row.DisplayTitle);
@@ -93,14 +114,18 @@ else
         return s.TrimEnd('/');
     }
 
+    private Task Activate() => SelectionMode
+        ? SelectionAvailable && !SelectionCovered ? OnToggle.InvokeAsync(Row) : Task.CompletedTask
+        : OnOpen.InvokeAsync(Row);
+
     private Task OnMenu() => OnAction.InvokeAsync((Row, RowAction.Menu));
 
     private Task OnKey(KeyboardEventArgs e)
     {
-        // Enter only: Space on a div would also scroll the page.
-        if (e.Key == "Enter")
+        // The delegated gesture listener prevents Space scrolling in selection mode.
+        if (e.Key == "Enter" || (SelectionMode && e.Key == " "))
         {
-            return OnOpen.InvokeAsync(Row);
+            return Activate();
         }
 
         return Task.CompletedTask;

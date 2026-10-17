@@ -24,10 +24,16 @@ public static class SafetyOperations
     public const string ConflictPull = "conflict-pull";
     public const string ConflictPush = "conflict-push";
     public const string ConflictMerge = "conflict-merge";
+    public const string SelectionDelete = "selection-delete";
+    public const string SelectionMove = "selection-move";
+    public const string SelectionUndo = "selection-move-undo";
     public const string Legacy = "legacy";
 
     public static string Describe(string operation) => operation switch
     {
+        SelectionDelete => Loc.Get(Str.SafetyOpSelectionDelete),
+        SelectionMove => Loc.Get(Str.SafetyOpSelectionMove),
+        SelectionUndo => Loc.Get(Str.SafetyOpSelectionUndo),
         TakeRemote => Loc.Get(Str.SafetyOpTakeRemote),
         UploadLocal => Loc.Get(Str.SafetyOpUploadLocal),
         CreateEmpty => Loc.Get(Str.SafetyOpCreateEmpty),

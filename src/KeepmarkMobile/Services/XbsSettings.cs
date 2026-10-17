@@ -20,6 +20,22 @@ public sealed class XbsSettings
         set => Preferences.Set(KServiceUrl, value);
     }
 
+    public IReadOnlyList<string> SavedServices
+    {
+        get
+        {
+            try { return System.Text.Json.JsonSerializer.Deserialize<string[]>(Preferences.Get("saved_services", "[]")) ?? []; }
+            catch (System.Text.Json.JsonException) { return []; }
+        }
+    }
+
+    // Called only after an actual successful link/create/move, never a connectivity probe.
+    public void RememberService(string url)
+    {
+        Preferences.Set("saved_services", System.Text.Json.JsonSerializer.Serialize(Core.Workflow.ServiceCatalog.Remember(SavedServices, url)));
+        ServiceUrl = Core.Workflow.ServiceCatalog.Normalize(url);
+    }
+
     public SyncMode Mode
     {
         get => Enum.TryParse<SyncMode>(Preferences.Get(KSyncMode, SyncMode.Auto.ToString()), out var m) ? m : SyncMode.Auto;

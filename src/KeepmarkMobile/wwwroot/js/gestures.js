@@ -19,6 +19,7 @@ window.xbsGestures = (() => {
     let listenersAttached = false;
     let state = null;
     let suppressUntil = 0;
+    let heldPointer = null;
 
     const LONG_PRESS_MS = 500;
     const MOVE_TOLERANCE_PX = 12;
@@ -26,11 +27,19 @@ window.xbsGestures = (() => {
 
     // The live pages may be replaced at any moment (old ref disposed, new one
     // not yet registered): never let a gesture crash on a dead reference.
-    function call(ref, method, id) {
-        try { if (ref) ref.invokeMethodAsync(method, id)?.catch(() => {}); } catch { /* disposed page */ }
+    function call(ref, method, ...args) {
+        try { if (ref) ref.invokeMethodAsync(method, ...args)?.catch(() => {}); } catch { /* disposed page */ }
+    }
+
+    function cancelGesture() {
+        if (!state) return;
+        if (state.timer) clearTimeout(state.timer);
+        state.el?.classList.remove('xbs-pressing');
+        state = null;
     }
 
     function onDown(e) {
+        cancelGesture();
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         if (!e.target.closest) return;
         // Action sheet details: horizontal swipe toggles the full text.
@@ -48,38 +57,50 @@ window.xbsGestures = (() => {
         if (dup && e.target.closest('.xbs-dupmark')) return;
         const id = parseInt(el.dataset.rowid, 10);
         const kind = row ? 'row' : 'dup';
+        const selection = row && el.dataset.selection === '1';
+        const pointerId = e.pointerId;
+        const nodeId = Number.parseInt(el.dataset.nodeid, 10);
+        const version = Number(el.dataset.contentVersion);
+        if (row && !selection) el.classList.add('xbs-pressing');
         state = {
-            id, kind, x0: e.clientX, y0: e.clientY, pointerId: e.pointerId,
+            id, kind, el, selection, x0: e.clientX, y0: e.clientY, pointerId: e.pointerId,
             timer: kind === 'row' ? setTimeout(() => {
-                state = null;
+                cancelGesture();
+                heldPointer = pointerId;
                 suppressUntil = Date.now() + 400; // finger-up click must not open the row after a long-press
-                try { if (navigator.vibrate) navigator.vibrate(25); } catch { /* noop */ }
-                call(dotNet, 'OnRowLongPress', id);
+                if (!selection && Number.isInteger(nodeId) && Number.isSafeInteger(version) && el.isConnected && el.dataset.nodeid === String(nodeId) && Number(el.dataset.contentVersion) === version && el.dataset.selection !== '1')
+                    call(dotNet, 'OnRowLongPress', id, nodeId, version);
             }, LONG_PRESS_MS) : null
         };
     }
 
     function onMove(e) {
         if (!state || e.pointerId !== state.pointerId) return;
+        if (state.selection) {
+            if (Math.abs(e.clientX - state.x0) > MOVE_TOLERANCE_PX || Math.abs(e.clientY - state.y0) > MOVE_TOLERANCE_PX) cancelGesture();
+            return;
+        }
         const dx = e.clientX - state.x0;
         const dy = e.clientY - state.y0;
         if (!state.swiping && Math.abs(dx) > MOVE_TOLERANCE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
             state.swiping = true;
+            state.el?.classList.remove('xbs-pressing');
             if (state.timer) clearTimeout(state.timer);
         }
         if (state.swiping) {
             state.dx = dx;
             if (e.cancelable) e.preventDefault();
         } else if (Math.abs(dy) > MOVE_TOLERANCE_PX || Math.abs(dx) > MOVE_TOLERANCE_PX) {
-            if (state.timer) clearTimeout(state.timer);
-            state = null;
+            cancelGesture();
         }
     }
 
     function onUp(e) {
+        if (heldPointer === e.pointerId) { heldPointer = null; suppressUntil = Date.now() + 400; }
         if (!state || e.pointerId !== state.pointerId) return;
         const s = state;
         state = null;
+        s.el?.classList.remove('xbs-pressing');
         if (s.timer) clearTimeout(s.timer);
         if (s.swiping) {
             const dx = s.dx || 0;
@@ -146,13 +167,18 @@ window.xbsGestures = (() => {
         document.addEventListener('pointerdown', onDown, { passive: true });
         document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onUp, { passive: true });
-        document.addEventListener('pointercancel', onUp, { passive: true });
+        document.addEventListener('pointercancel', () => { heldPointer = null; cancelGesture(); }, { passive: true });
         document.addEventListener('click', (e) => {
             if (Date.now() < suppressUntil && e.target.closest && e.target.closest('.xbs-row,.xbs-duprow')) {
                 e.stopPropagation();
                 e.preventDefault();
             }
         }, true);
+        window.addEventListener('blur', cancelGesture);
+        document.addEventListener('keydown', e => {
+            if (e.key === ' ' && e.target.closest?.('.xbs-row[data-selection="1"]')) e.preventDefault();
+        });
+        window.addEventListener('scroll', cancelGesture, { passive: true });
         window.addEventListener('scroll', onScroll, { passive: true });
         ensureGoButtons();
     }
@@ -549,8 +575,7 @@ window.xbsGestures = (() => {
         release(owner) {
             const home = homeOwner === owner, dup = dupOwner === owner;
             if ((home && state && state.kind !== 'dup') || (dup && state && state.kind === 'dup')) {
-                if (state.timer) clearTimeout(state.timer);
-                state = null;
+                cancelGesture();
             }
             if (home) { dotNet = null; homeOwner = null; }
             if (dup) { dupRef = null; dupOwner = null; }
@@ -598,3 +623,11 @@ window.xbsGestures = (() => {
         }
     };
 })();
+
+// Dismiss the keyboard when entering contextual selection.
+window.xbsGestures.blurActive = () => document.activeElement?.blur();
+
+window.xbsGestures.focusSelectionRow = nodeId => {
+    const row = document.querySelector('.xbs-row[data-nodeid="' + Number(nodeId) + '"]');
+    row?.focus({ preventScroll: true });
+};

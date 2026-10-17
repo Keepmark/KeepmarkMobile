@@ -4,6 +4,8 @@
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
+@inject KeepmarkMobile.Services.IQrScanner QrScanner
+@inject KeepmarkMobile.Services.AppLockState AppLock
 @using Keepmark.Core.Workflow
 
 <PageTitle>@L.Get(Str.NavConnect)</PageTitle>
@@ -71,31 +73,26 @@ else
     else
     {
         <button class="xbs-back" @onclick="Back" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>@L.Get(Str.CommonBack)</button>
-        <h2 class="xbs-step-title">@(mode == "existing" ? L.Get(Str.ConnLinkExistingTitle) : L.Get(Str.ConnCreateTitle))</h2>
-        <div class="xbs-service-row">
-            <span class="xbs-service-label">@L.Get(Str.ConnService)</span>
-            <span class="xbs-service-host">@ServiceHost</span>
-            @if (reconcile is null)
-            {
-                <button class="xbs-link-btn" @onclick="() => showService = !showService" aria-expanded="@ServiceOpen.ToString().ToLowerInvariant()">@(ServiceOpen ? L.Get(Str.CommonHide) : L.Get(Str.CommonChange))</button>
-            }
-        </div>
-        @if (ServiceOpen && reconcile is null)
+        @if (qrState.ShowReview)
         {
-            <div class="mb-3">
-                <label class="form-label">@L.Get(Str.ConnServiceUrl)</label>
-                <input class="form-control" @bind="serviceUrl" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
-                <div class="form-text">@L.Get(Str.ConnServiceUrlHint)</div>
-                <button class="btn btn-secondary mt-2" @onclick="CheckService" disabled="@busy">@L.Get(Str.ConnCheckService)</button>
-                @if (!string.IsNullOrEmpty(checkError))
-                {
-                    <div class="alert alert-danger mt-2" role="alert">@checkError</div>
-                }
-                @if (serviceInfo is not null)
-                {
-                    <p class="mt-2" role="status">@L.Get(Str.ConnStatusLine, serviceInfo.Status, serviceInfo.Version, serviceInfo.MaxSyncSize / 1024)</p>
-                }
-            </div>
+            <QrCredentialReview ServiceUrl="@qrServiceUrl" SyncId="@qrSyncId" Busy="@(busy || qrState.IsVerifying)"
+                                OnVerify="LinkQr" OnCancel="CancelQr" />
+        }
+        else
+        {
+        <h2 class="xbs-step-title">@(mode == "existing" ? L.Get(Str.ConnLinkExistingTitle) : L.Get(Str.ConnCreateTitle))</h2>
+        @if (mode == "existing" && reconcile is null)
+        {
+            <button class="btn btn-secondary mb-2" @onclick="ScanQr" disabled="@busy"><svg class="km-ico sm me-2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM19 15h2v6h-2zM15 19h2v2h-2z" /></svg>@L.Get(Str.ConnQrScan)</button>
+            <div class="form-text mb-3">@L.Get(Str.ConnQrHint)</div>
+            @if (!string.IsNullOrEmpty(qrError))
+            {
+                <div class="alert alert-danger" role="alert">@qrError</div>
+            }
+        }
+        @if (reconcile is null)
+        {
+            <ServiceSelector Value="@serviceUrl" ValueChanged="ServiceChanged" Checked="ServiceChecked" Disabled="@busy" />
         }
         @if (mode == "existing" && reconcile is not null)
         {
@@ -114,12 +111,12 @@ else
         {
             <div class="mb-3">
                 <label class="form-label">@L.Get(Str.ConnSyncId)</label>
-                <input class="form-control" @bind="syncId" @bind:after="ClearLinkError" placeholder="a1b2c3d4e5f6…" />
+                <input disabled="@busy" class="form-control" @bind="syncId" @bind:after="ClearLinkError" placeholder="a1b2c3d4e5f6…" />
                 <label class="form-label mt-2">@L.Get(Str.CommonPassword)</label>
-                <input type="password" class="form-control" @bind="password" @bind:after="ClearLinkError" autocomplete="current-password" />
+                <input disabled="@busy" type="password" class="form-control" @bind="password" @bind:after="ClearLinkError" autocomplete="current-password" />
                 <div class="form-text">@L.Get(Str.ConnPasswordHint)</div>
                 <div class="mt-3 d-grid">
-                    <button class="btn btn-primary" @onclick="LinkExisting" disabled="@busy">@L.Get(Str.ConnOpenSync)</button>
+                    <button class="btn btn-primary" @onclick="LinkExisting" disabled="@(busy || serviceInfo is null)">@L.Get(Str.ConnOpenSync)</button>
                 </div>
                 @if (!string.IsNullOrEmpty(linkError))
                 {
@@ -131,18 +128,18 @@ else
         {
             <div class="mb-3">
                 <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
-                <input type="password" class="form-control" @bind="newPassword" @bind:after="ClearLinkError" autocomplete="new-password" />
+                <input disabled="@busy" type="password" class="form-control" @bind="newPassword" @bind:after="ClearLinkError" autocomplete="new-password" />
                 <label class="form-label mt-2">@L.Get(Str.ConnConfirmPassword)</label>
-                <input type="password" class="form-control" @bind="confirmPassword" @bind:after="ClearLinkError" autocomplete="new-password" />
+                <input disabled="@busy" type="password" class="form-control" @bind="confirmPassword" @bind:after="ClearLinkError" autocomplete="new-password" />
                 <div class="form-text">@L.Get(Str.ConnPwNewHint)</div>
                 <div class="mt-2 d-grid gap-2">
                     @if (localCount > 0)
                     {
-                        <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@busy">@Loc.Plural(Str.ConnCreateUpload, localCount)</button>
+                        <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@(busy || !CanCreate)">@Loc.Plural(Str.ConnCreateUpload, localCount)</button>
                         <div class="form-text">@L.Get(Str.ConnCreateUploadHint)</div>
                         @if (armed != "createEmpty")
                         {
-                            <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@busy">@L.Get(Str.ConnCreateEmptyInstead)</button>
+                            <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@(busy || !CanCreate)">@L.Get(Str.ConnCreateEmptyInstead)</button>
                         }
                         else
                         {
@@ -154,7 +151,7 @@ else
                     }
                     else
                     {
-                        <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@busy">@L.Get(Str.ConnCreateNew)</button>
+                        <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@(busy || !CanCreate)">@L.Get(Str.ConnCreateNew)</button>
                         <div class="form-text">@L.Get(Str.ConnCreateEmptyHint)</div>
                     }
                 </div>
@@ -164,39 +161,33 @@ else
                 }
             </div>
         }
+        }
     }
 
-    @if (reconcile is not null)
+    @if (reconcile is not null && !qrState.ShowReview)
     {
-        @* One choice, one action button; the confirm (with merge counts) replaces the button in place. *@
         <DirectionPicker Name="syncDirection" Value="@direction" ValueChanged="SetDirection"
                          LocalCount="reconcile.LocalCount" RemoteCount="reconcile.RemoteCount"
-                         Disabled="@(busy || armedApply)" />
-        @if (!armedApply)
+                         Disabled="@busy" />
+        <p class="text-muted">@WorkflowTexts.DirectionConfirm(direction).Implication</p>
+        @if (direction == "merge" && mergeStats is not null)
         {
-            <div class="d-grid">
-                <button class="btn btn-primary" @onclick="ArmApply" disabled="@busy">@ApplyLabel</button>
-            </div>
-        }
-        else
-        {
-            var confirm = WorkflowTexts.DirectionConfirm(direction);
-            <ConfirmBlock Message="@confirm.Message" Implication="@confirm.Implication"
-                          ConfirmLabel="@confirm.ConfirmLabel" Danger="@(direction != "merge")" Busy="busy"
-                          OnConfirm="ApplyChosen" OnCancel="() => armedApply = false">
-                @if (direction == "merge" && mergeStats is not null)
+            <ul class="xbs-review-list mt-2">
+                <li><strong>@mergeStats.LocalOnly</strong> @L.Get(Str.ConnReviewUpload)</li>
+                <li><strong>@mergeStats.RemoteOnly</strong> @L.Get(Str.ConnReviewDownload)</li>
+                @if (mergeStats.TitleConflicts > 0)
                 {
-                    <ul class="xbs-review-list mt-2 mb-0">
-                        <li><strong>@mergeStats.LocalOnly</strong> @L.Get(Str.ConnReviewUpload)</li>
-                        <li><strong>@mergeStats.RemoteOnly</strong> @L.Get(Str.ConnReviewDownload)</li>
-                        @if (mergeStats.TitleConflicts > 0)
-                        {
-                            <li><strong>@mergeStats.TitleConflicts</strong> @Loc.Plural(Str.ConnReviewTitles, mergeStats.TitleConflicts)</li>
-                        }
-                    </ul>
+                    <li><strong>@mergeStats.TitleConflicts</strong> @Loc.Plural(Str.ConnReviewTitles, mergeStats.TitleConflicts)</li>
                 }
-            </ConfirmBlock>
+            </ul>
         }
+        @if (direction == "merge" && mergeStats is null && !busy && !string.IsNullOrEmpty(applyError))
+        {
+            <button class="btn btn-secondary mb-2" @onclick="PreviewMerge">@L.Get(Str.StatusCompareAgain)</button>
+        }
+        <div class="d-grid">
+            <button class="btn btn-primary" @onclick="ApplyChosen" disabled="@(busy || (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, reconcile))))">@ApplyLabel</button>
+        </div>
         @if (!string.IsNullOrEmpty(applyError))
         {
             <div class="alert alert-danger mt-2" role="alert">@applyError</div>
@@ -228,8 +219,6 @@ else
     private int localCount;
     private string? armed;
     private bool armedUnlink;
-    /// <summary>The single apply button was tapped: its inline confirm shows.</summary>
-    private bool armedApply;
     /// <summary>Reconcile direction choice: "download" replaces local with the
     /// remote copy, "upload" overwrites the remote with local, "merge" unions
     /// both sides. Preselected to the only sensible side when one of them is
@@ -242,7 +231,7 @@ else
     private bool ServiceOpen => showService || !string.IsNullOrEmpty(checkError);
     private string ServiceUrlClean => WorkflowRules.NormalizeServiceUrl(serviceUrl);
     // A stale "fill in both fields" error must not linger once the user edits them.
-    private void ClearLinkError() => linkError = string.Empty;
+    private void ClearLinkError() { linkError = string.Empty; ClearQr(); }
 
     private string ServiceHost => Uri.TryCreate(serviceUrl, UriKind.Absolute, out var u) ? (u.IsDefaultPort ? u.Host : $"{u.Host}:{u.Port}") : serviceUrl;
 
@@ -260,13 +249,14 @@ else
         reconcile = null;
         mergeStats = null;
         mergeStatsFor = null;
-        armedApply = false;
         applyError = string.Empty;
         message = string.Empty;
     }
 
     private void Back()
     {
+        if (qrState.ShowReview) { CancelQr(); return; }
+        ClearQr();
         mode = null;
         reconcile = null;
         armed = null;
@@ -278,16 +268,140 @@ else
         confirmPassword = string.Empty;
     }
 
-    private void SetDirection(string value)
+    private async Task SetDirection(string value)
     {
+        if (busy) return;
         direction = value;
         mergeStats = null;
         mergeStatsFor = null;
         applyError = string.Empty;
-        armedApply = false;
+        if (direction == "merge") await PreviewMerge();
     }
 
-    protected override void OnInitialized() => serviceUrl = AppSettings.ServiceUrl;
+    protected override void OnInitialized()
+    {
+        serviceUrl = AppSettings.ServiceUrl;
+        AppLock.Changed += LockChanged;
+    }
+
+    private readonly ConnectQrCandidateState qrState = new();
+    private ConnectQrPayload? pendingQr => qrState.Payload;
+    private CancellationTokenSource? qrExpiry;
+    private int qrGeneration => qrState.Generation;
+    private string qrError = string.Empty;
+    private string qrServiceUrl = string.Empty;
+    private string qrSyncId = string.Empty;
+
+    private void ClearQr()
+    {
+        qrState.Clear();
+        qrServiceUrl = qrSyncId = string.Empty;
+        StopQrExpiry();
+    }
+
+    private void CancelQr()
+    {
+        ClearQr();
+        qrError = string.Empty;
+    }
+
+    private void StopQrExpiry()
+    {
+        qrExpiry?.Cancel();
+        qrExpiry?.Dispose();
+        qrExpiry = null;
+    }
+
+    private void LockChanged()
+    {
+        if (AppLock.Locked || !AppLock.Foreground)
+            _ = InvokeAsync(() =>
+            {
+                // The permission dialog can pause the activity before any camera
+                // session exists. The scanner rechecks lock/foreground after it.
+                // Native active sessions cancel themselves on this event.
+                if (qrState.ShowReview) ClearQr();
+                if (!IsDisposed) StateHasChanged();
+            });
+    }
+
+    private async Task ScanQr()
+    {
+        if (busy || linked || AppLock.Locked || !AppLock.Foreground) return;
+        ClearQr();
+        var generation = qrGeneration;
+        busy = true; qrError = string.Empty;
+        try
+        {
+            var text = await QrScanner.ScanAsync(Lifetime);
+            if (IsDisposed || Lifetime.IsCancellationRequested || generation != qrGeneration || AppLock.Locked || !AppLock.Foreground) return;
+            if (text is null) return;
+            var allowLocal = false;
+#if DEBUG
+            allowLocal = true;
+#endif
+            if (!ConnectQrPayload.TryParse(text, out var candidate, allowLocal))
+            { qrError = L.Get(Str.ConnQrInvalid); return; }
+            serviceInfo = null; checkError = linkError = applyError = message = string.Empty;
+            reconcile = null; mergeStats = null; mergeStatsFor = null;
+            armed = null;
+            password = newPassword = confirmPassword = string.Empty;
+            mode = "existing"; showService = false;
+            qrServiceUrl = candidate!.ServiceUrl; qrSyncId = candidate.Id;
+            if (!qrState.Offer(candidate, generation)) return;
+            qrExpiry = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
+            _ = ExpireQr(generation, qrExpiry.Token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            if (!IsDisposed && generation == qrGeneration)
+                qrError = ex is Services.QrScanException scanError ? L.Get(scanError.MessageKey) : L.Get(Str.ConnQrUnavailable);
+            Session.Log.Warn("connect", $"QR scanner failed: {ex.GetType().Name}");
+        }
+        finally { if (!IsDisposed) busy = false; }
+    }
+
+    private async Task ExpireQr(int generation, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(60), ct);
+            await InvokeAsync(() =>
+            {
+                if (IsDisposed || generation != qrGeneration) return;
+                ClearQr(); qrError = L.Get(Str.ConnQrCleared); StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task LinkQr()
+    {
+        if (busy || linked || pendingQr is null || AppLock.Locked || !AppLock.Foreground) return;
+        var candidate = qrState.BeginVerification();
+        StopQrExpiry();
+        if (candidate is null) { qrError = L.Get(Str.ConnQrCleared); return; }
+        var generation = qrGeneration;
+        var targetUrl = candidate.ServiceUrl;
+        var targetId = candidate.Id;
+        var secret = candidate.Password;
+        candidate = null;
+        var task = LinkExistingCredentials(targetUrl, targetId, secret, generation);
+        secret = string.Empty;
+        try { await task; }
+        finally { if (generation == qrGeneration) ClearQr(); }
+    }
+
+    private bool CurrentQrAttempt(int generation) => !IsDisposed && generation == qrGeneration
+        && qrState.IsVerifying && !AppLock.Locked && AppLock.Foreground;
+
+    public override void Dispose()
+    {
+        AppLock.Changed -= LockChanged;
+        ClearQr();
+        base.Dispose();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -343,32 +457,42 @@ else
     }
 
 
+    private bool CanCreate => serviceInfo?.Status == Core.Models.ServiceStatus.Online;
+    private Task ServiceChecked(Core.Api.ServiceInfoResponse? info) { serviceInfo = info; return Task.CompletedTask; }
+    private Task ServiceChanged(string url) { serviceUrl = url; ClearQr(); reconcile = null; linkError = string.Empty; armed = null; return Task.CompletedTask; }
+
     private async Task CheckService()
     {
         await RunStepAsync(async () =>
         {
             serviceInfo = await Session.CheckServiceAsync(ServiceUrlClean);
-            AppSettings.ServiceUrl = ServiceUrlClean;
+
         }, err => checkError = err, "connect-check");
     }
 
-    private async Task LinkExisting()
+    private Task LinkExisting() => serviceInfo is null ? Task.CompletedTask : LinkExistingCredentials(ServiceUrlClean, syncId.Trim(), password);
+
+    private async Task LinkExistingCredentials(string targetUrl, string targetId, string targetPassword, int? qrAttempt = null)
     {
         await RunStepAsync(async () =>
         {
-            if (string.IsNullOrWhiteSpace(syncId) || string.IsNullOrEmpty(password))
+            if (string.IsNullOrWhiteSpace(targetId) || string.IsNullOrEmpty(targetPassword))
             {
                 throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
             }
 
-            reconcile = await Session.ProbeLinkAsync(ServiceUrlClean, syncId.Trim(), password);
+            var probe = Session.ProbeLinkAsync(targetUrl, targetId, targetPassword, Lifetime);
+            targetPassword = string.Empty;
+            var result = await probe;
+            if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;
+            serviceUrl = targetUrl; syncId = targetId;
+            reconcile = result;
             // Consumed: the candidate carries the key; a failed check keeps it for a retry.
             password = string.Empty;
-            AppSettings.ServiceUrl = ServiceUrlClean;
+
             mergeStats = null;
             mergeStatsFor = null;
             applyError = string.Empty;
-            armedApply = false;
             if (reconcile is { LocalCount: 0, RemoteCount: 0 })
             {
                 await Session.ApplyRemoteAsync(reconcile);
@@ -381,16 +505,21 @@ else
                 // Preselect the only sensible direction when one side is empty.
                 direction = reconcile.RemoteCount == 0 ? "upload" : "download";
             }
-        }, err => linkError = err, "connect-link");
+        }, err =>
+        {
+            if (!qrAttempt.HasValue) linkError = err;
+            else if (CurrentQrAttempt(qrAttempt.Value)) qrError = err;
+        }, "connect-link");
     }
 
     private async Task CreateNew()
     {
+        if (!CanCreate) return;
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
             await Session.CreateNewSyncAsync(ServiceUrlClean, newPassword);
-            AppSettings.ServiceUrl = ServiceUrlClean;
+
             reconcile = null;
             armed = null;
             newPassword = string.Empty;
@@ -402,11 +531,12 @@ else
 
     private async Task CreateWithUpload()
     {
+        if (!CanCreate) return;
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
             await Session.CreateNewSyncWithUploadAsync(ServiceUrlClean, newPassword);
-            AppSettings.ServiceUrl = ServiceUrlClean;
+
             reconcile = null;
             newPassword = string.Empty;
             confirmPassword = string.Empty;
@@ -417,29 +547,12 @@ else
 
     private string ApplyLabel => direction switch
     {
-        "upload" => L.Get(Str.StatusKeepDevice),
-        "merge" => L.Get(Str.StatusMergeBoth),
-        _ => L.Get(Str.StatusKeepServer),
+        "upload" => L.Get(Str.ConnApplyDevice),
+        "merge" => L.Get(Str.ConnApplyMerge),
+        _ => L.Get(Str.ConnApplyServer),
     };
 
-    /// <summary>First tap arms the confirm. Merge computes its dry-run here
-    /// so the confirm shows the counts (merge stays preview-locked).</summary>
-    private async Task ArmApply()
-    {
-        applyError = string.Empty;
-        if (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, reconcile)))
-        {
-            await PreviewMerge();
-            if (mergeStats is null)
-            {
-                return;
-            }
-        }
-
-        armedApply = true;
-    }
-
-    private Task ApplyChosen() => direction switch
+    private Task ApplyChosen() => busy || reconcile is null ? Task.CompletedTask : direction switch
     {
         "upload" => ApplyLocal(),
         "merge" => ApplyMerge(),
@@ -455,7 +568,6 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
-            armedApply = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyLocal)}");
         }, err => applyError = err, "connect-apply");
@@ -470,7 +582,6 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
-            armedApply = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "push", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyRemote)}");
         }, err => applyError = err, "connect-apply");
@@ -478,10 +589,15 @@ else
 
     private async Task PreviewMerge()
     {
+        if (busy) return;
         await RunStepAsync(async () =>
         {
-            mergeStats = await Session.GetMergePreviewAsync(reconcile!);
-            mergeStatsFor = reconcile;
+            var target = reconcile;
+            if (target is null || direction != "merge") return;
+            var preview = await Session.GetMergePreviewAsync(target);
+            if (IsDisposed || !ReferenceEquals(target, reconcile) || direction != "merge") return;
+            mergeStats = preview;
+            mergeStatsFor = target;
             message = string.Empty;
         }, err => applyError = err, "connect-merge-preview");
     }
@@ -500,7 +616,6 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
-            armedApply = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyBoth)}");
         }, err => applyError = err, "connect-apply");
@@ -521,8 +636,10 @@ else
             await action();
             Session.Log.Info("connect", $"{op}: ok");
         }
+        catch (OperationCanceledException) when (Lifetime.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (IsDisposed) return;
             isError = true;
             setError(ex.Message);
             Session.Log.Warn("connect", $"{op} failed: {ex.GetType().Name}");

@@ -8,7 +8,9 @@
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.SharedImportService SharedImport
 @inject NavigationManager Nav
+@inject KeepmarkMobile.Services.AppLockState AppLock
 @inject IJSRuntime JS
+@inject KeepmarkMobile.Services.ISelectionFeedback SelectionFeedback
 @implements IDisposable
 
 <PageTitle>@L.Get(Str.NavExplore)</PageTitle>
@@ -25,7 +27,13 @@ else
 {
     <h1 class="visually-hidden">@L.Get(Str.NavGroupBookmarks)</h1>
     <header class="xbs-pagebar @(searchOpen ? "searching" : string.Empty)">
-        @if (searchOpen)
+        @if (selection.Active)
+        {
+            <button class="xbs-barbtn" data-back="20" disabled="@selection.Busy" @onclick="ExitSelection" aria-label="@L.Get(Str.CommonCancel)">×</button>
+            <span class="xbs-selection-title" role="status" aria-live="polite">@(selection.SelectedNodeIds.Count == 0 ? L.Get(Str.SelectionPrompt) : L.Get(Str.SelectionCount, selection.SelectedNodeIds.Count))</span>
+            <button class="xbs-barbtn xbs-selection-all" disabled="@selection.Busy" @onclick="ToggleAllSelection">@L.Get(AllSelected ? Str.SelectionNone : Str.SelectionAll)</button>
+        }
+        else if (searchOpen)
         {
             <button class="xbs-barbtn" data-back="10" @onclick="CloseSearch" aria-label="@L.Get(Str.HomeCloseSearch)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg></button>
             <div class="xbs-barsearch">
@@ -56,7 +64,7 @@ else
     {
         @* "See all recent" is a virtual level: the root ribbon, then one lilac
            ribbon with the clock. Back (data-back) returns to the root. *@
-        <div class="xbs-crumbbar">
+        <div class="xbs-crumbbar" inert="@selection.Active">
             <button class="xbs-crumb-home" data-back="5" @onclick="CloseRecentView" aria-label="@L.Get(Str.HomeAllBookmarks)">
                 <span><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5M6.5 9.5V19h11V9.5" /></svg></span>
             </button>
@@ -68,7 +76,7 @@ else
     }
     else if (crumbs.Count > 0 && !searchOpen)
     {
-        <div class="xbs-crumbbar">
+        <div class="xbs-crumbbar" inert="@selection.Active">
             <button class="xbs-crumb-home" @onclick="GoRoot" aria-label="@L.Get(Str.HomeAllBookmarks)">
                 @* Root is the first ribbon of the path (canvas "RbTail"); the path slides under its notch. *@
                 <span><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-6.5 8 6.5M6.5 9.5V19h11V9.5" /></svg></span>
@@ -110,7 +118,7 @@ else
     }
     else if (isSearch)
     {
-        <h2 class="xbs-section" role="status">@Loc.Plural(Str.HomeResults, hits.Count)</h2>
+        <h2 class="xbs-section" role="status">@(selection.Active ? L.Get(Str.SelectionSearchContext, query, hits.Count) : Loc.Plural(Str.HomeResults, hits.Count))</h2>
         @if (hitRows.Count == 0 && !searching)
         {
             <p class="xbs-hint" role="status">@L.Get(Str.HomeNoMatches)</p>
@@ -121,7 +129,7 @@ else
                 @foreach (var id in hitRows)
                 {
                     <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRows.Contains(id)" Flash="flashRowId == id" Pinned="IsPinned(id)"
-                                 FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                                 FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(byRow[id].NodeId)" SelectionCovered="selection.IsCovered(byRow[id].NodeId)" SelectionAvailable="selection.IsAvailable(byRow[id].NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                 }
             </div>
         }
@@ -133,7 +141,7 @@ else
             @foreach (var r in recentAll)
             {
                 <BookmarkRow @key="@("v" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)"
-                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
             }
         </div>
     }
@@ -150,7 +158,7 @@ else
         @if (pinnedRows.Count > 0 && crumbs.Count == 0)
         {
             <section class="xbs-sect xbs-sect-pinned @(pinnedOpen ? "is-open" : string.Empty)">
-                <button class="xbs-sect-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
+                <button disabled="@selection.Active" class="xbs-sect-head" @onclick="TogglePinned" aria-expanded="@pinnedOpen.ToString().ToLowerInvariant()">
                     <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#6b4a07" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#b07a12" /><path d="M9.5 12h7l-1 4.5 2.6 2.6v1.6H7.9v-1.6l2.6-2.6z M13 20.7v4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" /></svg>
                     <span class="xbs-sect-text">
                         <span class="xbs-sect-line"><span class="xbs-sect-label">@L.Get(Str.HomePinned)</span><span class="xbs-sect-n">@pinnedRows.Count</span></span>
@@ -164,7 +172,7 @@ else
                         @foreach (var r in pinnedRows)
                         {
                             <BookmarkRow @key="@("p" + r.RowId)" Row="r" Pinned="true" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
-                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                         }
                     </div>
                 }
@@ -173,7 +181,7 @@ else
         @if (showRecent && recentAll.Count > 0 && crumbs.Count == 0)
         {
             <section class="xbs-sect xbs-sect-recent @(recentOpen ? "is-open" : string.Empty)">
-                <button class="xbs-sect-head" @onclick="ToggleRecent" aria-expanded="@recentOpen.ToString().ToLowerInvariant()">
+                <button disabled="@selection.Active" class="xbs-sect-head" @onclick="ToggleRecent" aria-expanded="@recentOpen.ToString().ToLowerInvariant()">
                     <svg class="xbs-sect-rib" viewBox="0 0 26 40" aria-hidden="true"><path d="M2 0h22l2 6H0z" fill="#144b3e" /><path d="M0 6h26v32l-13-7.5L0 38z" fill="#1f6f5c" /><circle cx="13" cy="18" r="5.5" fill="none" stroke="#fff" stroke-width="1.5" /><path d="M13 15v3.2l2 1.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" /></svg>
                     <span class="xbs-sect-text">
                         <span class="xbs-sect-line"><span class="xbs-sect-label">@L.Get(Str.HomeRecent)</span><span class="xbs-sect-n">@RecentShown.Count</span></span>
@@ -190,12 +198,12 @@ else
                         @foreach (var r in RecentShown)
                         {
                             <BookmarkRow @key="@("n" + r.RowId)" Row="r" Pinned="IsPinned(r.RowId)" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
-                                         FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                                         FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                         }
                     </div>
                     @if (recentAll.Count > RecentShown.Count)
                     {
-                        <button class="xbs-sect-more" @onclick="OpenRecentView">@L.Get(Str.HomeRecentAll)<svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+                        <button disabled="@selection.Active" class="xbs-sect-more" @onclick="OpenRecentView">@L.Get(Str.HomeRecentAll)<svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
                     }
                 }
             </section>
@@ -206,14 +214,14 @@ else
                 @if (rows.Count > 100 && !locationReveal && !hasSeparators && expandedRows.Count == 0)
                 {
                     <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize Items="rows" Context="r" ItemSize="64" OverscanCount="8">
-                        <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                        <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                     </Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize>
                 }
                 else
                 {
                 @foreach (var r in rows)
                 {
-                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" />
+                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                 }
                 }
             </div>
@@ -226,6 +234,8 @@ else
         </div>
     }
 
+    @if (!selection.Active)
+    {
     <div class="xbs-statusbar @StatusClass @(StatusVisible ? string.Empty : "away")" role="status" aria-hidden="@(StatusVisible ? "false" : "true")">
         <span class="xbs-status-dot" aria-hidden="true"></span>
         <span class="xbs-statusbar-main">
@@ -250,9 +260,10 @@ else
             <button class="xbs-statusbar-sync" @onclick="SyncNow">@L.Get(Str.CommonSyncNow)</button>
         }
     </div>
+    }
 }
 
-@if (ready && Session.Engine is not null)
+@if (ready && Session.Engine is not null && !selection.Active)
 {
     <button class="xbs-fab" @onclick="AddNew" aria-label="@L.Get(Str.HomeAddAria)">
         <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
@@ -260,9 +271,53 @@ else
     </button>
 }
 
+@if (selection.Active)
+{
+    <div class="xbs-selection-space"></div>
+    @if (!string.IsNullOrEmpty(FriendlyStatus()) && engineStatus != Core.Sync.SyncStatus.Syncing)
+    {
+        <p class="xbs-selection-notice" role="status">@FriendlyStatus()</p>
+    }
+    <div class="xbs-selection-actions" aria-busy="@selection.Busy.ToString().ToLowerInvariant()">
+        <button class="btn btn-primary" disabled="@(selection.Busy || selection.SelectedNodeIds.Count == 0)" @onclick="OpenBatchMove">@L.Get(Str.HomeMove)</button>
+        <button class="btn btn-outline-danger" disabled="@(selection.Busy || selection.SelectedNodeIds.Count == 0)" @onclick="PrepareBatchDelete">@L.Get(Str.CommonDelete)</button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(selectionError) && !batchMoving && batchDeletePlan is null)
+{
+    <p class="alert alert-danger" role="alert">@selectionError</p>
+}
+@if (batchMoving)
+{
+    <MovePicker BatchCount="selection.SelectedNodeIds.Count" Folders="allFolders" ExcludedNodeIds="BatchExcludedNodes"
+                SourceParentRowIds="BatchSourceParents" Recents="MoveRecentRowIds()" OnMove="ApplyBatchMove"
+                OnCancel="CloseBatchMove" CreateFolderIn="CreateBatchFolder" ErrorMessage="@batchError" />
+}
+@if (batchDeletePlan is not null)
+{
+    <div class="xbs-sheet-backdrop" data-back="35" @onclick="CloseBatchDelete">
+        <div class="xbs-sheet" role="dialog" aria-modal="true" aria-labelledby="selection-delete-title" @onclick:stopPropagation="true">
+            <h2 id="selection-delete-title">@L.Get(Str.SelectionDeleteQuestion, batchDeletePlan.RootFolders, batchDeletePlan.RootBookmarks)</h2>
+            @if (batchDeletePlan.ContainedFolders > 0 || batchDeletePlan.ContainedBookmarks > 0)
+            {
+                <p>@L.Get(Str.SelectionContained, batchDeletePlan.ContainedFolders, batchDeletePlan.ContainedBookmarks)</p>
+            }
+            <p>@L.Get(Str.SelectionDeleteBackup)</p>
+            <p>@L.Get(Str.SelectionSyncLater)</p>
+            @if (!string.IsNullOrEmpty(batchError)) { <p role="alert" class="alert alert-danger">@batchError</p> }
+            <button class="btn btn-secondary" disabled="@selection.Busy" @onclick="CloseBatchDelete">@L.Get(Str.CommonCancel)</button>
+            <button class="btn btn-danger" disabled="@selection.Busy" @onclick="ApplyBatchDelete">@(selection.Busy ? L.Get(Str.SelectionApplying) : L.Get(Str.CommonDelete))</button>
+        </div>
+    </div>
+}
+@if (batchUndo is not null && !selection.Active)
+{
+    <div class="xbs-undo xbs-batch-undo" role="status"><span>@batchResultText</span><button class="xbs-undo-btn" disabled="@batchUndoBusy" @onclick="UndoBatchMove">@L.Get(Str.CommonUndo)</button></div>
+}
+
 @if (sheetFor is not null)
 {
-    <BookmarkSheet Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
+    <BookmarkSheet @key="sharedSheetGeneration" Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
                    PresetUrl="@sheetFor.PresetUrl" PresetTitle="@sheetFor.PresetTitle"
                    Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null"
                    FindDuplicates="FindDuplicates" OnOpenExisting="OpenExisting"
@@ -323,7 +378,7 @@ else
                Move beside it, then recent destinations for a one-tap move. *@
             <div class="xbs-loc">
                 <button class="xbs-loc-path" @onclick="() => GoToLocation(menuFor)" aria-label="@($"{L.Get(Str.HomeGoToLocation)}: {FolderPath(menuFor.ParentRowId)}")">
-                    <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
+                    <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z" /><path d="M2 10h20" /></svg>
                     <span class="xbs-loc-text"><small>@L.Get(Str.HomeLocation)</small><span>@FolderPath(menuFor.ParentRowId)</span></span>
                 </button>
                 <button class="xbs-loc-move" @onclick="OpenMovePicker"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z M10 13.5h6M13.5 11l2.5 2.5-2.5 2.5" /></svg>@L.Get(Str.HomeMove)</button>
@@ -334,12 +389,13 @@ else
                 <div class="xbs-quick-chips">
                     @foreach (var f in quick)
                     {
-                        <button class="xbs-quick-chip" @onclick="() => MoveRow(menuFor, f.RowId)"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg><span>@(f.DisplayTitle ?? L.Get(Str.SheetTypeFolder))</span></button>
+                        <button class="xbs-quick-chip" @onclick="() => MoveRow(menuFor, f.RowId)"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z" /><path d="M2 10h20" /></svg><span>@(f.DisplayTitle ?? L.Get(Str.SheetTypeFolder))</span></button>
                     }
                     <button class="xbs-quick-chip other" @onclick="OpenMovePicker"><span>@L.Get(Str.HomeMoveOther)</span></button>
                 </div>
             }
             <div class="xbs-action-group">
+                <button class="xbs-action" @onclick="() => BeginSelection(menuFor)">@L.Get(Str.SelectionSelect)</button>
                 <button class="xbs-action danger" @onclick="() => DeleteRow(menuFor)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 11v6M14 11v6M6.5 7l1 12h9l1-12M9.5 7V4.5h5V7" /></svg>@L.Get(Str.CommonDelete)</button>
             </div>
         </div>
@@ -406,6 +462,7 @@ else if (moved is not null)
     private DotNetObjectReference<Home>? dotNet;
     private bool gesturesInit;
     private SheetTarget? sheetFor;
+    private long sharedSheetGeneration;
     private ItemRow? menuFor;
     private ItemRow? movingFor;
     // Last move, for the undo bar: the row, where it came from (RowId and stable NodeId) and the bar text.
@@ -463,6 +520,7 @@ else if (moved is not null)
         ready = true;
         StateHasChanged();
         SharedImport.Arrived += OnSharedArrived;
+        AppLock.Changed += OnSelectionLockChanged;
         Session.ForegroundChanged += OnForegroundChanged;
         OpenSharedIfPending();
         OnForegroundChanged();
@@ -473,7 +531,8 @@ else if (moved is not null)
     {
         recentClock?.Dispose();
         recentClock = null;
-        if (IsDisposed || !Session.Foreground) return;
+        if (IsDisposed) return;
+        if (!Session.Foreground) { SuspendSelection(); return; }
         TickRecent();
         recentClock = new Timer(_ => _ = InvokeAsync(TickRecent), null,
             TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
@@ -601,6 +660,11 @@ else if (moved is not null)
             await JS.InvokeVoidAsync("xbsGestures.init", dotNet, gestureOwner);
         }
 
+        if (restoreSelectionFocus)
+        {
+            restoreSelectionFocus = false;
+            if (selectionFocusNodeId is int focusNode) await JS.InvokeVoidAsync("xbsGestures.focusSelectionRow", focusNode);
+        }
         if (IsDisposed) return;
         if (focusSearch)
         {
@@ -617,7 +681,7 @@ else if (moved is not null)
         }
 
         if (IsDisposed) return;
-        if (ready && sheetFor is null && Session.Engine is not null && SharedImport.Peek() is not null)
+        if (ready && Session.Engine is not null && SharedImport.Peek() is not null)
         {
             if (OpenSharedIfPending())
             {
@@ -631,7 +695,7 @@ else if (moved is not null)
         // nav drawer: whoever is still open keeps the lock.
         if (ready)
         {
-            try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", menuFor is not null || sheetFor is not null || movingFor is not null, "sheet"); } catch { }
+            try { await JS.InvokeVoidAsync("xbsGestures.lockScroll", menuFor is not null || sheetFor is not null || movingFor is not null || batchMoving || batchDeletePlan is not null || confirmDelete is not null, "sheet"); } catch { }
         }
     }
 
@@ -652,6 +716,7 @@ else if (moved is not null)
             // Every successful push/pull rewrites all rows (new RowIds): rebase
             // in-memory RowId references on the stable NodeId first, otherwise
             // the open folder (and expansions) silently point nowhere.
+            var readVersion = Session.Store.ContentVersion;
             await RebaseCrumbsAsync();
             // Capture expanded folders by stable NodeId before byRow is refilled below.
             var expandedNodes = expandedRows
@@ -728,6 +793,7 @@ else if (moved is not null)
                     }
                 }
             }
+            renderedContentVersion = readVersion == Session.Store.ContentVersion ? readVersion : -1;
             // The flash target is a stable NodeId too: a sync rewrite between
             // render and tap rekeys every RowId, so resolve it to the fresh one.
             if (flashNodeId is not null)
@@ -748,7 +814,12 @@ else if (moved is not null)
         return local.Date == DateTime.Now.Date ? local.ToString("t") : local.ToString("g");
     }
 
-    private void OnData() => InvokeAsync(async () => { await RefreshAsync(); StateHasChanged(); });
+    private void OnData() => InvokeAsync(async () =>
+    {
+        if (selectionWork > 0) { selectionRefreshPending = true; return; }
+        if (selection.Active && Session.Store?.ContentVersion != selection.ContentVersion) InvalidateSelection();
+        await RefreshAsync(); StateHasChanged();
+    });
 
     // ---- JS gesture callbacks ----
 
@@ -757,6 +828,7 @@ else if (moved is not null)
     [JSInvokable]
     public Task OnRowSwipeRight(int rowId)
     {
+        if (selection.Active) return Task.CompletedTask;
         // Swipe right: expand details. Multiple rows stay expanded together.
         expandedRows.Add(rowId);
         StateHasChanged();
@@ -766,6 +838,7 @@ else if (moved is not null)
     [JSInvokable]
     public Task OnRowSwipeLeft(int rowId)
     {
+        if (selection.Active) return Task.CompletedTask;
         // Swipe left: collapse this row only.
         if (expandedRows.Remove(rowId))
         {
@@ -789,14 +862,12 @@ else if (moved is not null)
     }
 
     [JSInvokable]
-    public async Task OnRowLongPress(int rowId)
+    public async Task OnRowLongPress(int rowId, int nodeId, long contentVersion)
     {
-        var row = await ResolveAsync(rowId);
-        if (row is not null)
-        {
-            menuFor = row;
-            StateHasChanged();
-        }
+        if (selection.Active || contentVersion != renderedContentVersion || Session.Store?.ContentVersion != contentVersion) return;
+        if (!byRow.TryGetValue(rowId, out var row) || row.NodeId != nodeId) return;
+        await BeginSelection(row);
+        if (selection.Active) SelectionFeedback.ConfirmLongPress();
     }
 
     private async Task<ItemRow?> ResolveAsync(int rowId)
@@ -813,6 +884,7 @@ else if (moved is not null)
     private async Task OpenRow(ItemRow? row)
     {
         if (row is null) return;
+        if (selection.Active) { ToggleSelection(row); return; }
         if (row.IsFolder)
         {
             crumbs.Push(row);
@@ -836,6 +908,7 @@ else if (moved is not null)
         _ = JS.InvokeVoidAsync("xbsGestures.closeAll");
         switch (a.Action)
         {
+            case RowAction.Select: await BeginSelection(a.Row); break;
             case RowAction.Share: await ShareRow(a.Row); break;
             case RowAction.Delete: await DeleteRow(a.Row); break;
             case RowAction.Menu: menuFor = a.Row; break;
@@ -1678,19 +1751,32 @@ else if (moved is not null)
     {
         // Peek first: consuming before the engine exists would drop the share.
         var pending = SharedImport.Peek();
-        if (pending is null || Session.Engine is null)
+        if (pending is null || Session.Engine is null || selection.Active || batchUndo is not null || batchMoving || batchDeletePlan is not null)
         {
             return false;
         }
 
+        // Incoming shares take over single-item overlays, including an old edit
+        // form. Otherwise the later-rendered action/move/delete panel hides it.
+        menuFor = null;
+        menuCollapsedFor = null;
+        movingFor = null;
+        confirmDelete = null;
         SharedImport.Consume();
+        sharedSheetGeneration++; // Reset even when the same URL/title is shared again.
         sheetFor = new SheetTarget(null, LastCreateFolder(), pending.Url, pending.Title);
         return true;
     }
 
     public override void Dispose()
     {
+        selectionOperation?.Cancel();
+        selectionOperation?.Dispose();
+        batchUndoExpiry?.Cancel();
+        batchUndoExpiry?.Dispose();
+        selection.Clear();
         base.Dispose();
+        AppLock.Changed -= OnSelectionLockChanged;
         Session.ForegroundChanged -= OnForegroundChanged;
         SharedImport.Arrived -= OnSharedArrived;
         _ = JS.InvokeVoidAsync("xbsGestures.lockScroll", false, "sheet");

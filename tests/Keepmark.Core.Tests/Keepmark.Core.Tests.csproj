@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../../src/KeepmarkMobile/Services/SelectionController.cs" Link="SelectionController.cs" />
     <ProjectReference Include="..\..\src\Keepmark.Core\Keepmark.Core.csproj" />
   </ItemGroup>
 
