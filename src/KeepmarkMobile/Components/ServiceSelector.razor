@@ -32,7 +32,7 @@
     }
     <div class="form-text mt-2" role="status" aria-live="polite">
         @if (checking) { @L.Get(Str.ServiceChecking) }
-        else if (info is not null) { @L.Get(Str.ServiceReady, info.Version, (info.MaxSyncSize / 1048576d).ToString("0.##"), info.Location) }
+        else if (info is not null) { @ReadyLine }
     </div>
     @if (info?.Status == Core.Models.ServiceStatus.NoNewSyncs) { <p class="form-text">@L.Get(Str.ServiceNoNew)</p> }
     @if (!string.IsNullOrWhiteSpace(info?.Message)) { <p class="form-text">@info.Message</p> }
@@ -58,6 +58,11 @@
         return $"{L.Get(Str.ServiceSaved)} · {metadata?.Location ?? "—"} · {(metadata is null ? "—" : (metadata.MaxSyncSize / 1048576d).ToString("0.##") + " MB")} · API {metadata?.Version ?? "—"}";
     }
     private string error = string.Empty;
+    /// <summary>Verified-endpoint summary. Self-hosted services may report no
+    /// location: drop the separator it would otherwise leave dangling.</summary>
+    private string ReadyLine =>
+        L.Get(Str.ServiceReady, info!.Version, (info.MaxSyncSize / 1048576d).ToString("0.##"), info.Location)
+            .TrimEnd(' ', '\u00a0', '·');
     private Core.Api.ServiceInfoResponse? info;
     private readonly ServiceCheckState checkState = new();
     private int generation => checkState.Generation;

@@ -153,16 +153,16 @@ else
         <div class="xbs-review">
             @if (slot == "new")
             {
-                <p>@Loc.Plural(Str.SwRevNew, localCount, TargetHost)</p>
+                <p>@Loc.Plural(Str.SwRevNew, localCount, TargetUrlClean)</p>
 
             }
             else if (direction == "upload")
             {
-                <p>@L.Get(Str.SwRevUpload, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost, localCount)</p>
+                <p>@L.Get(Str.SwRevUpload, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetUrlClean, localCount)</p>
             }
             else if (direction == "merge")
             {
-                <p>@L.Get(Str.SwRevMerge, localCount, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost)</p>
+                <p>@L.Get(Str.SwRevMerge, localCount, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetUrlClean)</p>
                 @if (mergeStats is not null)
                 {
                     <ul class="xbs-review-list">
@@ -177,7 +177,7 @@ else
             }
             else
             {
-                <p>@L.Get(Str.SwRevDownload, localCount, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetHost)</p>
+                <p>@L.Get(Str.SwRevDownload, localCount, probe?.RemoteCount, WorkflowRules.ShortId(probe?.Candidate.Id), TargetUrlClean)</p>
             }
         </div>
         <p class="text-muted">@MoveConfirm.Implication</p>
@@ -237,7 +237,15 @@ else
     private bool serviceOk =>
         serviceInfo is not null && checkedUrl == TargetUrlClean;
 
-    protected override void OnInitialized() => AppLock.Changed += LockChanged;
+    protected override void OnInitialized()
+    {
+        // Open on the service this device is linked to, so the current
+        // destination is recognisable before it is changed; the catalog
+        // default still applies while no sync is linked.
+        var current = AppSettings.ServiceUrl;
+        if (!string.IsNullOrWhiteSpace(current)) targetUrl = current;
+        AppLock.Changed += LockChanged;
+    }
 
     private readonly ConnectQrCandidateState qrState = new();
     private ConnectQrPayload? pendingQr => qrState.Payload;
@@ -500,9 +508,6 @@ else
         }, err => verifyError = err, "switch-merge-preview");
     }
 
-    private string TargetHost =>
-        Uri.TryCreate(TargetUrlClean, UriKind.Absolute, out var u) ? (u.IsDefaultPort ? u.Host : $"{u.Host}:{u.Port}") : TargetUrlClean;
-
     /// <summary>The picker speaks download/upload/merge; this page keeps "take" for download.</summary>
     private string PickerValue => direction == "take" ? "download" : direction;
 
@@ -523,7 +528,7 @@ else
         {
             if (slot == "new")
             {
-                return new(WorkflowTexts.MoveNewConfirm(TargetHost, localCount), WorkflowTexts.MoveImplication, L.Get(Str.CommonYesMove));
+                return new(WorkflowTexts.MoveNewConfirm(TargetUrlClean, localCount), WorkflowTexts.MoveImplication, L.Get(Str.CommonYesMove));
             }
 
             var d = WorkflowTexts.DirectionConfirm(PickerValue);

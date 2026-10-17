@@ -46,7 +46,7 @@ public static class WorkflowTexts
     // Move service.
     public static string MoveImplication => Loc.Get(Str.WfMoveImplication);
 
-    public static string MoveNewConfirm(string host, int count) => Loc.Plural(Str.WfMoveNewConfirm, count, host);
+    public static string MoveNewConfirm(string service, int count) => Loc.Plural(Str.WfMoveNewConfirm, count, service);
 
     public static string MoveDoneNext => Loc.Get(Str.WfMoveDoneNext);
 

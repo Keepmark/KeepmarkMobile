@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.208 (209)**,
+v1.2 extended contract when advertised. Current version: **v1.0.209 (210)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -155,6 +155,16 @@ dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android 
 dotnet build src/KeepmarkMobile -f net10.0-android -c Release -t:SignAndroidPackage -p:AndroidKeyStore=false -p:AndroidPackageFormats=apk
 # AndroidKeyStore=false uses the local debug key for testing only. Check the
 # APK manifest version before install; plain build may leave an older APK.
+
+# Play upload (Release + upload key, outside the repo): asks the keystore password
+# on the terminal, then builds and verifies the artifact. KEEPMARK_KEY_PASS (or
+# KEEPMARK_KEY_PASS_FILE, a mode-600 file) skips the prompt for unattended runs.
+scripts/build-play-aab.sh
+# -> src/KeepmarkMobile/bin/Release/net10.0-android/com.keepmark.mobile-Signed.aab
+#    (+ the same-name .apk for device QA), signed with ~/keys/keepmark-upload.keystore,
+#    alias "keepmark" (KEEPMARK_KEYSTORE / KEEPMARK_KEY_ALIAS override both).
+# The script only wraps:
+#   KEEPMARK_KEY_PASS=… dotnet build src/KeepmarkMobile -f net10.0-android -c Release -t:SignAndroidPackage
 adb -s IP:PORT shell "dumpsys package com.keepmark.mobile | grep -m1 versionName"
 adb -s IP:PORT exec-out screencap -p > /tmp/x.png     # screenshot
 adb -s IP:PORT shell input tap 540 1200               # tap (device 1080x2412)
@@ -621,3 +631,12 @@ successful pairing. Subsequent checks may refresh this endpoint metadata only
 for already-saved URLs. Legacy saved entries show unknown metadata until their
 next check. URL identities canonicalize host case/default ports while retaining
 path case, so equivalent addresses cannot create duplicate entries.
+
+## Service selection refinements (v1.0.209)
+
+Switch service opens on the service this device is linked to, so the current
+destination is recognisable before changing it; the catalog keeps its order and
+its default for unlinked setups. Destination names in the move review and in the
+confirm that precedes the definitive move use the full normalized URL, matching
+the completion messages. The verified-endpoint line drops the trailing separator
+when a service advertises no location.

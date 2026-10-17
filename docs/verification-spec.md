@@ -250,11 +250,20 @@ fails the review.
 
 ### 13.5 Release checklist (Keepmark Android)
 
-- [ ] `dotnet test` green (254 Core tests)
-- [ ] `dotnet build -f net10.0-android` 0 errors
-- [ ] Device deploy: `dotnet build -t:Run` or `adb install`
+- [ ] `dotnet test` green (310 Core tests)
+- [ ] `dotnet build src/KeepmarkMobile -f net10.0-android -c Debug` 0 errors
+- [ ] Device deploy via `dotnet build -t:Run` (a Debug APK installed with plain
+      `adb install` aborts: “No assemblies found … Fast Deployment”)
 - [ ] Manual device QA: conflict → merge → safety backup visible
-- [ ] Version bump in `KeepmarkMobile.csproj` (`ApplicationDisplayVersion`, `ApplicationVersion`)
+- [ ] Version bump in `KeepmarkMobile.csproj` (`ApplicationDisplayVersion` 1.0.N,
+      `ApplicationVersion` M) plus the `?v=` cache-buster in `wwwroot/index.html`
+      when CSS/JS changed; commit as `v1.0.N (M): …`
+- [ ] Play upload: signed AAB — `scripts/build-play-aab.sh` (asks the keystore
+      password; `KEEPMARK_KEY_PASS`/`KEEPMARK_KEY_PASS_FILE` for unattended runs)
+      → `src/KeepmarkMobile/bin/Release/net10.0-android/com.keepmark.mobile-Signed.aab`
+- [ ] Verify the artifact before uploading: `keytool -printcert -jarfile …aab`
+      (upload key fingerprint) and `adb -s IP:PORT shell "dumpsys package
+      com.keepmark.mobile | grep -m1 versionName"` after installing the test APK
 
 
 ## Native database engine verification
@@ -342,3 +351,34 @@ interaction checks passed; headless Chromium checked 144 layout combinations
 (six scenarios × three widths × two heights × two themes × two text scales),
 with no horizontal overflow or hidden footer actions. This is layout/component
 evidence; native keyboard, TalkBack and device behavior still require Android QA.
+
+## Service selection — v1.0.208/209
+
+- Connect (existing/new) and Switch service use `ServiceSelector`: a button with
+  the current service, then the eight public services, the saved ones and
+  “Custom URL…”. Each row shows the host (or the saved URL) with country, size
+  limit and API version; the selected row is marked for assistive technology
+  (`aria-pressed`) and the whole picker stays usable at large text scales.
+- Only the latest selection may pass: `Workflow/ServiceCheckState.cs` ties
+  readiness and create permission to a generation, so a probe that answers after
+  the user switched endpoints leaves the action blocked and reports nothing about
+  the abandoned service (`ServiceCatalogTests.LateResultCannotEnableAnotherSelectedService`).
+  A service accepting existing syncs only (`NoNewSyncs`) is announced and blocks
+  new-sync creation while still allowing an existing link.
+- Custom URLs verify manually and the proof is invalidated by any edit; the URL
+  is remembered only after a successful connect/create/move, with the verified
+  location, limit and API version refreshed only by later checks of that same URL.
+  Legacy saved rows show unknown metadata until their next check.
+  `ServiceCatalog.Normalize` ignores host case and default ports, keeps path case
+  and rejects credentials/query/fragment, so equivalent addresses cannot create a
+  second entry (`CanonicalServiceIdentityIgnoresHostCaseAndDefaultPort`).
+- Switch service opens on the service this device is linked to; the catalog
+  default applies while no sync is linked. The move review and the confirm that
+  precedes the move name the destination with its full normalized URL, matching
+  the completion message. The verified-endpoint line drops a trailing separator
+  when the service reports no location.
+
+Regression check on a device: link a custom HTTPS service, switch to a public one
+and back; the saved row keeps country/limit/API, a service in `NoNewSyncs` blocks
+only “Create a new sync”, and switching while a check is in flight never unlocks
+the other endpoint.
