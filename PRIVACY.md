@@ -36,6 +36,12 @@ device.
 
 Keepmark contacts no other server.
 
+If you link a browser by scanning its connection QR, the service, sync ID and
+password read from the code stay in memory for that connection only: an unused
+candidate is discarded after 60 seconds, when you leave the screen or when the
+app goes to the background. Nothing from a QR is written to storage or to the
+log, and no image is kept.
+
 ## What stays on your device
 
 - Your bookmarks, in a local database encrypted with SQLCipher.
@@ -53,6 +59,9 @@ pick. Uninstalling the app deletes all local data.
 
 - Internet and network state: to reach the sync service you choose and to know
   when you are offline.
+- Camera: only when you choose **Scan QR from browser**, to read a connection
+  code from the browser manager. Keepmark decodes QR codes only, keeps no image
+  and releases the camera when the scan ends.
 - Biometrics: for the optional app lock with fingerprint or device PIN. Your
   fingerprint is handled by Android and never reaches Keepmark.
 

@@ -23,7 +23,9 @@
 
 Keepmark keeps the same bookmarks on your browsers and your phone. Everything
 is encrypted on the device before it leaves: the service that stores your
-data sees only ciphertext, and your password never leaves the phone.
+data sees only ciphertext, and your password never leaves the phone. Linking a
+browser by QR is the one exception, and it stays between your own devices: the
+password goes from that browser to this phone, never through the service.
 
 It works with **any xBrowserSync service** (the official one, a community
 host or your own) and with the official xBrowserSync apps. A sync created in
@@ -39,9 +41,14 @@ Keepmark opens there, and the other way round. Nothing to migrate.
   first. Before overwriting your bookmarks Keepmark saves an encrypted
   safety backup you can restore; single deletes have Undo, and deleting a
   folder with 5 or more bookmarks asks first.
+- **Link a browser with one scan.** The Keepmark browser manager shows a
+  connection QR: scan it here and the service, sync ID and password arrive
+  together, ready to review. Nothing from the QR is saved, and an unused scan
+  is discarded after 60 seconds.
 - **Made for the phone.** Fast full-text search, pinned bookmarks, recently
   added bookmarks on Home, a clickable breadcrumb, folders first, swipe for
-  details and one menu for every action.
+  details and one menu for every action. Hold an item to select several and
+  move or delete them together.
 - **Share to Keepmark** from any app: the add form opens already filled in.
 - **App lock** with fingerprint or device PIN, with a relock time you choose.
 
@@ -50,6 +57,9 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 | | |
 |---|---|
 | **Sync** | Automatic or manual, with clear status and honest conflict handling |
+| **Link a browser** | Scan the connection QR from the Keepmark browser manager; the service is reviewed before linking |
+| **Select many** | Hold an item to select it, tap more rows or All, then move or delete the selection together |
+| **Choose a service** | Eight public services with country, size limit and API version, plus the custom URLs that worked before |
 | **Browse** | Search, pinned and recently added sections, breadcrumb, folder tree picker |
 | **Edit** | Add, edit, move and delete bookmarks and folders, with undo; new folder right from the picker; "already saved" hint when you add a page you have |
 | **Backup** | Encrypted export and import, compatible with Keepmark for browsers |
@@ -62,6 +72,32 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 With **Keepmark Server** you also get revision-based conflict detection,
 faster "nothing changed" checks and the option to delete your sync from the
 server. On other services Keepmark falls back automatically.
+
+## Link a browser by QR
+
+Bringing a browser onto this phone's sync normally means typing the service, the
+sync ID and the password. If you have the Keepmark browser extension, one scan is
+enough:
+
+1. In the Keepmark browser manager, the Android card says **Connect Keepmark on
+   your phone**; choose **Show connection QR** and verify the sync password there.
+2. On Android, open **Connect → Existing sync → Scan QR from browser** (the same
+   QR button is in **Move service**, before the manual target credentials).
+3. Check the service and abbreviated sync ID the review shows, tap **Connect**,
+   wait for verification, then choose the direction.
+
+The QR contains your credentials, password included, so show it only to your own
+device. The browser erases it after 60 seconds or when it loses focus, and this
+app discards an unused scan after 60 seconds or when it goes to the background:
+nothing from the QR is written to storage or to the log, and no image is kept.
+The camera is used only while you are scanning. Manual linking stays available.
+
+## Organize several items
+
+Hold an item to select it, then tap others or choose All. Move them together to an
+existing or newly created folder, with a short Undo window. Delete shows the affected
+folder contents before confirmation and keeps a safety backup in Backup → Safety
+backups. A brief touch response and visible checkboxes confirm selection.
 
 ## Screenshots
 
@@ -151,27 +187,3 @@ a particular purpose. Use it at your own risk: the authors are not liable for
 any loss of data (including bookmarks), damage or other consequences arising
 from its use. See `LICENSE.md`. Keep your own backups.
 
-### Connect from your browser
-
-In the Keepmark browser manager, open **Link a phone**, verify your current
-password and scan the QR from Android's **Connect → Link existing** screen.
-The QR review shows only the service, abbreviated sync ID and clearly spaced
-**Connect** / **Cancel** actions. Manual fields and later wizard steps stay
-hidden while you review and verify the QR. Tap **Connect**, wait for verification,
-then choose the existing sync direction. Camera permission is requested only when scanning; no images
-are saved. The same QR button is available before manual target credentials in **Move
-service**, followed by the usual review and confirmation. Manual connection
-remains available.
-
-The QR contains your sync credentials, including your password. Show it only
-to your own device. The browser hides it after 60 seconds or loss of focus;
-a captured copy still works. Android clears an unused candidate after 60
-seconds. The password is never sent to the server or persisted by this flow.
-
-
-### Organize several items on Android
-
-Hold an item to select it, then tap others or choose All. Move them together to an
-existing or newly created folder, with a short Undo window. Delete shows the affected
-folder contents before confirmation and keeps a safety backup in Backup → Safety
-backups. A brief touch response and visible checkboxes confirm selection.
