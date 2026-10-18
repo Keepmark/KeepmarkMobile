@@ -113,6 +113,7 @@ backups. A brief touch response and visible checkboxes confirm selection.
   <img src="docs/img/screens/05-backup.png" width="24%" alt="Encrypted backups" />
   <img src="docs/img/screens/06-actions.png" width="24%" alt="Bookmark actions" />
   <img src="docs/img/screens/07-pinned.png" width="24%" alt="Pinned bookmarks" />
+  <img src="docs/img/screens/08-qr.png" width="24%" alt="Scan the connection QR from the browser" />
 </p>
 
 ## The Keepmark family
