@@ -60,8 +60,9 @@ Definiti in `:root` (`app.css:9-16`):
 | `--km-navy-deep` | `#0e1430` | Varianti scure navy |
 | `--km-accent` | `#4a5fc1` | Accenti secondari |
 | `--km-danger` | `#b32121` | Pericolo, errori, underlay distruttivo |
-| `--km-gold` | `#b58900` | Pin, sezione pinned |
+| `--km-gold` | `#b58900` | Pin, sezione pinned, stato "solo sync esistenti" |
 | `--km-green` | `#1f6f5c` | Cartelle, underlay sinistro, toast ok |
+| `--km-ok-dot` | `#1f8a6e` | Pallino di stato "ok" (status bar, card del servizio) |
 
 Altri colori d'uso (non ridefinire a caso):
 
@@ -148,6 +149,22 @@ Altri colori d'uso (non ridefinire a caso):
   fire-and-forget dopo `StateHasChanged`, mai bloccante.
 - Undo bar: fissa sopra la status bar, scura, visibile 6s dopo delete
   ottimistica (la UI rimuove subito, il DB segue; undo ripristina).
+
+### Card di stato del servizio (`.km-service-status`)
+
+- Il risultato della verifica di un endpoint (Connect, Switch service) è una
+  card (`ServiceSelector.razor.css`): pallino colorato + parola di stato, i
+  fatti dell'endpoint come chip, la nota sotto una hairline piena.
+- Il pallino riusa gli stessi token della status bar (`--km-ok-dot`, `--km-gold`,
+  `--km-danger`, grigio `#8a90a8` pulsante durante la verifica) e **non porta
+  mai lo stato da solo**: la parola accanto lo ripete (regola 6, contrasto).
+- Chip: `API {versione}`, `{dimensione} MB` (unità tradotta), location; versione
+  e location cadono quando il servizio non le dichiara, senza separatori
+  pendenti. Superficie
+  `--km-surface`, bordo `--km-line-strong`; lo stato di errore tinge la card
+  dell'8% di `--km-danger` (come `.xbs-verified` fa col verde) e non usa più un
+  `alert` annidato.
+- La card è `role="status"` + `aria-live="polite"`.
 
 ### Sheet editor (`.xbs-sheet`)
 

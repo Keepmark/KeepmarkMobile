@@ -9,7 +9,7 @@ Product overview: [README](../README.md).
 > read it before reviewing code).
 
 Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.209 (210)**,
+v1.2 extended contract when advertised. Current version: **v1.0.210 (211)**,
 app id `com.keepmark.mobile`, display name `Keepmark`.
 
 Distribution:
@@ -638,5 +638,45 @@ Switch service opens on the service this device is linked to, so the current
 destination is recognisable before changing it; the catalog keeps its order and
 its default for unlinked setups. Destination names in the move review and in the
 confirm that precedes the definitive move use the full normalized URL, matching
-the completion messages. The verified-endpoint line drops the trailing separator
-when a service advertises no location.
+the completion messages. The verified-endpoint summary of that release is
+superseded by the status card in "Service status card (v1.0.210)".
+
+## Connect mode choice (v1.0.210)
+
+Switch service picks new vs existing sync with the segmented control `.xbs-seg`
+(`app.css`): the question `SwIntoWhich` above it, the two labels inside it and one
+line of explanation below (`SwANewText` / `SwExistingText`, `role="status"`).
+Both options stay visible in the vertical room of a single select row, and the
+labels are short (`Nuova` / `Esistente`) because the question already carries the
+noun; the chosen side is the filled accent pill (`aria-pressed="true"`), as on
+the active sort button. The group is `role="group"` + `aria-labelledby` and the
+buttons join the global `:focus-visible` ring. `ChooseSlot` routes through
+`Unverify`, so a sync verified in one branch can never be applied from the other
+one. The long card descriptions and their plural forms (`SwANewText_one/_other`)
+were dropped with the switch; Connect keeps its two cards.
+
+## Service status card (v1.0.210)
+
+The endpoint check result under `ServiceSelector` (Connect and Switch service) is
+one card, `.km-service-status` in `ServiceSelector.razor.css`, instead of loose
+helper lines: a coloured dot and the state word, the endpoint facts as chips, and
+the server note under a solid hairline. The dot reuses the status-bar tokens and
+follows the same precedence as the word (`checking` > `error` > `status`):
+pulsing grey `#8a90a8` while `ServiceChecking`, green `--km-ok-dot` for
+`Online` (`ServiceReady`), amber `--km-gold` for `NoNewSyncs`
+(`ServiceStatusNoNew`), red `--km-danger` for `Offline`/`Error` and for a check
+that failed (`ServiceUnavailable`). Colour never carries the state alone — the
+word beside the dot says the same thing, and the card is `role="status"` with
+`aria-live="polite"`.
+
+The facts are three chips: `ServiceApi {0}` and the raw location are dropped when
+the service omits them (self-hosted services often have no location), which is
+why the trailing separator of the old single line is gone, while the size chip
+`ServiceSize {0}` (unit translated: MB/Mo/МБ) always shows the advertised limit,
+as before. The note
+shows, in order, the failure from the last check, the service's own `message`
+(a plain accent-icon note) or the `ServiceNoNew` explanation for the amber state;
+a failure tints the card red (8% `--km-danger` over `--km-surface`, the same
+trick `.xbs-verified` uses with green) and the standalone `alert` it used to
+render is gone. `ServiceReady` is a word now ("Collegato"), no longer the whole
+summary line.

@@ -13,6 +13,9 @@ public static partial class Str
     public const string ServiceSaved = nameof(ServiceSaved);
     public const string ServiceChecking = nameof(ServiceChecking);
     public const string ServiceReady = nameof(ServiceReady);
+    public const string ServiceStatusNoNew = nameof(ServiceStatusNoNew);
+    public const string ServiceSize = nameof(ServiceSize);
+    public const string ServiceApi = nameof(ServiceApi);
     public const string ServiceUnavailable = nameof(ServiceUnavailable);
 
     public const string SelectionSearchContext = nameof(SelectionSearchContext);
@@ -577,8 +580,7 @@ public static partial class Str
     public const string SwServiceLine = nameof(SwServiceLine);
     public const string SwIntoWhich = nameof(SwIntoWhich);
     public const string SwANew = nameof(SwANew);
-    public const string SwANewText_one = nameof(SwANewText_one);
-    public const string SwANewText_other = nameof(SwANewText_other);
+    public const string SwANewText = nameof(SwANewText);
     public const string SwExisting = nameof(SwExisting);
     public const string SwExistingText = nameof(SwExistingText);
     public const string SwNewOn = nameof(SwNewOn);
@@ -710,8 +712,6 @@ public static partial class Str
     public const string StatusMergeWouldTitles = nameof(StatusMergeWouldTitles);
     /// <summary>Base for Loc.Plural (StatusExpiryDays_one / StatusExpiryDays_other).</summary>
     public const string StatusExpiryDays = nameof(StatusExpiryDays);
-    /// <summary>Base for Loc.Plural (SwANewText_one / SwANewText_other).</summary>
-    public const string SwANewText = nameof(SwANewText);
     /// <summary>Base for Loc.Plural (SwCreatedB_one / SwCreatedB_other).</summary>
     public const string SwCreatedB = nameof(SwCreatedB);
     /// <summary>Base for Loc.Plural (SwRevNew_one / SwRevNew_other).</summary>

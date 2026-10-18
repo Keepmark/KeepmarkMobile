@@ -375,10 +375,32 @@ evidence; native keyboard, TalkBack and device behavior still require Android QA
 - Switch service opens on the service this device is linked to; the catalog
   default applies while no sync is linked. The move review and the confirm that
   precedes the move name the destination with its full normalized URL, matching
-  the completion message. The verified-endpoint line drops a trailing separator
-  when the service reports no location.
+  the completion message. The endpoint check result is the status card of
+  "Service status card (v1.0.210)": dot + state word, endpoint chips (API, size,
+  location; version and location dropped when the service omits them) and the
+  server note.
 
 Regression check on a device: link a custom HTTPS service, switch to a public one
 and back; the saved row keeps country/limit/API, a service in `NoNewSyncs` blocks
 only “Create a new sync”, and switching while a check is in flight never unlocks
 the other endpoint.
+
+## Connect mode choice — v1.0.210
+
+- Switch service shows new vs existing sync as the segmented control `.xbs-seg`
+  (both labels visible, chosen one filled with the accent colour), with the
+  explanation line under it; no dropdown is left in the wizard.
+- The explanation follows the selection (`SwANewText` / `SwExistingText`), and
+  the password or sync-ID fields of the other branch disappear with it.
+- Switching branch drops a sync that was already verified in the other one
+  (`ChooseSlot` → `Unverify`): the review can never apply a probe taken on the
+  abandoned branch.
+- The two buttons are ≥ 48px tall, reachable with TalkBack (`role="group"` with
+  the question as its label, `aria-pressed` on each side) and keyboard-focusable,
+  with the group still legible at the largest text scale without horizontal
+  overflow.
+
+Regression check on a device: in Switch service pick an existing sync, verify it,
+switch to “Nuova” and back — the verified line is gone and the password fields
+come back; rotate the device and open the keyboard: the segment stays on one row
+and both labels stay readable in light and dark theme.

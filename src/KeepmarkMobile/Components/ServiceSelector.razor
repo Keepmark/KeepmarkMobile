@@ -30,13 +30,42 @@
         <input id="@(id + "-url")" class="form-control" value="@Value" @oninput="Edit" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <button class="btn btn-secondary mt-2" disabled="@(Disabled || checking || string.IsNullOrWhiteSpace(Value))" @onclick="Check">@L.Get(Str.ConnCheckService)</button>
     }
-    <div class="form-text mt-2" role="status" aria-live="polite">
-        @if (checking) { @L.Get(Str.ServiceChecking) }
-        else if (info is not null) { @ReadyLine }
-    </div>
-    @if (info?.Status == Core.Models.ServiceStatus.NoNewSyncs) { <p class="form-text">@L.Get(Str.ServiceNoNew)</p> }
-    @if (!string.IsNullOrWhiteSpace(info?.Message)) { <p class="form-text">@info.Message</p> }
-    @if (!string.IsNullOrEmpty(error)) { <div class="alert alert-danger mt-2" role="alert">@error</div> }
+    @if (checking || info is not null || !string.IsNullOrEmpty(error))
+    {
+        @* One card for the whole service state: coloured dot + status word,
+           the endpoint facts as chips, then the server note (or the error)
+           below a hairline. Never colour alone: the word carries the state. *@
+        <div class="km-service-status @StatusClass" role="status" aria-live="polite">
+            <div class="km-service-status-head">
+                <span class="km-service-dot" aria-hidden="true"></span>
+                <strong>@StatusLabel</strong>
+            </div>
+            @if (info is not null)
+            {
+                <div class="km-service-meta">
+                    @* Endpoint facts: version and location are dropped when the
+                       service omits them (self-hosted often has no location). *@
+                    @if (!string.IsNullOrWhiteSpace(info.Version)) { <span class="km-chip">@L.Get(Str.ServiceApi, info.Version)</span> }
+                    <span class="km-chip">@L.Get(Str.ServiceSize, (info.MaxSyncSize / 1048576d).ToString("0.##"))</span>
+                    @if (!string.IsNullOrWhiteSpace(info.Location)) { <span class="km-chip">@info.Location</span> }
+                </div>
+            }
+            @if (StatusNote is not null)
+            {
+                <p class="km-service-note">
+                    @if (NoteIsWarning)
+                    {
+                        <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v5M12 17h.01" /></svg>
+                    }
+                    else
+                    {
+                        <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></svg>
+                    }
+                    <span>@StatusNote</span>
+                </p>
+            }
+        </div>
+    }
 </div>
 
 @code {
@@ -58,11 +87,29 @@
         return $"{L.Get(Str.ServiceSaved)} · {metadata?.Location ?? "—"} · {(metadata is null ? "—" : (metadata.MaxSyncSize / 1048576d).ToString("0.##") + " MB")} · API {metadata?.Version ?? "—"}";
     }
     private string error = string.Empty;
-    /// <summary>Verified-endpoint summary. Self-hosted services may report no
-    /// location: drop the separator it would otherwise leave dangling.</summary>
-    private string ReadyLine =>
-        L.Get(Str.ServiceReady, info!.Version, (info.MaxSyncSize / 1048576d).ToString("0.##"), info.Location)
-            .TrimEnd(' ', '\u00a0', '·');
+    /// <summary>State of the checked endpoint: dot colour and word, driven by
+    /// the same value so they can never disagree (checking > error > status).</summary>
+    private string StatusClass =>
+        checking ? "is-checking"
+        : info?.Status == Core.Models.ServiceStatus.Online ? "is-ok"
+        : info?.Status == Core.Models.ServiceStatus.NoNewSyncs ? "is-warn"
+        : "is-error";
+    private string StatusLabel =>
+        checking ? L.Get(Str.ServiceChecking)
+        : info?.Status == Core.Models.ServiceStatus.Online ? L.Get(Str.ServiceReady)
+        : info?.Status == Core.Models.ServiceStatus.NoNewSyncs ? L.Get(Str.ServiceStatusNoNew)
+        : L.Get(Str.ServiceUnavailable);
+    /// <summary>Error and "no new syncs" are warnings for the note icon; the
+    /// server's own message is an info note.</summary>
+    private bool NoteIsWarning =>
+        !string.IsNullOrEmpty(error) || info?.Status == Core.Models.ServiceStatus.NoNewSyncs;
+    /// <summary>One note line: the failure that stopped the check, else the
+    /// server's message, else the explanation of the amber state.</summary>
+    private string? StatusNote =>
+        !string.IsNullOrEmpty(error) ? error
+        : !string.IsNullOrWhiteSpace(info?.Message) ? info!.Message
+        : info?.Status == Core.Models.ServiceStatus.NoNewSyncs ? L.Get(Str.ServiceNoNew)
+        : null;
     private Core.Api.ServiceInfoResponse? info;
     private readonly ServiceCheckState checkState = new();
     private int generation => checkState.Generation;

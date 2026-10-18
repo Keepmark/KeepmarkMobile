@@ -217,7 +217,8 @@ a, .btn-link {
     color: var(--km-accent);
 }
 
-.btn:focus-visible, .form-control:focus, .form-select:focus, .form-check-input:focus {
+.btn:focus-visible, .form-control:focus, .form-select:focus, .form-check-input:focus,
+.xbs-seg button:focus-visible {
     box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.3);
 }
 
@@ -2316,6 +2317,38 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 .xbs-choice-text strong { font-size: 1.05rem; font-weight: 700; }
 .xbs-choice-text span { font-size: 0.875rem; color: var(--km-ink-2); line-height: 1.35; }
 .xbs-choice-chev { color: var(--km-ink-2); }
+
+/* New / existing sync as a segmented control: both options stay visible in
+   the room a dropdown takes, and the line under it explains the difference. */
+.xbs-seg {
+    display: flex;
+    gap: 0.375rem;
+    padding: 0.25rem;
+    border: 1px solid var(--km-line-strong);
+    border-radius: 15px;
+    background: var(--km-surface-2);
+}
+
+.xbs-seg button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 48px;
+    padding: 0 0.5rem;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--km-ink-2);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+/* Filled pill = the chosen one (same language as the active sort button). */
+.xbs-seg button[aria-pressed="true"] { background: var(--km-accent); color: var(--km-on-accent); font-weight: 700; }
+.xbs-seg button:disabled { opacity: 0.6; }
+.xbs-seg-note { margin: 0.5rem 0 0; font-size: 0.875rem; color: var(--km-ink-2); line-height: 1.35; }
 
 .xbs-back {
     display: inline-flex;

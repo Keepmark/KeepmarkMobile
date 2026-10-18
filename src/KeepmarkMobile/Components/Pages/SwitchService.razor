@@ -103,11 +103,16 @@ else
         <h2 class="xbs-step-title">@L.Get(Str.SwWhere)</h2>
         <ServiceSelector Value="@targetUrl" ValueChanged="ServiceChanged" Checked="ServiceChecked" Disabled="@busy" />
         <div class="mb-3">
-            <label class="form-label">@L.Get(Str.SwIntoWhich)</label>
-            <select class="form-select" disabled="@busy" @bind="slot" @bind:after="Unverify">
-                <option value="new">@L.Get(Str.SwANew)</option>
-                <option value="existing">@L.Get(Str.SwExisting)</option>
-            </select>
+            <span class="form-label" id="slot-label">@L.Get(Str.SwIntoWhich)</span>
+            <div class="xbs-seg" role="group" aria-labelledby="slot-label">
+                <button type="button" disabled="@busy" aria-pressed="@((slot == "new").ToString().ToLowerInvariant())" @onclick='() => ChooseSlot("new")'>
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>@L.Get(Str.SwANew)
+                </button>
+                <button type="button" disabled="@busy" aria-pressed="@((slot == "existing").ToString().ToLowerInvariant())" @onclick='() => ChooseSlot("existing")'>
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>@L.Get(Str.SwExisting)
+                </button>
+            </div>
+            <p class="xbs-seg-note" role="status">@(slot == "new" ? L.Get(Str.SwANewText) : L.Get(Str.SwExistingText))</p>
         </div>
         @if (slot == "new")
         {
@@ -433,6 +438,16 @@ else
         verifiedFor = null;
         mergeStats = null;
         mergeStatsFor = null;
+    }
+
+    /// <summary>New / existing sync. Switching branch drops the verified
+    /// candidate: it belongs to the other one (same as editing the ID).</summary>
+    private void ChooseSlot(string value)
+    {
+        if (busy || slot == value) return;
+        slot = value;
+        verifyError = string.Empty;
+        Unverify();
     }
 
     private Task ServiceChanged(string url) { targetUrl = url; Unverify(); checkedUrl = null; serviceInfo = null; targetExpiryDays = null; return Task.CompletedTask; }
