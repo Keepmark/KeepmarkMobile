@@ -164,7 +164,8 @@ Altri colori d'uso (non ridefinire a caso):
   `--km-surface`, bordo `--km-line-strong`; lo stato di errore tinge la card
   dell'8% di `--km-danger` (come `.xbs-verified` fa col verde) e non usa più un
   `alert` annidato.
-- La card è `role="status"` + `aria-live="polite"`.
+- La card è `role="status"` + `aria-live="polite"`; una verifica fallita la rende
+  `role="alert"` (regola 6: ogni cluster d'azione ha la sua superficie d'errore).
 
 ### Sheet editor (`.xbs-sheet`)
 
@@ -261,6 +262,9 @@ Altri colori d'uso (non ridefinire a caso):
 - Classi `xbs-*` = tutto il custom comportamentale (righe, sheet, albero,
   search, toast, lock, gesture). Bootstrap = solo form e chrome generico
   (`btn`, `form-control`, `d-flex`, `alert`, `badge`, `spinner`).
+  Classi `km-*` = presentazione locale di un componente, definite nel suo
+  `.razor.css` scoped (`km-ico`, `km-brand-mark`, `km-service-*` nel selettore
+  del servizio): nessun comportamento, nessun uso fuori dal componente.
 - Scala z-index: sort/dupbar 890 < crumbs 900 < search 950 < error-ui 1000
   < spacer status 1050 < statusbar 1070 < FAB = frecce go 1080 < undo 1090
   < sheet 1100 < tree-full 1150 < toast 1200 < sync-loader 1300 < lock 2000.

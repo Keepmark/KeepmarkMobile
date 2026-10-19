@@ -41,6 +41,47 @@ public class WorkflowTests
         Assert.Equal(expected, WorkflowRules.NormalizeServiceUrl(raw));
 
     [Theory]
+    [InlineData("https://sync.example.org:8443/Api/x", "https", "sync.example.org:8443/Api/x")]
+    [InlineData("HTTP://Sync.Example.ORG/Api", "http", "sync.example.org/Api")]
+    [InlineData("https://xbs.eris.cc", "https", "xbs.eris.cc")]
+    // Not an absolute http(s) URL: shown whole, under the safe default scheme.
+    [InlineData("sync.example.org", "https", "sync.example.org")]
+    [InlineData("ftp://host/x", "https", "ftp://host/x")]
+    [InlineData("  api.xbrowsersync.org  ", "https", "api.xbrowsersync.org")]
+    [InlineData("", "https", "")]
+    [InlineData(null, "https", "")]
+    public void SplitServiceUrl(string? raw, string scheme, string host) =>
+        Assert.Equal((scheme, host), WorkflowRules.SplitServiceUrl(raw));
+
+    [Theory]
+    [InlineData("https", "sync.example.org", "https://sync.example.org")]
+    [InlineData("https", "sync.example.org:8443/Api", "https://sync.example.org:8443/Api")]
+    [InlineData("http", "sync.example.org", "http://sync.example.org")]
+    // Android keyboards capitalize the first letter of the host box.
+    [InlineData("https", "Api.xbrowsersync.org", "https://Api.xbrowsersync.org")]
+    // A pasted URL wins over the picker: the user meant that scheme.
+    [InlineData("http", "https://xbs.eris.cc", "https://xbs.eris.cc")]
+    [InlineData("https", "http://localhost:8080", "http://localhost:8080")]
+    // Empty host never yields a dangling listener-less scheme.
+    [InlineData("https", "", "")]
+    [InlineData("https", null, "")]
+    [InlineData("https", "  ", "")]
+    [InlineData(null, "sync.example.org", "https://sync.example.org")]
+    [InlineData("gopher", "sync.example.org", "https://sync.example.org")]
+    public void ComposeServiceUrl(string? scheme, string? host, string expected) =>
+        Assert.Equal(expected, WorkflowRules.ComposeServiceUrl(scheme, host));
+
+    [Theory]
+    [InlineData("https://sync.example.org:8443/Api")]
+    [InlineData("http://localhost:8080")]
+    [InlineData("https://Api.xbrowsersync.org")]
+    public void SplitAndComposeAreInverses(string url)
+    {
+        var (scheme, host) = WorkflowRules.SplitServiceUrl(url);
+        Assert.Equal(url, WorkflowRules.ComposeServiceUrl(scheme, host));
+    }
+
+    [Theory]
     [InlineData(null, "—")]
     [InlineData(0, "kept forever")]
     [InlineData(1, "deleted after 1 day without use")]

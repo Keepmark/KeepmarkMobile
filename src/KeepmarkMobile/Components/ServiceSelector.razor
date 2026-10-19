@@ -27,15 +27,29 @@
     @if (selection == "custom")
     {
         <label class="form-label mt-2" for="@(id + "-url")">@L.Get(Str.ConnServiceUrl)</label>
-        <input id="@(id + "-url")" class="form-control" value="@Value" @oninput="Edit" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        @* Scheme picker and host box are one field: two halves of the same URL,
+           composing to exactly what the single box used to hold. The picker
+           carries the HTTPS-only default, so a host typed on its own is never
+           sent in cleartext (http is for self-hosted services, and the check
+           still refuses it outside DEBUG). *@
+        <div class="km-url-row">
+            <select class="form-select" aria-label="@L.Get(Str.ConnServiceScheme)" disabled="@Disabled" @onchange="EditScheme">
+                <option value="https" selected="@(Scheme == "https")">https://</option>
+                <option value="http" selected="@(Scheme == "http")">http://</option>
+            </select>
+            <input id="@(id + "-url")" class="form-control" value="@Host" @oninput="EditHost" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sync.example.org" />
+        </div>
+        <div class="form-text">@L.Get(Str.ConnServiceUrlHintPlain)</div>
         <button class="btn btn-secondary mt-2" disabled="@(Disabled || checking || string.IsNullOrWhiteSpace(Value))" @onclick="Check">@L.Get(Str.ConnCheckService)</button>
     }
     @if (checking || info is not null || !string.IsNullOrEmpty(error))
     {
         @* One card for the whole service state: coloured dot + status word,
            the endpoint facts as chips, then the server note (or the error)
-           below a hairline. Never colour alone: the word carries the state. *@
-        <div class="km-service-status @StatusClass" role="status" aria-live="polite">
+           below a hairline. Never colour alone: the word carries the state.
+           A failed check is an error surface, so it is role="alert" (R8.7);
+           every other state is a polite status. *@
+        <div class="km-service-status @StatusClass" role="@(IsError ? "alert" : "status")" aria-live="@(IsError ? null : "polite")">
             <div class="km-service-status-head">
                 <span class="km-service-dot" aria-hidden="true"></span>
                 <strong>@StatusLabel</strong>
@@ -45,9 +59,9 @@
                 <div class="km-service-meta">
                     @* Endpoint facts: version and location are dropped when the
                        service omits them (self-hosted often has no location). *@
-                    @if (!string.IsNullOrWhiteSpace(info.Version)) { <span class="km-chip">@L.Get(Str.ServiceApi, info.Version)</span> }
-                    <span class="km-chip">@L.Get(Str.ServiceSize, (info.MaxSyncSize / 1048576d).ToString("0.##"))</span>
-                    @if (!string.IsNullOrWhiteSpace(info.Location)) { <span class="km-chip">@info.Location</span> }
+                    @if (!string.IsNullOrWhiteSpace(info.Version)) { <span class="km-service-chip">@L.Get(Str.ServiceApi, info.Version)</span> }
+                    <span class="km-service-chip">@L.Get(Str.ServiceSize, (info.MaxSyncSize / 1048576d).ToString("0.##"))</span>
+                    @if (!string.IsNullOrWhiteSpace(info.Location)) { <span class="km-service-chip">@LocationLabel(info.Location)</span> }
                 </div>
             }
             @if (StatusNote is not null)
@@ -76,15 +90,29 @@
     private readonly string id = "service-" + Guid.NewGuid().ToString("N");
     private string? observed;
     private string selection = string.Empty;
+    /// <summary>What the scheme picker shows: the scheme of the URL the parent
+    /// holds, "https" for a host on its own. Derived, never stored separately —
+    /// the composed URL stays the single source of truth.</summary>
+    private string Scheme => WorkflowRules.SplitServiceUrl(Value).Scheme;
+    /// <summary>What the host box shows: the URL without its scheme.</summary>
+    private string Host => WorkflowRules.SplitServiceUrl(Value).Host;
     private bool checking;
     private bool expanded;
     private string SelectedTitle => selection == "custom" ? L.Get(Str.ServiceCustom) : Uri.TryCreate(Value, UriKind.Absolute, out var uri) ? uri.Host : Value;
     private string SelectedDetail => ServiceCatalog.Public.FirstOrDefault(x => x.Url == selection) is { } item ? Detail(item) : selection == "custom" ? string.Empty : SavedDetail(selection);
     private string Detail(ServiceChoice item) => $"{L.Get("ServiceCountry" + item.Location)} · {item.Limit} · API {item.Version}";
+    /// <summary>Catalog rows and endpoint metadata name the same country codes:
+    /// translate the ones the app ships (GB/CA/DE/IT) so the card never shows a
+    /// bare "GB" next to a list that says "Regno Unito"; anything else is shown
+    /// as the service reports it, "—" when absent.</summary>
+    private string LocationLabel(string? location) =>
+        string.IsNullOrWhiteSpace(location) ? "—"
+        : ServiceCatalog.Public.Any(x => x.Location == location) ? L.Get("ServiceCountry" + location)
+        : location;
     private string SavedDetail(string url)
     {
         var metadata = ServiceCatalog.Normalize(Value) == url && info is not null ? info : Settings.SavedServiceInfo(url);
-        return $"{L.Get(Str.ServiceSaved)} · {metadata?.Location ?? "—"} · {(metadata is null ? "—" : (metadata.MaxSyncSize / 1048576d).ToString("0.##") + " MB")} · API {metadata?.Version ?? "—"}";
+        return $"{L.Get(Str.ServiceSaved)} · {LocationLabel(metadata?.Location)} · {(metadata is null ? "—" : (metadata.MaxSyncSize / 1048576d).ToString("0.##") + " MB")} · API {metadata?.Version ?? "—"}";
     }
     private string error = string.Empty;
     /// <summary>State of the checked endpoint: dot colour and word, driven by
@@ -99,6 +127,9 @@
         : info?.Status == Core.Models.ServiceStatus.Online ? L.Get(Str.ServiceReady)
         : info?.Status == Core.Models.ServiceStatus.NoNewSyncs ? L.Get(Str.ServiceStatusNoNew)
         : L.Get(Str.ServiceUnavailable);
+    /// <summary>A failed check is an error surface (<c>role="alert"</c>, R8.7);
+    /// the three other states are a polite status.</summary>
+    private bool IsError => StatusClass == "is-error";
     /// <summary>Error and "no new syncs" are warnings for the note icon; the
     /// server's own message is an info note.</summary>
     private bool NoteIsWarning =>
@@ -146,9 +177,23 @@
         await ValueChanged.InvokeAsync(Value);
         if (selection != "custom") await Check();
     }
-    private async Task Edit(ChangeEventArgs e)
+    private async Task EditScheme(ChangeEventArgs e)
     {
-        Value = e.Value?.ToString() ?? string.Empty; observed = Value;
+        if (Disabled) return;
+        await Compose(e.Value?.ToString(), Host);
+    }
+    private async Task EditHost(ChangeEventArgs e)
+    {
+        if (Disabled) return;
+        await Compose(Scheme, e.Value?.ToString());
+    }
+    /// <summary>Publishes the URL the two controls describe. An emptied host box
+    /// clears the parent value too, so "Check service" goes back to disabled
+    /// instead of testing the previous endpoint.</summary>
+    private async Task Compose(string? scheme, string? host)
+    {
+        Value = WorkflowRules.ComposeServiceUrl(scheme, host);
+        observed = Value;
         await Invalidate(); await ValueChanged.InvokeAsync(Value);
     }
     private async Task Check()

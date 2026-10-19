@@ -205,6 +205,8 @@ internal static partial class Catalogs
         [Str.ConnBackupHintB] = "——无需连接。",
         [Str.ConnService] = "服务",
         [Str.ConnServiceUrl] = "服务 URL",
+        [Str.ConnServiceScheme] = "服务 URL 协议",
+        [Str.ConnServiceUrlHintPlain] = "xBrowserSync 服务的主机和路径，不含协议。“检查服务”会确认其返回兼容的 API 版本。",
         [Str.ConnServiceUrlHint] = "要使用的 xBrowserSync 服务 URL。“检查服务”会确认其返回兼容的 API 版本。",
         [Str.ConnCheckService] = "检查服务",
         [Str.ConnStatusLine] = "状态：{0} · API v{1} · 最大 {2} KB",

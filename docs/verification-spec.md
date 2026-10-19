@@ -139,7 +139,7 @@ the applied result. Rules:
 | R8.4 | Gating matrix: Switch-service menu + page require an existing link (disabled + guard page); Sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty; merge disabled unless both sides hold items); danger buttons outline-first/solid-confirm. |
 | R8.5 | Status page: mode/state/last-sync/service (+version) / local DB bytes / server copy bytes + max + % + bar (one `/info` probe per visit, offline = "unknown") / content stats / app + sync-format + API versions. |
 | R8.6 | About page declares v1.1 + v1.2 extended contract (with fallback) + encryption + independence + proprietary license (© Yari Melzani). Bug-report mail includes app/API versions. |
-| R8.7 | Error evidence belongs to the step that produced it: wizard pages (Connect, Switch service) render one error box per action cluster (check / verify-link / apply-review) adjacent to its button, with `role="alert"`, instead of a single shared box. Multi-outcome successes restate WHAT ran (mode + direction + target) via the pure `MoveResult.Describe` helper (unit-pinned), never a bare "Done". |
+| R8.7 | Error evidence belongs to the step that produced it: wizard pages (Connect, Switch service) render one error surface per action cluster (check / verify-link / apply-review) adjacent to its action, with `role="alert"`, instead of a single shared box. The check cluster reports inside the service status card (see "Service status card (v1.0.210)"): a failed check turns the card red with `role="alert"` and the message verbatim; verify-link and apply-review keep their adjacent boxes. Multi-outcome successes restate WHAT ran (mode + direction + target) via the pure `MoveResult.Describe` helper (unit-pinned), never a bare "Done". |
 
 ## 9. Logging (`Logging.cs`, `InMemoryLogger`, Logs page)
 
@@ -171,8 +171,8 @@ fails the review.
 
 | View | Checks |
 |---|---|
-| `Connect.razor` (R6.1–R6.4b, R8.1–R8.4, R8.7) | Check service ok/offline (error box by the button). Link existing: wrong password → `InvalidCredentials`, zero mutations; `0/0` → auto-apply. Direction pull/push/merge each applied once: success restates mode+direction+target (`MoveResult`), safety row appears. Merge: preview counts = applied result; change direction → preview invalidated and recomputed automatically for Merge; apply waits for a current preview; merge radio disabled when either side is empty. Create new + create-with-upload: new ID shown + Copy. Unlink: confirm armed, creds cleared, local kept. Each step's error appears in ITS box (`role="alert"`), never a shared one. |
-| `SwitchService.razor` (R6.5, R8.1–R8.4, R8.7) | Unlinked → guard page. Step 1 check error by the button. Step 2 new-mode passwords mismatch/short → verify-box error (no navigation); existing-mode verify wrong password → zero mutations. All 3 directions reviewed in step 3 with counts; merge requires fresh preview. Execute → step 4 success names outcome + safety location; draft cleared (navigate away/back → wizard reset). Start over resets everything incl. errors. |
+| `Connect.razor` (R6.1–R6.4b, R8.1–R8.4, R8.7) | Check service ok/offline (status card by the selector; a failed check is red with the message). Link existing: wrong password → `InvalidCredentials`, zero mutations; `0/0` → auto-apply. Direction pull/push/merge each applied once: success restates mode+direction+target (`MoveResult`), safety row appears. Merge: preview counts = applied result; change direction → preview invalidated and recomputed automatically for Merge; apply waits for a current preview; merge radio disabled when either side is empty. Create new + create-with-upload: new ID shown + Copy. Unlink: confirm armed, creds cleared, local kept. Each step's error appears in ITS surface (`role="alert"`), never a shared one. |
+| `SwitchService.razor` (R6.5, R8.1–R8.4, R8.7) | Unlinked → guard page. Step 1 check error in the status card by the selector. Step 2 new-mode passwords mismatch/short → verify-box error (no navigation); existing-mode verify wrong password → zero mutations. All 3 directions reviewed in step 3 with counts; merge requires fresh preview. Execute → step 4 success names outcome + safety location; draft cleared (navigate away/back → wizard reset). Start over resets everything incl. errors. |
 | `Backup.razor` (R6.7, R7) | Export → file created, envelope `{App:"xBrowserSyncNg",Format:1}`. Preview with wrong password vs damaged file → distinct errors. Import → preview and consequences → Restore backup executes directly, safety row first, count matches. Safety list shows all `connect-merge`/`switch-merge` rows (both sides). Restore local → pre-restore row; restore remote unlinked → refused; delete → file + index row gone. |
 | `Duplicates.razor` (R6.9) | Groups listed; last copy locked (never deletable); per-group + global delete armed; ONE safety row per cleanup; ONE push (no sync storm — check logs); toast names backup location. |
 | `Status.razor` (R8.5) | Mode/state/last-sync/service + version, DB bytes, server bytes + max + % + bar (one `/info` per visit; offline = "unknown"), content stats, app + sync-format + API versions. No `.ToString("0.#")` leaks into percents. |
@@ -404,3 +404,13 @@ Regression check on a device: in Switch service pick an existing sync, verify it
 switch to “Nuova” and back — the verified line is gone and the password fields
 come back; rotate the device and open the keyboard: the segment stays on one row
 and both labels stay readable in light and dark theme.
+
+Evidence (2026-10-18): on device (1080×2412, dark theme) the segment shows both
+labels with the note switching per side, and the status card shows the state word,
+the translated location and the server message; the status page reports the same
+run as v1.0.210 (build 211). The four card states (checking / ok / warn / error)
+and the light theme were rendered in headless Chromium from the component's real
+stylesheet. The isolated layout matrix used for MovePicker (widths × heights ×
+themes × text scales, no horizontal overflow) has NOT been re-run for these two
+surfaces: run it before release. Native TalkBack, rotation and font scaling still
+require device QA.

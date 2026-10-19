@@ -204,6 +204,8 @@ internal static partial class Catalogs
         [Str.ConnBackupHintB] = "— 接続は不要です。",
         [Str.ConnService] = "サービス",
         [Str.ConnServiceUrl] = "サービス URL",
+        [Str.ConnServiceScheme] = "サービス URL のスキーム",
+        [Str.ConnServiceUrlHintPlain] = "xBrowserSync サービスのホストとパス（スキームなし）。「サービスを確認」で互換性のある API バージョンで応答するかを確かめます。",
         [Str.ConnServiceUrlHint] = "使用する xBrowserSync サービスの URL。「サービスを確認」で互換性のある API バージョンで応答するかを確かめます。",
         [Str.ConnCheckService] = "サービスを確認",
         [Str.ConnStatusLine] = "状態: {0} · API v{1} · 最大 {2} KB",

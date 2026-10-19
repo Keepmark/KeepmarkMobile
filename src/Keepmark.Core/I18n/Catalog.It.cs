@@ -204,6 +204,8 @@ internal static partial class Catalogs
         [Str.ConnBackupHintB] = "— non serve connessione.",
         [Str.ConnService] = "Servizio",
         [Str.ConnServiceUrl] = "URL del servizio",
+        [Str.ConnServiceScheme] = "Schema dell’URL del servizio",
+        [Str.ConnServiceUrlHintPlain] = "Host e percorso del servizio xBrowserSync, senza schema. “Controlla servizio” verifica che risponda con una versione API compatibile.",
         [Str.ConnServiceUrlHint] = "URL del servizio xBrowserSync da usare. “Controlla servizio” verifica che risponda con una versione API compatibile.",
         [Str.ConnCheckService] = "Controlla servizio",
         [Str.ConnStatusLine] = "Stato: {0} · API v{1} · max {2} KB",

@@ -9,6 +9,13 @@
 .km-service-option[aria-pressed=true] { background:var(--bs-tertiary-bg); box-shadow:inset 3px 0 var(--bs-primary); }
 .km-service-option:focus-visible,.km-service-current:focus-visible { outline:2px solid var(--bs-primary); outline-offset:-2px; }
 .km-service-current:disabled { opacity:.6; }
+.km-url-row:has(.form-select:disabled) { opacity:.6; }
+
+/* Scheme picker + host box: one field in two halves. The picker is only as
+   wide as "https://" needs, the rest of the row belongs to the host. */
+.km-url-row { display:flex; gap:.5rem; align-items:stretch; }
+.km-url-row .form-select { flex:0 0 auto; width:7.25rem; }
+.km-url-row .form-control { flex:1 1 auto; min-width:0; }
 
 /* Verified-endpoint card: dot + state word, endpoint chips, note under a
    hairline. Colours reuse the status-bar tokens (ok/gold/danger). */
@@ -20,7 +27,7 @@
 .km-service-status.is-warn .km-service-dot { background:var(--km-gold, #b58900); }
 .km-service-status.is-error .km-service-dot { background:var(--km-danger, #b32121); }
 .km-service-meta { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.5rem; }
-.km-chip { font-size:.72rem; padding:.15rem .45rem; border-radius:999px; background:var(--km-tile-bg, var(--bs-tertiary-bg)); color:var(--bs-secondary-color); border:1px solid var(--km-line, var(--bs-border-color)); }
+.km-service-chip { font-size:.72rem; padding:.15rem .45rem; border-radius:999px; background:var(--km-tile-bg, var(--bs-tertiary-bg)); color:var(--bs-secondary-color); border:1px solid var(--km-line, var(--bs-border-color)); }
 .km-service-note { margin:.6rem 0 0; padding-top:.6rem; border-top:1px solid var(--km-line, var(--bs-border-color)); display:flex; gap:.5rem; font-size:.83rem; color:var(--bs-secondary-color); }
 .km-service-note .km-ico { width:16px; height:16px; flex:none; margin-top:1px; color:var(--km-accent, #3d4fb0); }
 .km-service-status.is-warn .km-service-note .km-ico { color:var(--km-gold, #b58900); }

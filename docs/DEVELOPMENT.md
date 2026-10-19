@@ -459,9 +459,11 @@ instead of a file (documented, no snapshot required).
 - Change-password and switch-existing keep their current-password /
   verify-first gates; nothing in this spec weakens them.
 - Wizard error evidence belongs to the step that produced it: Connect and
-  Switch service render one error box per action cluster
-  (check / verify-link / apply-review) adjacent to its button
-  (`role="alert"`), never a single shared box.
+  Switch service render one error surface per action cluster
+  (check / verify-link / apply-review) adjacent to its action
+  (`role="alert"`), never a single shared box. The check cluster is the
+  service status card: a failed check turns it red, `role="alert"` and the
+  message verbatim; a successful check is a polite `role="status"`.
 - Multi-outcome successes restate WHAT ran (mode + direction + target) via
   the pure `MoveResult.Describe` helper (unit-pinned in
   `BookmarkMergeTests`), never a bare "Done".
@@ -666,14 +668,18 @@ pulsing grey `#8a90a8` while `ServiceChecking`, green `--km-ok-dot` for
 `Online` (`ServiceReady`), amber `--km-gold` for `NoNewSyncs`
 (`ServiceStatusNoNew`), red `--km-danger` for `Offline`/`Error` and for a check
 that failed (`ServiceUnavailable`). Colour never carries the state alone — the
-word beside the dot says the same thing, and the card is `role="status"` with
-`aria-live="polite"`.
+word beside the dot says the same thing; the card is `role="status"` with
+`aria-live="polite"`, and a failed check becomes `role="alert"` instead, so the
+wizard keeps the R8.7 rule that each action cluster owns its error surface.
 
-The facts are three chips: `ServiceApi {0}` and the raw location are dropped when
+The facts are three chips: `ServiceApi {0}` and the location are dropped when
 the service omits them (self-hosted services often have no location), which is
 why the trailing separator of the old single line is gone, while the size chip
 `ServiceSize {0}` (unit translated: MB/Mo/МБ) always shows the advertised limit,
-as before. The note
+as before. The location chip translates the country codes the app ships
+(`ServiceCountry*`: GB/CA/DE/IT, so the official service reads "Regno Unito", not
+"GB") and prints anything else as reported; the saved row uses the same
+translation. The note
 shows, in order, the failure from the last check, the service's own `message`
 (a plain accent-icon note) or the `ServiceNoNew` explanation for the amber state;
 a failure tints the card red (8% `--km-danger` over `--km-surface`, the same

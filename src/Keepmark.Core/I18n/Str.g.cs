@@ -204,6 +204,8 @@ public static partial class Str
     public const string ConnService = nameof(ConnService);
     public const string ConnServiceUrl = nameof(ConnServiceUrl);
     public const string ConnServiceUrlHint = nameof(ConnServiceUrlHint);
+    public const string ConnServiceScheme = nameof(ConnServiceScheme);
+    public const string ConnServiceUrlHintPlain = nameof(ConnServiceUrlHintPlain);
     public const string ConnCheckService = nameof(ConnCheckService);
     public const string ConnStatusLine = nameof(ConnStatusLine);
     public const string ConnSyncOpenedA = nameof(ConnSyncOpenedA);
