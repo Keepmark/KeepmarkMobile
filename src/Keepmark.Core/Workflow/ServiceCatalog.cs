@@ -24,7 +24,8 @@ public static class ServiceCatalog
     public static IReadOnlyList<string> Remember(IEnumerable<string> previous, string successfulUrl)
     {
         var url = Normalize(successfulUrl);
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != WorkflowRules.HttpScheme && uri.Scheme != WorkflowRules.PreferredServiceScheme) ||
             !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)) return previous.ToArray();
         return previous.Select(Normalize).Append(url).Where(x => !IsPublic(x)).Distinct(StringComparer.Ordinal).ToArray();
     }

@@ -40,6 +40,16 @@
             <input id="@(id + "-url")" class="form-control" value="@Host" @oninput="EditHost" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sync.example.org" />
         </div>
         <div class="form-text">@L.Get(Str.ConnServiceUrlHintPlain)</div>
+        @if (WorkflowRules.IsCleartextServiceUrl(Value))
+        {
+            @* Cleartext warning sits where the choice is made, not in a dialog:
+               it must be readable before "Check service", and colour alone never
+               carries it (icon + word + sentence). *@
+            <p class="km-cleartext" role="status">
+                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v5M12 17h.01" /></svg>
+                <span>@L.Get(Str.ServiceCleartext)</span>
+            </p>
+        }
         <button class="btn btn-secondary mt-2" disabled="@(Disabled || checking || string.IsNullOrWhiteSpace(Value))" @onclick="Check">@L.Get(Str.ConnCheckService)</button>
     }
     @if (checking || info is not null || !string.IsNullOrEmpty(error))
@@ -206,11 +216,12 @@
         checking = true;
         try
         {
-            var allowLoopback = false;
-#if DEBUG
-            allowLoopback = Uri.TryCreate(url, UriKind.Absolute, out var local) && local.IsLoopback && local.Scheme == "http";
-#endif
-            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "https" && !allowLoopback) ||
+            // Both schemes are accepted: http is the user's choice for a
+            // self-hosted service (the editor warns about cleartext, and the
+            // release network-security-config permits it). Everything else
+            // stays rejected: no credentials in the URL, no query, no fragment.
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != "https" && uri.Scheme != WorkflowRules.HttpScheme) ||
                 !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
                 throw new InvalidOperationException(L.Get(Str.ServiceUnavailable));
             var result = await Session.CheckServiceAsync(url, token);

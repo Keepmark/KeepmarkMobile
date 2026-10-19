@@ -21,6 +21,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} MB",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "Service unavailable",
+        [Str.ServiceCleartext] = "Plain HTTP: the sync ID and your encrypted bookmarks travel unprotected. Anyone on the same network can read them. Use it only on a network you trust.",
 
         [Str.SelectionSearchContext] = "Results for “{0}” · {1} shown",
         [Str.SelectionUndoFailed] = "Could not undo the move. Items or their original folders may have changed. Your safety backup is available in Backup → Safety backups.",

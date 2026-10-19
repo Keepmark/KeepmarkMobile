@@ -21,6 +21,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} MB",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "Servizio non disponibile",
+        [Str.ServiceCleartext] = "HTTP non cifrato: l’ID di sincronizzazione e i segnalibri cifrati viaggiano senza protezione. Chiunque sulla stessa rete può leggerli. Usalo solo su una rete di cui ti fidi.",
 
         [Str.SelectionSearchContext] = "Risultati per “{0}” · {1} mostrati",
         [Str.SelectionUndoFailed] = "Impossibile annullare lo spostamento. Gli elementi o le cartelle originarie potrebbero essere cambiati. Il backup è disponibile in Backup → Backup di sicurezza.",

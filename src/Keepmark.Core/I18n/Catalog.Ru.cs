@@ -23,6 +23,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} МБ",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "Сервис недоступен",
+        [Str.ServiceCleartext] = "Открытый HTTP: ID синхронизации и зашифрованные закладки передаются без защиты. Любой в той же сети может их прочитать. Используйте только в доверенной сети.",
 
         [Str.SelectionSearchContext] = "Результаты для «{0}» · Показано: {1}",
         [Str.SelectionUndoFailed] = "Не удалось отменить перемещение. Элементы или исходные папки могли измениться. Копия доступна в разделе Резервные копии → Страховочные копии.",

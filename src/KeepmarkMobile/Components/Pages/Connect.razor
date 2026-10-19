@@ -333,11 +333,7 @@ else
             var text = await QrScanner.ScanAsync(Lifetime);
             if (IsDisposed || Lifetime.IsCancellationRequested || generation != qrGeneration || AppLock.Locked || !AppLock.Foreground) return;
             if (text is null) return;
-            var allowLocal = false;
-#if DEBUG
-            allowLocal = true;
-#endif
-            if (!ConnectQrPayload.TryParse(text, out var candidate, allowLocal))
+            if (!ConnectQrPayload.TryParse(text, out var candidate))
             { qrError = L.Get(Str.ConnQrInvalid); return; }
             serviceInfo = null; linkError = applyError = message = string.Empty;
             reconcile = null; mergeStats = null; mergeStatsFor = null;

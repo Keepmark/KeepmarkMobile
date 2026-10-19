@@ -17,6 +17,7 @@ public static partial class Str
     public const string ServiceSize = nameof(ServiceSize);
     public const string ServiceApi = nameof(ServiceApi);
     public const string ServiceUnavailable = nameof(ServiceUnavailable);
+    public const string ServiceCleartext = nameof(ServiceCleartext);
 
     public const string SelectionSearchContext = nameof(SelectionSearchContext);
     public const string SelectionUndoFailed = nameof(SelectionUndoFailed);

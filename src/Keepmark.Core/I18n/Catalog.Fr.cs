@@ -21,6 +21,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} Mo",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "Service indisponible",
+        [Str.ServiceCleartext] = "HTTP en clair : l’ID de synchronisation et vos signets chiffrés circulent sans protection. Toute personne sur le même réseau peut les lire. À utiliser uniquement sur un réseau de confiance.",
 
         [Str.SelectionSearchContext] = "Résultats pour « {0} » · {1} affichés",
         [Str.SelectionUndoFailed] = "Impossible d’annuler le déplacement. Les éléments ou dossiers d’origine ont peut-être changé. La sauvegarde est dans Sauvegarde → Sauvegardes de sécurité.",

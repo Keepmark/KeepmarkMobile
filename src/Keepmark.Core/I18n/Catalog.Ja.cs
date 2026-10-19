@@ -21,6 +21,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} MB",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "サービスを利用できません",
+        [Str.ServiceCleartext] = "平文 HTTP：同期 ID と暗号化されたブックマークが保護なしで送信されます。同じネットワーク上の誰でも読めます。信頼できるネットワークでのみ使用してください。",
 
         [Str.SelectionSearchContext] = "「{0}」の結果 · {1} 件表示",
         [Str.SelectionUndoFailed] = "移動を元に戻せませんでした。項目や元のフォルダーが変更された可能性があります。バックアップ → 安全バックアップを確認してください。",

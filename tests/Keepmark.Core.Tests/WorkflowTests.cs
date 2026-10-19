@@ -85,6 +85,19 @@ public class WorkflowTests
     }
 
     [Theory]
+    [InlineData("https://sync.example.org", false)]
+    [InlineData("https://sync.example.org:8443/api", false)]
+    [InlineData("http://192.168.1.50:8090", true)]
+    [InlineData("HTTP://Localhost:8090", true)]
+    [InlineData("http://sync.example.org", true)]
+    [InlineData("sync.example.org", false)]      // no scheme yet: nothing is sent
+    [InlineData("not a url", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsCleartextServiceUrlOnlyForHttp(string? url, bool expected) =>
+        Assert.Equal(expected, WorkflowRules.IsCleartextServiceUrl(url));
+
+    [Theory]
     [InlineData(null, "—")]
     [InlineData(0, "kept forever")]
     [InlineData(1, "deleted after 1 day without use")]

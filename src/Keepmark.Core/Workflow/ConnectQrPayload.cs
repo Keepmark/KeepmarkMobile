@@ -16,7 +16,7 @@ public sealed class ConnectQrPayload
         => (ServiceUrl, Id, Version, Password) = (url, id, version, password);
     public override string ToString() => "Keepmark QR credentials [redacted]";
 
-    public static bool TryParse(string? text, out ConnectQrPayload? payload, bool allowDevelopmentLocalhost = false)
+    public static bool TryParse(string? text, out ConnectQrPayload? payload)
     {
         payload = null;
         if (string.IsNullOrEmpty(text) || text.Length > MaxUtf8Bytes || Encoding.UTF8.GetByteCount(text) > MaxUtf8Bytes) return false;
@@ -51,7 +51,7 @@ public sealed class ConnectQrPayload
                 Regex.IsMatch(url, "%((0[0-9a-f])|(1[0-9a-f])|7f|5c)", RegexOptions.IgnoreCase) ||
                 url.Split('/').ElementAtOrDefault(2)?.Contains('@') == true || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
                 string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)) return false;
-            if (uri.Scheme != "https" && !(allowDevelopmentLocalhost && uri.Scheme == "http" && (uri.Host == "localhost" || uri.Host == "127.0.0.1"))) return false;
+            if (uri.Scheme != "https" && uri.Scheme != WorkflowRules.HttpScheme) return false;
             payload = new(WorkflowRules.NormalizeServiceUrl(url), id, version, password);
             return true;
         }

@@ -11,6 +11,11 @@
 .km-service-current:disabled { opacity:.6; }
 .km-url-row:has(.form-select:disabled) { opacity:.6; }
 
+/* Cleartext warning (http:// was chosen): amber, icon + sentence, never colour
+   alone. Amber = "works, but know what you are accepting", not an error. */
+.km-cleartext { display:flex; gap:.5rem; margin:.5rem 0 0; font-size:.83rem; color:var(--km-gold, #9a6a0a); }
+.km-cleartext .km-ico { width:16px; height:16px; flex:none; margin-top:1px; }
+
 /* Scheme picker + host box: one field in two halves. The picker is only as
    wide as "https://" needs, the rest of the row belongs to the host. */
 .km-url-row { display:flex; gap:.5rem; align-items:stretch; }

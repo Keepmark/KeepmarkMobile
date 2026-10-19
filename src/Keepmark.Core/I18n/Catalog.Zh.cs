@@ -22,6 +22,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} MB",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "服务不可用",
+        [Str.ServiceCleartext] = "明文 HTTP：同步 ID 和加密书签会以未保护的方式传输。同一网络上的任何人都可以读取。请仅在信任的网络上使用。",
 
         [Str.SelectionSearchContext] = "“{0}”的结果 · 显示 {1} 项",
         [Str.SelectionUndoFailed] = "无法撤销移动。项目或原始文件夹可能已更改。可在备份 → 安全备份中恢复。",

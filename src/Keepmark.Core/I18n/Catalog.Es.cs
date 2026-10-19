@@ -21,6 +21,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} MB",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "Servicio no disponible",
+        [Str.ServiceCleartext] = "HTTP sin cifrar: el ID de sincronización y tus marcadores cifrados viajan sin protección. Cualquiera en la misma red puede leerlos. Úsalo solo en una red de confianza.",
 
         [Str.SelectionSearchContext] = "Resultados de «{0}» · {1} mostrados",
         [Str.SelectionUndoFailed] = "No se pudo deshacer el movimiento. Los elementos o sus carpetas originales pueden haber cambiado. La copia está en Copia de seguridad → Copias de seguridad preventivas.",

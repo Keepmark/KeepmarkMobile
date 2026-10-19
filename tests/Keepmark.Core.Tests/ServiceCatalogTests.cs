@@ -49,9 +49,19 @@ public class ServiceCatalogTests
     }
 
     [Theory]
-    [InlineData("http://my.example")]
+    // http is a supported scheme now (user's warned choice for self-hosted
+    // services), so it must be remembered; credentials, query and fragment
+    // stay rejected, as does anything unparseable.
     [InlineData("https://user:secret@my.example")]
     [InlineData("https://my.example?secret=x")]
+    [InlineData("https://my.example#frag")]
     [InlineData("invalid")]
     public void UnsafeUrlsAreNotRemembered(string url) => Assert.Empty(ServiceCatalog.Remember([], url));
+
+    [Fact]
+    public void CleartextServicesAreRemembered()
+    {
+        Assert.Equal(["http://192.168.1.50:8090"], ServiceCatalog.Remember([], "http://192.168.1.50:8090"));
+        Assert.Empty(ServiceCatalog.Remember([], "http://user:secret@192.168.1.50"));
+    }
 }

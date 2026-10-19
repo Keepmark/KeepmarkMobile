@@ -33,7 +33,6 @@ public sealed class ConnectQrTests
     public void RejectsMalformedInput(string text) => Assert.False(ConnectQrPayload.TryParse(text, out _));
 
     [Theory]
-    [InlineData("serviceUrl", "http://sync.example.test")]
     [InlineData("serviceUrl", "https://user:pass@sync.example.test")]
     [InlineData("serviceUrl", "https://@sync.example.test")]
     [InlineData("serviceUrl", "https://sync.example.test?query")]
@@ -64,9 +63,10 @@ public sealed class ConnectQrTests
         Assert.False(ConnectQrPayload.TryParse(Fixture()[..^1] + ",\"password\":\"other\"}", out _));
         Assert.False(ConnectQrPayload.TryParse(Fixture()[..^1] + ",\"extra\":{\"a\":{\"b\":{\"c\":{}}}}}", out _));
         Assert.False(ConnectQrPayload.TryParse(Fixture(new string('界', 1800)), out _));
-        var local = Fixture().Replace("https://sync.example.test:8443/prefix", "http://localhost:8090/prefix");
-        Assert.False(ConnectQrPayload.TryParse(local, out _));
-        Assert.True(ConnectQrPayload.TryParse(local, out _, allowDevelopmentLocalhost: true));
+        // http is accepted wherever https is: it is the user's warned choice for
+        // a self-hosted service, so a QR carrying one must link too.
+        var local = Fixture().Replace("https://sync.example.test:8443/prefix", "http://192.168.1.50:8090/prefix");
+        Assert.True(ConnectQrPayload.TryParse(local, out _));
     }
 }
 

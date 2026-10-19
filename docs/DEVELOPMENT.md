@@ -46,10 +46,22 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
 - Custom service URL is edited as **scheme picker (https default) + host box**
   in one row (`ServiceSelector.razor`): `WorkflowRules.SplitServiceUrl` /
   `ComposeServiceUrl` are inverses and the split+composed URL stays the
-  rendered value's single source of truth. A host typed on its own is never
-  sent in cleartext — `http` is offered for self-hosted services, and the
-  endpoint check still refuses it outside DEBUG, so cleartext stays a warning
-  inside the flow rather than a scheme error at typing time.
+  rendered value's single source of truth.
+- **Plain HTTP services are supported** (user decision, v1.0.211+): both
+  schemes pass validation everywhere — `ServiceSelector.Check`,
+  `ConnectQrPayload.TryParse`, `ServiceCatalog.Remember` — so a self-hosted
+  service on the home LAN works in release builds too. Requirements, in this
+  order: `Platforms/Android/NetworkSecurity/release.xml` sets
+  `cleartextTrafficPermitted="true"` (Android's format knows host names, not
+  address ranges, so the permission is necessarily global — the narrower
+  rule is the one below); every scheme check goes through
+  `WorkflowRules.HttpScheme` / `PreferredServiceScheme`, never a literal;
+  and `WorkflowRules.IsCleartextServiceUrl` drives the amber warning shown by
+  `ServiceSelector` (`Str.ServiceCleartext`, icon + sentence, `role="status"`)
+  the moment http is chosen, so the user knows the sync ID and the encrypted
+  blob travel unprotected. HTTPS stays the default and the recommended
+  choice, and `http` is never assumed: a host typed without a scheme is
+  composed as `https://`.
 - Sync: auto default + manual mode; **409 conflict never silently merged**;
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.

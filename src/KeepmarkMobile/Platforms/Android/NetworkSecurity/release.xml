@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Release: HTTPS only (same as the Android default). -->
+<!-- Release: cleartext is permitted because the app lets the user point at a
+     self-hosted service over plain HTTP (typically one on the home LAN). The
+     scheme is the user's explicit choice in the service editor, and choosing
+     http shows a warning that the sync ID and the encrypted blob travel
+     unencrypted. Android's network-security-config knows only host names, not
+     address ranges, so the permission has to be global; the narrower rule
+     ("http only to loopback/private hosts") lives in WorkflowRules.
+     Debug additionally allows localhost/127.0.0.1 for `adb reverse` (debug.xml). -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

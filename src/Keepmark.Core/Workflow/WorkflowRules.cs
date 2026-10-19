@@ -59,12 +59,23 @@ public static class WorkflowRules
     }
 
     /// <summary>Scheme assumed when the user types only the host part in the
-    /// custom-service editor. HTTPS only: cleartext would send the sync
-    /// password and the bookmark blob unencrypted.</summary>
+    /// custom-service editor. HTTPS is the default because it is the only
+    /// scheme safe on a network we do not control; http is the user's
+    /// explicit, warned choice (see <see cref="HttpScheme"/>).</summary>
     public const string PreferredServiceScheme = "https";
 
-    /// <summary>Schemes offered by the custom-service editor.</summary>
+    /// <summary>Cleartext scheme, offered in the editor for self-hosted
+    /// services (typically on the home LAN). Accepting it is deliberate: the
+    /// app warns at the point of choice and Android permits cleartext (see
+    /// <c>Platforms/Android/NetworkSecurity/release.xml</c>).</summary>
     public const string HttpScheme = "http";
+
+    /// <summary>True when the URL points at a service over plain HTTP, i.e.
+    /// when the sync ID (a bearer token) and the encrypted blob travel
+    /// unencrypted. Not an error: a warning the UI must show near the chooser
+    /// and before creating a new sync.</summary>
+    public static bool IsCleartextServiceUrl(string? url) =>
+        Uri.TryCreate(NormalizeServiceUrl(url), UriKind.Absolute, out var u) && u.Scheme == HttpScheme;
 
     /// <summary>
     /// Splits an absolute http(s) URL into the pair the custom-service editor

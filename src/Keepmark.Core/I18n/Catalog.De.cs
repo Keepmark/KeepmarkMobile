@@ -21,6 +21,7 @@ internal static partial class Catalogs
         [Str.ServiceSize] = "{0} MB",
         [Str.ServiceApi] = "API {0}",
         [Str.ServiceUnavailable] = "Dienst nicht verfügbar",
+        [Str.ServiceCleartext] = "Unverschlüsseltes HTTP: Sync-ID und die verschlüsselten Lesezeichen übertragen ungeschützt. Jeder im selben Netz kann sie lesen. Nur in einem vertrauenswürdigen Netz verwenden.",
 
         [Str.SelectionSearchContext] = "Ergebnisse für „{0}“ · {1} angezeigt",
         [Str.SelectionUndoFailed] = "Verschieben konnte nicht rückgängig gemacht werden. Elemente oder ursprüngliche Ordner wurden möglicherweise geändert. Das Backup ist unter Backup → Sicherheitsbackups verfügbar.",
