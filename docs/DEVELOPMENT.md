@@ -43,6 +43,13 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   Display only, never stored; the line is hidden on legacy/offline services.
   `ApiCapabilities.SyncExpiryDays` reads a raw `JsonElement`, so a malformed
   value is ignored instead of failing the v1.2 probe.
+- Custom service URL is edited as **scheme picker (https default) + host box**
+  in one row (`ServiceSelector.razor`): `WorkflowRules.SplitServiceUrl` /
+  `ComposeServiceUrl` are inverses and the split+composed URL stays the
+  rendered value's single source of truth. A host typed on its own is never
+  sent in cleartext — `http` is offered for self-hosted services, and the
+  endpoint check still refuses it outside DEBUG, so cleartext stays a warning
+  inside the flow rather than a scheme error at typing time.
 - Sync: auto default + manual mode; **409 conflict never silently merged**;
   safety backup before overwrites; display sort never affects sync order;
   background push serializes with pull on the engine gate.

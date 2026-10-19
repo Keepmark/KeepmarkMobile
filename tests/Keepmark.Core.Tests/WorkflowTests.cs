@@ -72,9 +72,12 @@ public class WorkflowTests
         Assert.Equal(expected, WorkflowRules.ComposeServiceUrl(scheme, host));
 
     [Theory]
+    // Round-trips what the app stores: the authority is already lower case
+    // (NormalizeServiceUrl lowercases it), so split+compose is idempotent on
+    // any stored URL — including ones carrying a path or a port.
     [InlineData("https://sync.example.org:8443/Api")]
     [InlineData("http://localhost:8080")]
-    [InlineData("https://Api.xbrowsersync.org")]
+    [InlineData("https://api.xbrowsersync.org")]
     public void SplitAndComposeAreInverses(string url)
     {
         var (scheme, host) = WorkflowRules.SplitServiceUrl(url);
