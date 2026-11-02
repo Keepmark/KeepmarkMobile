@@ -216,7 +216,7 @@ internal static partial class Catalogs
         [Str.ConnItemsCounts] = "服务器上的项目：{0} · 此设备上：{1}",
         [Str.ConnSyncId] = "同步 ID",
         [Str.ConnPasswordHint] = "密码会与服务器副本核对：密码错误时无法打开同步。在下一步选择同步方向之前，不会做任何更改。",
-        [Str.ConnApplyServer] = "连接并使用服务器",
+        [Str.ConnApplyServer] = "连接并使用服务器副本",
         [Str.ConnApplyMerge] = "连接并合并",
         [Str.ConnApplyDevice] = "连接并使用此设备",
         [Str.ConnOpenSync] = "继续",

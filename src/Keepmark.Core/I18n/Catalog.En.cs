@@ -215,7 +215,7 @@ internal static partial class Catalogs
         [Str.ConnItemsCounts] = "Items on the server: {0} · on this device: {1}",
         [Str.ConnSyncId] = "Sync ID",
         [Str.ConnPasswordHint] = "The password is verified against the server copy: a wrong password cannot open the sync. Nothing changes until you choose the sync direction in the next step.",
-        [Str.ConnApplyServer] = "Connect and use server",
+        [Str.ConnApplyServer] = "Connect and use the server copy",
         [Str.ConnApplyMerge] = "Connect and merge",
         [Str.ConnApplyDevice] = "Connect and use this device",
         [Str.ConnOpenSync] = "Continue",

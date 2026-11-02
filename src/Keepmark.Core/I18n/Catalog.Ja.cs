@@ -215,7 +215,7 @@ internal static partial class Catalogs
         [Str.ConnItemsCounts] = "サーバーの項目: {0} · このデバイス: {1}",
         [Str.ConnSyncId] = "同期 ID",
         [Str.ConnPasswordHint] = "パスワードはサーバーのコピーで確認されます。誤ったパスワードでは同期を開けません。次の手順で同期の方向を選ぶまで何も変更されません。",
-        [Str.ConnApplyServer] = "接続してサーバーを使用",
+        [Str.ConnApplyServer] = "接続してサーバーのコピーを使用",
         [Str.ConnApplyMerge] = "接続して統合",
         [Str.ConnApplyDevice] = "接続してこの端末を使用",
         [Str.ConnOpenSync] = "次へ",

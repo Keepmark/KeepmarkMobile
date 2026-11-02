@@ -215,7 +215,7 @@ internal static partial class Catalogs
         [Str.ConnItemsCounts] = "Elemente auf dem Server: {0} · auf diesem Gerät: {1}",
         [Str.ConnSyncId] = "Sync-ID",
         [Str.ConnPasswordHint] = "Das Passwort wird an der Serverkopie geprüft: Ein falsches Passwort kann die Synchronisierung nicht öffnen. Nichts ändert sich, bis du im nächsten Schritt die Richtung wählst.",
-        [Str.ConnApplyServer] = "Verbinden und Server verwenden",
+        [Str.ConnApplyServer] = "Verbinden und Serverkopie verwenden",
         [Str.ConnApplyMerge] = "Verbinden und zusammenführen",
         [Str.ConnApplyDevice] = "Verbinden und dieses Gerät verwenden",
         [Str.ConnOpenSync] = "Weiter",
