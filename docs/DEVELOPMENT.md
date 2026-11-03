@@ -944,15 +944,23 @@ has.
 | Conflict → Download | local tree | local JSON | `conflict-pull` |
 | Conflict → Upload | server copy | remote JSON | `conflict-push` |
 | Conflict → Merge | both sides | local + remote JSON | `conflict-merge` |
-| Sync download, more than 5 nodes changed | local tree | local JSON | `sync-pull` |
-| Sync upload, more than 5 nodes changed | server copy | remote JSON | `sync-push` |
+| Sync download, more than 10 nodes changed | local tree | local JSON | `sync-pull` |
+| Sync upload, more than 10 nodes changed | server copy | remote JSON | `sync-push` |
 
 A normal sync takes no snapshot: replacing a whole tree is its normal shape.
-When one side would lose more than `XbsConstants.MaxSilentSyncChanges` (5)
+When one side would lose more than `XbsConstants.MaxSilentSyncChanges` (10)
 nodes something massive happened (a wipe, an import done outside the app,
 another client gone wrong), so the side being replaced is snapshotted first
 (`TreeMagnitude.ChangedNodeCount`: bookmarks by normalized URL, folders by path
-below the three roots) and the sync continues; a failed snapshot aborts it.
+below the three roots, counted per parent) and the sync continues; a failed
+snapshot aborts it. Additions, removals and moves all count, and a move is a
+removal plus an addition, so moving a folder with more than five bookmarks is
+massive too.
+
+Every push normalises the three containers (`ContainerNames.EnsureContainers`):
+a tree missing Menu/Other/Toolbar would otherwise delete that container for
+every other client on its next pull. The added roots are persisted in the
+mirror at the same time, so the local and server shapes stay equal.
 
 Exception: a single bookmark/folder delete on Home keeps its 6-second in-memory
 undo instead of a file (documented; no snapshot required).

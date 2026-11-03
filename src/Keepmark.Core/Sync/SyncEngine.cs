@@ -426,6 +426,14 @@ public sealed partial class SyncEngine(
             }
 
             Normalize(roots);
+            // Never upload a tree missing one of the three containers: another
+            // client would see it as a deletion on its next pull. Persist what
+            // was added so the mirror and the server keep the same shape.
+            var addedContainers = ContainerNames.EnsureContainers(roots);
+            if (addedContainers.Count > 0)
+            {
+                await store.AddRootsAsync(addedContainers).ConfigureAwait(false);
+            }
             var json = JsonSerializer.Serialize(roots, Json);
             blob = crypto.Encrypt(json, c.DerivedKey);
 
@@ -1232,6 +1240,7 @@ public sealed partial class SyncEngine(
                 }
 
                 var merged = BookmarkMerge.Merge(localRoots, remoteRoots);
+                ContainerNames.EnsureContainers(merged.Tree);
                 await store.RestoreLocalAsync(merged.Tree).ConfigureAwait(false);
                 try
                 {
@@ -1286,10 +1295,40 @@ public sealed partial class SyncEngine(
                         : new SyncMeta { Revision = prefetched.Revision.Value, Hash = prefetched.Hash }
                 }
                 : await GetFullAsync(candidate, ct).ConfigureAwait(false);
-            // Decrypts (wrong password throws) before the mirror is replaced;
-            // credentials switch last.
-            await ApplyPulledAsync(full, candidate, ct, guardMassive: false).ConfigureAwait(false);
-            await creds.SetAsync(candidate with { Version = full.Version ?? candidate.Version }).ConfigureAwait(false);
+            // The mirror and the credentials must move together: the app must
+            // never say "sync X is active" while the visible tree is still the
+            // previous one (or the other way round). The previous mirror is
+            // kept in memory and put back when the credential switch fails.
+            var (prevRoots, prevBlob, prevLastUpdated, prevVersion) =
+                await store.LoadMirrorAsync(includeBlob: true).ConfigureAwait(false);
+            var prevRevision = long.TryParse(
+                await store.GetMetaAsync(BookmarkStore.MetaRevision).ConfigureAwait(false), out var rev)
+                ? rev
+                : (long?)null;
+            var prevHash = await store.GetMetaAsync(BookmarkStore.MetaHash).ConfigureAwait(false);
+            try
+            {
+                // Decrypts (wrong password throws) before the mirror is replaced;
+                // credentials switch last.
+                await ApplyPulledAsync(full, candidate, ct, guardMassive: false).ConfigureAwait(false);
+                await creds.SetAsync(candidate with { Version = full.Version ?? candidate.Version }).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best effort: the original error always wins, but the visible
+                // tree must keep matching the credentials that are still active.
+                try
+                {
+                    await store.ReplaceAllAsync(prevRoots, prevBlob ?? string.Empty,
+                        prevLastUpdated ?? string.Empty, prevVersion, prevRevision, prevHash).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Nothing more to do: the caller surfaces the original error.
+                }
+
+                throw;
+            }
         }
         catch (XbsException ex)
         {
@@ -1315,6 +1354,7 @@ public sealed partial class SyncEngine(
         {
             SetStatus(SyncStatus.Syncing);
             Normalize(roots);
+            ContainerNames.EnsureContainers(roots);
             var blob = crypto.Encrypt(JsonSerializer.Serialize(roots, Json), candidate.DerivedKey);
             var res = await apiFor(candidate.ServiceUrl)
                 .UpdateBookmarksAsync(candidate.Id, blob, remoteLastUpdated, ct: ct).ConfigureAwait(false);

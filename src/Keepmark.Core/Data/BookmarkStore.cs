@@ -313,6 +313,24 @@ public sealed partial class BookmarkStore : IAsyncDisposable
         }
     }
 
+    /// <summary>Appends top-level roots the mirror is missing (the push-time
+    /// container normalisation). The dirty flag is left alone: the caller is
+    /// already uploading this tree, and the push clears it on success.</summary>
+    public async Task AddRootsAsync(IReadOnlyList<BookmarkNode> roots)
+    {
+        if (roots.Count == 0) return;
+        var db = Db;
+        await db.RunInTransactionAsync(tran =>
+        {
+            Interlocked.Increment(ref _contentVersion);
+            var order = tran.ExecuteScalar<int>("SELECT COALESCE(MAX(SortOrder), -1) + 1 FROM Items");
+            foreach (var root in roots)
+            {
+                InsertNode(tran, root, parentRowId: null, ref order);
+            }
+        }).ConfigureAwait(false);
+    }
+
     public async Task<(List<BookmarkNode> Roots, string? Blob, string? LastUpdated, string? Version)> LoadMirrorAsync(bool includeBlob = true)
     {
         var db = Db;

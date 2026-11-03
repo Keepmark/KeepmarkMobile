@@ -80,6 +80,76 @@ public sealed class SyncGuardTests : IAsyncLifetime
         Assert.Equal("2024-02-02T00:00:00.000Z", await _store.GetMetaAsync(BookmarkStore.MetaLastUpdated));
     }
 
+    private static List<BookmarkNode> OtherWithFolder(int count)
+    {
+        var folder = new BookmarkNode
+        {
+            Id = 10,
+            Title = "Dev",
+            Children = Enumerable.Range(0, count)
+                .Select(i => new BookmarkNode { Id = 100 + i, Title = $"m{i}", Url = $"https://m{i}.example" })
+                .ToList(),
+        };
+        return [new BookmarkNode { Id = 1, Title = "[xbs] Other", Children = [folder] }];
+    }
+
+    private static List<BookmarkNode> OtherWithLoose(int count) =>
+    [
+        new BookmarkNode
+        {
+            Id = 1,
+            Title = "[xbs] Other",
+            Children = Enumerable.Range(0, count)
+                .Select(i => new BookmarkNode { Id = 200 + i, Title = $"m{i}", Url = $"https://m{i}.example" })
+                .ToList(),
+        },
+    ];
+
+    [Fact]
+    public async Task MovingAFolderWithMoreThanFiveBookmarks_TakesASnapshot()
+    {
+        await SeedAsync(OtherWithFolder(6));
+        _api.Blob = Enc(OtherWithLoose(6));
+        _api.LastUpdated = "2024-02-02T00:00:00.000Z";
+
+        await _engine.PullAsync();
+
+        var snapshot = Assert.Single(_snapshots);
+        Assert.Equal(SafetyOperations.SyncPull, snapshot.Operation);
+        Assert.Equal(8, snapshot.Items);
+    }
+
+    [Fact]
+    public async Task MovingAFolderWithFewBookmarks_TakesNoSnapshot()
+    {
+        await SeedAsync(OtherWithFolder(3));
+        _api.Blob = Enc(OtherWithLoose(3));
+        _api.LastUpdated = "2024-02-02T00:00:00.000Z";
+
+        await _engine.PullAsync();
+
+        Assert.Empty(_snapshots);
+    }
+
+    [Fact]
+    public async Task Push_AddsMissingContainersSoNoClientSeesADeletion()
+    {
+        // A mirror without the Toolbar (old build, half import): uploading it
+        // as-is would delete the toolbar for every other client.
+        var local = OtherWithLoose(1);
+        await SeedAsync(local);
+        _api.Blob = Enc(local);
+
+        await _engine.PushAsync();
+
+        Assert.Equal(1, _api.PushCount);
+        var pushed = JsonSerializer.Deserialize<List<BookmarkNode>>(
+            _crypto.Decrypt(_api.LastPushed!, Key))!;
+        Assert.Contains(pushed, n => n.Title == ContainerNames.Menu);
+        Assert.Contains(pushed, n => n.Title == ContainerNames.Other);
+        Assert.Contains(pushed, n => n.Title == ContainerNames.Toolbar);
+    }
+
     [Fact]
     public async Task OrdinaryDownload_TakesNoSnapshot()
     {

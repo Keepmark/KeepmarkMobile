@@ -91,6 +91,9 @@ yarn-error.log*
 ## Local agent settings
 .claude/
 .aura/
+# Local scratch memory (never pushed): test syncs on public services and other
+# throwaway credentials the agent must reuse across sessions.
+.local/
 
 # Signed release outputs (dotnet publish -o dist/<version>)
 /dist/

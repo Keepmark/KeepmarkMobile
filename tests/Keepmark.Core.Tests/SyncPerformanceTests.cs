@@ -58,7 +58,9 @@ public sealed class SyncPerformanceTests : IAsyncLifetime
         await _engine.WaitForBackgroundPushAsync().WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(1, _api.Inner.PushCount);
         var tree = JsonSerializer.Deserialize<List<BookmarkNode>>(_crypto.Decrypt(_api.Inner.Blob, Key))!;
-        Assert.Equal(20, tree.Count);
+        // 20 bookmarks + the three synced containers the push normalisation adds.
+        Assert.Equal(20, tree.Count(n => n.Url is not null));
+        Assert.Equal(3, tree.Count(n => n.Url is null));
         Assert.Equal("0", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
         Assert.Equal(0, _engine.PendingEdits);
     }
@@ -78,7 +80,8 @@ public sealed class SyncPerformanceTests : IAsyncLifetime
         _clock.Release();
         await _engine.WaitForBackgroundPushAsync().WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(1, _api.Inner.PushCount);
-        Assert.Equal(2, JsonSerializer.Deserialize<List<BookmarkNode>>(_crypto.Decrypt(_api.Inner.Blob, Key))!.Count);
+        // 2 bookmarks + the three containers added by the push normalisation.
+        Assert.Equal(5, JsonSerializer.Deserialize<List<BookmarkNode>>(_crypto.Decrypt(_api.Inner.Blob, Key))!.Count);
     }
 
     [Fact]
@@ -103,7 +106,7 @@ public sealed class SyncPerformanceTests : IAsyncLifetime
         await _engine.WaitForBackgroundPushAsync().WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(2, _api.Inner.PushCount);
         var tree = JsonSerializer.Deserialize<List<BookmarkNode>>(_crypto.Decrypt(_api.Inner.Blob, Key))!;
-        Assert.Equal(2, tree.Count);
+        Assert.Equal(2, tree.Count(n => n.Url is not null));
         Assert.Equal("0", await _store.GetMetaAsync(BookmarkStore.MetaDirty));
     }
 
@@ -143,7 +146,10 @@ public sealed class SyncPerformanceTests : IAsyncLifetime
         var changes = 0;
         _engine.DataChanged += () => changes++;
         await _engine.PushAsync();
-        Assert.Equal(id, (await _store.GetChildrenAsync(null)).Single().RowId);
+        var roots = await _store.GetChildrenAsync(null);
+        // The pushed row keeps its RowId; the containers are added around it.
+        Assert.Equal(id, roots.Single(r => r.Title == "One").RowId);
+        Assert.Equal(3, roots.Count(r => r.Url is null));
         Assert.Equal(0, changes);
     }
 

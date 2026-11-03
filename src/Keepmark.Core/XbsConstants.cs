@@ -39,10 +39,12 @@ public static class XbsConstants
     /// <summary>Unused legacy delimiter; Keepmark connection QR uses explicit JSON v1.</summary>
     public const string QrDelimiter = "|$$|";
 
-    /// <summary>A sync that adds or removes more nodes than this is treated as a
-    /// massive change: the side it replaces gets a safety snapshot (a normal
-    /// sync does not, because a whole-tree replace is the normal shape).</summary>
-    public const int MaxSilentSyncChanges = 5;
+    /// <summary>A sync that adds, removes or moves more nodes than this is
+    /// treated as a massive change: the side it replaces gets a safety snapshot
+    /// (a normal sync does not, because a whole-tree replace is the normal
+    /// shape). A move counts as a removal plus an addition, so moving a folder
+    /// with more than half this many bookmarks also triggers the snapshot.</summary>
+    public const int MaxSilentSyncChanges = 10;
 
     /// <summary>Default auto-sync poll interval, mirrors the 15-minute background alarm.</summary>
     public static readonly TimeSpan SyncPollInterval = TimeSpan.FromMinutes(15);
