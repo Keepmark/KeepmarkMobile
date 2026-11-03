@@ -203,6 +203,96 @@ public sealed class XbsSession : IAsyncDisposable
         }).ConfigureAwait(false);
     }
 
+    /// <summary>Forget a dormant row. The row goes and, when this device no
+    /// longer holds that key anywhere (active sync included), its wrap leaves
+    /// the safety master so it cannot crowd out a live key in the small wrap
+    /// list. Safety backups and copies of removed syncs are untouched: every
+    /// backup is encrypted once under the shared Master Key, which any
+    /// remaining wrap still opens.</summary>
+    public async Task ForgetSavedSyncAsync(SavedSyncIdentity identity)
+    {
+        var registry = Registry ?? throw new InvalidOperationException("Session not ready");
+        if (await registry.FindAsync(identity).ConfigureAwait(false) is null)
+        {
+            return;
+        }
+
+        await registry.ForgetAsync(identity).ConfigureAwait(false);
+        await PruneSafetyWrapsAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Drops safety-master wraps whose key this device no longer has.
+    /// Best effort: forgetting a row must never fail because of hygiene, and the
+    /// last wrap is always kept so the backups stay readable.</summary>
+    private async Task PruneSafetyWrapsAsync()
+    {
+        await _safetyGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var dir = SafetyDir();
+            var master = await LoadSafetyMasterAsync(dir).ConfigureAwait(false);
+            if (master is null || master.Wraps.Count == 0)
+            {
+                return;
+            }
+
+            var live = new HashSet<string>(StringComparer.Ordinal);
+            if (await _creds.GetAsync().ConfigureAwait(false) is { } active)
+            {
+                live.Add(SafetyMaster.Fingerprint(active.DerivedKey));
+            }
+
+            if (Registry is not null)
+            {
+                foreach (var row in await Registry.ListAsync().ConfigureAwait(false))
+                {
+                    if (!string.IsNullOrEmpty(row.KeyId))
+                    {
+                        live.Add(row.KeyId);
+                    }
+                    else if (row.CanActivate)
+                    {
+                        live.Add(SafetyMaster.Fingerprint(row.DerivedKey));
+                    }
+                }
+            }
+
+            var kept = SafetyMaster.PruneWraps(master.Wraps, live);
+            if (kept.Count == master.Wraps.Count)
+            {
+                return;
+            }
+
+            await WriteSafetyMasterAsync(dir, master with { Wraps = kept }).ConfigureAwait(false);
+            _log.Info("session", $"Safety master wraps pruned ({master.Wraps.Count - kept.Count} dropped)");
+        }
+        catch (Exception ex)
+        {
+            _log.Warn("session", $"Safety master prune failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            _safetyGate.Release();
+        }
+    }
+
+    /// <summary>Atomic master write (temp + flush + rename), same shape as
+    /// rotation: a crash leaves the previous record intact.</summary>
+    private static async Task WriteSafetyMasterAsync(string dir, SafetyMasterRecord record)
+    {
+        var path = Path.Combine(dir, "safety-master.json");
+        var tmp = path + ".tmp";
+        await using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+        await using (var sw = new StreamWriter(fs))
+        {
+            await sw.WriteAsync(System.Text.Json.JsonSerializer.Serialize(record)).ConfigureAwait(false);
+            await sw.FlushAsync().ConfigureAwait(false);
+            fs.Flush(flushToDisk: true);
+        }
+
+        File.Move(tmp, path, overwrite: true);
+    }
+
     public async Task ApplyRemoteAsync(ReconcileInfo info, string operation = SafetyOperations.TakeRemote, CancellationToken ct = default)
     {
         await PrepareForLinkAsync(info.Candidate, ct).ConfigureAwait(false);

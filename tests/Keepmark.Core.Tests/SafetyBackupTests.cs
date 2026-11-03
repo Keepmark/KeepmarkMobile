@@ -47,6 +47,32 @@ public sealed class SafetyBackupTests
     }
 
     [Fact]
+    public void PruneWraps_DropsKeysTheDeviceNoLongerHolds()
+    {
+        var wraps = new List<SafetyMasterWrap>
+        {
+            new("live-a", "w1"),
+            new("forgotten", "w2"),
+            new("live-b", "w3"),
+        };
+
+        var kept = SafetyMaster.PruneWraps(wraps, new HashSet<string> { "live-a", "live-b" });
+
+        Assert.Equal(["w1", "w3"], kept.Select(w => w.WrappedKey));
+    }
+
+    [Fact]
+    public void PruneWraps_NeverLeavesTheMasterUnreadable()
+    {
+        var wraps = new List<SafetyMasterWrap> { new("gone", "w1") };
+
+        var kept = SafetyMaster.PruneWraps(wraps, new HashSet<string>());
+
+        Assert.Single(kept);
+        Assert.Equal("gone", kept[0].KekId);
+    }
+
+    [Fact]
     public void ParseLegacy_ReadsOldShape()
     {
         var e = SafetyBackupFiles.ParseLegacy("safety-local-20260925-213022.json", 123);

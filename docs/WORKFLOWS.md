@@ -56,7 +56,7 @@ Words come from `UI-TERMS.md`. Platform differences are listed at the end.
 | Sync conflict | conflict | direction with consequences → apply | Android: apply executes; extension: one inline confirmation | Same direction text as Connect. |
 | Add a sync while linked (Android Connect) | yes | Connect → `+ Add a sync` → existing sync (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict or a failed push cancels the switch and changes nothing. |
 | Syncs: Activate | no | Syncs → `Activate` → device unlock when app lock is set → apply | none beyond the unlock | Read-only check first (service/version gate + download + decrypt with the key saved in the row); only then the active sync is saved and this device adopts the chosen sync's copy behind a `switch-take-remote` safety backup. The sync you leave stays in the list. The sync's own long password is never asked. |
-| Syncs: Forget / Unlink | no | Syncs → `Forget…` (inactive) / `Unlink this device…` (active) | always | Inactive: only the row is forgotten; bookmarks and the server copy stay. Active: this device is unlinked and the row disappears; the bookmarks stay and the sync plus its server copy stay for the other devices. Dormant rows survive an unlink. |
+| Syncs: Forget / Unlink | no | Syncs → `Forget…` (inactive) / `Unlink this device…` (active) | always | Inactive: only the row is forgotten; bookmarks and the server copy stay. Active: this device is unlinked and the row disappears; the bookmarks stay and the sync plus its server copy stay for the other devices. Dormant rows survive an unlink. Forgetting also drops that key's safety-master wrap when no other saved sync uses it; safety backups and copies of removed syncs stay. |
 | Removed sync (Android) | shown while linked | Home/Status notice → `Try again` / `Unlink and keep a copy…` / `Cancel` | always for the unlink; retry and cancel execute at once | The service no longer has this sync (expiry or another device's deletion). Nothing happens automatically and local bookmarks are untouched. Unlinking keeps a verified local copy of this device's tree, restorable from Backup → `Copies of removed syncs` and never pruned; `Cancel` keeps the notice quiet for that sync until an explicit retry. |
 | Duplicates | no | mark → `Delete marked` (per URL or all marked) | always | One copy of each URL always stays. While linked the deletion is uploaded and the other devices get it at their next sync. A safety backup is saved first. |
 
@@ -173,9 +173,11 @@ host.
 - A sync already present in the list is never duplicated: identity is the
   canonical service URL plus the sync ID and the row is updated in place.
 - `Forget…` removes the inactive row only: bookmarks and the server copy stay,
-  and so do the other rows. `Unlink this device…` unlinks this device and removes
-  the active row; local bookmarks and the server copy stay, and dormant rows are
-  untouched.
+  and so do the other rows. It also drops that key's safety-master wrap when no
+  other saved sync holds it (dead wraps could crowd out a live one); safety
+  backups and copies of removed syncs stay. `Unlink this device…` unlinks this
+  device and removes the active row; local bookmarks and the server copy stay,
+  and dormant rows are untouched.
 
 ## Android: a sync removed from the service
 

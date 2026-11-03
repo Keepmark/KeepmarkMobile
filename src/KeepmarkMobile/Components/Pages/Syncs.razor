@@ -282,7 +282,7 @@ else
         var name = SavedSyncs.Name(row);
         try
         {
-            if (Session.Registry is not null) await Session.Registry.ForgetAsync(row.Identity);
+            if (Session.Registry is not null) await Session.ForgetSavedSyncAsync(row.Identity);
             Disarm();
             await RefreshAsync();
             _ = Toast.ShowAsync(L.Get(Str.SyncsForgot, name));

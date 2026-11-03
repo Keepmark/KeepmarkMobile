@@ -482,6 +482,11 @@ instead of a file (documented, no snapshot required).
   ("locked to another sync (…)" naming the origin sync) instead of guessing.
 - Unlink drops the key from memory; deterministic PBKDF2 means re-linking
   the same sync+password re-opens everything with no recovery flow.
+- Forgetting a saved row prunes that key's wrap from the master when no saved
+  sync (active included) still holds it (`SafetyMaster.PruneWraps`), so dead
+  wraps cannot crowd out a live key in the max-3 list. The last wrap is never
+  dropped and no backup is deleted: all files share the Master Key, which any
+  remaining wrap opens. Copies of removed syncs use the device key instead.
 
 ### 4. Restore semantics
 

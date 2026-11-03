@@ -28,6 +28,19 @@ public static class SafetyMaster
 
     public static SafetyMasterWrap? FindWrap(IEnumerable<SafetyMasterWrap> wraps, string kekId) =>
         wraps.FirstOrDefault(w => w.KekId == kekId);
+
+    /// <summary>Drops wraps whose key-encrypting key this device no longer holds
+    /// (a forgotten or unlinked sync), so they cannot crowd out a live key in
+    /// the small wrap list. Backups are encrypted once under the Master Key, so
+    /// they stay readable through any remaining wrap. Never returns an empty
+    /// list: the master must stay readable by at least one known key.</summary>
+    public static List<SafetyMasterWrap> PruneWraps(
+        IEnumerable<SafetyMasterWrap> wraps, ISet<string> liveKekIds)
+    {
+        var all = wraps.ToList();
+        var kept = all.Where(w => liveKekIds.Contains(w.KekId)).ToList();
+        return kept.Count == 0 ? all : kept;
+    }
 }
 
 /// <summary>Master Key record: the plaintext key never touches disk, only
