@@ -10,6 +10,7 @@ namespace KeepmarkMobile;
 [Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true, LaunchMode = LaunchMode.SingleTop, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode | ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
 public class MainActivity : MauiAppCompatActivity
 {
+    private BackCallback? _back;
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -37,9 +38,9 @@ public class MainActivity : MauiAppCompatActivity
 
         ApplySafeAreaPadding();
 
-        // Registered after base.OnCreate, so it runs before MAUI's own
-        // callback (dispatcher is LIFO) and before BlazorWebView's GoBack.
-        OnBackPressedDispatcher.AddCallback(this, new BackCallback(this));
+        // The back callback is registered later, in EnsureBackCallback: the
+        // dispatcher is LIFO and MAUI's BlazorWebView adds its own when its
+        // handler is created, which happens after OnCreate.
 
         Platforms.Android.ShareIntake.Handle(Intent);
 
@@ -51,6 +52,53 @@ public class MainActivity : MauiAppCompatActivity
     {
         base.OnNewIntent(intent);
         Platforms.Android.ShareIntake.Handle(intent);
+    }
+
+    /// <summary>Registers the back callback once the WebView exists, so it sits
+    /// on top of the dispatcher's LIFO stack: MAUI's BlazorWebView adds its own
+    /// callback when its handler is created (after OnCreate) and would
+    /// otherwise consume the key first, navigating history instead of closing
+    /// the open sheet.</summary>
+    private void EnsureBackCallback()
+    {
+        if (_back is not null) return;
+        if (Window?.DecorView is null || FindWebView(Window.DecorView) is null) return;
+        _back = new BackCallback(this);
+        OnBackPressedDispatcher.AddCallback(this, _back);
+    }
+
+    protected override void OnPostResume()
+    {
+        base.OnPostResume();
+        EnsureBackCallback();
+    }
+
+    public override void OnWindowFocusChanged(bool hasFocus)
+    {
+        base.OnWindowFocusChanged(hasFocus);
+        if (hasFocus) EnsureBackCallback();
+    }
+
+    private static global::Android.Webkit.WebView? FindWebView(global::Android.Views.View? view)
+    {
+        if (view is global::Android.Webkit.WebView web)
+        {
+            return web;
+        }
+
+        if (view is ViewGroup group)
+        {
+            for (var i = 0; i < group.ChildCount; i++)
+            {
+                var found = FindWebView(group.GetChildAt(i));
+                if (found is not null)
+                {
+                    return found;
+                }
+            }
+        }
+
+        return null;
     }
 
     protected override void OnPause()
@@ -136,28 +184,6 @@ public class MainActivity : MauiAppCompatActivity
             {
                 Enabled = true;
             }
-        }
-
-        private static global::Android.Webkit.WebView? FindWebView(global::Android.Views.View? view)
-        {
-            if (view is global::Android.Webkit.WebView web)
-            {
-                return web;
-            }
-
-            if (view is ViewGroup group)
-            {
-                for (var i = 0; i < group.ChildCount; i++)
-                {
-                    var found = FindWebView(group.GetChildAt(i));
-                    if (found is not null)
-                    {
-                        return found;
-                    }
-                }
-            }
-
-            return null;
         }
     }
 
