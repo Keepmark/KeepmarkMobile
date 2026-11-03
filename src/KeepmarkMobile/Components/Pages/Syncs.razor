@@ -49,7 +49,9 @@ else
         var key = SavedSyncs.Key(row.ServiceUrl, row.SyncId);
         var name = SavedSyncs.Name(row);
         var isActive = IsActive(row);
-        <div class="card mb-2" @key="key">
+        @* One row task at a time: the row that owns the open confirmation or
+           rename editor is outlined, every other row is disabled below. *@
+        <div class="card mb-2 @(OwnsTask(key) ? "border-primary" : "")" @key="key">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div>
@@ -106,23 +108,23 @@ else
                     <div class="mt-2 d-flex flex-wrap gap-2">
                         @if (!isActive)
                         {
-                            <button class="btn btn-primary btn-sm" @onclick="() => Arm(key, armActivate: true)" disabled="@busy"
+                            <button class="btn btn-primary btn-sm" @onclick="() => Arm(key, armActivate: true)" disabled="@RowBusy(key)"
                                     title="@L.Get(Str.SyncsActivateHint, name)">
                                 @L.Get(Str.SyncsActivate)
                             </button>
                         }
-                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => StartRename(key, row)" disabled="@busy">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => StartRename(key, row)" disabled="@RowBusy(key)">
                             @L.Get(Str.SyncsRename)
                         </button>
                         @if (isActive)
                         {
-                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armUnlink: true)" disabled="@busy">
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armUnlink: true)" disabled="@RowBusy(key)">
                                 @L.Get(Str.ConnUnlinkBtn)
                             </button>
                         }
                         else
                         {
-                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armForget: true)" disabled="@busy">
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armForget: true)" disabled="@RowBusy(key)">
                                 @L.Get(Str.SyncsForget)
                             </button>
                         }
@@ -138,7 +140,9 @@ else
     }
 
     <div class="d-grid mt-3">
-        <button class="btn btn-outline-primary" @onclick="StartAdding" disabled="@busy">@L.Get(Str.ConnAddSyncBtn)</button>
+        @* Starting the add flow closes any row task first: the list is replaced
+           by the panel, so the two operations never share the screen. *@
+        <button class="btn btn-outline-primary" @onclick="StartAdding" disabled="@(busy || RowTaskOpen)">@L.Get(Str.ConnAddSyncBtn)</button>
     </div>
     @if (active is not null)
     {
@@ -159,6 +163,23 @@ else
     private string? armedForgetKey;
     private string? armedUnlinkKey;
     private string? renamingKey;
+
+    /// <summary>A row task is open (a confirmation or the rename editor) or
+    /// running: the page must show one operation only, so every other row
+    /// action stays disabled until it ends or is cancelled.</summary>
+    private bool RowTaskOpen =>
+        busy || renamingKey is not null || armedActivateKey is not null
+        || armedForgetKey is not null || armedUnlinkKey is not null;
+
+    /// <summary>True for the row that owns the open task (it gets the
+    /// outline; its action buttons are replaced by the confirmation).</summary>
+    private bool OwnsTask(string key) =>
+        renamingKey == key || armedActivateKey == key
+        || armedForgetKey == key || armedUnlinkKey == key;
+
+    /// <summary>Disabled state of a row action: running, or another row is
+    /// in the middle of a task. The owner keeps its own controls live.</summary>
+    private bool RowBusy(string key) => busy || (RowTaskOpen && !OwnsTask(key));
     private string renameText = string.Empty;
     private bool nameTaken;
 

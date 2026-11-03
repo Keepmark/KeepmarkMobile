@@ -1088,7 +1088,9 @@ disposal. Shared components are presentation-only: data in through
   Select/Cancel; MovePicker adds recent destinations and inline folder creation.
 - `DirectionPicker` implements the fixed direction order and consequence text.
 - `ConfirmBlock` is the single inline confirmation block (armed boolean, action
-  + Cancel, busy state).
+  + Cancel, busy state). In `Syncs.razor` a row task (confirmation or rename
+  editor) disables every other row and the `+ Add a sync` button, and the
+  owning row is outlined: one operation at a time, on its own surface.
 - `StepMessage` renders one success/error line next to its action cluster.
 - `SyncGoneNotice` is the 401 notice used by Home and Status.
 
