@@ -130,6 +130,40 @@ public sealed partial class SyncEngine(
     public event Action? DataChanged;
     public event Action<SyncStatus>? StatusChanged;
 
+    /// <summary>A sync that last answered 401 (not found on its service),
+    /// surfaced so the UI can offer Retry / Unlink and keep a copy / Dismiss.
+    /// Nothing is ever unlinked, snapshotted or retried automatically.</summary>
+    private sealed record GoneSync(SyncCredentials Creds, bool Dismissed);
+
+    private volatile GoneSync? _gone;
+
+    /// <summary>The sync the last 401 was about, unless the user dismissed the
+    /// notice. Cleared by any successful sync and by every credential switch.</summary>
+    public SyncCredentials? GoneCredentials => _gone is { Dismissed: false } g ? g.Creds : null;
+
+    /// <summary>"Cancel" on the notice: a repeated 401 of the same sync stays
+    /// quiet until an explicit retry or a different sync.</summary>
+    public void DismissGoneSync()
+    {
+        if (_gone is { } g)
+        {
+            _gone = g with { Dismissed = true };
+        }
+    }
+
+    public void ClearGoneSync() => _gone = null;
+
+    private void NoteSyncGone(SyncCredentials c)
+    {
+        if (_gone is { } g &&
+            SavedSyncs.Key(g.Creds.ServiceUrl, g.Creds.Id) == SavedSyncs.Key(c.ServiceUrl, c.Id))
+        {
+            return;
+        }
+
+        _gone = new GoneSync(c, false);
+    }
+
     /// <summary>Explicit push base: the remote state just read by the caller
     /// (conflict resolution, link upload, password change). Pushing on the
     /// stored mirror base there would always 409.</summary>
@@ -233,6 +267,7 @@ public sealed partial class SyncEngine(
         }
         catch (XbsException ex)
         {
+            if (ex is SyncNotFoundException) NoteSyncGone(c);
             SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
             throw;
         }
@@ -470,6 +505,7 @@ public sealed partial class SyncEngine(
         }
         catch (XbsException ex)
         {
+            if (ex is SyncNotFoundException) NoteSyncGone(c);
             SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
             throw;
         }
@@ -546,6 +582,11 @@ public sealed partial class SyncEngine(
             }
             catch (XbsException ex)
             {
+                if (ex is SyncNotFoundException && await creds.GetAsync().ConfigureAwait(false) is { } gone)
+                {
+                    NoteSyncGone(gone);
+                }
+
                 SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
                 throw new InvalidOperationException(str.Get(Str.ErrSavedNotSaved), ex);
             }
@@ -593,6 +634,14 @@ public sealed partial class SyncEngine(
         {
             SetStatus(SyncStatus.Offline);
             return;
+        }
+        catch (SyncNotFoundException)
+        {
+            // The very first call a sync makes: the sync no longer exists.
+            // Hand it to the notice; nothing is changed automatically.
+            NoteSyncGone(c);
+            SetStatus(SyncStatus.Error);
+            throw;
         }
 
         var local = await store.GetMetaAsync(BookmarkStore.MetaLastUpdated).ConfigureAwait(false);
@@ -1247,6 +1296,9 @@ public sealed partial class SyncEngine(
 
     private void SetStatus(SyncStatus s)
     {
+        // Any successful (idle) reconciliation clears the 401 notice; a new
+        // failure of another sync creates a fresh one.
+        if (s == SyncStatus.Idle) _gone = null;
         Status = s;
         StatusChanged?.Invoke(s);
     }

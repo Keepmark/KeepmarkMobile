@@ -173,6 +173,16 @@ public sealed class XbsSession : IAsyncDisposable
             return;
         }
 
+        await SaveActiveSideAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Fail-closed save of the active side (no-op when unlinked) plus
+    /// its registry row refresh. Used before any operation that replaces the
+    /// local tree or starts a new sync.</summary>
+    public async Task SaveActiveSideAsync(CancellationToken ct = default)
+    {
+        var current = await _creds.GetAsync().ConfigureAwait(false);
+        if (current is null) return;
         await Engine!.PersistActiveSideAsync(ct).ConfigureAwait(false);
         if (Registry is not null)
         {
@@ -293,6 +303,7 @@ public sealed class XbsSession : IAsyncDisposable
             await Registry.ForgetAsync(new SavedSyncIdentity(current.ServiceUrl, current.Id)).ConfigureAwait(false);
         }
 
+        Engine?.ClearGoneSync();
         _log.Info("session", "Device unlinked");
     }
 
@@ -359,6 +370,9 @@ public sealed class XbsSession : IAsyncDisposable
 
     public async Task CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
+        // Creating replaces the local tree: save the sync in use first (no-op
+        // when unlinked), then snapshot what is about to be destroyed.
+        await SaveActiveSideAsync(ct).ConfigureAwait(false);
         // Safety backup: the local tree is about to be replaced by an empty sync.
         var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
@@ -371,6 +385,7 @@ public sealed class XbsSession : IAsyncDisposable
         await Store.ReplaceAllAsync([], string.Empty, created.LastUpdated!, created.Version).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
         RememberService(serviceUrl);
+        await RememberActiveAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version)).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
     }
 
@@ -378,6 +393,9 @@ public sealed class XbsSession : IAsyncDisposable
     /// Returns the new sync ID (the caller must show it: it is not derivable later).</summary>
     public async Task<string> CreateNewSyncWithUploadAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
+        // The local tree becomes a new sync: save the sync in use first (no-op
+        // when unlinked), so a failed push cannot silently lose its edits.
+        await SaveActiveSideAsync(ct).ConfigureAwait(false);
         var created = await ApiFor(serviceUrl).CreateSyncAsync(ct).ConfigureAwait(false);
         var derived = _crypto.DeriveKey(password, created.Id!, created.Version);
         var candidate = new SyncCredentials(created.Id!, serviceUrl, derived, created.Version);
@@ -387,6 +405,7 @@ public sealed class XbsSession : IAsyncDisposable
         await Engine!.LinkUploadAsync(candidate, roots, created.LastUpdated!, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
         RememberService(serviceUrl);
+        await RememberActiveAsync(candidate).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
         _log.Info("session", "Created new sync and uploaded local tree");
         return created.Id!;
@@ -429,6 +448,11 @@ public sealed class XbsSession : IAsyncDisposable
         var newDerived = _crypto.DeriveKey(newPassword, creds.Id, version);
         await Engine!.ChangeKeyAsync(newDerived, SafetyOperations.ChangePassword, ct).ConfigureAwait(false);
         _log.Info("session", "Password changed, blob re-encrypted");
+        if (Registry is not null)
+        {
+            await Registry.SyncActiveAsync(await _creds.GetAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        }
+
         await RotateSafetyMasterBestEffortAsync(currentDerived, newDerived).ConfigureAwait(false);
     }
 
@@ -927,6 +951,194 @@ public sealed class XbsSession : IAsyncDisposable
         await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
             SafetyOperations.DuplicatesCleanup, CountBackupNodes(roots)).ConfigureAwait(false);
         return await Engine.DeleteBookmarksByNodeIdsAsync(ids, ct).ConfigureAwait(false);
+    }
+
+    // ---- copies of removed syncs (service answered 401) -------------------
+
+    /// <summary>Unlink after the service said the sync does not exist: the
+    /// local tree is the only copy left, so it is verified and kept first.
+    /// The copy is content-addressed (same tree = same file) and never pruned
+    /// automatically. Nothing else is deleted.</summary>
+    public async Task<(string? FileName, int Items)> UnlinkGoneSyncAsync(CancellationToken ct = default)
+    {
+        var copy = await KeepRemovedSyncCopyAsync(ct).ConfigureAwait(false);
+        await UnlinkAsync().ConfigureAwait(false);
+        Engine?.ClearGoneSync();
+        _log.Info("session", copy is null
+            ? "Removed sync unlinked (nothing local to keep)"
+            : $"Removed sync unlinked; local copy kept ({copy.Value.Items} items)");
+        return (copy?.FileName, copy?.Items ?? 0);
+    }
+
+    /// <summary>Manual retry from the 401 notice: clears the dismissal so a
+    /// repeated 401 brings the notice back.</summary>
+    public async Task RetrySyncAsync(CancellationToken ct = default)
+    {
+        Engine?.ClearGoneSync();
+        if (Engine is not null)
+        {
+            await Engine.ForceSyncAsync(ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Keeps an encrypted copy of the local tree before the sync that
+    /// held it disappears. Verified end to end (validate → write → decrypt and
+    /// hash again), deduplicated by tree hash, never auto-pruned.</summary>
+    public async Task<(string FileName, int Items)?> KeepRemovedSyncCopyAsync(CancellationToken ct = default)
+    {
+        var creds = await _creds.GetAsync().ConfigureAwait(false);
+        if (creds is null)
+        {
+            return null;
+        }
+
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+        var count = BackupGuard.ValidateTree(roots);
+        if (count == 0)
+        {
+            return null;
+        }
+
+        var treeJson = System.Text.Json.JsonSerializer.Serialize(roots);
+        var hash = RemovedSyncCopies.Hash(treeJson);
+        var dir = RemovedDir();
+        Directory.CreateDirectory(dir);
+        var name = RemovedSyncCopies.FileName(hash);
+        var path = Path.Combine(dir, name);
+        if (File.Exists(path) && await MatchesRemovedCopyAsync(path, hash).ConfigureAwait(false))
+        {
+            _log.Info("session", "Removed-sync copy already kept (same tree)");
+            return (name, count);
+        }
+
+        var envelope = new RemovedSyncCopyFile(
+            RemovedSyncCopies.CurrentFormat, DateTime.UtcNow, creds.ServiceUrl, count, roots);
+        var payload = _crypto.Encrypt(
+            System.Text.Json.JsonSerializer.Serialize(envelope), await CopyKeyAsync().ConfigureAwait(false));
+        var tmp = path + ".tmp";
+        await File.WriteAllTextAsync(tmp, payload, ct).ConfigureAwait(false);
+        if (!await MatchesRemovedCopyAsync(tmp, hash).ConfigureAwait(false))
+        {
+            File.Delete(tmp);
+            throw new InvalidOperationException(_str.Get(Str.ErrCopyVerify));
+        }
+
+        File.Move(tmp, path, overwrite: true);
+        _log.Info("session", $"Kept local copy of removed sync ({count} items)");
+        return (name, count);
+    }
+
+    public async Task<List<RemovedSyncCopyInfo>> ListRemovedSyncCopiesAsync()
+    {
+        var dir = RemovedDir();
+        if (!Directory.Exists(dir))
+        {
+            return [];
+        }
+
+        var list = new List<RemovedSyncCopyInfo>();
+        foreach (var file in new DirectoryInfo(dir).GetFiles(RemovedSyncCopies.FilePrefix + "*.json"))
+        {
+            try
+            {
+                var copy = await OpenRemovedCopyAsync(file.FullName).ConfigureAwait(false);
+                list.Add(new RemovedSyncCopyInfo(file.Name, copy.CreatedAtUtc, copy.Items, copy.ServiceUrl));
+            }
+            catch (Exception ex)
+            {
+                // A damaged or foreign file is skipped, never listed or deleted.
+                _log.Warn("session", $"Removed-sync copy unreadable ({file.Name}): {ex.GetType().Name}");
+            }
+        }
+
+        return list.OrderByDescending(c => c.CreatedAtUtc).ToList();
+    }
+
+    /// <summary>Puts a kept copy back as this device's tree, with the usual
+    /// pre-restore safety backup. While linked it is pushed at the next sync.</summary>
+    public async Task<int> RestoreRemovedSyncCopyAsync(string fileName, CancellationToken ct = default)
+    {
+        var path = RemovedPath(fileName);
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupPruned));
+        }
+
+        var copy = await OpenRemovedCopyAsync(path).ConfigureAwait(false);
+        var count = BackupGuard.ValidateTree(copy.Tree);
+        var (local, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(local),
+            SafetyOperations.PreRestore, CountBackupNodes(local)).ConfigureAwait(false);
+        await Store.RestoreLocalAsync(copy.Tree).ConfigureAwait(false);
+        _log.Info("session", $"Restored removed-sync copy ({count} items)");
+        return count;
+    }
+
+    /// <summary>Deletes one kept copy (confirmed in UI). Never automatic.</summary>
+    public Task DeleteRemovedSyncCopyAsync(string fileName)
+    {
+        var path = RemovedPath(fileName);
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupPruned));
+        }
+
+        File.Delete(path);
+        _log.Info("session", "Removed-sync copy deleted");
+        return Task.CompletedTask;
+    }
+
+    private async Task<RemovedSyncCopyFile> OpenRemovedCopyAsync(string path, CancellationToken ct = default)
+    {
+        var raw = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+        var json = _crypto.Decrypt(raw, await CopyKeyAsync().ConfigureAwait(false));
+        var copy = System.Text.Json.JsonSerializer.Deserialize<RemovedSyncCopyFile>(json);
+        if (copy is null || copy.Format != RemovedSyncCopies.CurrentFormat || copy.Tree is null)
+        {
+            throw new InvalidOperationException(_str.Get(Str.ErrBackupUnreadable));
+        }
+
+        return copy;
+    }
+
+    private async Task<bool> MatchesRemovedCopyAsync(string path, string expectedHash)
+    {
+        try
+        {
+            var copy = await OpenRemovedCopyAsync(path).ConfigureAwait(false);
+            return RemovedSyncCopies.Hash(System.Text.Json.JsonSerializer.Serialize(copy.Tree)) == expectedHash;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Device key that never rotates on unlink, so a kept copy stays
+    /// openable on this device after the sync credentials are gone.</summary>
+    private async Task<string> CopyKeyAsync() =>
+        Convert.ToBase64String(Convert.FromHexString(await _creds.GetOrCreateDbKeyAsync().ConfigureAwait(false)));
+
+    private static string RemovedDir() =>
+        Path.Combine(FileSystem.AppDataDirectory, RemovedSyncCopies.DirName);
+
+    private static string RemovedPath(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || fileName != Path.GetFileName(fileName) ||
+            !fileName.StartsWith(RemovedSyncCopies.FilePrefix, StringComparison.Ordinal) ||
+            !fileName.EndsWith(".json", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(Loc.Get(Str.ErrUnknownBackup));
+        }
+
+        var dir = RemovedDir();
+        var full = Path.GetFullPath(Path.Combine(dir, fileName));
+        if (full != Path.Combine(dir, fileName))
+        {
+            throw new InvalidOperationException(Loc.Get(Str.ErrUnknownBackup));
+        }
+
+        return full;
     }
 
     private static string SafetyDir() =>

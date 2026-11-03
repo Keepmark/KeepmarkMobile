@@ -57,6 +57,7 @@ Words come from `UI-TERMS.md`. Platform differences are listed at the end.
 | Add a sync while linked (Android Connect) | yes | Connect → `+ Add a sync` → existing sync (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict or a failed push cancels the switch and changes nothing. |
 | Syncs: Activate | no | Syncs → `Activate` → device unlock when app lock is set → apply | none beyond the unlock | Read-only check first (service/version gate + download + decrypt with the key saved in the row); only then the active sync is saved and this device adopts the chosen sync's copy behind a `switch-take-remote` safety backup. The sync you leave stays in the list. The sync's own long password is never asked. |
 | Syncs: Forget / Unlink | no | Syncs → `Forget…` (inactive) / `Unlink this device…` (active) | always | Inactive: only the row is forgotten; bookmarks and the server copy stay. Active: this device is unlinked and the row disappears; the bookmarks stay and the sync plus its server copy stay for the other devices. Dormant rows survive an unlink. |
+| Removed sync (Android) | shown while linked | Home/Status notice → `Try again` / `Unlink and keep a copy…` / `Cancel` | always for the unlink; retry and cancel execute at once | The service no longer has this sync (expiry or another device's deletion). Nothing happens automatically and local bookmarks are untouched. Unlinking keeps a verified local copy of this device's tree, restorable from Backup → `Copies of removed syncs` and never pruned; `Cancel` keeps the notice quiet for that sync until an explicit retry. |
 | Duplicates | no | mark → `Delete marked` (per URL or all marked) | always | One copy of each URL always stays. While linked the deletion is uploaded and the other devices get it at their next sync. A safety backup is saved first. |
 
 ## Step and button visibility
@@ -176,7 +177,22 @@ host.
   the active row; local bookmarks and the server copy stay, and dormant rows are
   untouched.
 
+## Android: a sync removed from the service
 
+- A 401 (sync not found: expired after inactivity, or deleted by someone) never
+  triggers a local action. Home and Status show one notice with `Try again`,
+  `Unlink and keep a copy…` and `Cancel`; nothing is unlinked, uploaded or
+  snapshotted until the user chooses.
+- `Unlink and keep a copy…` asks once, then keeps a verified local copy of this
+  device's tree before the credentials go: encrypted with the device key, in
+  `Backup` → `Copies of removed syncs`, with `Restore` and `Delete`. The copy is
+  never pruned automatically and identical trees are stored once.
+- `Cancel` only silences the notice for that sync: it comes back after an
+  explicit `Try again` or for a different sync, never on its own.
+- The unlink keeps local bookmarks on screen and removes only the row of that
+  sync; dormant rows are untouched.
+
+## Android: organize multiple items
 
 Hold a bookmark/folder, or choose Select from its action menu. Tap more rows or All;
 folders include their contents. Move opens the destination tree: choose a folder or

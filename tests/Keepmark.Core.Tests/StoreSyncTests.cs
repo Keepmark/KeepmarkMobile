@@ -23,6 +23,8 @@ sealed class FakeApi : IXSyncApiClient
     /// device "pushed" in between (remote moves on each loss).</summary>
     public int ConflictsBeforeSuccess { get; set; }
     public bool Offline { get; set; }
+    /// <summary>Service answered 401: the sync no longer exists.</summary>
+    public bool NotFound { get; set; }
     public int PushCount { get; private set; }
     public string? LastPushed { get; private set; }
     public bool V12 { get; set; }
@@ -69,8 +71,15 @@ sealed class FakeApi : IXSyncApiClient
             Meta = new SyncMeta { Revision = Revision, Hash = current },
         });
     }
-    public Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default) =>
-        Task.FromResult(new LastUpdatedResponse { LastUpdated = LastUpdated });
+    public Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default)
+    {
+        if (NotFound)
+        {
+            throw new SyncNotFoundException("not found");
+        }
+
+        return Task.FromResult(new LastUpdatedResponse { LastUpdated = LastUpdated });
+    }
     public Task<VersionResponse> GetVersionAsync(string syncId, CancellationToken ct = default) =>
         Task.FromResult(new VersionResponse { Version = Version });
     public Task<UpdateBookmarksResponse> UpdateBookmarksAsync(

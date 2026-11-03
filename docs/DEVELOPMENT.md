@@ -277,6 +277,14 @@ PERFORMANCE.md are independent of this engine migration.
   linked (only the "existing sync" path, QR included): it runs the same
   fail-closed activation with the usual direction choice and keeps the
   previous sync in the list.
+- `src/Keepmark.Core/Safety/RemovedSyncCopies.cs` — copies of syncs the
+  service no longer knows (401). The engine never acts on a 401
+  (`SyncEngine.GoneCredentials`: notice, dismiss, retry explicit only); the
+  user chooses Retry / Unlink and keep a copy / Cancel. The copy is the local
+  tree, encrypted with the device DB key (which survives an unlink), stored in
+  `removed-syncs/removed-<sha256>.json`, verified after writing (decrypt and
+  re-hash) and deduplicated by tree hash. Never pruned automatically; listed
+  with restore/delete in Backup.
 - `src/Keepmark.Core/Sync/BookmarkMerge.cs` — pure two-way union by URL
   (remote kept, local adopted with fresh ids, separators unioned, deletes
   never merged) + `NormalizeUrl`; same function serves preview and apply.
@@ -292,8 +300,11 @@ PERFORMANCE.md are independent of this engine migration.
   export/import (`/backup`).
 - `src/KeepmarkMobile/Components/Pages/` — `Home` (explore, sheets, share
   consume, sort, status bar), `Duplicates`, `Connect` (link/create + unlink),
-  `Backup` (encrypted export/import), `SwitchService` (move-service wizard),
-  `Settings`, `Status`, `About`.
+  `Syncs` (saved-sync list, activate/rename/forget/unlink),
+  `Backup` (encrypted export/import, safety backups, copies of removed syncs),
+  `SwitchService` (move-service wizard), `Settings`, `Status`, `About`.
+- `Components/SyncGoneNotice.razor` — the 401 notice reused on Home and Status
+  (Retry / Unlink and keep a copy / Cancel; nothing automatic).
 - `Components/{BookmarkSheet,BookmarkRow,FolderPicker}.razor` — edit dialog,
   row rendering, collapsible tree with Select/Cancel protocol.
 - `Platforms/Android/ShareActivity.cs` — translucent, owns SEND filter,

@@ -25,6 +25,7 @@ else if (engineStatus == Core.Sync.SyncStatus.NoCredentials)
 }
 else
 {
+    <SyncGoneNotice />
     <h1 class="visually-hidden">@L.Get(Str.NavGroupBookmarks)</h1>
     <header class="xbs-pagebar @(searchOpen ? "searching" : string.Empty)">
         @if (selection.Active)

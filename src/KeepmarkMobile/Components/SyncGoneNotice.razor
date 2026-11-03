@@ -1,0 +1,154 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
+@inject KeepmarkMobile.Services.XbsSession Session
+@inject KeepmarkMobile.Services.ToastState Toast
+@using Keepmark.Core.Errors
+@using Keepmark.Core.Sync
+
+@* The service answered 401: the sync this device points at no longer exists.
+   Nothing happens automatically (docs/WORKFLOWS.md): the user retries, unlinks
+   keeping a verified local copy, or dismisses the notice. A repeated 401 of the
+   same sync stays quiet until an explicit retry or a different sync. *@
+@if (gone is not null)
+{
+    <section class="alert alert-warning" role="alert" aria-label="@L.Get(Str.GoneTitle)">
+        <h2 class="h6">@L.Get(Str.GoneTitle)</h2>
+        <p class="mb-2">@L.Get(Str.GoneBody)</p>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-primary" @onclick="Retry" disabled="@busy">@L.Get(Str.GoneRetry)</button>
+            <button class="btn btn-outline-danger" @onclick="ArmUnlink" disabled="@busy">@L.Get(Str.GoneUnlinkKeep)</button>
+            <button class="btn btn-secondary" @onclick="Dismiss" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+        </div>
+        @if (armed)
+        {
+            <ConfirmBlock Message="@L.Get(Str.GoneUnlinkMessage)"
+                          Implication="@L.Get(Str.GoneUnlinkImplication)"
+                          ConfirmLabel="@L.Get(Str.CommonYesUnlinkKeep)"
+                          Busy="@busy"
+                          OnConfirm="UnlinkAndKeep"
+                          OnCancel="Disarm" />
+        }
+        <StepMessage Text="@error" Error="true" />
+    </section>
+}
+
+@code {
+    private SyncCredentials? gone;
+    private bool armed;
+    private bool busy;
+    private string error = string.Empty;
+    private bool subscribed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await WaitForSessionAsync(Session);
+        if (IsDisposed) return;
+        if (Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged += OnStatus;
+            subscribed = true;
+        }
+
+        gone = Session.Engine?.GoneCredentials;
+    }
+
+    private void OnStatus(SyncStatus _) => InvokeAsync(() =>
+    {
+        if (IsDisposed) return;
+        gone = Session.Engine?.GoneCredentials;
+        StateHasChanged();
+    });
+
+    private void ArmUnlink()
+    {
+        if (busy) return;
+        armed = true;
+        error = string.Empty;
+    }
+
+    private void Disarm() => armed = false;
+
+    /// <summary>"Cancel": the same sync's repeated 401 stays quiet until an
+    /// explicit retry or a different sync.</summary>
+    private void Dismiss()
+    {
+        if (busy) return;
+        armed = false;
+        error = string.Empty;
+        Session.Engine?.DismissGoneSync();
+        gone = Session.Engine?.GoneCredentials;
+    }
+
+    private async Task Retry()
+    {
+        if (busy) return;
+        busy = true;
+        armed = false;
+        error = string.Empty;
+        Session.Log.Info("sync", "Removed-sync notice: retry");
+        try
+        {
+            await Session.RetrySyncAsync();
+        }
+        catch (OperationCanceledException) when (IsDisposed)
+        {
+            return;
+        }
+        catch (SyncNotFoundException)
+        {
+            // Still gone: the notice's own text already says what happened.
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+            gone = Session.Engine?.GoneCredentials;
+            if (!IsDisposed) StateHasChanged();
+        }
+    }
+
+    /// <summary>Unlink and keep a copy: the local tree is the only copy of this
+    /// sync left, so it is saved and verified before the credentials go.</summary>
+    private async Task UnlinkAndKeep()
+    {
+        if (busy) return;
+        busy = true;
+        error = string.Empty;
+        Session.Log.Info("sync", "Removed-sync notice: unlink and keep a copy");
+        try
+        {
+            var (_, items) = await Session.UnlinkGoneSyncAsync();
+            armed = false;
+            gone = null;
+            _ = Toast.ShowAsync(items > 0
+                ? Loc.Plural(Str.GoneUnlinkedCopy, items)
+                : L.Get(Str.GoneUnlinkedNoCopy));
+        }
+        catch (OperationCanceledException) when (IsDisposed)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+            if (!IsDisposed) StateHasChanged();
+        }
+    }
+
+    public override void Dispose()
+    {
+        if (subscribed && Session.Engine is not null)
+        {
+            Session.Engine.StatusChanged -= OnStatus;
+        }
+
+        subscribed = false;
+        base.Dispose();
+    }
+}

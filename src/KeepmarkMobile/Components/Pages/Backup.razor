@@ -95,6 +95,47 @@ else
             </div>
         }
     </div>
+
+    <div class="mb-3">
+        <h4>@L.Get(Str.BackupRemovedH)</h4>
+        <p class="text-muted">@L.Get(Str.BackupRemovedIntro)</p>
+        <button class="btn btn-outline-secondary mb-2" @onclick="RefreshRemoved" disabled="@busy">@L.Get(Str.BackupRefreshList)</button>
+        <StepMessage Text="@removedMessage" Error="removedError" />
+        @if (removedList.Count == 0)
+        {
+            <p class="text-muted">@L.Get(Str.BackupRemovedEmpty)</p>
+        }
+        @foreach (var rc in removedList)
+        {
+            <div class="card mb-2" @key="rc.FileName">
+                <div class="card-body py-2">
+                    <div><strong>@RemovedSyncCopies.Describe(rc)</strong></div>
+                    <div class="form-text">@rc.FileName</div>
+                    @if (armedRemovedRestore == rc.FileName)
+                    {
+                        <ConfirmBlock Message="@L.Get(Str.BackupRemovedRestoreMessage)"
+                                      Implication="@L.Get(Str.BackupRemovedRestoreImplication)"
+                                      ConfirmLabel="@L.Get(Str.CommonYesRestore)" Busy="busy"
+                                      OnConfirm="ExecuteRemovedRestore" OnCancel="() => armedRemovedRestore = null" />
+                    }
+                    else if (armedRemovedDelete == rc.FileName)
+                    {
+                        <ConfirmBlock Message="@L.Get(Str.BackupRemovedDeleteMessage)"
+                                      Implication="@L.Get(Str.BackupRemovedDeleteImplication)"
+                                      ConfirmLabel="@L.Get(Str.CommonYesDelete)" Busy="busy"
+                                      OnConfirm="ExecuteRemovedDelete" OnCancel="() => armedRemovedDelete = null" />
+                    }
+                    else
+                    {
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-outline-primary" @onclick="() => { armedRemovedRestore = rc.FileName; armedRemovedDelete = null; }" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
+                            <button class="btn btn-outline-danger" @onclick="() => { armedRemovedDelete = rc.FileName; armedRemovedRestore = null; }" disabled="@busy">@L.Get(Str.CommonDelete)</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
 }
 
 @code {
@@ -116,6 +157,11 @@ else
     private string? armedDelete;
     private string safetyMessage = string.Empty;
     private bool safetyError;
+    private List<RemovedSyncCopyInfo> removedList = new();
+    private string? armedRemovedRestore;
+    private string? armedRemovedDelete;
+    private string removedMessage = string.Empty;
+    private bool removedError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -123,6 +169,7 @@ else
 
         await RefreshCountsAsync();
         await RefreshSafetyListAsync();
+        await RefreshRemovedListAsync();
     }
 
     private async Task RefreshCountsAsync()
@@ -144,6 +191,18 @@ else
         catch
         {
             safetyList = new();
+        }
+    }
+
+    private async Task RefreshRemovedListAsync()
+    {
+        try
+        {
+            removedList = await Session.ListRemovedSyncCopiesAsync();
+        }
+        catch
+        {
+            removedList = new();
         }
     }
 
@@ -354,6 +413,65 @@ else
         }
 
         (safetyMessage, safetyError) = (text, error);
+    }
+
+    private async Task RefreshRemoved()
+    {
+        await RunAsync(async () =>
+        {
+            await RefreshRemovedListAsync();
+            return string.Empty;
+        }, ReportRemovedToast);
+    }
+
+    private async Task ExecuteRemovedRestore()
+    {
+        await RunAsync(async () =>
+        {
+            if (armedRemovedRestore is null)
+            {
+                throw new InvalidOperationException(L.Get(Str.BackupPickFirst));
+            }
+
+            var restored = await Session.RestoreRemovedSyncCopyAsync(armedRemovedRestore);
+            armedRemovedRestore = null;
+            await RefreshCountsAsync();
+            await RefreshSafetyListAsync();
+            await RefreshRemovedListAsync();
+            return WorkflowTexts.SafetyRestoreDone(restored);
+        }, ReportRemovedToast);
+        armedRemovedRestore = null;
+    }
+
+    private async Task ExecuteRemovedDelete()
+    {
+        await RunAsync(async () =>
+        {
+            if (armedRemovedDelete is null)
+            {
+                throw new InvalidOperationException(L.Get(Str.BackupPickFirst));
+            }
+
+            await Session.DeleteRemovedSyncCopyAsync(armedRemovedDelete);
+            armedRemovedDelete = null;
+            await RefreshRemovedListAsync();
+            return L.Get(Str.BackupRemovedDeleted);
+        }, ReportRemovedToast);
+        armedRemovedDelete = null;
+    }
+
+    /// <summary>Copies of removed syncs: a refresh says nothing, so only the
+    /// outcome of a restore or a delete is announced.</summary>
+    private void ReportRemovedToast(string text, bool error)
+    {
+        if (!error && !string.IsNullOrEmpty(text))
+        {
+            (removedMessage, removedError) = (string.Empty, false);
+            _ = Toast.ShowAsync(text);
+            return;
+        }
+
+        (removedMessage, removedError) = (text, error);
     }
 
     /// <summary>Runs one action and reports into that action's own message

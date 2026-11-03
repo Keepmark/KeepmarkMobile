@@ -810,6 +810,27 @@ public static partial class Str
     public const string DupDeleteN = nameof(DupDeleteN);
     /// <summary>Base for Loc.Plural (DupBarMarked_one / DupBarMarked_other).</summary>
     public const string DupBarMarked = nameof(DupBarMarked);
+    public const string GoneTitle = nameof(GoneTitle);
+    public const string GoneBody = nameof(GoneBody);
+    public const string GoneRetry = nameof(GoneRetry);
+    public const string GoneUnlinkKeep = nameof(GoneUnlinkKeep);
+    public const string GoneUnlinkMessage = nameof(GoneUnlinkMessage);
+    public const string GoneUnlinkImplication = nameof(GoneUnlinkImplication);
+    public const string CommonYesUnlinkKeep = nameof(CommonYesUnlinkKeep);
+    public const string GoneUnlinkedCopy_one = nameof(GoneUnlinkedCopy_one);
+    public const string GoneUnlinkedCopy_other = nameof(GoneUnlinkedCopy_other);
+    public const string GoneUnlinkedNoCopy = nameof(GoneUnlinkedNoCopy);
+    public const string BackupRemovedH = nameof(BackupRemovedH);
+    public const string BackupRemovedIntro = nameof(BackupRemovedIntro);
+    public const string BackupRemovedEmpty = nameof(BackupRemovedEmpty);
+    public const string BackupRemovedRestoreMessage = nameof(BackupRemovedRestoreMessage);
+    public const string BackupRemovedRestoreImplication = nameof(BackupRemovedRestoreImplication);
+    public const string BackupRemovedDeleteMessage = nameof(BackupRemovedDeleteMessage);
+    public const string BackupRemovedDeleteImplication = nameof(BackupRemovedDeleteImplication);
+    public const string BackupRemovedDeleted = nameof(BackupRemovedDeleted);
+    public const string ErrCopyVerify = nameof(ErrCopyVerify);
     /// <summary>Base for Loc.Plural (SafetyItems_one / SafetyItems_other).</summary>
     public const string SafetyItems = nameof(SafetyItems);
+    /// <summary>Base for Loc.Plural (GoneUnlinkedCopy_one / GoneUnlinkedCopy_other).</summary>
+    public const string GoneUnlinkedCopy = nameof(GoneUnlinkedCopy);
 }
