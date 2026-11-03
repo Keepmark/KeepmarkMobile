@@ -916,6 +916,11 @@ Every destructive operation snapshots the side it is about to destroy **before**
 mutating anything, and tells the user where the snapshot went. No snapshot → the
 operation must not run (fail closed, error surfaced).
 
+Only steps that cannot be taken back cost a snapshot. A single edit, a move and
+a move's undo are reversible in place (Undo, or the receipt's own restore), so
+they write none: a snapshot there would only duplicate the tree the user still
+has.
+
 | Flow | Destroyed side | Snapshot | Operation tag |
 |---|---|---|---|
 | Connect → Download | local tree | local JSON | `take-remote` |
@@ -929,9 +934,7 @@ operation must not run (fail closed, error surfaced).
 | Import encrypted backup | local tree | local JSON | `import-backup` |
 | Change password | server copy | remote JSON | `change-password` |
 | Duplicates bulk delete | local tree | pre-delete JSON | `duplicates-cleanup` |
-| Selection → Move | local tree | pre-move JSON | `selection-move` |
 | Selection → Delete | local tree | pre-delete JSON | `selection-delete` |
-| Selection → Undo | local tree | pre-undo JSON | `selection-move-undo` |
 | Safety restore | current state | local or server state | `pre-restore` |
 | Conflict → Download | local tree | local JSON | `conflict-pull` |
 | Conflict → Upload | server copy | remote JSON | `conflict-push` |
@@ -942,6 +945,8 @@ undo instead of a file (documented; no snapshot required).
 
 `switch-upload` and `switch-merge` remain known labels for old backups only.
 `switch-take-remote` is live because activation still writes it.
+`selection-move` and `selection-move-undo` are the same: older versions wrote
+them, so `SafetyOperations.Describe` still names them; nothing writes them now.
 
 ### 11.2 Files, naming, manifest
 

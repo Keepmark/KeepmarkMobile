@@ -27,6 +27,8 @@ public static class SafetyOperations
     public const string ConflictPush = "conflict-push";
     public const string ConflictMerge = "conflict-merge";
     public const string SelectionDelete = "selection-delete";
+    // Retired: moves and their undo are reversible and no longer snapshot.
+    // Kept so the backups written by older versions keep their label.
     public const string SelectionMove = "selection-move";
     public const string SelectionUndo = "selection-move-undo";
     public const string Legacy = "legacy";

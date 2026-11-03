@@ -81,7 +81,7 @@ public sealed class SelectionBatchTests : IAsyncLifetime
         Assert.Empty((await store.LoadMirrorAsync(false)).Roots);
     }
     [Fact]
-    public async Task BackupFailureAndConcurrentEditDuringBackupFailClosed()
+    public async Task MoveTakesNoBackupAndDeleteFailsClosedOnBackupErrorOrConcurrentEdit()
     {
         var logger = new InMemoryLogger();
         var engine = new Keepmark.Core.Sync.SyncEngine(_ => new FakeApi(),
@@ -89,19 +89,30 @@ public sealed class SelectionBatchTests : IAsyncLifetime
             store, new MemCreds(new SyncCredentials("sync", "https://example.test",
                 Convert.ToBase64String(new byte[32]), "1.8.0")),
             new Keepmark.Core.I18n.XbsLocalizer(), logger) { Mode = Keepmark.Core.Sync.SyncMode.Manual };
-        var plan = await store.PlanSelectionAsync([2], store.ContentVersion, 5, true);
+        // A move is reversible through Undo, so it never writes a snapshot.
+        int backups = 0;
+        var move = await store.PlanSelectionAsync([2], store.ContentVersion, 5, true);
+        var moved = await engine.ApplySelectionAsync(move, false,
+            (_, _) => { backups++; return Task.CompletedTask; });
+        Assert.True(moved.Applied);
+        Assert.Equal(0, backups);
+        // A delete snapshots first and fails closed when the snapshot fails.
         var version = store.ContentVersion;
-        await Assert.ThrowsAsync<IOException>(() => engine.ApplySelectionAsync(plan, false,
+        var delete = await store.PlanSelectionAsync([2], store.ContentVersion);
+        await Assert.ThrowsAsync<IOException>(() => engine.ApplySelectionAsync(delete, true,
             (_, _) => throw new IOException("Backup failed")));
         Assert.Equal(version, store.ContentVersion);
-        await Assert.ThrowsAsync<SelectionChangedException>(() => engine.ApplySelectionAsync(plan, false,
-            async (_, _) => await store.UpdateNodeByNodeIdAsync(6,"Changed","https://three",null,null)));
-        Assert.Empty((await store.LoadMirrorAsync(false)).Roots.Single(x=>x.Id==5).Children!);
-        int backups=0;
-        var fresh=await store.PlanSelectionAsync([2,6],store.ContentVersion,5,true);
-        var result=await engine.ApplySelectionAsync(fresh,false,(_,operation)=>
-        { Assert.Equal("selection-move",operation); backups++; return Task.CompletedTask; });
-        Assert.True(result.Applied); Assert.Equal(1,backups);
+        await Assert.ThrowsAsync<SelectionChangedException>(() => engine.ApplySelectionAsync(delete, true,
+            async (_, _) => await store.UpdateNodeByNodeIdAsync(6, "Changed", "https://three", null, null)));
+        // The concurrent edit changed the tree, but the plan never applied:
+        // node 2 is still where the move put it.
+        Assert.Equal(2, (await store.LoadMirrorAsync(false)).Roots.Single(x => x.Id == 5).Children!.Single().Id);
+        int deletes = 0;
+        var fresh = await store.PlanSelectionAsync([2], store.ContentVersion);
+        var result = await engine.ApplySelectionAsync(fresh, true, (_, operation) =>
+        { Assert.Equal("selection-delete", operation); deletes++; return Task.CompletedTask; });
+        Assert.True(result.Applied);
+        Assert.Equal(1, deletes);
     }
 
     [Fact]

@@ -214,7 +214,7 @@ public partial class Home
         if (batchUndo is null || Session.Engine is null || batchUndoBusy) return;
         batchUndoBusy = true; batchUndoExpiry?.Cancel();
         var receipt = batchUndo; batchUndo = null;
-        try { await Session.Engine.UndoSelectionMoveAsync(receipt, Session.SaveSelectionBackupAsync, Lifetime); await RefreshAsync(); }
+        try { await Session.Engine.UndoSelectionMoveAsync(receipt, Lifetime); await RefreshAsync(); }
         catch (Exception ex)
         {
             Session.Log.Warn("ui", $"Selection undo failed: {ex.GetType().Name}");

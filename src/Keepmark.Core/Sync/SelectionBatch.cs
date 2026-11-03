@@ -1,6 +1,7 @@
 using Keepmark.Core.Logging;
 using Keepmark.Core.Data;
 using Keepmark.Core.Models;
+using Keepmark.Core.Safety;
 namespace Keepmark.Core.Sync;
 public sealed partial class SyncEngine
 {
@@ -20,7 +21,9 @@ public sealed partial class SyncEngine
             if (validated.IsNoOp) return new(validated, false);
             var mirror = await store.LoadMirrorAsync(false).ConfigureAwait(false);
             if (store.ContentVersion != plan.ContentVersion) throw new SelectionChangedException();
-            await backup(mirror.Roots, delete ? "selection-delete" : "selection-move").ConfigureAwait(false);
+            // Only a deletion is unrecoverable. A move has Undo for a few
+            // seconds, so it does not spend a safety backup.
+            if (delete) await backup(mirror.Roots, SafetyOperations.SelectionDelete).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             var result = await store.ApplySelectionAsync(validated, ct).ConfigureAwait(false);
             try { await NotifyLocalEditAsync(CancellationToken.None).ConfigureAwait(false); }
@@ -33,19 +36,16 @@ public sealed partial class SyncEngine
         }
         finally { _gate.Release(); }
     }
-    public async Task UndoSelectionMoveAsync(SelectionMoveReceipt receipt,
-        Func<List<BookmarkNode>, string, Task> backup, CancellationToken ct = default)
+    /// <summary>Puts a batch move back where it was. No safety backup: the undo
+    /// itself restores the previous tree, so a snapshot would only duplicate it.</summary>
+    public async Task UndoSelectionMoveAsync(SelectionMoveReceipt receipt, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(backup);
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             await RequireCredsAsync().ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             if (_resolvingConflict || store.ContentVersion != receipt.ContentVersion) throw new SelectionChangedException();
-            var mirror = await store.LoadMirrorAsync(false).ConfigureAwait(false);
-            if (store.ContentVersion != receipt.ContentVersion) throw new SelectionChangedException();
-            await backup(mirror.Roots, "selection-move-undo").ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             await store.UndoSelectionMoveAsync(receipt, ct).ConfigureAwait(false);
             try { await NotifyLocalEditAsync(CancellationToken.None).ConfigureAwait(false); }
