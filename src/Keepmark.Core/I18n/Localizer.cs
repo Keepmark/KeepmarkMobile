@@ -2,10 +2,10 @@ using System.Globalization;
 
 namespace Keepmark.Core.I18n;
 
-// UI strings in en/it/fr/es/de/ja/pt/ru/zh (pt = Brazilian Portuguese,
+// UI strings in en/it/fr/es/de/ja/pt/ro/ru/zh (pt = Brazilian Portuguese,
 // zh = Simplified Chinese; zh-TW/zh-HK fall back to it). The active language is CurrentUICulture
 // (set at app start from the Language setting). Log strings stay English.
-// Every key lives in Str.g.cs and in the nine Catalog.*.cs files.
+// Every key lives in Str.g.cs and in the ten Catalog.*.cs files.
 
 public interface IXbsLocalizer
 {
@@ -14,7 +14,7 @@ public interface IXbsLocalizer
 
 public static class Langs
 {
-    public static readonly string[] Supported = ["en", "it", "fr", "es", "de", "ja", "pt", "ru", "zh"];
+    public static readonly string[] Supported = ["en", "it", "fr", "es", "de", "ja", "pt", "ro", "ru", "zh"];
 
     /// <summary>An explicit supported setting wins; otherwise the base language
     /// of <paramref name="systemCulture"/> if supported, else "en".</summary>
@@ -89,6 +89,7 @@ internal static partial class Catalogs
         ["de"] = De,
         ["ja"] = Ja,
         ["pt"] = Pt,
+        ["ro"] = Ro,
         ["ru"] = Ru,
         ["zh"] = Zh,
     };

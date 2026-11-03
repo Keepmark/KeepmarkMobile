@@ -7,7 +7,7 @@ namespace Keepmark.Core.Tests;
 
 public class I18nTests
 {
-    private static readonly string[] Others = ["it", "fr", "es", "de", "ja", "pt", "ru", "zh"];
+    private static readonly string[] Others = ["it", "fr", "es", "de", "ja", "pt", "ro", "ru", "zh"];
 
     private static IEnumerable<string> Placeholders(string s) =>
         Regex.Matches(s, @"\{\d+\}").Select(m => m.Value).OrderBy(x => x, StringComparer.Ordinal);
@@ -65,6 +65,7 @@ public class I18nTests
     [InlineData("system", "it-CH", "it")]
     [InlineData("system", "pt-BR", "pt")]
     [InlineData("system", "ja-JP", "ja")]
+    [InlineData("system", "ro-RO", "ro")]
     [InlineData("system", "ru-RU", "ru")]
     [InlineData("system", "zh-TW", "zh")]
     [InlineData("system", "ko-KR", "en")]

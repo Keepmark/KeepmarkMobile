@@ -264,7 +264,7 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
 - `src/Keepmark.Core/Workflow/` — `ServiceCatalog`, `ServiceCheckState`,
   `ConnectQrPayload`/`ConnectQrCandidateState`, `WorkflowRules`,
   `WorkflowTexts`.
-- `src/Keepmark.Core/I18n/` — `Str.g.cs`, nine `Catalog.*.cs`, `Localizer`,
+- `src/Keepmark.Core/I18n/` — `Str.g.cs`, ten `Catalog.*.cs`, `Localizer`,
   `RelativeTime`.
 - `src/Keepmark.Core/Security/` — `LockPolicy` (relock presets).
 - `src/KeepmarkMobile/Services/` — session, settings, secure store, language,
@@ -1216,14 +1216,16 @@ lock 2000.
 ## 14. Internationalization
 
 - Every UI text is a key in `src/Keepmark.Core/I18n/Str.g.cs`
-  (`public const string`) and a value in **all nine** `Catalog.*.cs` files.
+  (`public const string`) and a value in **all ten** `Catalog.*.cs` files.
   `I18nTests` enforces key parity and that every `Str` constant exists in
   English.
 - `Loc.Get(key, args)` uses `Langs.Current` (explicit setting, else
   `CurrentUICulture`, else `en`) and falls back to English, then the key.
 - Plurals: `baseKey_one` / `baseKey_other`; French and Brazilian Portuguese use
-  `_one` for 0; Japanese and Chinese use the same text for both; Russian
-  `_other` is count-neutral ("Закладок: {count}") so 2–4 and 5+ read correctly.
+  `_one` for 0; Japanese and Chinese use the same text for both; Romanian and
+  Russian `_other` is the plain plural (`Intl.PluralRules` maps Romanian `few`
+  there), Russian written count-neutral ("Закладок: {count}") so 2–4 and 5+ read
+  correctly.
 - `LanguageService.Apply` sets culture and the process-wide `Langs.Forced`,
   bumps `Version` and raises `Changed`; the layout re-renders on that version so
   a language change needs no restart. If the language matches the system
@@ -1240,7 +1242,7 @@ lock 2000.
 
 ## 15. Tests and verification
 
-### Automated suites (390 tests, no device)
+### Automated suites (391 tests, no device)
 
 | Suite | Proves |
 |---|---|
@@ -1259,7 +1261,7 @@ lock 2000.
 | `ServiceCatalogTests` | catalog, normalization, saved metadata, stale checks |
 | `ConnectQrTests` | strict parser, bounded sizes, candidate generations/timeout/consume |
 | `WorkflowTests` | URL split/compose, password rules, short IDs, cleartext detection |
-| `I18nTests` | nine-language parity and `Str` coverage |
+| `I18nTests` | ten-language parity and `Str` coverage |
 | `SelectionBatchTests`, `SelectionControllerTests` | batch validation, undo, version gates |
 | `ForegroundPollerTests`, `LockPolicyTests` | lifecycle/cancellation, relock presets |
 | `VersionCompareTests` | numeric dotted compare |
