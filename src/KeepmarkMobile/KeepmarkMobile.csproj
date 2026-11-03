@@ -109,8 +109,9 @@
       <ProjectReference Include="..\Keepmark.Core\Keepmark.Core.csproj" />
     </ItemGroup>
 
-    <!-- Network security config: Debug also allows plain HTTP to localhost
-         (local KeepmarkApi via adb reverse); Release stays HTTPS-only. -->
+    <!-- Network security config: Debug allows plain HTTP only to localhost
+         (local KeepmarkApi via adb reverse); Release permits cleartext globally
+         for self-hosted HTTP services, which the editor warns about. -->
     <ItemGroup Condition="'$(Configuration)' == 'Debug'">
         <AndroidResource Include="Platforms\Android\NetworkSecurity\debug.xml" Link="Resources\xml\network_security_config.xml" />
     </ItemGroup>

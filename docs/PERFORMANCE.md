@@ -1,34 +1,64 @@
-# Performance and battery work — v1.0.191 (192)
+# Performance and battery
 
-## Behavior
+Living document: behavior that is designed to stay cheap, the desktop
+measurements behind the big optimizations, and what still needs a device. The
+numbers are desktop indicators, not Android predictions: cold startup, WebView
+frame time, memory residency and idle battery must be measured on hardware.
+
+## Sync behavior
 
 The local library paints before derived Home data is loaded. Startup shares a
 single initialization task rather than 100 ms readiness polling. Component
-lifetimes prevent late subscriptions/timers. Auto synchronization runs only while
-the window is visible; its first check is delayed 500 ms to let local content
-paint, subsequent checks wait 15 minutes after completion. Manual mode has no poll.
-Stopping cancels reads/retries; a PUT already sent by the edit worker may complete
-to preserve its outcome. Dirty edits remain durable and are checked on resume.
+lifetimes prevent late subscriptions and timers. Auto synchronization runs only
+while the window is visible; its first check is delayed 500 ms to let local
+content paint, and later checks wait 15 minutes **after the previous tick
+completes** (fixed delay, no catch-up storm). Manual mode has no poll.
 
-One 250 ms edit worker coalesces uploads and checks dirty/conflict/mode/visibility
-under the engine gate. Successful ordinary uploads update metadata/blob and only
-changed normalized descriptions, without deleting/reinserting every Item or
-rebuilding FTS. Pull/restore retain their full-replacement semantics.
+Stopping cancels reads and retries; a PUT already sent by the edit worker may
+complete, to preserve its outcome. Dirty edits remain durable and are checked on
+resume. One 250 ms edit worker coalesces uploads and checks
+dirty/conflict/mode/visibility under the engine gate.
+
+Successful ordinary uploads update metadata/blob and only changed normalized
+descriptions, without deleting and reinserting every Item or rebuilding FTS.
+Pull and restore keep their full-replacement semantics. Creating, activating or
+adding a saved sync costs one `/info` probe, one full GET and one decrypt — no
+background polling of dormant rows happens at all.
+
+## Store and rendering
 
 Store lookups use indexes, targeted ancestor queries and bulk reads/deletes.
-Folder counts aggregate bottom-up; depth/path memoization avoids repeated ancestor
-walks. Home reuses derived data until the store generation, culture, pins or
-settings change. The duplicate badge uses SQL aggregation. Uniform collapsed folder lists above 100 rows virtualize; duplicate groups use
-pages of 100 rows; separators or expanded Home rows use the ordinary renderer; explicit Home location
-jumps render the complete target folder until navigation to retain scroll anchors.
+Folder counts aggregate bottom-up; depth/path memoization avoids repeated
+ancestor walks. Home reuses derived data until the store generation, culture,
+pins or settings change. The duplicate badge uses SQL aggregation.
 
-Compression history uses bounded hash chains (~384 KiB maximum tables),
+Uniform collapsed folder lists above 100 rows virtualize; duplicate groups use
+pages of 100 rows; separators or expanded Home rows use the ordinary renderer;
+explicit Home location jumps render the complete target folder until navigation,
+to retain scroll anchors. Selection resolves ids and validates inside the same
+transaction as the mutation, so a batch never walks the tree twice.
+
+Safety backups are written once per destructive operation (plus one index
+rewrite), never per item; removed-sync copies are content-addressed, so keeping
+the same tree twice costs no extra file.
+
+## Memory bounds
+
+Compression history uses bounded hash chains (~384 KiB maximum tables);
 decompression sizes and validates output before allocating. Backup envelopes are
 deserialized from a stream; base64 validation does not allocate decoded copies.
-Limits: backup file 50 MiB; decoded encrypted envelope 50 MiB; plaintext UTF-8
-256 MiB; HTTP JSON 72 MiB (fits base64 envelope plus metadata); error body 64 KiB.
+
+| Limit | Value |
+|---|---|
+| Backup file | 50 MiB |
+| Decoded encrypted envelope | 50 MiB |
+| Plaintext UTF-8 tree | 256 MiB |
+| HTTP JSON response | 72 MiB (fits base64 envelope plus metadata) |
+| HTTP error body | 64 KiB |
+
 These are device resource limits, independent of a server's configured quota.
-Extremely compressible payloads may be rejected even below the encrypted-file cap.
+Extremely compressible payloads may be rejected even below the encrypted-file
+cap.
 
 ## Desktop measurements
 
@@ -37,8 +67,7 @@ Intel i5-1145G7, Release .NET 10, SQLCipher. Synthetic valid tree has 32 folder
 levels, bookmarks distributed between those levels, and 50 matching search rows.
 One warmup then five samples, reported median; full GC outside measured intervals.
 Allocations use `GC.GetTotalAllocatedBytes`, so background runtime activity may
-contribute. These are not Android startup, frame-time, memory-residency or battery
-measurements.
+contribute.
 
 | Nodes | Operation | Baseline ms | Optimized ms |
 |---:|---|---:|---:|
@@ -67,7 +96,7 @@ ASCII reduced allocations from 15,525,360 to 1,441,760 bytes and elapsed time fr
 281.1 to 43.6 ms, with identical output length. Treat timing as illustrative,
 not an Android prediction or a statistical benchmark.
 
-## Repeat verification
+## Verification
 
 Run from `KeepmarkMobile/`:
 
@@ -81,36 +110,30 @@ dotnet run --project tools/Keepmark.Benchmarks -c Release -- --interop /tmp/keep
 node scripts/verify-csharp-blobs.cjs /tmp/keepmark-csharp-blobs.json
 ```
 
-Existing JSON vectors test Node→C#. The reverse script decrypts C# output with
-Node AES-GCM and lzutf8@0.6.0 for ASCII, Unicode, bookmarks and a larger payload.
-New regression tests cover worker coalescing, edits during upload, stable RowIds,
-SQL query plans, targeted paths, deep aggregation/delete/undo, lifecycle
-cancellation/drain, response limits/timeouts and bounded compression allocation.
+The Core suite is **370 tests**. Existing JSON vectors test Node→C#. The reverse
+script decrypts C# output with Node AES-GCM and lzutf8@0.6.0 for ASCII, Unicode,
+bookmarks and a larger payload. Regression tests cover worker coalescing, edits
+during upload, stable RowIds, SQL query plans, targeted paths, deep
+aggregation/delete/undo, lifecycle cancellation/drain, response limits/timeouts
+and bounded compression allocation.
 
-Android Debug and Release builds validate compilation/packaging. Device validation
-is still required for actual cold startup, WebView virtualization with variable
-row heights, scroll anchors, 30–60 minute idle battery usage and long navigation
-memory stability. No device access is required for the automated checks above.
+## Still requires a device
 
-## NuGet follow-up — v1.0.192 (193)
+Android Debug and Release builds validate compilation and packaging. Real
+validation is still needed for cold startup, WebView virtualization with variable
+row heights, scroll anchors, 30–60 minute idle battery usage, long navigation
+memory stability, QR camera behavior and TalkBack/font scaling. No device access
+is required for the automated checks above.
 
-Updated the compatible SQLCipher bundle from 2.1.10 to 2.1.11 and switched the
-ORM package to `sqlite-net-sqlcipher` 1.9.172, removing the unused unencrypted
-SQLite native packages. This is dependency cleanup, not an additional measured
-performance gain. Linux runtime probes report SQLCipher 4.5.2 / SQLite 3.39.2 in
-both bundle versions; a maintained native engine remains separate work.
-The old encrypted fixture is covered by the 253-test Core suite. See DEVELOPMENT.md.
+## Native SQLCipher engine
 
+`sqlite-net-base` 1.9.172 plus `SQLitePCLRaw.provider.sqlcipher` 3.0.5 load
+SQLCipher 4.19.0 / SQLite 3.53.4. Android uses the official Community 4.19.1 AAR
+binaries; Linux tests compile the same engine source with OpenSSL. The old
+encrypted fixture still opens, and a separate bidirectional compatibility probe
+verifies new-engine writes with the old 4.5.2 engine and vice versa, including
+FTS. The Release APK is checked for exact official hashes, both ABIs and 16 KiB
+ELF/ZIP alignment. No database conversion is needed.
 
-## Native engine follow-up — v1.0.193 (194)
-
-The earlier NuGet-only update above is superseded by a native migration:
-`sqlite-net-base` 1.9.172 + `SQLitePCLRaw.provider.sqlcipher` 3.0.5 load
-SQLCipher 4.19.0 / SQLite 3.53.4. Android uses official Community 4.19.1 AAR
-binaries; Linux tests compile the same engine source with OpenSSL.
-The Core suite has 254 passing tests. A separate bidirectional compatibility
-probe verifies new-engine writes with the old 4.5.2 engine and vice versa,
-including FTS. The final Release APK is checked for exact official hashes,
-both ABIs and 16 KiB ELF/ZIP alignment. No database conversion is needed.
-This engine upgrade has no claimed measured speed or battery improvement;
-the desktop performance measurements above describe the code optimizations.
+This engine upgrade makes no claimed speed or battery improvement; the desktop
+measurements above describe the code optimizations.

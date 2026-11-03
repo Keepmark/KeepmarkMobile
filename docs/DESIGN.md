@@ -167,6 +167,45 @@ Altri colori d'uso (non ridefinire a caso):
 - La card è `role="status"` + `aria-live="polite"`; una verifica fallita la rende
   `role="alert"` (regola 6: ogni cluster d'azione ha la sua superficie d'errore).
 
+### Avviso HTTP in chiaro (`.km-cleartext`)
+
+- Quando nel selettore del servizio si sceglie `http://`, la riga schema+host
+  mostra subito sotto un avviso ambra (`--km-gold`, icona triangolo 16px +
+  frase `Str.ServiceCleartext`), `role="status"`.
+- Sta **dove si fa la scelta**, prima di `Check service`: non è un `alert`, non
+  blocca, non è un dialog e non ripete lo stato della verifica. Con `https`
+  sparisce, senza lasciare spazio vuoto.
+- Il colore non porta mai il messaggio da solo (icona + testo). Stessa regola
+  per il QR: un payload `http://` oggi mostra l'URL senza questo avviso
+  (gap noto, vedi DEVELOPMENT.md).
+
+### Pagina Syncs (`/syncs`)
+
+- Una card Bootstrap per ogni sync salvato: nome (etichetta o host) in grassetto,
+  riga secondaria `host · ID <short>`, badge `Active` / `Inactive` con testo
+  (mai solo colore). La riga attiva non offre `Activate`.
+- Azioni come bottoni `btn-sm` nella card, non in un menu: `Activate` (solo
+  inattive), `Rename`, `Forget…` (solo inattive), `Unlink this device…` (solo
+  attiva). `Rename` apre un campo inline (max 40 caratteri) con errore nome già
+  usato accanto e Save/Cancel.
+- Ogni conferma usa lo stesso `ConfirmBlock` inline della card; attivazione e
+  unlink mostrano le conseguenze, `Forget` no. Lista vuota = invito a Connect.
+- L'attivazione con app lock passata non ha UI propria: apre il prompt di
+  sistema e, se annullato, lascia un errore inline nella card senza cambiare
+  nulla.
+
+### Avviso sync rimosso (`SyncGoneNotice`)
+
+- È una `section.alert.alert-warning` con `role="alert"`, titolo `h2.h6`, corpo
+  esplicativo e tre azioni affiancate (`Try again`, `Unlink and keep a copy…`,
+  `Cancel`); la conferma dell'unlink è un `ConfirmBlock` dentro la stessa
+  sezione, con il suo errore adiacente.
+- Compare sopra il contenuto di Home e di Status; non è un dialog, non blocca la
+  pagina e non nasconde il resto. Non intraprende nulla da solo: l'unica azione
+  automatica è mostrare l'avviso.
+- A conferma avvenuta mostra un toast con il numero di elementi salvati (o che
+  non c'era nulla da salvare) e sparisce.
+
 ### Sheet editor (`.xbs-sheet`)
 
 - Bottom sheet: backdrop `rgba(0,0,0,0.45)` che chiude al tap, card fino a
@@ -252,6 +291,16 @@ Altri colori d'uso (non ridefinire a caso):
 - **Password**: mai persistite; ogni step azzera i segreti che ha consumato
   quando riesce, mai su errore (servono al retry); minimo 8 caratteri per
   ogni password nuova (`WorkflowRules`).
+- **Multi-sync**: un solo sync attivo possiede l'albero locale; le altre righe
+  sono credenziali dormienti. L'attivazione è read-only finché il target non è
+  provato, poi salva il lato attivo fail-closed, prende un backup
+  `switch-take-remote` e adotta. Con app lock attivo il prompt di sistema è
+  obbligatorio prima di qualsiasi scrittura. Un 401 non sblocca, non carica e
+  non fa snapshot: solo l'avviso con tre scelte.
+- **URL del servizio**: `https` è il default e l'unica scelta del catalogo;
+  `http` è una scelta esplicita dell'utente, accompagnata dall'avviso
+  `.km-cleartext` e mai silenziosa. Non confrontare mai letterali di schema:
+  usare `WorkflowRules`.
 - **Stabilità dati**: i `RowId` cambiano a ogni sync — rifare il rebase su
   `NodeId` stabile (crumbs, expanded, pinned) prima di ridisegnare.
 
@@ -292,4 +341,8 @@ Altri colori d'uso (non ridefinire a caso):
 7. Toast fire-and-forget, mai bloccanti; errori vicino all'azione?
 8. Password azzerate, conferme distruttive armate, dirty-check dove si edita?
 9. Solo classi `xbs-*` per il custom, Bootstrap per form/chrome?
-10. Build Android verde + prova su dispositivo prima del commit.
+10. Se si tocca un URL di servizio, l'avviso HTTP compare dove si sceglie e
+    sparisce con `https` (mai solo colore)?
+11. Se si tocca il multi-sync, l'attivazione resta read-only finché il target
+    non è provato, salva fail-closed e lascia il sync precedente in lista?
+12. Build Android verde + prova su dispositivo prima del commit.

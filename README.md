@@ -35,12 +35,17 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 
 - **Private by design.** PBKDF2-SHA256 and AES-GCM on the device. The local
   database is encrypted too (SQLCipher), and the credentials live in the
-  Android KeyStore. No telemetry, HTTPS-only services.
+  Android KeyStore. No telemetry. HTTPS is the default; a self-hosted plain
+  HTTP service is an explicit choice and Keepmark warns you before using it.
 - **Never lose a bookmark silently.** Conflicts are never resolved behind
   your back: you pick download, upload or merge, and merge shows a preview
   first. Before overwriting your bookmarks Keepmark saves an encrypted
   safety backup you can restore; single deletes have Undo, and deleting a
   folder with 5 or more bookmarks asks first.
+- **A sync that disappears does not take your bookmarks with it.** If the
+  service no longer has your sync (it expired, or another device deleted it),
+  Keepmark says so instead of guessing. You can unlink and keep a verified
+  local copy, then restore it whenever you want.
 - **Link a browser with one scan.** The Keepmark browser manager shows a
   connection QR: scan it here and the service, sync ID and password arrive
   together, ready to review. Nothing from the QR is saved, and an unused scan
@@ -66,12 +71,13 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 | **Safety backups** | Automatic snapshot before every overwrite (newest 5 kept) |
 | **Duplicates** | Find links saved more than once; one copy of each always survives |
 | **Syncs** | Keep several syncs on the phone with one active at a time; activate another, rename or forget it, or add an existing sync with its ID and password (or the browser QR) |
+| **Removed syncs** | If a sync disappears from its service, unlink and keep a verified local copy you can restore or delete from Backup |
 | **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch, 日本語, Português (Brasil), Русский, 简体中文 |
 | **Logs** | Built-in viewer with share export, sync IDs and secrets redacted |
 
-With **Keepmark Server** you also get revision-based conflict detection,
-faster "nothing changed" checks and the option to delete your sync from the
-server. On other services Keepmark falls back automatically.
+With **Keepmark Server** you also get revision-based conflict detection and
+faster "nothing changed" checks. On other services Keepmark falls back
+automatically.
 
 ## Link a browser by QR
 
@@ -84,7 +90,7 @@ enough:
 2. On Android, open **Connect → Link an existing sync → Scan QR from browser**
    (the same QR button is in **Connect → + Add a sync** when a sync is already
    active).
-3. Check the service and abbreviated sync ID the review shows, tap **Connect**,
+3. Check the service and abbreviated sync ID the review shows, tap **Continue**,
    wait for verification, then choose the direction.
 
 The QR contains your credentials, password included, so show it only to your own
@@ -130,6 +136,8 @@ wording, so moving between them feels the same.
 ## Compatibility
 
 - **Services:** any xBrowserSync API service, version 1.1.9 or later.
+  HTTPS is the default; a self-hosted service over plain HTTP is an explicit,
+  warned choice.
 - **Clients:** syncs open both ways with the official xBrowserSync apps
   (sync format 1.8.0). The encryption is verified byte for byte against the
   official implementation.

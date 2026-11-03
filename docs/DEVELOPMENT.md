@@ -1,16 +1,17 @@
-# Keepmark for Android — developer guide
+# Keepmark for Android — technical guide
 
-Technical reference for contributors and reviewers: requirements, build
-environment, architecture, engineering rules and the safety-backup spec.
-Product overview: [README](../README.md).
+Reference for contributors and reviewers: requirements, build environment,
+architecture, data and crypto, sync engine, multi-sync behavior, safety
+backups, UI rules, tests and release steps.
 
-> Behavioral spec for outsourced code verification:
-> [`docs/verification-spec.md`](verification-spec.md) (requirements Rxx —
-> read it before reviewing code).
+Product overview: [README](../README.md). Verification requirements (Rxx, for
+outsourced review): [verification-spec.md](verification-spec.md). User-visible
+workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
+[UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
+Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Talks to any xBrowserSync API **v1.1.13** service (min v1.1.9), plus the
-v1.2 extended contract when advertised. Current version: **v1.0.210 (211)**,
-app id `com.keepmark.mobile`, display name `Keepmark`.
+Current version: **v1.0.210 (211)** · app id `com.keepmark.mobile` · display
+name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
 
@@ -18,127 +19,106 @@ Distribution:
   <https://play.google.com/store/apps/details?id=com.keepmark.mobile>.
   Testers join <https://groups.google.com/g/keepmark-testers>, then opt in at
   <https://play.google.com/apps/testing/com.keepmark.mobile>.
-- GitHub releases (<https://github.com/Keepmark/KeepmarkMobile/releases>,
-  tag `v1.0.N`, `gh release create`): release notes only, **no APK or other
-  assets** (since 2026-10-15). Each release explains how to join the testers
-  group, so new users come in through Play closed testing. The signed AAB
-  for Play is built with the upload key (`~/keys/keepmark-upload.keystore`).
+- GitHub releases
+  (<https://github.com/Keepmark/KeepmarkMobile/releases>, tag `v1.0.N`,
+  `gh release create`): release notes only, **no APK or other assets** (since
+  2026-10-15). Each release explains how to join the testers group, so new
+  users come in through Play closed testing.
+- The signed AAB for Play is built with the upload key
+  (`~/keys/keepmark-upload.keystore`) by `scripts/build-play-aab.sh`.
 
-`KeepmarkMobile/` is its own git repo (root `$HOME/Projects/xBrowserSync`
-is NOT a git repo). Solution `KeepmarkMobile.slnx`:
-`src/KeepmarkMobile` (MAUI Blazor, `net10.0-android` only, min API 29),
-`src/Keepmark.Core` (net10.0, UI-free logic),
-`tests/Keepmark.Core.Tests` (xUnit).
+`KeepmarkMobile/` is its own git repo (the parent `xBrowserSync/` directory is
+not a git repo). Solution `KeepmarkMobile.slnx`:
 
-## Requirements (load-bearing)
+| Project | Target | Role |
+|---|---|---|
+| `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
+| `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (370 tests) |
+| `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
-- Android only, API 29+. UI in en/it/fr/es/de/ja/pt-BR/ru/zh (codes `ja`, `pt`, `ru`, `zh`; zh-TW falls back to Simplified): default follows the Android language, override in Settings → Language (reloads the UI). Logs stay English. Every UI text is a key in `Keepmark.Core/I18n` (`Str` + `Catalog.*.cs`, parity checked by `I18nTests`); wording follows `docs/UI-TERMS.md`.
-- Top-level `[xbs] Menu/Other/Toolbar` containers are shown with localized
-  names (`ItemRow.DisplayTitle` → `ContainerNames`, v1.0.170). Display only:
-  `Title` keeps the synced value every client looks containers up by, and the
-  edit form still shows it raw. Use `DisplayTitle` for any new title/path in the UI.
-- Status shows the server's inactive-sync expiry from the
-  v1.2 `/info` `capabilities.syncExpiryDays` (`0` = kept forever; v1.0.171):
-  `XbsSession.GetSyncExpiryDaysAsync` → `WorkflowRules.DescribeSyncExpiry`.
-  Display only, never stored; the line is hidden on legacy/offline services.
-  `ApiCapabilities.SyncExpiryDays` reads a raw `JsonElement`, so a malformed
-  value is ignored instead of failing the v1.2 probe.
-- Custom service URL is edited as **scheme picker (https default) + host box**
-  in one row (`ServiceSelector.razor`): `WorkflowRules.SplitServiceUrl` /
-  `ComposeServiceUrl` are inverses and the split+composed URL stays the
-  rendered value's single source of truth.
-- **Plain HTTP services are supported** (user decision, v1.0.211+): both
-  schemes pass validation everywhere — `ServiceSelector.Check`,
-  `ConnectQrPayload.TryParse`, `ServiceCatalog.Remember` — so a self-hosted
-  service on the home LAN works in release builds too. Requirements, in this
-  order: `Platforms/Android/NetworkSecurity/release.xml` sets
-  `cleartextTrafficPermitted="true"` (Android's format knows host names, not
-  address ranges, so the permission is necessarily global — the narrower
-  rule is the one below); every scheme check goes through
-  `WorkflowRules.HttpScheme` / `PreferredServiceScheme`, never a literal;
-  and `WorkflowRules.IsCleartextServiceUrl` drives the amber warning shown by
-  `ServiceSelector` (`Str.ServiceCleartext`, icon + sentence, `role="status"`)
-  the moment http is chosen, so the user knows the sync ID and the encrypted
-  blob travel unprotected. HTTPS stays the default and the recommended
-  choice, and `http` is never assumed: a host typed without a scheme is
-  composed as `https://`.
-- Sync: auto default + manual mode; **409 conflict never silently merged**;
-  safety backup before overwrites; display sort never affects sync order;
-  background push serializes with pull on the engine gate.
-- Home sections (v1.0.198, canvas "Filo di colore"): Pinned and Recently added
-  keep their hanging ribbon heads (amber / forest green), also when open.
-  Open cards have a 3px side accent (opacity 0% → 100% at midpoint → 0%), starting exactly at the
-  perforated divider (grid body row, following the real header height), without
-  decorations, plus a visible neutral outline. Rows and "See all recent" use the full card width;
-  the previous 44px solid ticket gutter is removed. Light and
-  dark themes have separate neutral panel/border colors. Closed cards retain
-  their original layout: a muted line under the label previews them (canvas
-  "F2"): Pinned lists its titles, Recently added shows
-  the newest title + its relative time. Recently added = newest bookmarks by `dateAdded`,
-  undated ones after them by `NodeId` (`BookmarkStore.GetRecentBookmarksAsync`;
-  ids are MAX+1 on add), with
-  folder path; Settings → Home toggles it and sets 5/10/20; "See all recent"
-  is a virtual crumb level (up to 50).
-- `dateAdded` (v1.0.181): optional Keepmark field on synced nodes, Unix ms
-  like the browser bookmarks API, omitted when null. Stored in
-  `ItemRow.DateAdded`, kept through pull/push/merge/backup; nodes added on the
-  device are stamped with now (`StampMissingDates`, an existing value wins).
-  Legacy xBrowserSync clients may drop it: rows without it show no time.
-  Recent rows show `RelativeTime.Format` after the folder path (just now /
-  N min / N hours same day / yesterday / N days / N weeks / date, calendar
-  steps in the device time zone); the action sheet shows "Added: <date time>
-  · <relative>" (`RelativeTime.Detail`, relative part dropped from 30 days).
-  Home re-renders them every minute while visible.
-- UX: tap opens; long press enters context-local multi-selection with native haptics; ⋮ keeps single-item actions plus Select; swipe right expands details /
-  left collapses, pinned section, clickable breadcrumb, folder-first sorting,
-  share-receiving with prefilled form (incoming shares close single-item action,
-  move and delete panels and replace any open edit form; selection/batch flows defer intake), full-screen folder tree picker with
-  explicit Select/Cancel.
-- Top bar: single fixed bar with brand mark left + hamburger right (fixed, not
-  sticky: the `.sidebar` parent is only as tall as the bar, so sticky had zero
-  room and scrolled away);
-- Renamed v1.0.116: project/namespace/folder `src/Keepmark` → `src/KeepmarkMobile`
-  (`KeepmarkMobile.slnx`, `KeepmarkMobile.csproj`, root namespace `KeepmarkMobile`;
-  the library stays `Keepmark.Core`, aliased as `Core` in `GlobalUsings.cs`), app id
-  `com.keepmark.legacy.keepmark` → `com.keepmark.mobile` (= fresh install, re-link or
-  backup-import; the old app stays installed until removed by hand).
-- Renamed v1.0.76: app/namespace/folders `XBrowserSyncNg` → `Keepmark`, app id
-  `com.keepmark.legacy.keepmark` (= fresh install, old app data stays in the old app —
-  re-link or backup-import). Backup envelope `App` stays `"xBrowserSyncNg"`
-  so old backup files keep importing.
-- v1.0.81 batch: navy top bar/drawer + white mark, item sheet without
-  Show-details and uniform Cancel, verdone `#1F6F5C` accents, Theme
-  System/Light/Dark setting (`xbsSetTheme` + `IStatusBarService` for OS icons),
-  Logs viewer page (`/logs`, filter + share export), search re-runs after
-  store rewrites (no stale counts).
-- v1.0.82: explicit theme text color on native buttons (`.xbs-sort`,
-  `.xbs-crumb`, `.xbs-tree-node`) — the UA button color followed the OS theme
-  and went white-on-white in light mode.
-  brand truncates, `padding-right: 4.5rem` reserves hamburger space
-  (regression seen v1.0.63: title overlapped ☰).
-- v1.0.110 redesign ("Navy ledger", canvas in the Keepmark Redesign artifact):
-  tokens in `app.css` (`--km-*`, light + dark, Bootstrap vars mapped onto
-  them), bundled Figtree (`wwwroot/fonts`, OFL), grouped row lists with
-  `RowTile` (folder glyph / host-hashed initial), segmented sort, floating
-  status pill + extended "Add" FAB that collapses on scroll (`xbs-scrolled`),
-  icon action sheet, side drawer with sync card under the fixed top bar.
-- Security: SQLCipher store, KeyStore creds, no telemetry, HTTPS-only,
-  app lock off by default with mandatory device-PIN confirmation on enable.
-- App lock (Settings → Security, `/settings/security`): relock after
-  Immediately / 1 / 5 / 15 / 30 min / 1 h / 4 h / only on restart (Core
-  `LockPolicy`; old free-form timeouts snap down to the stricter preset).
-  Background time uses `SystemClock.ElapsedRealtime` (wall-clock changes
-  can't bypass it). Locked + foreground opens the system prompt directly;
-  a cancel leaves a manual Unlock button (no auto re-prompt loop).
-  Enable/disable or a longer relock time needs the device PIN.
-- Duplicates cleanup: **one copy of each link must always survive**
-  (structural enforcement, never just a warning). Single By-link view,
-  compact rows, red-✕ marking with locked 🔒 last copy, per-group + global
-  delete with busy guard, swipe-right on dup rows shows details.
-- Every user-facing change bumps version + is committed in `KeepmarkMobile/`
-  and pushed to `origin/master`. Docs-only changes don't bump.
+## Contents
 
-## Environment
+1. [Requirements and compatibility](#1-requirements-and-compatibility)
+2. [Build environment](#2-build-environment)
+3. [Commands](#3-commands)
+4. [Architecture](#4-architecture)
+5. [Local data and secrets](#5-local-data-and-secrets)
+6. [Cryptography](#6-cryptography)
+7. [API client and version negotiation](#7-api-client-and-version-negotiation)
+8. [Sync engine](#8-sync-engine)
+9. [Multiple saved syncs](#9-multiple-saved-syncs)
+10. [Connect](#10-connect)
+11. [Safety backups](#11-safety-backups)
+12. [Encrypted backup export and import](#12-encrypted-backup-export-and-import)
+13. [UI architecture and behavior](#13-ui-architecture-and-behavior)
+14. [Internationalization](#14-internationalization)
+15. [Tests and verification](#15-tests-and-verification)
+16. [Release and distribution](#16-release-and-distribution)
+17. [Engineering rules and gotchas](#17-engineering-rules-and-gotchas)
+18. [License and notices](#18-license-and-notices)
+
+---
+
+## 1. Requirements and compatibility
+
+### Product requirements
+
+- **Android only**, API 29+.
+- **Nine UI languages**: English (source), Italiano, Français, Español, Deutsch,
+  日本語, Português (Brasil), Русский, 简体中文 (internal codes `ja`, `pt`, `ru`,
+  `zh`; `zh-TW`/`zh-HK` fall back to Simplified). Default follows the Android
+  language; override in Settings → Language (the UI reloads without restart).
+  Logs stay English. Every UI string is a `Str` key in
+  `Keepmark.Core/I18n`; parity is enforced by `I18nTests`.
+- **No telemetry**, no accounts, no analytics. The service sees ciphertext only.
+- **Secrets stay out of logs**: no bodies, passwords, derived keys or full sync
+  IDs (truncated by `LogSanitizer` / `WorkflowRules.ShortId`).
+- **Nothing destructive happens silently**: conflict choices are explicit, and
+  every overwrite or deletion snapshots the destroyed side first (§11).
+- **One active sync at a time** per installation, with additional dormant syncs
+  kept only as credentials (§9).
+
+### Service and protocol compatibility
+
+| Item | Value |
+|---|---|
+| Service API | any xBrowserSync-compatible service, min **1.1.9** |
+| Default `Accept-Version` | **1.1.13** (satisfies the server `^1.1.3` route) |
+| Optional extended contract | **1.2.0**, sent only after a capability probe |
+| Sync format advertised | **1.8.0** (`SyncClientVersion`) |
+| Remote sync format accepted | ≤ 1.8.0; newer is refused, never guessed |
+| Crypto | PBKDF2-SHA256/250k + AES-GCM with 16-byte IV + lzutf8 |
+
+Blobs are byte-compatible with the official xBrowserSync clients and with
+Keepmark for browsers in both directions (see §6). The client is end-to-end
+encrypted: service operators cannot read bookmarks.
+
+### Service URL policy (HTTPS default, HTTP explicit)
+
+- The curated catalog only contains HTTPS endpoints and HTTPS is the default.
+- A **custom service may use plain `http://`** (typically a self-hosted
+  instance on the home LAN). The custom editor is one row: scheme picker
+  (`https` default) + host box. `WorkflowRules.SplitServiceUrl` /
+  `ComposeServiceUrl` are inverses, and a host typed without a scheme is
+  always composed as `https://`.
+- Choosing `http` immediately shows the amber warning
+  `Str.ServiceCleartext` in the editor (icon + sentence, `role="status"`): the
+  sync ID (a bearer token) and the encrypted blob travel unprotected.
+- Both schemes pass `ServiceSelector.Check`, `ConnectQrPayload.TryParse` and
+  `ServiceCatalog.Remember`; no code compares scheme literals — always use
+  `WorkflowRules.HttpScheme` / `PreferredServiceScheme`.
+- Android network security: `release.xml` sets
+  `cleartextTrafficPermitted="true"` globally, because Android's format can
+  express host names, not address ranges. `debug.xml` allows cleartext only to
+  `localhost` / `127.0.0.1` (for `adb reverse`), so a plain-HTTP LAN service is
+  testable with a Release build, not with Debug.
+- Privacy is still end-to-end: HTTP exposes the **sync ID** and traffic
+  metadata, not bookmark contents. The UI says exactly that.
+
+---
+
+## 2. Build environment
 
 ```sh
 export ANDROID_HOME=$HOME/android-sdk ANDROID_SDK_ROOT=$HOME/android-sdk
@@ -152,587 +132,1183 @@ Device is WiFi-debug, IP:port rotates. Reconnect:
 adb disconnect; adb connect <device-ip>:<port>; adb devices
 # pairing port ≠ service port: `adb pair IP:PAIRPORT` (code), then `adb connect IP:SVCPORT`
 # mDNS ghosts cause XA0010: `adb disconnect <ghost>` or `adb disconnect` (all), use explicit `-s IP:port`
-# device offline on deploy: disconnect ghost entries, reconnect explicit
 # connection refused: the wireless-debug port rotated — find the open one with
 #   nmap -p 30000-49999 -T4 --open <device-ip>
-# with the "Wireless debugging" screen open, mDNS advertises the device under a
-# stable serial `adb-<id>._adb-tls-connect._tcp`; pass that to `-p:AdbTarget` too
-# reach a local KeepmarkApi from the device (Debug builds allow loopback HTTP):
+# with the "Wireless debugging" screen open, mDNS advertises a stable serial
+# `adb-<id>._adb-tls-connect._tcp`; pass that to `-p:AdbTarget` too
+# reach a local KeepmarkApi from the device (Debug allows loopback HTTP):
 adb reverse tcp:8090 tcp:8090; curl -s localhost:8090/info   # then use http://localhost:8090 in-app
 ```
 
-## Commands (from `KeepmarkMobile/`)
+Linux prerequisites for the Core tests: Python 3.12+, GCC, make, Tcl,
+pkg-config and OpenSSL development files. Run the SQLCipher preparation once
+per checkout (§3). Workload problems (`MissingWorkloadPack`, workload-set
+mismatch) are fixed with `sudo dotnet workload repair`; verify with
+`dotnet workload list` and never paper over them with `DOTNETSDK_WORKLOAD_*`
+overrides.
+
+---
+
+## 3. Commands
+
+All commands run from `KeepmarkMobile/`.
 
 ```sh
-python3 scripts/prepare-sqlcipher.py --linux            # once: Linux x64 native prerequisites below
-dotnet test                                            # Core unit + crypto/lifecycle regression tests
-dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
-dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug  # deploy+launch
-# add "-p:AdbTarget=-s IP:PORT" when several adb entries are listed. A Debug APK
-# installed with plain `adb install` aborts ("No assemblies found … Fast Deployment"):
-# deploy Debug only via -t:Run. For a self-contained test APK, package Release:
-dotnet build src/KeepmarkMobile -f net10.0-android -c Release -t:SignAndroidPackage -p:AndroidKeyStore=false -p:AndroidPackageFormats=apk
-# AndroidKeyStore=false uses the local debug key for testing only. Check the
-# APK manifest version before install; plain build may leave an older APK.
+python3 scripts/prepare-sqlcipher.py --linux   # once: Linux x64 native engine for tests
+dotnet test                                    # Core unit + crypto/lifecycle regression tests
+node tests/js/gestures.test.cjs                # gesture unit tests (node:test, no browser)
 
-# Play upload (Release + upload key, outside the repo): asks the keystore password
-# on the terminal, then builds and verifies the artifact. KEEPMARK_KEY_PASS (or
-# KEEPMARK_KEY_PASS_FILE, a mode-600 file) skips the prompt for unattended runs.
-scripts/build-play-aab.sh
+dotnet build src/KeepmarkMobile -f net10.0-android -c Debug
+dotnet build src/KeepmarkMobile/KeepmarkMobile.csproj -t:Run -f net10.0-android -c Debug
+# add "-p:AdbTarget=-s IP:PORT" when several adb entries are listed.
+```
+
+Deployment quirks:
+
+- A Debug APK installed with plain `adb install` aborts ("No assemblies found …
+  Fast Deployment"). Deploy Debug only through `-t:Run`.
+- For a self-contained test APK, package Release:
+
+```sh
+dotnet build src/KeepmarkMobile -f net10.0-android -c Release \
+  -t:SignAndroidPackage -p:AndroidKeyStore=false -p:AndroidPackageFormats=apk
+# AndroidKeyStore=false uses the local debug key for testing only.
+# Check the manifest version before installing; a plain build may leave an older APK.
+```
+
+Play upload (Release + upload key, outside the repo):
+
+```sh
+scripts/build-play-aab.sh          # asks the keystore password, builds, verifies
+scripts/build-play-aab.sh --dry-run
 # -> src/KeepmarkMobile/bin/Release/net10.0-android/com.keepmark.mobile-Signed.aab
 #    (+ the same-name .apk for device QA), signed with ~/keys/keepmark-upload.keystore,
-#    alias "keepmark" (KEEPMARK_KEYSTORE / KEEPMARK_KEY_ALIAS override both).
-# The script only wraps:
-#   KEEPMARK_KEY_PASS=… dotnet build src/KeepmarkMobile -f net10.0-android -c Release -t:SignAndroidPackage
+#    alias "keepmark". KEEPMARK_KEYSTORE / KEEPMARK_KEY_ALIAS override both.
+# KEEPMARK_KEY_PASS or KEEPMARK_KEY_PASS_FILE (mode-600 file) skip the prompt.
+```
+
+Device inspection:
+
+```sh
 adb -s IP:PORT shell "dumpsys package com.keepmark.mobile | grep -m1 versionName"
 adb -s IP:PORT exec-out screencap -p > /tmp/x.png     # screenshot
 adb -s IP:PORT shell input tap 540 1200               # tap (device 1080x2412)
-# workloads: MissingWorkloadPack / workloadset mismatch (SDK 10.0.x vs manifest) is fixed with
-#   sudo dotnet workload repair   (fallback: update + install maui-android wasm-tools)
-# verify with `dotnet workload list`; never paper over it with DOTNETSDK_WORKLOAD_* overrides.
-# QA quirks: `input text` drops characters on WebView inputs — type one char at a time (~0.3s);
-# `screencap` can return a corrupted frame (duplicated glyphs) right after the keyboard hides —
-# just re-capture (use `dumpsys input_method | grep mInputShown` before sending BACK, which
-# closes the keyboard first and only then navigates back).
 ```
 
-Version bump (manual): `ApplicationDisplayVersion` 1.0.N and `ApplicationVersion`
-M in `src/KeepmarkMobile/KeepmarkMobile.csproj`; CSS/JS releases also bump
-`?v=` cache-buster in `wwwroot/index.html`. Commit message format:
-`v1.0.N (M): short description`.
+QA quirks: `input text` drops characters on WebView inputs — type one character
+at a time (~0.3 s). A `screencap` taken right after the keyboard hides can be
+corrupted; check `dumpsys input_method | grep mInputShown` before sending BACK
+(BACK closes the keyboard first and only then navigates back) and re-capture.
 
-## Native SQLCipher migration (v1.0.193)
+Other scripts:
 
-The ORM is `sqlite-net-base` 1.9.172 with `SQLitePCLRaw.provider.sqlcipher`
-3.0.5. `SqlCipherRuntime` initializes the provider once; database startup fails
-closed if the loaded library does not report `cipher_version`. Do not restore
+```sh
+python3 scripts/verify-native-sqlcipher.py --apk /path/to/app.apk [--abi arm64-v8a]
+python3 scripts/verify-sqlcipher-compat.py --old /path/to/old/libe_sqlcipher.so
+dotnet run --project tools/Keepmark.Benchmarks -c Release
+dotnet run --project tools/Keepmark.Benchmarks -c Release -- --interop /tmp/keepmark-csharp-blobs.json
+node scripts/verify-csharp-blobs.cjs /tmp/keepmark-csharp-blobs.json
+```
+
+Version bump (manual): `ApplicationDisplayVersion` `1.0.N` and
+`ApplicationVersion` `M` in `src/KeepmarkMobile/KeepmarkMobile.csproj`; a CSS/JS
+change also bumps the `?v=` cache-buster in `wwwroot/index.html`. Commit message
+format: `v1.0.N (M): short description`. **Docs-only changes do not bump.**
+Commits happen in this repo; pushing to any remote requires an explicit
+go-ahead in chat each time.
+
+---
+
+## 4. Architecture
+
+### Process model
+
+`MauiProgram` registers one instance of each service: `IXbsLocalizer`
+(`XbsLocalizer`), `XbsSettings`, `LanguageService`, `SecureCredentialStore`,
+`PinnedStore`, `ToastState`, `ISelectionFeedback`, `SharedImportService`,
+`AppLockState`, `IQrScanner`, `XbsSession`, plus the Android
+`IAppLockService` and `IStatusBarService`. `App.CreateWindow` wires
+`Activated`/`Resumed`/`Stopped`/`Destroying` to `XbsSession.SetForeground`;
+`App.OnStart` calls `XbsSession.InitAsync()` once (shared task) and then
+initializes the lock state.
+
+`XbsSession` is the app-scoped composition root at runtime: it owns the
+SQLCipher store, the sync engine, the saved-sync registry, the safety subsystem
+and the automatic poller. Components never talk to `SyncEngine` storage
+directly for multi-step flows; they call session methods.
+
+```
+Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (per service URL)
+                   │              │
+                   │              └──► BookmarkStore (SQLCipher + FTS5)
+                   ├──► SecureCredentialStore (KeyStore-backed SecureStorage)
+                   ├──► SavedSyncRegistry (dormant sync rows)
+                   └──► Safety backups / removed-sync copies (app-private files)
+```
+
+### Project layout
+
+- `src/Keepmark.Core/Api/` — `XSyncApiClient`, version negotiation, response
+  shapes, error mapping, retry policy, redacting logger.
+- `src/Keepmark.Core/Crypto/` — `XCryptoService` (PBKDF2/AES-GCM/lzutf8),
+  `BackupGuard`, `BlobHash`, bounds.
+- `src/Keepmark.Core/Data/` — `BookmarkStore` (schema, FTS5, queries, bulk
+  mutations), `SelectionBatch` (pure batch plan), `SqlCipherRuntime`.
+- `src/Keepmark.Core/Sync/` — `SyncEngine`, `ForegroundPoller`,
+  `SavedSyncs`/`SavedSyncRegistry` (pure registry + storage-facing registry),
+  `BookmarkMerge` (pure union), `MoveResult` (result text), `SelectionBatch`.
+- `src/Keepmark.Core/Safety/` — `SafetyBackups` (files, index, naming),
+  `SafetyMaster` (wrapped master key), `RemovedSyncCopies` (content-addressed
+  copies).
+- `src/Keepmark.Core/Workflow/` — `ServiceCatalog`, `ServiceCheckState`,
+  `ConnectQrPayload`/`ConnectQrCandidateState`, `WorkflowRules`,
+  `WorkflowTexts`.
+- `src/Keepmark.Core/I18n/` — `Str.g.cs`, nine `Catalog.*.cs`, `Localizer`,
+  `RelativeTime`.
+- `src/Keepmark.Core/Security/` — `LockPolicy` (relock presets).
+- `src/KeepmarkMobile/Services/` — session, settings, secure store, language,
+  app lock state, QR scanner, share intake, pinned store, selection controller.
+- `src/KeepmarkMobile/Components/Pages/` — one page per workflow:
+
+| Route | Page | Role |
+|---|---|---|
+| `/` | `Home` | tree, search, pinned/recent, sheets, share intake, selection |
+| `/duplicates` | `Duplicates` | duplicate groups and bulk cleanup |
+| `/backup` | `Backup` | encrypted export/import, safety backups, removed copies |
+| `/syncs` | `Syncs` | saved syncs: activate, rename, forget, unlink |
+| `/connect` | `Connect` | link existing, create new, add while linked, unlink |
+| `/settings` | `Settings` | sync mode, theme, language, home sections, verbosity |
+| `/settings/security` | `Security` | app lock and relock time |
+| `/status` | `Status` | sync state, sizes, versions, removed-sync notice |
+| `/logs` | `Logs` | in-memory log viewer + share export |
+| `/help` | `Help` | user help |
+| `/about` | `About` | versions, license, bug-report mail |
+| `/switch-service`, `/migrate` | `MoveServiceLegacy` | redirect to `/connect` (old links only) |
+
+- `Components/` — shared UI: `BookmarkRow`, `BookmarkSheet`, `FolderPicker`,
+  `MovePicker`, `DirectionPicker`, `ConfirmBlock`, `StepMessage`,
+  `ServiceSelector`, `QrCredentialReview`, `SyncGoneNotice`, `RowTile`.
+- `Platforms/Android/` — `MainActivity` (non-edge-to-edge window, app lock on
+  resume), `ShareActivity` (translucent SEND target), `ShareIntake`
+  (publish/limbo/flush), `QrScanner` (ZXing.Net.Maui 0.10.4), biometric and
+  status-bar services.
+- `wwwroot/` — `app.css` (tokens, components, dark overrides), `js/gestures.js`,
+  Figtree font (OFL).
+
+### Data flow rules
+
+- UI reads the store through `BookmarkStore`; mutations that must sync go
+  through `SyncEngine` batch APIs so they are acknowledged and coalesced.
+- `SyncEngine` is the only writer of sync metadata (`lastUpdated`, revision,
+  hash, dirty) and the only component that pushes.
+- `XbsSession` serializes the safety subsystem (`_safetyGate`) and the switch
+  flows; it also owns the 401 notice state through the engine.
+- Every service URL gets one cached `XSyncApiClient`, so `/info` capability
+  probes are cached per URL and credentials never leak between services.
+
+---
+
+## 5. Local data and secrets
+
+### Encrypted mirror (`xbs.db`)
+
+`BookmarkStore` keeps a SQLCipher database at
+`FileSystem.AppDataDirectory/xbs.db`, opened with a 64-hex device key. Startup
+fails closed if `PRAGMA cipher_version` is empty: a mispackaged plain-SQLite
+runtime must never silently store plaintext.
+
+| Table | Columns / role |
+|---|---|
+| `Meta` | key/value: `lastUpdated`, `syncVersion`, `syncRevision`, `syncHash`, `dirty` (`"1"`/`"0"`) |
+| `Blob` | `bookmarks` = last encrypted sync blob |
+| `Items` | `RowId` (local, rekeyed on replace), `NodeId` (stable synced id), `ParentRowId`, `Title`, `Url`, `Description`, `Tags`, `DateAdded`, `IsFolder`, `SortOrder` |
+| `ItemsFts` | FTS5 external-content index over title/url/description/tags, maintained by triggers |
+
+- Tree structure is `ParentRowId` + `SortOrder`. `RowId` changes on every
+  pull/restore; UI state (crumbs, expansions, pins, selection) must use
+  `NodeId`.
+- `ContentVersion` increments on content changes; components invalidate derived
+  data against it.
+- `Tags` are joined with U+001F. Descriptions are normalized on push (empty →
+  null, max 300 chars).
+- `ReplaceAllAsync`/`RestoreLocalAsync` replace the tree atomically and reset
+  revision/hash for legacy pulls.
+- `AcknowledgePushAsync` updates blob/meta and only changed normalized
+  descriptions in place, preserving RowIds and FTS.
+- Top-level `[xbs] Menu/Other/Toolbar` containers keep their synced `Title` but
+  display a localized name (`ItemRow.DisplayTitle` → `ContainerNames`). Never
+  write the localized name back.
+- `DateAdded` is an optional Keepmark field (Unix ms, like the browser
+  bookmarks API). It survives pull/push/merge/backup; new local nodes are
+  stamped with "now" when missing. Legacy clients may drop it.
+
+Indexes: `IX_Items_NodeId`, `IX_Items_Parent_Order`, `IX_Items_Url_Order`.
+
+### SecureStorage (Android KeyStore-backed)
+
+| Key | Content | Cleared by Unlink |
+|---|---|---|
+| `xbs_sync_id` | active sync ID | yes |
+| `xbs_service_url` | active service URL | yes |
+| `xbs_derived_key` | base64 derived key, never the password | yes |
+| `xbs_sync_version` | active sync format version | yes |
+| `xbs_db_key` | 64-hex database key, created once | **no** (kept forever) |
+| `xbs_saved_syncs` | JSON array of dormant rows | no (active row is removed) |
+
+`SecureCredentialStore` sanitizes the saved-sync JSON on read: unknown/broken
+rows are dropped, URLs canonicalized, duplicates collapsed to the most recently
+used. The raw sync password is never stored anywhere. Dormant rows keep the
+derived key (same material as the active one), encrypted at rest by the platform
+store.
+
+### Preferences (`XbsSettings`)
+
+Non-secret settings: `service_url`, `saved_services`, `saved_service_info`,
+`sync_mode`, `log_verbosity`, `app_lock`, `lock_timeout_min`, `theme`,
+`ui_language`, `open_mode`, `home_show_recent`, `home_recent_count`,
+`home_recent_open`, `list_sort`.
+
+### App-private files
+
+| Path | Content |
+|---|---|
+| `backups/xbs-backup-YYYYMMDD-HHmmss.xbs.json` | user encrypted export (§12) |
+| `safety-backups/safety-*.json` + `safety-index.json` | safety snapshots (§11) |
+| `safety-backups/safety-master.json` (+ `.prev.json` during rotation) | wrapped master key |
+| `removed-syncs/removed-<sha256>.json` | copies of removed syncs (§9.5) |
+
+### SQLCipher runtime
+
+The ORM is `sqlite-net-base` 1.9.172 with
+`SQLitePCLRaw.provider.sqlcipher` 3.0.5. `SqlCipherRuntime` initializes the
+provider once; startup fails closed without `cipher_version`. Do not restore
 `sqlite-net-pcl`, `bundle_green` or the deprecated `bundle_e_sqlcipher`.
 
-Android uses the official SQLCipher Community Android 4.19.1 AAR runtime:
-SQLCipher 4.19.0 / SQLite 3.53.4, arm64-v8a and x86_64. Binaries, SHA-256 pins,
-source URLs and third-party licenses live in `native/sqlcipher/`. Since v1.0.195,
-the unchanged `classes.jar` is packaged with `AndroidLibrary Bind="false"`:
-`JNI_OnLoad` requires Java classes even when .NET only uses the C API.
-`Xamarin.AndroidX.Sqlite` 2.6.2 supplies its Java interfaces (no SQLite engine).
-SQLCipher ProGuard rules preserve these native registration roots in shrunk
-builds. Omitting them aborts startup with `SQLiteCustomFunction` missing. The notices
-are included as an APK asset. See [native setup](../native/sqlcipher/README.md).
+Android uses the official SQLCipher Community Android 4.19.1 AAR runtime
+(SQLCipher 4.19.0 / SQLite 3.53.4, arm64-v8a + x86_64). Binaries, SHA-256 pins,
+source URLs and notices live in `native/sqlcipher/`. The unchanged
+`classes.jar` is packaged with `AndroidLibrary Bind="false"` because
+`JNI_OnLoad` requires the Java classes even though .NET uses only the C API;
+`Xamarin.AndroidX.Sqlite` 2.6.2 supplies the Java interfaces. ProGuard rules
+preserve the native registration roots; omitting them aborts startup with
+`SQLiteCustomFunction` missing. Notices are bundled as an APK asset.
 
-Linux x64 tests and benchmarks use the same SQLCipher source release, built
-with system OpenSSL. Run `python3 scripts/prepare-sqlcipher.py --linux` before
-`dotnet test` on a new checkout (Python 3.12+, GCC, make, Tcl, pkg-config and
-OpenSSL development files required). Generated output stays in ignored
-`artifacts/native/`; Android builds use the checked-in official binaries.
+Linux tests and benchmarks build the same SQLCipher source release with system
+OpenSSL via `scripts/prepare-sqlcipher.py --linux` (output in ignored
+`artifacts/native/`). Android builds use the checked-in official binaries. No
+database conversion, rekey or credential change is performed: the synthetic
+2.1.10 fixture opens, searches, modifies and reopens under the new engine, and
+unkeyed reads fail. `scripts/verify-sqlcipher-compat.py` proves new-write →
+old-read/write → new-read including FTS. `scripts/verify-native-sqlcipher.py`
+checks the pinned Java runtime, both ABI binaries, 16 KiB ELF/ZIP alignment,
+uncompressed storage, and the absence of legacy/plain SQLite libraries.
 
-No database format conversion, rekey or credential change is performed.
-The synthetic original 2.1.10 fixture is opened, searched, modified and reopened
-by the new engine; unkeyed reads fail. `scripts/verify-sqlcipher-compat.py --old
-/path/to/old/libe_sqlcipher.so` additionally proves new-write → old-read/write
-→ new-read, including FTS, in isolated processes. Rollback restores the previous
-application/provider/native stack without rewriting databases.
+---
 
-`python3 scripts/verify-native-sqlcipher.py --apk /path/to/app.apk` verifies
-the pinned Java runtime hash and all its class definitions in APK DEX, plus
-both official binary hashes, ABI, 16 KiB ELF/ZIP alignment, uncompressed storage
-and absence of legacy/plain SQLite libraries. Use `--abi arm64-v8a` for a
-device-specific Debug APK; the default requires both supported ABIs. Android 15
-arm64 startup and the existing encrypted store were verified on-device with
-v1.0.195 Debug (2026-10-16); Release shrinking and battery remain unverified.
-Query/code benchmark improvements in
-PERFORMANCE.md are independent of this engine migration.
+## 6. Cryptography
 
-## Architecture map
+### Sync envelope
 
-- `src/Keepmark.Core/Api/` — XSyncApiClient, API v1.1.13, `Accept-Version` header.
-- `src/Keepmark.Core/Crypto/` — PBKDF2/AES-GCM-16B-IV via BouncyCastle +
-  internal LzUtf8 port of lzutf8@0.6.0. **Never change without running both:**
-  Node vectors in `tests/.../TestData/vectors.json` (generated with the
-  original xBrowserSync JS logic, `crypto.service.ts` + lzutf8@0.6.0) +
-  the reverse check (`tools/Keepmark.Benchmarks --interop` then
-  `scripts/verify-csharp-blobs.cjs`, lzutf8@0.6.0).
-  Backup envelope: PBKDF2-SHA256/250k (random 16B salt stored in the file) +
-  AES-128-GCM over lzutf8 payload; all import/export params validated via
-  `BackupGuard` (password ≥8, path present, .json only, 50MB cap, base64
-  allocation-free base64 pre-checks, tree validated ≤200k nodes, tmp cache cleaned).
-  Device memory limits: encrypted envelope ≤50 MiB; decompressed UTF-8 ≤256 MiB.
-  HTTP JSON streams are capped at 72 MiB (including base64 overhead); error bodies
-  at 64 KiB. Limits reject extreme payloads with a localized device-limit error.
-  See [performance notes](PERFORMANCE.md) for measurements and commands.
-- `src/Keepmark.Core/Sync/SyncEngine.cs` — gated push/pull, background
-  push, conflict logic, `DeleteBookmarkAsync`.
-- `src/Keepmark.Core/Sync/SavedSyncs.cs` + `SavedSyncRegistry.cs` — multi-sync
-  registry: one active sync (live `SyncCredentials`), dormant rows keep only
-  the derived key so they can be activated again. Pure helpers (canonical
-  identity = service URL + sync id, upsert, labels ≤40 chars unique
-  case-insensitively, sort by last use) plus defensive JSON sanitize;
-  `XbsSession.InitializeCoreAsync` migrates single-sync installs by
-  registering the live credentials (no schema change, no data migration).
-  Activation (`VerifySavedSyncAsync` → `ActivateSavedSyncAsync`) is read-only
-  first (service/version gate + GET + decrypt with the row's stored key, never
-  the long password), then saves the active side fail-closed
-  (`SyncEngine.PersistActiveSideAsync`: pending conflict or failed push aborts
-  the switch), then adopts the target tree behind a `switch-take-remote`
-  safety backup and rotates the safety master. Unlink removes the active row;
-  dormant rows survive it. Connect can also add a sync while the device is
-  linked (only the "existing sync" path, QR included): it runs the same
-  fail-closed activation with the usual direction choice and keeps the
-  previous sync in the list.
-- `src/Keepmark.Core/Safety/RemovedSyncCopies.cs` — copies of syncs the
-  service no longer knows (401). The engine never acts on a 401
-  (`SyncEngine.GoneCredentials`: notice, dismiss, retry explicit only); the
-  user chooses Retry / Unlink and keep a copy / Cancel. The copy is the local
-  tree, encrypted with the device DB key (which survives an unlink), stored in
-  `removed-syncs/removed-<sha256>.json`, verified after writing (decrypt and
-  re-hash) and deduplicated by tree hash. Never pruned automatically; listed
-  with restore/delete in Backup.
-- `src/Keepmark.Core/Sync/BookmarkMerge.cs` — pure two-way union by URL
-  (remote kept, local adopted with fresh ids, separators unioned, deletes
-  never merged) + `NormalizeUrl`; same function serves preview and apply.
-  `MoveResult.cs` — contextual result text (mode + direction + target).
-- `src/Keepmark.Core/Data/BookmarkStore.cs` — SQLCipher store, FTS5,
-  duplicates query, `RestoreLocalAsync`. Pull/restore replacements rekey rows;
-  ordinary pushes acknowledge blob/meta and normalize changed descriptions in
-  place, preserving RowIds/FTS. UI crumbs/expansions rebase on stable `NodeId`.
-  `ContentVersion` invalidates component-local derived data after mutations.
-- `src/KeepmarkMobile/Services/XbsSession.cs` — session, backup export/import,
-  create+upload. Connect = link/create + unlink, plus adding an existing sync
-  while linked; the retired `/switch-service` and `/migrate` routes redirect
-  there. Backup = encrypted backup export/import (`/backup`).
-- `src/KeepmarkMobile/Components/Pages/` — `Home` (explore, sheets, share
-  consume, sort, status bar), `Duplicates`, `Connect` (link/create + unlink,
-  add a sync while linked), `Syncs` (saved-sync list,
-  activate/rename/forget/unlink),
-  `Backup` (encrypted export/import, safety backups, copies of removed syncs),
-  `MoveServiceLegacy` (redirect only), `Settings`, `Status`, `About`.
-- `Components/SyncGoneNotice.razor` — the 401 notice reused on Home and Status
-  (Retry / Unlink and keep a copy / Cancel; nothing automatic).
-- `Components/{BookmarkSheet,BookmarkRow,FolderPicker}.razor` — edit dialog,
-  row rendering, collapsible tree with Select/Cancel protocol.
-- `Platforms/Android/ShareActivity.cs` — translucent, owns SEND filter,
-  forwards action+type+text to MainActivity. `ShareIntake.cs` — publish/limbo/flush.
-- `wwwroot/js/gestures.js` — swipe/long-press, single listener set, always
-  re-points at live Home/Dup instance refs. `wwwroot/app.css` — styling + dark
-  overrides (`data-bs-theme` follows system).
+```text
+key    = PBKDF2-SHA256(UTF8(password), salt = UTF8(syncId), 250_000) → 256-bit
+blob   = base64( IV(16 random bytes) || AES-128-GCM(lzutf8(JSON tree)) )
+```
 
-## Async/UI patterns (earned the hard way)
+BouncyCastle is required because .NET `AesGcm` only accepts a 12-byte nonce.
+The 16-byte IV is prepended, matching the original JS client.
 
-- **Optimistic delete**: remove row from local `rows`/`pinnedRows`/group lists +
-  `StateHasChanged()` + `Task.Delay(1)` FIRST, then DB/sync work, `ReloadAsync()`
-  after. List must react instantly, never wait for popup/toast.
-- **Busy before toast**: set `busy=false` + `StateHasChanged()` BEFORE
-  `Toast.ShowAsync` (toast waits ~3.5s; buttons must re-enable immediately).
-- Fire-and-forget no-op JS: `_ = JS.InvokeVoidAsync("xbsGestures.closeAll")`,
-  never `await` it before UI work.
-- Modal sheets lock page scroll: `xbsGestures.lockScroll(bool)` toggles
-  `xbs-locked` on html/body; backdrop has `touch-action: none`, sheet
-  `touch-action: pan-y`, both `overscroll-behavior: contain`. Home syncs the
-  lock in `OnAfterRenderAsync` and releases it in `Dispose`.
-  The nav drawer (`NavMenu` checkbox `@onchange`) uses the same lock,
-  owner-keyed (`"sheet"` / `"nav"`): the page stays locked while ANY holder
-  asks for it.
-- Toast is fire-and-forget on the UI path: every action renders its list
-  update (`StateHasChanged`) BEFORE `_ = Toast.ShowAsync(...)`. Never `await`
-  a toast while list state is still unpainted (Blazor paints the handler's
-  renders only around explicit `StateHasChanged`, so awaiting first delays
-  the visible update by the toast duration).
-- Share consume: peek-before-consume in `Home.OpenSharedIfPending` via
-  `ShareIntake` choke point (limbo for cold start).
-- Auto-mode push uses one worker with 250 ms coalescing and dirty/conflict/mode
-  checks under the engine gate; UI closes sheets right after the durable local write.
-- `XbsSession.InitAsync` shares one initialization task. Components await it with
-  their lifetime token; never register singleton events or create timers after disposal.
-- `Window.Activated/Resumed/Stopped/Destroying` control visibility. Auto polling
-  runs only while foreground + Auto, first after 500 ms, then 15 minutes after the
-  previous tick completes. Stop cancels reads/retries and drains the worker.
-  Already-started edit uploads may finish and acknowledge their outcome.
-- Home's relative-time clock stops in background. Global folder/count/pin data is
-  refreshed only after `ContentVersion`, language, pins or relevant settings change.
-  Uniform collapsed folder lists over 100 rows virtualize; duplicate groups page in batches of 100; explicit location jumps
-  temporarily reveal all rows until the next navigation to preserve DOM anchors.
-- Gesture registrations are owner-keyed and released with their component;
-  layout measurements are coalesced into one animation frame.
+- `XCryptoService.DeriveKey` / `Encrypt` / `Decrypt`.
+- A sync without a version is refused (`UnsupportedSyncVersionException`,
+  "open it once in an official xBrowserSync client"): the old crypto would only
+  surface as a misleading wrong-password.
+- Decryption failure surfaces as `InvalidCredentialsException`, never as a
+  generic error.
+- Sync format is checked before decrypting: remote > 1.8.0 is refused.
 
-## Engineering rules (non-negotiable)
+### Encrypted backup envelope
 
-- **Efficiency**: batch work into the fewest transactions and network calls.
-  Never loop single-item operations when a bulk path exists — one sync storm
-  can get the service to throttle or blacklist us (it has anti-abuse limits).
-  Example: duplicates cleanup deletes everything in ONE store transaction +
-  ONE push, never one push per row.
-- **Safety**: destructive work resolves by stable identity (NodeId, never a
-  possibly-rekeyed RowId), validates before acting, keeps an undo or
-  safety-backup path, and never swallows errors silently — log them with context.
-- **Atomicity**: multi-step mutations go in a single transaction where SQLite
-  allows it (resolve + delete inside one `tran`), so a concurrent push/pull
-  rekey cannot strand half a batch.
+```json
+{ "App": "xBrowserSyncNg", "Format": 1, "Salt": "<base64 16B>", "Blob": "<sync envelope>" }
+```
 
-## Razor/blazor gotchas
+PBKDF2-SHA256/250k with the random salt stored in the file, then AES-GCM +
+lzutf8. The `App` marker stays `xBrowserSyncNg` so old files keep importing.
 
-- String component params without `@` pass literals.
-- Ternary with `: null` or nested ternaries inside attributes fails to parse —
-  use `@code` helpers.
-- Blazor renders bool ARIA as `True/False` — must lowercase.
-- Inside `@if { }` blocks Blazor drops the whitespace between and before
-  inline expressions and `<text> …</text>` (seen live as `2 KBof 1 MB`,
-  `3Resolve`): build the run as one string, `@($" {a} {b}")`, or emit `@(" ")`.
-- URL inputs need `autocapitalize="off" autocorrect="off" spellcheck="false"`
-  (Android capitalized `Https://`); store via `WorkflowRules.NormalizeServiceUrl`.
-- sqlite-net enables shared-cache; SQLCipher `PRAGMA key` needs ExecuteScalar.
-- AndroidX Biometric forbids custom negative button with DEVICE_CREDENTIAL.
+### Safety-backup envelope
 
-## Restart checklist
+Files are encrypted **once** under a random 256-bit Master Key, using the same
+`XCryptoService` envelope. Only the master key is re-wrapped when the sync key
+rotates. Removed-sync copies are encrypted with the device database key, which
+survives an unlink.
 
-1. `cd $HOME/Projects/xBrowserSync/KeepmarkMobile && git log --oneline | head -3`
-2. Set env (above), `adb connect`, `dotnet test`.
-3. Deploy `-t:Run`, verify `versionName`, screenshot.
-4. Deploy restarts the app → device shows lock screen if auto-lock on; unlock manually.
+### Limits (device resource limits, not server quotas)
 
-## Development requirements (prevent regression)
+| Limit | Value |
+|---|---|
+| Backup file | 50 MiB |
+| Decoded encrypted envelope | 50 MiB |
+| Decompressed UTF-8 | 256 MiB |
+| Tree nodes (backup/selection validation) | 200,000 |
+| HTTP JSON response | 72 MiB (base64 envelope + metadata) |
+| HTTP error body | 64 KiB |
+| New password | ≥ 8 characters |
 
-### Concurrency & gate discipline
+Lzutf8 compression uses bounded hash chains (~384 KiB tables) and validates
+output before allocating; base64 validation does not allocate decoded copies.
+Extremely compressible payloads may be rejected even below the file cap.
 
-- **Every `await _gate.WaitAsync()` MUST have a matching `_gate.Release()` in a `finally` block.** No exceptions.
-- **Conflict resolution methods** (`ResolveConflictPullAsync`, `ResolveConflictPushAsync`, `ResolveConflictMergeAsync`) MUST:
-  1. Set `_resolvingConflict = true` at start of `try`
-  2. Reset `_resolvingConflict = false` in `finally` (after `_gate.Release()`)
-- **`ForceSyncAsync` and `PushInBackgroundAsync`** MUST check `_resolvingConflict` after acquiring `_gate` and return early if true.
-- **Background timers** MUST NOT fire sync logic while `_resolvingConflict` is true.
+### Interop discipline
 
-### Merge retry discipline
+Never change `Keepmark.Core/Crypto/` without running **both** directions:
 
-- **Merge push MUST retry on 409** with re-fetch + re-merge (max 3 attempts).
+1. Node vectors in `tests/Keepmark.Core.Tests/TestData/vectors.json`
+   (generated with the original JS logic, `crypto.service.ts` + lzutf8@0.6.0).
+2. `tools/Keepmark.Benchmarks -- --interop /tmp/keepmark-csharp-blobs.json`
+   followed by `node scripts/verify-csharp-blobs.cjs /tmp/keepmark-csharp-blobs.json`
+   (Node decrypts C# output with AES-GCM + lzutf8@0.6.0 for ASCII, Unicode,
+   bookmarks and a larger payload).
 
-### State capture completeness
+---
 
-- **All conflict entry points** must capture conflict state for UI resolution.
-- **Preview API** MUST re-fetch remote at call time.
+## 7. API client and version negotiation
 
-### Test coverage requirements
+`XSyncApiClient` is created per normalized service URL by `XbsSession.ApiFor`
+and calls:
 
-- **Concurrency tests**: race between auto-sync and conflict resolution
-- **Merge retry test**: simulate 409 on push, verify re-merge + retry
-- **Gate release test**: every method acquiring `_gate` releases in `finally`
-- **Flag test**: `_resolvingConflict` prevents auto-sync during resolution
+| Call | Endpoint | Notes |
+|---|---|---|
+| `GetInfoAsync` | `GET /info` | legacy contract for the service check |
+| `GetInfoV12Async` | `GET /info` with `Accept-Version: 1.2.0` | capability probe (revision, conditional GET) |
+| `CreateSyncAsync` | `POST /bookmarks` | returns ID, version, `lastUpdated` |
+| `GetBookmarksAsync` | `GET /bookmarks/{id}` | legacy full sync |
+| `GetBookmarksV12Async` | same, v1.2 | includes `meta` |
+| `GetBookmarksIfChangedAsync` | conditional `GET` with `If-None-Match: "<hash>"` | `304` → `null` |
+| `GetLastUpdatedAsync` | `GET /bookmarks/{id}/lastUpdated` | cheap poll |
+| `UpdateBookmarksAsync` | `PUT /bookmarks/{id}` | timestamp base |
+| `UpdateBookmarksV12Async` | same, v1.2 | `baseRevision` CAS |
 
-## Safety backups (behavioral spec — verifiable by a third party)
+There is **no server-side sync DELETE** in this client (no `HttpMethod.Delete`).
+The app cannot erase a server copy; `Unlink` only removes local credentials.
 
-Every destructive operation snapshots the side it is about to destroy
-("backup what you destroy") BEFORE mutating anything, and tells the user
-where the snapshot went. Snapshots live in `safety-backups/` (app-private),
-are listed/restored/deleted from Backup → Safety backups, and are
-encrypted except legacy/pre-link files (flagged "not encrypted" in the UI).
+- `Accept-Version` is `1.1.13` by default. `1.2.0` is used only for the
+  capability probe and, after a positive probe, for full GET / conditional GET /
+  PUT with revision CAS.
+- Timeouts: 12 s default, 3 s probe. Timeout / `HttpRequestException` →
+  `ServiceOfflineException`. Reads retry with backoff (`Retry-After` honored);
+  create and PUT never retry blindly (non-idempotent).
+- Status mapping: 401 `SyncNotFound`, 404 `InvalidService`, 405
+  `NotAcceptingNewSyncs`, 406 `DailyNewSyncLimit`, 409 `DataOutOfSync`, 413
+  `SyncTooLarge`, 429 `Throttled` (+ `Retry-After`), 412/5xx/other mapped
+  honestly. The server `code`/`message` shape is preserved for display.
+- Bodies are never logged; sync IDs are truncated (`abcd…xy`); timings and byte
+  counts are logged at Info.
+- A v1.2 capability probe that returns `412`, lacks capabilities or fails stays
+  on the legacy path. A service below 1.1.9 is refused instead of used
+  silently.
+- `capabilities.syncExpiryDays` is display-only on Status (`0` = kept forever);
+  a malformed value must not break the probe.
 
-### 1. What must be backed up (per flow)
+---
 
-| Flow | Destroyed side | Snapshot content | Operation tag |
+## 8. Sync engine
+
+`SyncEngine` owns the gate, the status and every read/write against the
+service. It never resolves a conflict, never overwrites after a 409 and never
+acts on a 401 without the user.
+
+### Modes and status
+
+- `SyncMode.Auto` (default): a foreground-only poller ticks 500 ms after the
+  app becomes visible, then every 15 minutes **after the previous tick
+  completes** (fixed delay, no catch-up storm).
+- `SyncMode.Manual`: no poll; only an explicit Sync now.
+- Statuses: `Idle`, `Syncing`, `Offline`, `Conflict`, `Error`, `NoCredentials`.
+  `DataChanged` and `StatusChanged` events drive the UI; pages preserve scroll
+  and query across events.
+- `AutoSyncEnabled` follows visibility. Stopping cancels reads/retries and
+  drains the worker; an already-sent PUT may finish and acknowledge its result.
+  Dirty edits stay durable and are checked on resume.
+
+### Whole-blob reconciliation
+
+The API has no deltas: every sync compares `lastUpdated` first.
+
+| Remote vs local | Local dirty | Action |
+|---|---|---|
+| remote ≠ local | yes | `Conflict` — never auto-merge |
+| remote ≠ local | no | pull (full GET, or conditional 304) |
+| remote = local | yes | push |
+| remote = local | no | stamp `LastSyncAt`, `Idle` |
+
+Additional rules:
+
+- Pull refuses a dirty mirror (`DataOutOfSyncException`, status `Conflict`).
+- Push encrypts the tree, normalizes descriptions, and uses revision CAS when a
+  v1.2 revision is stored; otherwise the timestamp base. A 409 surfaces as
+  `Conflict`; if the server already holds exactly our blob (ambiguous timeout),
+  the client adopts the acknowledged state instead of reporting a phantom
+  conflict.
+- After a pull the engine stores the server version, revision and hash;
+  `ReplaceAll` clears revision/hash for legacy pulls.
+- Ordinary pushes preserve RowIds and FTS; an edit arriving during an upload is
+  never lost, and redundant queued pushes skip clean data.
+- `Normalize` on push: empty description/tags → null, description ≤ 300 chars.
+- Version gates: service < `MinApiVersion` is refused; remote sync format >
+  `SyncClientVersion` is refused on pull/compare/link.
+
+### Conflict resolution
+
+When status is `Conflict`, the UI offers download / upload / merge:
+
+- `ResolveConflictPullAsync` — snapshot local → full GET → replace local.
+- `ResolveConflictPushAsync` — fetch remote (for the snapshot and the push
+  base) → snapshot remote → push local on that fresh base.
+- `ResolveConflictMergeAsync` — fetch remote → snapshot both sides once → union
+  → push; on 409 re-fetch and re-merge from the **original local tree**, max 3
+  attempts.
+- `GetConflictMergePreviewAsync` always re-fetches the remote and returns the
+  same `BookmarkMerge.Merge` counts that apply will use.
+- `RunConflictResolutionAsync` sets `_resolvingConflict`, suspends the auto
+  timer, holds the gate for the whole resolution, and undoes both in one
+  `finally` even when the gate wait times out.
+- `SnapshotAsync` goes through `XbsSession.SaveSafetyBackupAsync`; if no
+  callback is wired (unit tests) nothing is written, but production always
+  wires it, and a real snapshot failure aborts the operation (fail closed).
+
+Merge rules (pure `BookmarkMerge.Merge`, normative):
+
+1. The remote is the shared truth: its nodes, ids and metadata are kept.
+2. Local bookmarks whose normalized URL is absent remotely are adopted with
+   fresh ids into the folder matched by full title path, or a new folder.
+3. Same URL, different title → remote title wins (`TitleConflicts`).
+4. Separators (`xbs:separator`) are unioned, never matched.
+5. Deletes are not merged (no tombstones): items deleted on one side come back
+   after a merge.
+6. `NormalizeUrl`: lowercase host, drop default ports/fragments, remove
+   tracking params (`utm_*`, `fbclid`, `gclid`, `msclkid`, `mc_cid`,
+   `mc_eid`, `igshid`); path/query keep case. Unparsable input: trim,
+   lowercase, drop fragment and trailing slash.
+7. `remoteOnly` is computed against the remote as received; `localOnly` counts
+   adopted local bookmarks at all levels.
+8. A bookmark carrying children keeps the bookmark and flattens the children
+   into the same folder.
+
+### Gate and background discipline
+
+- **Every `_gate.WaitAsync()` has a matching `_gate.Release()` in `finally`.**
+- Conflict methods set `_resolvingConflict` in `try` and clear it in `finally`
+  after the release; `ForceSyncAsync` and `PushInBackgroundAsync` check it
+  after acquiring the gate and return early.
+- Background timers never fire sync logic while `_resolvingConflict` is true.
+- One 250 ms edit worker coalesces pushes; dirty/conflict/mode/visibility are
+  re-checked under the gate.
+- `XbsSession.InitAsync` shares one initialization task; components await it
+  with their lifetime token and never subscribe after disposal.
+
+### Push-base rule
+
+Every PUT that follows an explicit GET (conflict resolutions, link upload/merge,
+activation, password change) uses the `lastUpdated`/`meta.revision` of **that**
+GET. The stored mirror base is exactly what caused the conflict, and after a
+link it belongs to the previous sync.
+
+### The 401 state (`GoneCredentials`)
+
+A 401 means the service no longer knows the sync (expiry or deletion by another
+client). The engine records `GoneSync(creds, dismissed)` and sets `Error`; it
+does **not** unlink, retry, upload or snapshot. `GoneCredentials` is `null` once
+the user dismisses it. Any successful sync (`Idle`) clears it; a 401 for a
+different sync creates a fresh notice. See §9.5 for the UI and the copy flow.
+
+---
+
+## 9. Multiple saved syncs
+
+### 9.1 Model
+
+Exactly one sync is **active**: its credentials are the live
+`SyncCredentials` in SecureStorage, and its tree is the only tree in `xbs.db`.
+Every other saved sync is **dormant**: a row with service URL, sync ID, derived
+key, optional label, optional sync version, key fingerprint and last-used time.
+Dormant rows are never polled, pushed or decrypted except during an explicit
+activation probe.
+
+There is no schema change and no data migration: the active sync keeps using
+the historical keys, and the registry is additive. On the first start after the
+upgrade, `SavedSyncRegistry.SyncActiveAsync` registers the live credentials as
+the first row (a no-op once it exists).
+
+### 9.2 Registry rules (`SavedSyncs`, `SavedSyncRegistry`)
+
+- **Identity** = canonical service URL + sync ID (`SavedSyncs.Key`). The sync ID
+  alone is not unique across services. `ServiceCatalog.Normalize` lowercases
+  host/scheme and drops default ports/trailing slash while preserving path
+  case.
+- **Label** ≤ 40 characters, optional, unique case-insensitively; empty clears
+  it. The display name is the label, or the service host when absent.
+  `SuggestName` proposes the host, then "host 2", "host 3"…
+- **Order**: last used first, then label, then sync ID (deterministic).
+- **Upsert** refreshes `LastUsedAt` and preserves a label/version/fingerprint
+  the caller did not supply.
+- **Deserialize** is defensive: malformed JSON → empty list; rows without service
+  URL or sync ID dropped; duplicates collapsed to the most recently used.
+- `KeyId` is `SafetyMaster.Fingerprint(derivedKey)` (first 8 hex of
+  SHA-256), so the safety master can be pruned without holding keys.
+
+### 9.3 Activate a dormant sync
+
+Preconditions: the row exists and has a key, the sync is not already active,
+and the app is unlocked (when app lock is configured).
+
+1. **Device proof first**: with app lock on, the PIN/biometric prompt must
+   succeed because the saved key alone is enough to switch. Without app lock
+   there is no extra prompt beyond the inline confirmation.
+2. **Read-only preflight** (`VerifySavedSyncAsync`): service `/info` version
+   gate, full GET, decrypt with the row's stored key. A wrong/stale key, an
+   expired sync or an unreachable service changes nothing. The sync's long
+   password is never asked again.
+3. **Fail-closed save of the active side** (`PrepareForLinkAsync` →
+   `SaveActiveSideAsync` → `PersistActiveSideAsync`): pending conflict, offline
+   service or failed push aborts the whole switch; the local tree is not replaced.
+4. **Snapshot** the local tree (`switch-take-remote`) through the safety
+   subsystem. No snapshot → no switch.
+5. **Adopt** the target tree (`LinkAdoptRemoteAsync`: download, decrypt, replace
+   the mirror, then switch credentials).
+6. **Rotate** the safety master from the old key to the new one (best effort,
+   never fails the switch) and **remember** the target row (it becomes active).
+7. The previously active sync stays in the list, dormant, ready to reactivate.
+
+Failure surfaces stay next to the row (inline error), and a toast on success.
+The list is refreshed in place.
+
+### 9.4 Add a sync while linked
+
+`Connect → + Add a sync` is available only while linked and offers **only the
+existing-sync path** (manual credentials or QR). Creating a brand-new sync is a
+first-time flow: unlink first (bookmarks stay).
+
+The flow reuses `ProbeLinkAsync` and the normal direction review:
+
+| Direction | Behavior | Safety tags |
+|---|---|---|
+| Download | save active side (fail closed) → snapshot local → adopt remote → rotate → remember | `take-remote` |
+| Upload | save active side → snapshot remote → `LinkUploadAsync` on the probed base → rotate → remember | `upload-local` |
+| Merge | save active side → snapshot both sides → union + push → rotate → remember | `connect-merge` |
+
+The added sync becomes active; the previous one stays in `Syncs`. A pending
+conflict or failed push cancels the switch and changes nothing. Re-adding the
+same canonical URL + sync ID updates the row in place, never duplicates it.
+Note that only activation writes the `switch-take-remote` tag; adding while
+linked uses the Connect tags because it is the same Connect apply path.
+
+### 9.5 Forget, Unlink, and removed syncs
+
+**Forget** (inactive row only): removes the row. Bookmarks, the server copy,
+other rows and all backups stay. It then prunes that key's wrap from the safety
+master when no saved sync (active included) still holds it
+(`SafetyMaster.PruneWraps`), so dead wraps cannot crowd out a live key in the
+max-3 list. The last wrap is never dropped; no backup is deleted
+(`safety-master` keeps every file readable through any remaining wrap).
+
+**Unlink this device** (active row): clears the four active credential keys,
+removes the active row, clears the 401 state. The local tree stays, the server
+copy stays, dormant rows stay. Safety wraps stay (deterministic PBKDF2 means
+re-linking the same sync+password opens the backups again).
+
+**Removed sync (401)** — the service no longer has the sync:
+
+- Home and Status show one notice (`SyncGoneNotice`): `Try again`,
+  `Unlink and keep a copy…`, `Cancel`.
+- `Try again` clears the dismissal and runs an explicit `ForceSyncAsync`; a
+  repeated 401 stays quiet (the notice text already explains it).
+- `Cancel` dismisses that sync until an explicit retry or a different sync.
+  Nothing is unlinked, uploaded or snapshotted automatically.
+- `Unlink and keep a copy…` asks once, then:
+  1. loads the local tree, validates it (`BackupGuard.ValidateTree`) and counts
+     items (0 items → no copy, just unlink);
+  2. hashes the serialized tree; the file name is `removed-<sha256>.json`
+     (content-addressed, so identical trees are stored once);
+  3. writes `{Format:1, CreatedAtUtc, ServiceUrl, Items, Tree}` encrypted with
+     the device key, then **verifies** by decrypting and re-hashing; a failed
+     verification deletes the temp file and aborts before the unlink;
+  4. unlinks the device (credentials + active row).
+- Copies are listed in Backup → **Copies of removed syncs** with restore and
+  delete (both confirmed), and are **never pruned automatically**. Restore
+  first snapshots the current local tree (`pre-restore`), replaces the local
+  tree and marks it dirty; while linked, it is pushed at the next sync.
+
+---
+
+## 10. Connect
+
+### 10.1 Page states
+
+`Connect` has four states:
+
+1. **Session not ready** — loading status.
+2. **Linked, not adding** — the linked service (full normalized URL) and the
+   abbreviated ID, `Copia sync ID`, the last outcome (including a newly created
+   full ID + `Copia sync ID`), `+ Add a sync`, a link to `Syncs`, and
+   `Unlink this device…` with confirmation.
+3. **Mode choice** (unlinked, or after `+ Add a sync` the mode is preset) —
+   two cards: `Link an existing sync` and `Create a new sync`. While linked,
+   only the existing path is reachable.
+4. **Editor** — service selector, credentials, QR, verification, direction
+   review and apply.
+
+### 10.2 Service selection
+
+`ServiceSelector` is used everywhere a service URL is edited:
+
+- Eight curated public services, first (`api.xbrowsersync.org`) selected by
+  default, then locally saved custom URLs, then "Custom URL…".
+- Each row shows the host (marked default/saved) with country, size limit and
+  API version. A service accepting existing syncs only is labelled; its
+  message is shown with the endpoint.
+- Only the selected service is probed. `Workflow/ServiceCheckState` ties
+  readiness and create permission to a generation, so a late reply for an
+  abandoned URL can never unlock the new one.
+- Public/saved entries check automatically; a custom URL exposes a manual
+  `Check service` and its proof is invalidated by any edit.
+- `NoNewSyncs` blocks only "Create a new sync"; existing links still work.
+- A custom URL is remembered (`XbsSettings.SavedServices`) only after a
+  successful connect/create, never after a probe or preview; verified
+  location/limit/version are refreshed only by later checks of that same URL.
+  Saved rows stay selectable while temporarily offline.
+- The selector opens on the service this device is linked to; the catalog
+  default applies while unlinked.
+- Everywhere a destination is named in words (review, confirmation, completion
+  message) the full normalized URL is used, never the bare host.
+
+**Status card** (`ServiceSelector.razor.css`): one card with a coloured dot and
+a state word, endpoint chips (`API {version}`, `{size} MB`, translated
+location), then the server note or the failure under a hairline. Precedence:
+`checking` > `error` > `status`; pulsing grey while checking, green `Online`,
+amber `NoNewSyncs`, red `Offline`/`Error`. Colour never carries the state alone.
+It is `role="status"` + `aria-live="polite"`, and a failed check becomes
+`role="alert"` with the message verbatim. Version/location chips disappear when
+the service omits them; the size chip always shows. Country codes shipped by
+the app are translated; anything else is printed as reported.
+
+### 10.3 Create a new sync
+
+The password is typed twice, minimum 8 characters (`WorkflowRules`). Two
+variants:
+
+- **Create empty** (`CreateNewSyncAsync`): save the active side (no-op when
+  unlinked) → snapshot the local tree (`create-empty`) → `POST` → derive key
+  from the returned ID → store credentials → replace the mirror with an empty
+  tree → rotate master → remember the row. The local tree is replaced, hence
+  the backup.
+- **Create with upload** (`CreateNewSyncWithUploadAsync`): save the active side
+  → `POST` → derive → `LinkUploadAsync` the current local tree on the creation
+  timestamp → rotate → remember. Credentials switch only after the upload
+  landed.
+
+Both return the **full new sync ID**; the page shows it with `Copia sync ID`
+and stores nothing but the derived key. The ID is a bearer token and cannot be
+read again later.
+
+### 10.4 Link an existing sync
+
+1. Enter service, sync ID and password (or scan a QR, §10.5).
+2. `ProbeLinkAsync` derives the key and runs `CompareAsync`: service version
+   gate, full GET, decrypt, count both sides. Wrong password → zero mutations;
+   legacy version-less sync → explicit refusal.
+3. If both sides are empty, the link applies immediately with a `take-remote`
+   snapshot.
+4. Otherwise pick a direction in this order: `Keep the server copy` (Download),
+   `Merge both`, `Keep this device's copy` (Upload). The only sensible direction
+   is preselected when one side is empty; Merge is disabled unless both sides
+   hold items.
+5. Merge computes a preview with the pure union (same function as apply) and
+   apply refuses without a current preview.
+6. Apply uses the verified candidate, snapshots the destroyed side(s), pushes
+   on the probed base, rotates the master and remembers the row. Success text
+   restates the mode, direction and full target URL (`MoveResult.Describe`).
+
+Verification hides the credential fields (the review is the confirmation);
+changing direction or re-verifying invalidates the merge preview. Each action
+cluster keeps its own adjacent error surface (`check` / `verify-link` /
+`apply-review`, `role="alert"`), never one shared box.
+
+### 10.5 Browser QR
+
+Connect → Existing sync (first link, and `+ Add a sync` while linked) places a
+QR icon and "Scan QR from browser" before the manual fields. `IQrScanner` /
+`QrScanner` use pinned `ZXing.Net.Maui.Controls` 0.10.4.
+
+- CAMERA is requested only on the scan action; camera hardware is optional; no
+  photo, gallery, clipboard or image import. The scanner decodes QR only (UTF-8)
+  and releases CameraManager/CameraX in every exit (back, cancel, modal close,
+  app lock/background, page disposal).
+- `ConnectQrPayload` validates before any network call: Keepmark JSON v1
+  allowlist, 1,800 UTF-8 bytes, strict markers/types/duplicate names/depth,
+  safe ID, supported sync version, absolute `https`/`http` URL without
+  credentials, query, fragment, backslash or control chars.
+- A valid scan produces an **in-memory candidate** only. `ConnectQrCandidateState`
+  rejects stale/duplicate scans, expires against monotonic time at consumption
+  and consumes the secret before probing. The review shows service URL and
+  abbreviated ID, then `Continue` / `Cancel`; manual fields, service controls and
+  later headings stay hidden while pending or verifying. `BeginVerification`
+  keeps the review visible with "Verifying sync…" so no form flashes.
+- Success enters exactly the manual `ProbeLink` → reconcile → apply path,
+  including direction, preview lock and safety backups. Failure drops the QR
+  password and requires a rescan; manual entry remains available.
+- The candidate clears on consumption, failure, edits, cancel, background,
+  lock or a 60-second local timeout. This is not credential expiry.
+- **Known gap**: the cleartext warning is attached to the service editor, so a
+  QR carrying `http://` shows the URL in the review but not the amber warning.
+
+### 10.6 Unlink
+
+`Unlink this device…` is armed inline (`Yes, unlink` / Cancel). It clears the
+active credentials and the active row; local bookmarks and the server copy
+stay. The result says so. Undo is cleared.
+
+### 10.7 Retired routes
+
+`/switch-service` and `/migrate` are handled by `MoveServiceLegacy.razor`, which
+redirects to `/connect`. They exist only so old links, bookmarks and launcher
+shortcuts never hit a dead route. There is no multi-step switch wizard, no
+resume draft and no "new sync next to an existing link" path.
+
+---
+
+## 11. Safety backups
+
+### 11.1 Obligation
+
+Every destructive operation snapshots the side it is about to destroy **before**
+mutating anything, and tells the user where the snapshot went. No snapshot → the
+operation must not run (fail closed, error surfaced).
+
+| Flow | Destroyed side | Snapshot | Operation tag |
 |---|---|---|---|
-| Connect → take remote | local tree | current local JSON | `take-remote` |
-| Connect → upload local | server copy | current remote JSON | `upload-local` |
-| Connect → merge both sides | both sides | current local JSON + current remote JSON | `connect-merge` |
-| Connect → create empty | local tree | current local JSON | `create-empty` |
-| Import encrypted backup | local tree | current local JSON | `import-backup` |
-| Change password | server copy | current remote JSON | `change-password` |
-| Sync switch → take remote | local tree | current local JSON | `switch-take-remote` |
-| Sync switch → upload local | server copy | current remote JSON | `switch-upload` |
-| Sync switch → merge both sides | both sides | current local JSON + current remote JSON | `switch-merge` |
-| Duplicates bulk delete | local tree | pre-delete local JSON | `duplicates-cleanup` |
-| Safety restore (any) | current state | state being replaced | `pre-restore` |
-| Conflict → take remote | local tree | current local JSON | `conflict-pull` |
-| Conflict → upload local | server copy | current remote JSON | `conflict-push` |
-| Conflict → merge both sides | both sides | current local JSON + current remote JSON | `conflict-merge` |
+| Connect → Download | local tree | local JSON | `take-remote` |
+| Connect → Upload | server copy | remote JSON | `upload-local` |
+| Connect → Merge | both sides | local + remote JSON | `connect-merge` |
+| Connect → Create empty | local tree | local JSON | `create-empty` |
+| Add while linked → Download | local tree | local JSON | `take-remote` |
+| Add while linked → Upload | server copy | remote JSON | `upload-local` |
+| Add while linked → Merge | both sides | local + remote JSON | `connect-merge` |
+| Activate a saved sync | local tree | local JSON | `switch-take-remote` |
+| Import encrypted backup | local tree | local JSON | `import-backup` |
+| Change password | server copy | remote JSON | `change-password` |
+| Duplicates bulk delete | local tree | pre-delete JSON | `duplicates-cleanup` |
+| Selection → Move | local tree | pre-move JSON | `selection-move` |
+| Selection → Delete | local tree | pre-delete JSON | `selection-delete` |
+| Selection → Undo | local tree | pre-undo JSON | `selection-move-undo` |
+| Safety restore | current state | local or server state | `pre-restore` |
+| Conflict → Download | local tree | local JSON | `conflict-pull` |
+| Conflict → Upload | server copy | remote JSON | `conflict-push` |
+| Conflict → Merge | both sides | local + remote JSON | `conflict-merge` |
 
-Rule: no snapshot → the operation must not run (fail closed, error surfaced).
-Exception: single-bookmark delete on Home keeps its 6-second in-memory undo
-instead of a file (documented, no snapshot required).
+Exception: a single bookmark/folder delete on Home keeps its 6-second in-memory
+undo instead of a file (documented; no snapshot required).
 
-### 2. File format, naming, manifest
+`switch-upload` and `switch-merge` remain known labels for old backups only.
+`switch-take-remote` is live because activation still writes it.
 
-- Payload: bookmark-tree JSON (same shape as sync blobs, plaintext) or, when
-  an aligned link key exists, AES-GCM envelope via `XCryptoService`
-  (see §3). Extension always `.json`.
-- Filename: `safety-{yyyyMMdd-HHmmss}-{operation}[-{n}].json`
-  (human-readable in file managers; `-{n}` disambiguates same-second writes).
+### 11.2 Files, naming, manifest
+
+- Payload: bookmark-tree JSON (same shape as sync blobs, plaintext) or, when an
+  aligned link key exists, an AES-GCM envelope under the master key (§11.3).
+  Extension always `.json`.
+- Name: `safety-{yyyyMMdd-HHmmss}-{operation}.json` (UTC); second writes with
+  the same operation get `-2`, `-3`, …
 - Manifest `safety-index.json`: array of
   `{FileName, CreatedAtUtc, Operation, Side, Items, SizeBytes, SyncId, Enc}`.
   `SyncId` is truncated (`ab12…ef`); `Enc` is `"master"` or absent (plaintext).
-- Legacy files (`safety-{local|remote}-{ts}.json`, no manifest entry) MUST
-  still be listed, restorable and deletable, shown as "Older backup".
-- Retention: newest 5 kept, older pruned automatically (file + index row
-  removed together). Manual delete allowed anytime with two-tap confirm.
-- Corrupt index → treated as empty (legacy scan still lists files).
-  Damaged payload → open refuses with "damaged", never half-restores.
+- Legacy files (`safety-local-<ts>.json` / `safety-remote-<ts>.json`, no
+  manifest entry) are still listed, restorable and deletable as "Older backup".
+- Retention: newest 5 kept; older files and index rows are pruned together.
+  Manual delete is always allowed with two-tap confirmation.
+- A corrupt index is treated as empty (the directory scan still lists files).
+  A damaged payload refuses to open ("damaged"), never half-restores.
+- Writes are atomic (temp + flush + rename); the prune set is computed before
+  the index is rewritten and files are deleted only afterwards, so a crash can
+  leave an orphan payload but never an index row pointing at a missing file.
 
-### 3. Encryption (envelope, Master Key)
+### 11.3 Encryption and the Master Key
 
-- Files are encrypted ONCE under a random 256-bit Master Key
-  (`XCryptoService.Encrypt`, same envelope as sync crypto).
-- The Master Key record (`safety-master.json`) holds ONLY wrapped copies:
-  `[{KekId, WrappedKey}]`, newest first, max 3. KEK = current sync-derived
-  key; `KekId` = first 8 hex of SHA-256(KEK). The plaintext master never
-  touches disk.
-- Pre-link / misaligned writes fall back to plaintext flagged `Enc: absent`
-  ("not encrypted" in UI) — never silently, never assumed encrypted.
-- Rotation (switch success, password-change success): unwrap with old KEK,
-  wrap with new KEK, write temp + fsync + atomic rename, then test-unwrap
-  before trusting; previous file kept as `.prev` until verify passes.
-  Rotation failure must NEVER fail the user flow (warn + continue).
-- Atomicity contract: rotation is ONE small atomic write; backup blobs are
-  never re-encrypted. A crash can only leave (a) old master intact, or
-  (b) new master verified — never a torn master. Concurrent access is
-  serialized by a session gate; misaligned states refuse honestly
-  ("locked to another sync (…)" naming the origin sync) instead of guessing.
-- Unlink drops the key from memory; deterministic PBKDF2 means re-linking
-  the same sync+password re-opens everything with no recovery flow.
-- Forgetting a saved row prunes that key's wrap from the master when no saved
-  sync (active included) still holds it (`SafetyMaster.PruneWraps`), so dead
-  wraps cannot crowd out a live key in the max-3 list. The last wrap is never
-  dropped and no backup is deleted: all files share the Master Key, which any
-  remaining wrap opens. Copies of removed syncs use the device key instead.
+- Files are encrypted **once** under a random 256-bit Master Key, using
+  `XCryptoService` (same envelope as sync crypto).
+- `safety-master.json` holds only wrapped copies:
+  `{Format:1, Wraps:[{KekId, WrappedKey}]}`, newest first, max **3**.
+  `KekId` = first 8 hex of SHA-256(KEK); KEK = current sync-derived key.
+  The plaintext master never touches disk.
+- Pre-link/misaligned writes fall back to plaintext flagged `Enc: absent`
+  ("not encrypted" in the UI) — never silently, never assumed encrypted.
+- Rotation (link, activation, add, password change): unwrap with the old KEK,
+  wrap with the new KEK, write temp + fsync + atomic rename, then test-unwrap
+  before trusting; the previous file is kept as `.prev` until verification
+  passes. A rotation failure never fails the user flow (warn + continue).
+- Unlink drops the key from memory, but deterministic PBKDF2 means re-linking
+  the same sync + password re-opens every backup without a recovery flow.
+- Forgetting a dormant row prunes that key's wrap when no saved sync still
+  holds it; the last wrap is never dropped. Backups are never deleted by
+  pruning.
+- Concurrent access is serialized by the session safety gate; misaligned states
+  refuse honestly ("locked to another sync (…)") instead of guessing.
 
-### 4. Restore semantics
+### 11.4 Restore semantics
 
-- Local-side entry: pre-restore snapshot of current local first, then
-  replace local tree (dirty → auto-push, or honest 409 later). Works unlinked.
-- Remote-side entry: requires an active link (refuse otherwise: "Link the
-  sync this backup belongs to first"); pre-restore snapshot of current
-  remote; re-encrypt with the CURRENT link key; push (revision CAS or
-  timestamp; 409 surfaces, nothing is clobbered). The entry's origin sync
-  is shown so the user never uploads old data onto the wrong sync silently.
-- Restore never deletes the used entry. Counts shown before confirm must
-  match `ValidateTree` (bounded tree, no nulls).
+- **Local-side entry**: snapshot the current local tree (`pre-restore`), then
+  replace the local tree. It works unlinked; the mirror is dirty and is pushed
+  at the next sync (or surfaces an honest conflict).
+- **Remote-side entry**: requires an active link (otherwise refuse: "Link the
+  sync this backup belongs to first"), snapshots the **real** server copy,
+  replaces the local tree and pushes under the current key with revision CAS.
+  A 409 surfaces; nothing is clobbered.
+- The used entry is never deleted. Counts shown before confirm come from
+  `ValidateTree` (bounded tree, no nulls).
 
-### 5. UI obligations
+### 11.5 UI obligations
 
-- Every destructive success message names the safety net and where to find
-  it ("… — see Backup → Safety backups").
-- Safety list rows show: local time, operation description, side
-  (local tree / server copy), item count, size, origin sync, encrypted flag.
-- Restore and Delete both require explicit confirm; destructive errors show
-  the reason verbatim, secrets are cleared from inputs on failure.
-- Change password and linking an existing sync keep their current-password /
-  verify-first gates; nothing in this spec weakens them.
-- Error evidence belongs to the step that produced it: Connect renders
-  one error surface per action cluster
-  (check / verify-link / apply-review) adjacent to its action
-  (`role="alert"`), never a single shared box. The check cluster is the
-  service status card: a failed check turns it red, `role="alert"` and the
-  message verbatim; a successful check is a polite `role="status"`.
-- Multi-outcome successes restate WHAT ran (mode + direction + target) via
-  the pure `MoveResult.Describe` helper (unit-pinned in
-  `BookmarkMergeTests`), never a bare "Done".
-- Merge is always preview-locked: Preview shows the union counts, changing
-  direction or re-verifying invalidates the preview, and apply refuses
-  without a fresh preview for the current probe.
+- Every destructive success message names the safety net and where to find it
+  ("… — see Backup → Safety backups").
+- Each safety row shows local time, operation description, side (local tree /
+  server copy), item count, size, origin sync and encrypted flag.
+- Restore and Delete require explicit confirmation; errors show the reason
+  verbatim; consumed secrets are cleared on failure.
+- Change password and link-existing keep their verify-first gates; nothing in
+  this spec weakens them.
+- Multi-outcome successes restate WHAT ran (mode + direction + target) through
+  `MoveResult.Describe`, never a bare "Done".
+- Merge is preview-locked: changing direction or re-verifying invalidates the
+  preview, and apply refuses without a fresh preview for the current probe.
 
-### 6. How to verify (third-party checklist)
+### 11.6 Third-party verification checklist
 
-1. `dotnet test` green (incl. `SafetyBackupTests`: naming, describe,
-   prune-5, legacy parse, index round-trip/damage, fingerprint, wrap trim).
-2. Trigger each flow in §1 → Backup → Safety backups shows a new row with
-   the right operation/side/count; filename matches on disk.
-3. Restore a local entry → tree replaced, pre-restore row appears, count matches.
-4. Restore a remote entry unlinked → refused with the link message.
-5. Delete a row → file + index row gone; restore-then-delete of the same
-   name → "not found".
-6. Sync switch / change password → previous rows still open
-   (re-wrapped, same origin sync shown).
-7. Unlink → encrypted rows refuse with the origin sync named; re-link same
+1. `dotnet test` green (safety suite: naming, describe, prune-5, legacy parse,
+   index round-trip/damage, fingerprint, wrap trim).
+2. Trigger each flow in §11.1 → Backup → Safety backups shows a row with the
+   right operation/side/count; the filename matches on disk.
+3. Restore a local entry → tree replaced, `pre-restore` row appears, count
+   matches.
+4. Restore a remote entry while unlinked → refused with the link message.
+5. Delete a row → file + index row gone; restore-then-delete of the same name →
+   "not found".
+6. Activate another sync / change password → previous rows still open
+   (re-wrapped, origin sync shown).
+7. Unlink → encrypted rows refuse with the origin sync named; re-link the same
    credentials → they open again.
-8. Kill the app mid-rotation (or restore `.prev` over master) → master
-   intact or verifiable, no silent lockout; index damage → list falls back
-   to directory scan.
-9. Merge (Connect): Preview counts match the applied
-   result (same pure `BookmarkMerge` function serves both); after apply,
-   TWO new rows appear (`connect-merge`, sides local + remote) with the right
-   counts; tree holds the union, nothing deleted. `switch-merge` rows from the
-   retired wizard stay readable.
-10. Merge preview-lock: preview, then change direction and back (or
-    re-verify) → apply refuses with "Preview the merge first — …".
-11. Merge wrong-password: verify with a wrong password → `InvalidCredentials`,
-    zero mutations, zero safety rows.
+8. Kill the app mid-rotation (or restore `.prev` over master) → master intact or
+   verifiable, no silent lockout; index damage → list falls back to the
+   directory scan.
+9. Merge in Connect: preview counts equal the applied result; TWO new rows
+   (`connect-merge`, local + remote) with the right counts; the tree holds the
+   union and nothing is deleted. Old `switch-merge` rows stay readable.
+10. Merge preview lock: preview, change direction and back (or re-verify) →
+    apply refuses with "Preview the merge first — …".
+11. Merge with a wrong password → `InvalidCredentials`, zero mutations, zero
+    safety rows.
 
-## Compatibility
+---
 
-- Server: any xBrowserSync API v1.1.13 service (official
-  `https://api.xbrowsersync.org`, self-hosted or community), min API v1.1.9.
-  `Accept-Version` header pinned to v1.1.13 (satisfies the server `^1.1.3` route).
-- Sync format v1.8.0 (≥ latest known official client): syncs open both ways.
-- Crypto (PBKDF2-SHA256/250k + AES-128-GCM-16B-IV + lzutf8) verified
-  byte-for-byte against Node in both directions — blobs are interchangeable
-  with the official clients.
-- Same guarantees: end-to-end encrypted, operators can't read data.
+## 12. Encrypted backup export and import
 
-## License and notices
+- **Export** (`ExportBackupAsync`): validates the password (≥ 8, typed twice in
+  the UI), loads the mirror, validates the tree, derives a key from a random
+  16-byte salt, writes the envelope to
+  `backups/xbs-backup-YYYYMMDD-HHmmss.xbs.json`, and offers the system share /
+  folder UI. The backup password is independent of the sync password and cannot
+  be recovered.
+- **Preview** (`PreviewBackupAsync`): checks the file size, deserializes from a
+  stream, validates the marker/salt/blob, distinguishes damaged file from wrong
+  password with a base64 pre-check, decrypts, validates the tree and returns the
+  item count. Nothing changes.
+- **Import** (`ImportBackupAsync`): re-opens the file, snapshots the current
+  local tree (`import-backup`), replaces the local tree (dirty). While linked it
+  is pushed at the next sync; a 409 surfaces honestly. The review is the only
+  confirmation and its final button executes immediately.
+- A wrong password clears only the password; the chosen file stays.
+- File suffix is `.json` (export name `.xbs.json`); limits are in §6.
 
-License, third-party notices and disclaimer: see the [README](../README.md#license).
+---
 
-## Browser QR connection (v1.0.200)
+## 13. UI architecture and behavior
 
-Connect → Existing sync (first link and `+ Add a sync` while linked)
-places a QR icon and Scan QR from browser before the manual credential fields.
-It uses the native
-`IQrScanner` / `QrScanner` modal, pinned `ZXing.Net.Maui.Controls` **0.10.4**
-(net10.0-android). CAMERA is requested only on the scan action; camera hardware
-is optional. No photographs, gallery, clipboard or image import are used.
-The scanner only decodes QR, with UTF-8; DisconnectHandler stops detection,
-unsubscribes events, disconnects/disposes CameraManager and unbinds CameraX.
-Cancellation, Android Back, modal disappearance, app lock/background and page
-disposal release the session. `AppLockState.Changed` now includes foreground
-transitions, so native content cannot remain over the lock overlay.
+### Pages and shared components
 
-`Workflow/ConnectQrPayload` validates the Keepmark JSON v1 allowlist before
-network access: 1,800 UTF-8 bytes, strict markers/types/duplicate names/depth,
-safe ID, supported numeric sync version, HTTPS URL without credentials,
-query/fragment/backslash/controls. Debug alone accepts HTTP localhost/127.0.0.1.
-Its representation is redacted; passwords remain literal and are never stored.
-A valid scan only produces an in-memory candidate. Connect renders the
-shared `QrCredentialReview` exclusively while `ConnectQrCandidateState.ShowReview`
-is pending or verifying: service URL and abbreviated sync ID, acquired-credentials
-message, and separate, spaced primary/cancel actions. Manual credentials,
-service controls and later Connect headings stay
-hidden. Explicit verification switches the same review to the localized
-“Verifying sync…” status; `BeginVerification` consumes the raw secret without
-removing the review, so no manual form or next-stage heading flashes during
-the probe. Reconciliation/direction controls appear only after verification
-succeeds; failures return to a cleared candidate and adjacent safe error. Connect explicitly calls the same ProbeLinkAsync/reconcile/apply path as
-manual entry, including backups and the final informed action. A scan never
-bypasses the app-lock gate or commits a direction on its own. The pending secret clears
-on consumption, failure, edits, cancellation, background, lock or 60-second
-local timeout. This timeout does not expire credentials or invalidate copies.
+`SessionComponentBase` waits for `XbsSession.InitAsync` with the component
+lifetime token, exposes `L`/`Loc` and `Lifetime`, and prevents work after
+disposal. Shared components are presentation-only: data in through
+`[Parameter]`, events out through `EventCallback`; no direct store fetches.
 
-Core parser and `ConnectQrCandidateState` tests run without Android. The
-shared candidate state rejects stale/duplicate scans, expires against monotonic
-time at consumption and removes its secret before probing. Debug and Release builds cannot verify
-camera permission, real UTF-8 decoding, rotation, camera-indicator shutdown,
-biometrics or device shrinking behavior: those require a real device.
+- `BookmarkRow` renders a bookmark/folder/separator row with ribbon, folder
+  glyph, swipe-expanded details and action affordances.
+- `BookmarkSheet` is the add/edit bottom sheet (snapshot anti-wipe, dirty
+  discard confirm, validation, http/https absolute URL).
+- `FolderPicker`/`MovePicker` render the collapsible tree with explicit
+  Select/Cancel; MovePicker adds recent destinations and inline folder creation.
+- `DirectionPicker` implements the fixed direction order and consequence text.
+- `ConfirmBlock` is the single inline confirmation block (armed boolean, action
+  + Cancel, busy state).
+- `StepMessage` renders one success/error line next to its action cluster.
+- `SyncGoneNotice` is the 401 notice used by Home and Status.
 
+### Async and rendering patterns
 
-## Multiple selection (v1.0.201)
+- **Optimistic delete**: remove the row from local lists + `StateHasChanged()` +
+  `Task.Delay(1)` first, then DB/sync work, then `ReloadAsync()`. The list must
+  react instantly.
+- **Busy before toast**: set `busy=false` and `StateHasChanged()` BEFORE
+  `Toast.ShowAsync` (the toast lasts ~3.5 s; buttons must re-enable at once).
+- Toasts are fire-and-forget on the UI path; never await one while list state is
+  still unpainted.
+- Fire-and-forget JS no-ops: `_ = JS.InvokeVoidAsync(...)`, never awaited before
+  UI work.
+- Modal sheets lock page scroll via `xbsGestures.lockScroll(bool, owner)`
+  (`"sheet"`, `"nav"`); the page stays locked while any owner asks. Backdrop
+  `touch-action: none`, sheet `touch-action: pan-y`, both
+  `overscroll-behavior: contain`. Home syncs the lock after render and releases
+  it in `Dispose`.
+- `Window.Activated/Resumed/Stopped/Destroying` control visibility; polling and
+  the relative-time clock stop in the background. Global folder/count/pin data
+  refresh only after `ContentVersion`, language, pins or relevant settings
+  change.
+- Uniform collapsed folder lists above 100 rows virtualize; duplicate groups
+  page in batches of 100; expanded/separator rows use the normal renderer.
+  Explicit location jumps render the full target folder until the next
+  navigation to keep scroll anchors.
+- Gesture registrations are owner-keyed and released with their component;
+  layout measurements are coalesced into one animation frame.
 
-Long press (500 ms) or ⋮ → Select captures the current list and content version.
-Checkboxes replace icons; tap/Enter/Space toggles selection. All/None applies to
-loaded logical candidates, including virtualized rows; search is limited to the
-50 returned results. Pinned/recent aliases deduplicate by NodeId. Folder selection
-includes its subtree; overlapping search descendants are covered, not counted twice.
-Top-level system containers and separators cannot be selected directly.
-Attempting to start selection on them shows an immediate informational toast,
-without leaving a persistent error below the list.
+### Gestures and selection
 
-The contextual pagebar and bottom Move/Delete actions freeze folder/search navigation.
-Back exits without mutation; Back in a destination picker/confirmation closes only
-that layer. Background/lock cancels pending interaction. Shared intake remains pending.
-A content change invalidates selection before it can act on stale row identities.
-The gesture captures NodeId and version at pointerdown; accepted long press triggers
-Android native LongPress haptics respecting system settings plus a visual checkbox
-transition. Reduced motion disables the transition; vertical scrolling stays available.
+- Delegated listeners on `document`: tap opens, swipe right expands, swipe left
+  collapses, long press (500 ms) opens the action sheet or, since v1.0.201,
+  starts multi-selection with native haptics.
+- Swipe thresholds: 12 px with a 1.5× ratio to start, 60 px to confirm; a
+  swipe/long press suppresses the following tap (400 ms). Separators and inner
+  buttons are ignored.
+- `Home.Selection.cs` coordinates `SelectionController`, the store
+  `SelectionBatch` and gated engine batch APIs. IDs are resolved and validated
+  inside the same transaction as the mutation; one engine notification follows
+  the batch.
+- Selection captures `NodeId` + content version; a content change invalidates
+  it. All/None applies to loaded logical candidates (including virtualized rows,
+  not unseen search results). Folder subtrees are included and overlapping
+  search descendants are covered once. Top-level system containers and
+  separators cannot be selected (informational toast, no persistent error).
+- Move appends roots in captured display order and skips roots already in the
+  destination. No-op batches create no backup and do not notify sync. Undo lasts
+  six seconds and restores only the batch positions; any intervening content
+  change refuses the whole undo. Delete has one confirmation with separate
+  root/contained counts and recovery through safety backups, not a global undo.
+- Single and batch moves share the six-entry recent-destination history (stable
+  NodeIds, most recent first). A new folder is saved immediately in the chosen
+  path and selected; cancelling the picker leaves it. Move stays disabled while
+  the folder name is a draft.
+- Move/delete snapshot the local tree under the engine gate and read-verify the
+  backup before mutation. Backup failure leaves the batch untouched. A
+  successful local write never claims the network is synchronized.
+- Selected folder subtrees are excluded from destinations. New-folder creation
+  is gated against the expected version and returns the new version explicitly.
 
-`Home.Selection.cs` coordinates `SelectionController`, store `SelectionPlan`, and
-gated engine batch APIs. IDs are resolved and validated inside the same SQLite
-transaction as the mutation; one engine notification follows the batch. Move appends
-roots in captured display order and skips roots already in the destination. No-op
-batches create no backup and do not notify sync. Undo lasts six seconds and restores
-only the batch positions; any intervening content change refuses the whole undo.
-Delete has one confirmation with separate selected-root and contained-item counts;
-it offers persistent safety backup recovery rather than a global-tree undo.
+### Home structure
 
-MovePicker is shared by single and batch flows. Single and batch moves save successful folder destinations in the same persistent
-six-entry history (stable NodeIds, most recent first). Both pickers show up to
-four valid recent destinations, excluding no-op and forbidden destinations;
-tapping a recent destination moves directly, while the tree requires confirmation.
-The batch summary appears only when some or all items are already at the target.
-One source folder is shown by path. Move results omit zero counts and show the
-destination, with Undo instead of a redundant backup reminder. Select a destination, then New folder
-in that path; enter name and Create. The folder is saved immediately and selected.
-Canceling the picker leaves a created folder intact. Move remains disabled while the
-name is a draft. Batch folder creation is gated against the expected version and
-returns the new version explicitly, preserving selection without ignoring external
-sync changes. Selected folder subtrees are excluded from destinations.
+- Fixed top bar with brand + hamburger (drawer overlays; it never becomes a
+  sidebar on tablets).
+- Sticky stack: search → breadcrumbs → sort, each with the body background and
+  decreasing z-index so rows never show through.
+- Pinned and Recently added cards keep their ribbon heads when open and a muted
+  preview line when closed. Recently added = newest `dateAdded`, undated after
+  them by `NodeId`, with folder path; Settings controls on/off, 5/10/20 and the
+  open state. "See all recent" is a virtual crumb level (up to 50).
+- Floating Add FAB and a fixed status bar; sync progress uses an indeterminate
+  top loader + dark `Syncing…` pill (Manual mode only).
+- Folders first; display sort (Default/Asc/Desc) is UI-only and never written
+  to the sync blob.
+- `DisplayTitle` localizes top-level `[xbs]` containers; edit forms show the raw
+  synced title.
 
-Move/delete snapshot the local tree under the engine gate, write and read-verify the
-safety backup before mutation (`selection-move`, `selection-delete`; undo uses
-`selection-move-undo`). Backup failure leaves the batch untouched. A successful local
-write does not claim the network is synchronized. Test coverage: SelectionBatchTests,
-SelectionControllerTests and `node tests/js/gestures.test.cjs`. TalkBack, physical
-haptic perception, font scaling and rotation require device QA.
+### Accessibility and error surfaces
 
-Move-picker layout: original tree layout retained, with the approved “Cartella incisa” icon
-(closed folder pocket and fine outline on the existing tinted tile).
-Single and batch flows share wrapping names, capped visual nesting, 44px expand
-targets, explicit Cancel/Move actions and a separate wrapping destination path.
-New-folder entry uses a full-width field above Create/Cancel; destination/search
-controls pause while a folder-name draft is open, preventing accidental draft loss.
+- Focus moves to the `h1` on navigation (`FocusOnNavigate`).
+- Dialogs are `role="dialog" aria-modal="true"`; trees use `role="tree"` /
+  `treeitem` with `aria-selected`, `aria-level`, `aria-expanded` only where
+  expand/collapse is real; list rows are `role="button" tabindex="0"` and only
+  Enter activates (Space scrolls).
+- Errors are `role="alert"`, counts/states `role="status"`, sync
+  `role="progressbar"`; `aria-invalid`/`aria-describedby` on fields.
+- Touch targets ≥ 44 px (48 px for rows/search/crumbs/pinned header); visible
+  tap/selected/active feedback.
+- Status and colour never alone: every state has a word or icon.
+- Each action cluster owns its adjacent error surface; a failed service check
+  turns the status card red with `role="alert"` and the verbatim message.
 
-The incised folder icon is shared visually by FolderPicker (including search and
-drafts), MovePicker, recent move shortcuts and the bookmark form folder button.
+### Razor/Blazor gotchas
 
-## Service selection (v1.0.208)
+- String component parameters without `@` pass literals.
+- A ternary with `: null` or nested ternaries inside attributes fails to parse —
+  use a `@code` helper.
+- Blazor renders bool ARIA as `True`/`False`: lowercase explicitly.
+- Inside `@if { }` whitespace between/around inline expressions and `<text>` can
+  be dropped (seen live as `2 KBof 1 MB`): build one string
+  (`@($" {a} {b}")`) or emit `@(" ")`.
+- URL inputs need `autocapitalize="off" autocorrect="off" spellcheck="false"`
+  (Android capitalized `Https://`); store through
+  `WorkflowRules.NormalizeServiceUrl`.
+- sqlite-net enables shared cache; SQLCipher `PRAGMA key` needs
+  `ExecuteScalar`.
+- AndroidX Biometric forbids a custom negative button with
+  `DEVICE_CREDENTIAL`.
 
-Connect (existing/new) uses `ServiceSelector`. The bundled
-eight-service catalog keeps api.xbrowsersync.org first and default; country codes,
-sync limits and API versions are advertised reference data. Selection probes only
-the chosen endpoint; automatic checks gate continuation and unavailable or
-incompatible services cannot advance. NoNewSyncs permits existing links only.
-Custom URLs expose manual verification, with inline live server metadata. Input
-changes invalidate results; `Workflow/ServiceCheckState.cs` (generation,
-readiness, create permission) rejects stale responses, and the scoped
-`ServiceSelector.razor.css` styles the collapsed button and the expanded choice
-list. `XbsSettings.SavedServices` remembers custom HTTPS endpoints only from successful
-session apply/create methods, never probes or reconciliation previews. Saved
-entries remain selectable across flows even after temporary outages.
+### Visual rules
 
-Saved service rows retain verified location, limit and API version after a
-successful pairing. Subsequent checks may refresh this endpoint metadata only
-for already-saved URLs. Legacy saved entries show unknown metadata until their
-next check. URL identities canonicalize host case/default ports while retaining
-path case, so equivalent addresses cannot create duplicate entries.
+Design tokens, layout, components, z-index scale and the accessibility checklist
+are normative in [DESIGN.md](DESIGN.md). Highlights: never cover the status
+bar/notch (non-edge-to-edge window + safe-area + confined scroll), `--km-*`
+tokens for brand colours, `xbs-*` classes for custom behavior, `km-*` scoped
+classes for local presentation only, status bar 1070 < sheet 1100 < toast 1200 <
+lock 2000.
 
-## Service selection refinements (v1.0.209)
+---
 
-Connect opens on the service this device is linked to, so the current
-destination is recognisable before changing it; the catalog keeps its order and
-its default for unlinked setups. Destination names in the Connect review and in the
-confirm that precedes the definitive apply use the full normalized URL, matching
-the completion messages. The verified-endpoint summary of that release is
-superseded by the status card in "Service status card (v1.0.210)".
+## 14. Internationalization
 
-## Connect mode choice (v1.0.210)
+- Every UI text is a key in `src/Keepmark.Core/I18n/Str.g.cs`
+  (`public const string`) and a value in **all nine** `Catalog.*.cs` files.
+  `I18nTests` enforces key parity and that every `Str` constant exists in
+  English.
+- `Loc.Get(key, args)` uses `Langs.Current` (explicit setting, else
+  `CurrentUICulture`, else `en`) and falls back to English, then the key.
+- Plurals: `baseKey_one` / `baseKey_other`; French and Brazilian Portuguese use
+  `_one` for 0; Japanese and Chinese use the same text for both; Russian
+  `_other` is count-neutral ("Закладок: {count}") so 2–4 and 5+ read correctly.
+- `LanguageService.Apply` sets culture and the process-wide `Langs.Forced`,
+  bumps `Version` and raises `Changed`; the layout re-renders on that version so
+  a language change needs no restart. If the language matches the system
+  culture, the system region (date/number formats) is kept.
+- Relative times: `RelativeTime.Format` (just now / N min / N hours same day /
+  yesterday / N days / N weeks / date) in the device time zone; the action sheet
+  shows `Added: <date time> · <relative>` and drops the relative part after 30
+  days.
+- Log strings and exception diagnostics stay English. UI terms and translations
+  are normative in [UI-TERMS.md](UI-TERMS.md); workflows in
+  [WORKFLOWS.md](WORKFLOWS.md).
 
-The retired Switch service picked new vs existing sync with the segmented control
-`.xbs-seg` (`app.css`): the question `SwIntoWhich` above it, the two labels inside
-it and one line of explanation below (`SwANewText` / `SwExistingText`,
-`role="status"`). Both options stayed visible in the vertical room of a single
-select row, and the labels were short (`Nuova` / `Esistente`) because the question
-already carried the noun; the chosen side was the filled accent pill
-(`aria-pressed="true"`). The wizard, its strings and its resume draft are gone in
-the multi-sync release: Connect keeps its two cards (`Link an existing sync`,
-`Create a new sync`) and adding while linked offers only the existing-sync path.
+---
 
-## Service status card (v1.0.210)
+## 15. Tests and verification
 
-The endpoint check result under `ServiceSelector` (Connect) is
-one card, `.km-service-status` in `ServiceSelector.razor.css`, instead of loose
-helper lines: a coloured dot and the state word, the endpoint facts as chips, and
-the server note under a solid hairline. The dot reuses the status-bar tokens and
-follows the same precedence as the word (`checking` > `error` > `status`):
-pulsing grey `#8a90a8` while `ServiceChecking`, green `--km-ok-dot` for
-`Online` (`ServiceReady`), amber `--km-gold` for `NoNewSyncs`
-(`ServiceStatusNoNew`), red `--km-danger` for `Offline`/`Error` and for a check
-that failed (`ServiceUnavailable`). Colour never carries the state alone — the
-word beside the dot says the same thing; the card is `role="status"` with
-`aria-live="polite"`, and a failed check becomes `role="alert"` instead, so
-Connect keeps the R8.7 rule that each action cluster owns its error surface.
+### Automated suites (370 tests, no device)
 
-The facts are three chips: `ServiceApi {0}` and the location are dropped when
-the service omits them (self-hosted services often have no location), which is
-why the trailing separator of the old single line is gone, while the size chip
-`ServiceSize {0}` (unit translated: MB/Mo/МБ) always shows the advertised limit,
-as before. The location chip translates the country codes the app ships
-(`ServiceCountry*`: GB/CA/DE/IT, so the official service reads "Regno Unito", not
-"GB") and prints anything else as reported; the saved row uses the same
-translation. The note
-shows, in order, the failure from the last check, the service's own `message`
-(a plain accent-icon note) or the `ServiceNoNew` explanation for the amber state;
-a failure tints the card red (8% `--km-danger` over `--km-surface`, the same
-trick `.xbs-verified` uses with green) and the standalone `alert` it used to
-render is gone. `ServiceReady` is a word now ("Collegato"), no longer the whole
-summary line.
+| Suite | Proves |
+|---|---|
+| `ApiClientTests` | routes, shapes, version headers, error mapping, timeouts, expiry capability |
+| `CryptoInteropTests` + `vectors.json` | sync envelope both directions |
+| `BackupGuardTests` | backup limits, tree validation, password rules |
+| `RetryPolicyTests` | read retries/backoff, no blind create/PUT retry |
+| `StoreSyncTests` | mirror/meta/dirty, pull/push, stable RowIds, restore |
+| `BookmarkMergeTests` | union rules, ids, folder paths, empty sides, URL identity, flatten, `MoveResult` |
+| `ConflictResolutionTests` | fake server with real base semantics, 409 handling, merge retry |
+| `SafetyBackupTests` | naming, describe, prune-5, legacy parse, index round-trip/damage, fingerprint, wrap trim |
+| `SavedSyncsTests` | identity, canonical URL, labels, upsert, sort, defensive JSON |
+| `SavedSyncActivationTests` | read-only activation probe, fail-closed switch, previous row kept |
+| `RemovedSyncNoticeTests` | 401 notice state, dismiss/retry, copy-before-unlink, dedupe |
+| `ServiceCatalogTests` | catalog, normalization, saved metadata, stale checks |
+| `ConnectQrTests` | strict parser, bounded sizes, candidate generations/timeout/consume |
+| `WorkflowTests` | URL split/compose, password rules, short IDs, cleartext detection |
+| `I18nTests` | nine-language parity and `Str` coverage |
+| `SelectionBatchTests`, `SelectionControllerTests` | batch validation, undo, version gates |
+| `ForegroundPollerTests`, `LockPolicyTests` | lifecycle/cancellation, relock presets |
+| `VersionCompareTests` | numeric dotted compare |
+| `StorePerformanceTests`, `SyncPerformanceTests` | query plans, targeted paths, aggregation, allocations |
+
+Commands: `dotnet test` (after `scripts/prepare-sqlcipher.py --linux` once) and
+`node tests/js/gestures.test.cjs`. Performance and interop commands are in §3
+and PERFORMANCE.md.
+
+### Manual / device verification
+
+The per-view checklist is in
+[verification-spec.md](verification-spec.md) §11. No view may be skipped: Home,
+Duplicates, Backup, Syncs, Connect, MoveServiceLegacy, Settings, Status, Logs,
+About, plus cross-view checks (live v1.2 conditional GET/CAS, restore against a
+real server, uninstall/reinstall data loss). QR hardware cases (permission
+denied/revoked, rotation, biometric lock, camera indicator off) and TalkBack,
+font scaling and haptics require a real device.
+
+### Release checklist
+
+See §16 and verification-spec.md §13.5.
+
+---
+
+## 16. Release and distribution
+
+1. `dotnet test` green.
+2. `dotnet build src/KeepmarkMobile -f net10.0-android -c Debug` with 0 errors.
+3. Device deploy via `-t:Run`; walk the changed flows; check
+   `dumpsys package … versionName`.
+4. Bump `ApplicationDisplayVersion`/`ApplicationVersion`; bump `?v=` in
+   `wwwroot/index.html` when CSS/JS changed.
+5. Commit as `v1.0.N (M): …` (no AI attribution), then ask before pushing.
+6. Play: `scripts/build-play-aab.sh`, verify the AAB with
+   `keytool -printcert -jarfile`, upload to closed testing.
+7. GitHub release: `gh release create v1.0.N` with notes only (no APK/assets),
+   explaining how to join the testers group.
+
+Docs-only changes do not bump the version and do not need a device build.
+
+---
+
+## 17. Engineering rules and gotchas
+
+### Non-negotiable
+
+- **Efficiency**: batch work into the fewest transactions and network calls.
+  Never loop single-item operations when a bulk path exists — one sync storm can
+  get the service to throttle or blacklist us. Example: duplicates cleanup
+  deletes everything in ONE store transaction + ONE push.
+- **Safety**: destructive work resolves by stable identity (`NodeId`, never a
+  possibly-rekeyed `RowId`), validates before acting, keeps an undo or
+  safety-backup path, and logs failures with context instead of swallowing them.
+- **Atomicity**: multi-step mutations go in one SQLite transaction where
+  possible (resolve + delete inside one `tran`), so a concurrent push/pull
+  rekey cannot strand half a batch.
+- **Fail closed**: no safety snapshot → no destructive operation; failed
+  verification → no switch; pending conflict → no activation.
+- **Secrets**: raw passwords only as method arguments; never persisted, never
+  logged, never in filenames or toasts. Sync IDs are bearer tokens: truncate
+  them in UI and logs.
+- **No silent conflict resolution**: a 409 is always surfaced; merge retries
+  re-fetch and re-merge, max 3 attempts.
+
+### Database and platform gotchas
+
+- Never edit `bin/`/`obj/` output or generated `Str.g.cs` by hand (regenerate
+  keys intentionally and keep catalogs in sync).
+- Do not restore plain SQLite packages; startup must keep failing closed when
+  `cipher_version` is absent.
+- Keep the `safety-*` filename/manifest formats stable: old backups must stay
+  listable and restorable.
+- Keep `SavedSyncs.Deserialize` defensive: it runs inside the link flow and must
+  never throw on old or hand-edited JSON.
+- The app is not edge-to-edge; do not enable it (status bar must stay visible).
+- SQLite `RowId` is not identity; always rebase UI state on `NodeId` before
+  redrawing after a sync.
+
+### Current known gaps
+
+- The QR review does not repeat the plain-HTTP warning (§10.5).
+- The 401 notice's explanatory text names the common three-week expiry; a v1.2
+  service may advertise a different `syncExpiryDays`, which Status shows.
+
+---
+
+## 18. License and notices
+
+Proprietary — © 2026 Yari Melzani, all rights reserved. See
+[`LICENSE.md`](../LICENSE.md). Independent implementation, compatible with the
+xBrowserSync protocol; not affiliated with or endorsed by xBrowserSync.
+
+Third-party notices: `Crypto/LzUtf8.cs` is a C# port of `lzutf8` (MIT, © Rotem
+Dan); BouncyCastle (MIT); SQLCipher Community (BSD-style), SQLite (public
+domain), LibTomCrypt (public-domain option); Figtree (OFL). See
+[`native/sqlcipher/THIRD-PARTY-NOTICES.txt`](../native/sqlcipher/THIRD-PARTY-NOTICES.txt),
+also bundled in the app.
