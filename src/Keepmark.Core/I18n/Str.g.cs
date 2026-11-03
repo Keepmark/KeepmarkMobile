@@ -455,6 +455,8 @@ public static partial class Str
     public const string CommonClear = nameof(CommonClear);
     public const string CommonYesClear = nameof(CommonYesClear);
     public const string LogLevelVerboseShort = nameof(LogLevelVerboseShort);
+    public const string LogsShow = nameof(LogsShow);
+    public const string LogsHide = nameof(LogsHide);
     public const string LogsBuffer = nameof(LogsBuffer);
     public const string LogsEntriesRecording = nameof(LogsEntriesRecording);
     public const string LogsInfoRest = nameof(LogsInfoRest);
@@ -495,6 +497,7 @@ public static partial class Str
     public const string SettingsSyncMode = nameof(SettingsSyncMode);
     public const string SettingsModeAuto = nameof(SettingsModeAuto);
     public const string SettingsModeManual = nameof(SettingsModeManual);
+    public const string SettingsLogsHint = nameof(SettingsLogsHint);
     public const string SettingsLogVerbosity = nameof(SettingsLogVerbosity);
     public const string SettingsVerbosityHint = nameof(SettingsVerbosityHint);
     public const string SettingsTheme = nameof(SettingsTheme);
@@ -657,6 +660,8 @@ public static partial class Str
     public const string SafetyOpConflictPull = nameof(SafetyOpConflictPull);
     public const string SafetyOpConflictPush = nameof(SafetyOpConflictPush);
     public const string SafetyOpConflictMerge = nameof(SafetyOpConflictMerge);
+    public const string SafetyOpSyncPull = nameof(SafetyOpSyncPull);
+    public const string SafetyOpSyncPush = nameof(SafetyOpSyncPush);
     public const string SafetyOpLegacy = nameof(SafetyOpLegacy);
     public const string SafetySideLocal = nameof(SafetySideLocal);
     public const string SafetySideServer = nameof(SafetySideServer);

@@ -34,7 +34,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (390 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (397 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -276,12 +276,11 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
 | `/` | `Home` | tree, search, pinned/recent, sheets, share intake, selection |
 | `/duplicates` | `Duplicates` | duplicate groups and bulk cleanup |
 | `/backup` | `Backup` | encrypted export/import, safety backups, removed copies |
-| `/syncs` | `Syncs` | saved syncs (activate, rename, forget, unlink) plus `+ Add a sync`, which opens the whole connect flow in place |
+| `/syncs` | `Syncs` | saved syncs (activate, rename, forget, unlink, `Change password` on the active row) plus `+ Add a sync`, which opens the whole connect flow in place |
 | `/connect` | `Connect` | redirect to `/syncs` (old links only) |
-| `/settings` | `Settings` | sync mode, theme, language, home sections, verbosity |
+| `/settings` | `Settings` | sync mode, theme, language, home sections, and the log panel folded behind one "Show logs" button (verbosity + current log inside) |
 | `/settings/security` | `Security` | app lock and relock time |
 | `/status` | `Status` | sync state, sizes, versions, removed-sync notice |
-| `/logs` | `Logs` | in-memory log viewer + share export |
 | `/help` | `Help` | user help |
 | `/about` | `About` | versions, license, bug-report mail |
 | `/switch-service`, `/migrate` | `MoveServiceLegacy` | redirect to `/syncs` (old links only) |
@@ -289,7 +288,9 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
 - `Components/` — shared UI: `ConnectPanel` (the add/connect flow used by
   `Syncs`), `BookmarkRow`, `BookmarkSheet`, `FolderPicker`,
   `MovePicker`, `DirectionPicker`, `ConfirmBlock`, `StepMessage`,
-  `ServiceSelector`, `QrCredentialReview`, `SyncGoneNotice`, `RowTile`.
+  `ServiceSelector`, `QrCredentialReview`, `SyncGoneNotice`, `RowTile`,
+  `LogsPanel` (the log viewer + share export, embedded in `Settings`; the log
+  is troubleshooting material, so it has no page and no menu entry).
 - `Platforms/Android/` — `MainActivity` (non-edge-to-edge window, app lock on
   resume), `ShareActivity` (translucent SEND target), `ShareIntake`
   (publish/limbo/flush), `QrScanner` (ZXing.Net.Maui 0.10.4), biometric and
@@ -374,7 +375,7 @@ Non-secret settings: `service_url`, `saved_services`, `saved_service_info`,
 
 | Path | Content |
 |---|---|
-| `backups/xbs-backup-YYYYMMDD-HHmmss.xbs.json` | user encrypted export (§12) |
+| `backups/xbs-backup-[<sync>-]YYYYMMDD-HHmmss.xbs.json` | user encrypted export (§12); `<sync>` is the active sync's name slugged |
 | `safety-backups/safety-*.json` + `safety-index.json` | safety snapshots (§11) |
 | `safety-backups/safety-master.json` (+ `.prev.json` during rotation) | wrapped master key |
 | `removed-syncs/removed-<sha256>.json` | copies of removed syncs (§9.5) |
@@ -943,6 +944,15 @@ has.
 | Conflict → Download | local tree | local JSON | `conflict-pull` |
 | Conflict → Upload | server copy | remote JSON | `conflict-push` |
 | Conflict → Merge | both sides | local + remote JSON | `conflict-merge` |
+| Sync download, more than 5 nodes changed | local tree | local JSON | `sync-pull` |
+| Sync upload, more than 5 nodes changed | server copy | remote JSON | `sync-push` |
+
+A normal sync takes no snapshot: replacing a whole tree is its normal shape.
+When one side would lose more than `XbsConstants.MaxSilentSyncChanges` (5)
+nodes something massive happened (a wipe, an import done outside the app,
+another client gone wrong), so the side being replaced is snapshotted first
+(`TreeMagnitude.ChangedNodeCount`: bookmarks by normalized URL, folders by path
+below the three roots) and the sync continues; a failed snapshot aborts it.
 
 Exception: a single bookmark/folder delete on Home keeps its 6-second in-memory
 undo instead of a file (documented; no snapshot required).
@@ -1055,8 +1065,11 @@ them, so `SafetyOperations.Describe` still names them; nothing writes them now.
 - **Export** (`ExportBackupAsync`): validates the password (≥ 8, typed twice in
   the UI), loads the mirror, validates the tree, derives a key from a random
   16-byte salt, writes the envelope to
-  `backups/xbs-backup-YYYYMMDD-HHmmss.xbs.json`, and offers the system share /
-  folder UI. The backup password is independent of the sync password and cannot
+  `backups/xbs-backup-[<sync>-]YYYYMMDD-HHmmss.xbs.json`, and offers the system
+  share / folder UI. `<sync>` is the active sync's name (label, else service
+  host) slugged by `BackupGuard.Slug`: lowercase, accents folded, anything that
+  is not a letter or digit collapsed into one underscore, at most 40 characters;
+  without a usable name the file keeps the plain timestamped name. The backup password is independent of the sync password and cannot
   be recovered.
 - **Preview** (`PreviewBackupAsync`): checks the file size, deserializes from a
   stream, validates the marker/salt/blob, distinguishes damaged file from wrong
@@ -1275,7 +1288,7 @@ and PERFORMANCE.md.
 
 The per-view checklist is in
 [verification-spec.md](verification-spec.md) §11. No view may be skipped: Home,
-Duplicates, Backup, Syncs, Connect, MoveServiceLegacy, Settings, Status, Logs,
+Duplicates, Backup, Syncs, Connect, MoveServiceLegacy, Settings, Status,
 About, plus cross-view checks (live v1.2 conditional GET/CAS, restore against a
 real server, uninstall/reinstall data loss). QR hardware cases (permission
 denied/revoked, rotation, biometric lock, camera indicator off) and TalkBack,

@@ -619,10 +619,26 @@ public sealed class XbsSession : IAsyncDisposable
         var envelope = new BackupEnvelope("xBrowserSyncNg", 1, salt, _crypto.Encrypt(json, derived));
         var dir = Path.Combine(FileSystem.AppDataDirectory, "backups");
         Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, $"xbs-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.xbs.json");
+        // The file name carries the sync it belongs to, so two exports of
+        // different syncs never look identical in the share sheet.
+        var path = Path.Combine(dir, BackupGuard.ExportFileName(await ActiveSyncNameAsync().ConfigureAwait(false), DateTime.UtcNow));
         await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(envelope), ct).ConfigureAwait(false);
         _log.Info("session", $"Encrypted backup exported ({CountBackupNodes(roots)} nodes)");
         return path;
+    }
+
+    /// <summary>Name of the sync this device is linked to (label or service
+    /// host), for the export file name. Null when nothing is linked.</summary>
+    private async Task<string?> ActiveSyncNameAsync()
+    {
+        var current = await _creds.GetAsync().ConfigureAwait(false);
+        if (current is null)
+        {
+            return null;
+        }
+
+        var row = await Registry.FindAsync(new SavedSyncIdentity(current.ServiceUrl, current.Id)).ConfigureAwait(false);
+        return row is null ? null : SavedSyncs.Name(row);
     }
 
     /// <summary>Reads a backup file: validates the password and returns the item count.</summary>

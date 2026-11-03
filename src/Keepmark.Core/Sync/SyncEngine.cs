@@ -273,10 +273,16 @@ public sealed partial class SyncEngine(
         }
     }
 
-    private async Task<bool> ApplyPulledAsync(GetBookmarksResponse full, SyncCredentials c, CancellationToken ct)
+    private async Task<bool> ApplyPulledAsync(GetBookmarksResponse full, SyncCredentials c, CancellationToken ct,
+        bool guardMassive = true)
     {
         ThrowIfVersionUnsupported(full.Version);
         var roots = ParseTree(crypto.Decrypt(full.Bookmarks ?? string.Empty, c.DerivedKey));
+        if (guardMassive)
+        {
+            await GuardMassivePullAsync(c, roots).ConfigureAwait(false);
+        }
+
         // Meta persists only when the server speaks v1.2; otherwise stale
         // revision/hash is cleared so the next push cannot reuse it.
         await store.ReplaceAllAsync(roots, full.Bookmarks ?? string.Empty, full.LastUpdated!, full.Version,
@@ -392,7 +398,8 @@ public sealed partial class SyncEngine(
     }
 
     private async Task PushCoreAsync(
-        bool updateVersion, CancellationToken ct, PushBase? baseOverride = null, string? keyOverride = null)
+        bool updateVersion, CancellationToken ct, PushBase? baseOverride = null, string? keyOverride = null,
+        bool guardMassive = true)
     {
         var stored = await RequireCredsAsync().ConfigureAwait(false);
         // keyOverride: password change re-encrypts under the NEW key; the
@@ -421,6 +428,13 @@ public sealed partial class SyncEngine(
             Normalize(roots);
             var json = JsonSerializer.Serialize(roots, Json);
             blob = crypto.Encrypt(json, c.DerivedKey);
+
+            // A change this big is not an ordinary edit: snapshot the server
+            // copy before replacing it (a failed snapshot aborts the push).
+            if (guardMassive)
+            {
+                await GuardMassivePushAsync(c, roots, ct).ConfigureAwait(false);
+            }
 
             var api = apiFor(c.ServiceUrl);
             UpdateBookmarksResponse res;
@@ -1119,6 +1133,57 @@ public sealed partial class SyncEngine(
 
     /// <summary>Fail-closed snapshot through the session callback. Without a
     /// callback (unit tests) nothing is written; production always wires it.</summary>
+    /// <summary>A sync replaces whole trees, so an ordinary edit is tiny and
+    /// takes no snapshot. When the download would drop more than
+    /// <see cref="XbsConstants.MaxSilentSyncChanges"/> nodes something massive
+    /// happened (a wipe, a bad import, another client gone wrong): snapshot the
+    /// local copy first. Fail-closed — a failed snapshot aborts the pull.</summary>
+    private async Task GuardMassivePullAsync(SyncCredentials c, List<BookmarkNode> remote)
+    {
+        var (localRoots, _, _, _) = await store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+        var magnitude = TreeMagnitude.ChangedNodeCount(localRoots, remote);
+        if (magnitude <= XbsConstants.MaxSilentSyncChanges)
+        {
+            return;
+        }
+
+        await SnapshotAsync("local", localRoots, SafetyOperations.SyncPull, c.Id).ConfigureAwait(false);
+        log.Warn("sync", $"Massive download ({magnitude} nodes): local copy snapshotted");
+    }
+
+    /// <summary>Same guard on the upload side: the server copy is snapshotted
+    /// before a massive replace. The base is the last synced tree (the stored
+    /// blob), so this measures the local change, not the server's.</summary>
+    private async Task GuardMassivePushAsync(SyncCredentials c, List<BookmarkNode> next, CancellationToken ct)
+    {
+        var previousBlob = await store.GetStoredBlobAsync().ConfigureAwait(false);
+        if (string.IsNullOrEmpty(previousBlob))
+        {
+            return;
+        }
+
+        List<BookmarkNode> previous;
+        try
+        {
+            previous = ParseTree(crypto.Decrypt(previousBlob, c.DerivedKey));
+        }
+        catch
+        {
+            // Cannot compare: the conflict path still protects the push.
+            return;
+        }
+
+        var magnitude = TreeMagnitude.ChangedNodeCount(previous, next);
+        if (magnitude <= XbsConstants.MaxSilentSyncChanges)
+        {
+            return;
+        }
+
+        var (_, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
+        await SnapshotAsync("remote", remoteRoots, SafetyOperations.SyncPush, c.Id).ConfigureAwait(false);
+        log.Warn("sync", $"Massive upload ({magnitude} nodes): server copy snapshotted");
+    }
+
     private Task SnapshotAsync(string side, List<BookmarkNode> tree, string operation, string syncId) =>
         _saveSafetyBackup is null
             ? Task.CompletedTask
@@ -1133,7 +1198,7 @@ public sealed partial class SyncEngine(
             var (localRoots, _, _, _) = await store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
             await SnapshotAsync("local", localRoots, SafetyOperations.ConflictPull, c.Id).ConfigureAwait(false);
             var full = await GetFullAsync(c, ct).ConfigureAwait(false);
-            await ApplyPulledAsync(full, c, ct).ConfigureAwait(false);
+            await ApplyPulledAsync(full, c, ct, guardMassive: false).ConfigureAwait(false);
         }, ct);
 
     /// <summary>Resolves a conflict by uploading the local tree (push), based
@@ -1144,7 +1209,8 @@ public sealed partial class SyncEngine(
         {
             var (res, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
             await SnapshotAsync("remote", remoteRoots, SafetyOperations.ConflictPush, c.Id).ConfigureAwait(false);
-            await PushCoreAsync(false, ct, new PushBase(res.LastUpdated!, res.Meta?.Revision)).ConfigureAwait(false);
+            await PushCoreAsync(false, ct, new PushBase(res.LastUpdated!, res.Meta?.Revision), guardMassive: false)
+                .ConfigureAwait(false);
         }, ct);
 
     /// <summary>Resolves a conflict by merging both trees (union, never
@@ -1222,7 +1288,7 @@ public sealed partial class SyncEngine(
                 : await GetFullAsync(candidate, ct).ConfigureAwait(false);
             // Decrypts (wrong password throws) before the mirror is replaced;
             // credentials switch last.
-            await ApplyPulledAsync(full, candidate, ct).ConfigureAwait(false);
+            await ApplyPulledAsync(full, candidate, ct, guardMassive: false).ConfigureAwait(false);
             await creds.SetAsync(candidate with { Version = full.Version ?? candidate.Version }).ConfigureAwait(false);
         }
         catch (XbsException ex)
@@ -1299,8 +1365,8 @@ public sealed partial class SyncEngine(
             }
 
             await SnapshotAsync("remote", remoteRoots, safetyOperation, c.Id).ConfigureAwait(false);
-            await PushCoreAsync(false, ct, new PushBase(res.LastUpdated!, res.Meta?.Revision), newDerivedKey)
-                .ConfigureAwait(false);
+            await PushCoreAsync(false, ct, new PushBase(res.LastUpdated!, res.Meta?.Revision), newDerivedKey,
+                guardMassive: false).ConfigureAwait(false);
             await creds.SetAsync(c with { DerivedKey = newDerivedKey }).ConfigureAwait(false);
         }
         finally

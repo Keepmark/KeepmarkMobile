@@ -30,6 +30,10 @@ public static class SafetyOperations
     public const string ConflictPush = "conflict-push";
     public const string ConflictMerge = "conflict-merge";
     public const string SelectionDelete = "selection-delete";
+    // A sync whose magnitude exceeded XbsConstants.MaxSilentSyncChanges: the
+    // side being replaced was snapshotted first (a normal sync takes none).
+    public const string SyncPull = "sync-pull";
+    public const string SyncPush = "sync-push";
     // Retired: moves and their undo are reversible and no longer snapshot.
     // Kept so the backups written by older versions keep their label.
     public const string SelectionMove = "selection-move";
@@ -55,6 +59,8 @@ public static class SafetyOperations
         ConflictPull => Loc.Get(Str.SafetyOpConflictPull),
         ConflictPush => Loc.Get(Str.SafetyOpConflictPush),
         ConflictMerge => Loc.Get(Str.SafetyOpConflictMerge),
+        SyncPull => Loc.Get(Str.SafetyOpSyncPull),
+        SyncPush => Loc.Get(Str.SafetyOpSyncPush),
         _ => Loc.Get(Str.SafetyOpLegacy),
     };
 }

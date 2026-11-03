@@ -1,11 +1,9 @@
-@page "/logs"
+@* The log panel itself: filters, export and clear. Settings folds it behind
+   one "Show logs" button — it is troubleshooting material, not a page. *@
 @using Keepmark.Core.Workflow
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.ToastState Toast
 
-<PageTitle>@L.Get(Str.NavLogs)</PageTitle>
-
-<h1>@L.Get(Str.NavLogs)</h1>
 <p class="text-muted">@L.Get(Str.LogsBuffer) <strong>@entries.Count</strong> @L.Get(Str.LogsEntriesRecording) <strong>@minLevel</strong> @L.Get(Str.LogsInfoRest)</p>
 
 <div class="d-flex gap-2 flex-wrap mb-2">

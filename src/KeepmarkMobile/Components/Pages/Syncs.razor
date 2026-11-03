@@ -103,6 +103,46 @@ else
                                   ConfirmLabel="@L.Get(Str.CommonYesUnlink)" Busy="busy"
                                   OnConfirm="UnlinkAsync" OnCancel="Disarm" />
                 }
+                else if (passwordKey == key)
+                {
+                    @* The long password belongs to this sync: its change is a
+                       row task here, never a Settings section. *@
+                    <div class="mt-2">
+                        <InfoHint Text="@L.Get(Str.SettingsChangePasswordShort)" Title="@L.Get(Str.SettingsChangePassword)" Body="@L.Get(Str.SettingsChangePasswordHint)" />
+                        <div class="mb-2">
+                            <label class="form-label" for="sync-pw-current-@i">@L.Get(Str.CommonCurrentPassword)</label>
+                            <input id="sync-pw-current-@i" type="password" class="form-control" @bind="pwCurrent" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" for="sync-pw-new-@i">@L.Get(Str.CommonNewPassword)</label>
+                            <input id="sync-pw-new-@i" type="password" class="form-control" @bind="pwNew" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" for="sync-pw-confirm-@i">@L.Get(Str.CommonConfirmNewPassword)</label>
+                            <input id="sync-pw-confirm-@i" type="password" class="form-control" @bind="pwConfirm" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
+                        </div>
+                        @if (!armedPw)
+                        {
+                            <div class="d-flex flex-wrap gap-2">
+                                <button class="btn btn-warning btn-sm" @onclick="ArmChangePassword" disabled="@pwBusy">@L.Get(Str.SettingsChangePasswordBtn)</button>
+                                <button class="btn btn-secondary btn-sm" @onclick="ClosePassword" disabled="@pwBusy">@L.Get(Str.CommonCancel)</button>
+                            </div>
+                        }
+                        @if (armedPw)
+                        {
+                            <ConfirmBlock Message="@L.Get(Str.SettingsChangePasswordMessage)" Implication="@WorkflowTexts.ChangePasswordImplication"
+                                          ConfirmLabel="@L.Get(Str.CommonYesChangePassword)" Busy="pwBusy" OnConfirm="ChangePasswordAsync" OnCancel="() => armedPw = false" />
+                        }
+                        @if (!string.IsNullOrEmpty(pwError))
+                        {
+                            <div class="alert alert-danger mt-2" role="alert">@pwError</div>
+                        }
+                        @if (pwDone)
+                        {
+                            <div class="alert alert-success mt-2" role="status">@WorkflowTexts.ChangePasswordDone</div>
+                        }
+                    </div>
+                }
                 else
                 {
                     <div class="mt-2 d-flex flex-wrap gap-2">
@@ -118,6 +158,9 @@ else
                         </button>
                         @if (isActive)
                         {
+                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => StartPassword(key)" disabled="@RowBusy(key)">
+                                @L.Get(Str.SettingsChangePasswordBtn)
+                            </button>
                             <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armUnlink: true)" disabled="@RowBusy(key)">
                                 @L.Get(Str.ConnUnlinkBtn)
                             </button>
@@ -163,19 +206,29 @@ else
     private string? armedForgetKey;
     private string? armedUnlinkKey;
     private string? renamingKey;
+    /// <summary>Row whose change-password task is open (active row only).</summary>
+    private string? passwordKey;
+    private string pwCurrent = string.Empty;
+    private string pwNew = string.Empty;
+    private string pwConfirm = string.Empty;
+    private string pwError = string.Empty;
+    private bool pwDone;
+    private bool pwBusy;
+    private bool armedPw;
 
     /// <summary>A row task is open (a confirmation or the rename editor) or
     /// running: the page must show one operation only, so every other row
     /// action stays disabled until it ends or is cancelled.</summary>
     private bool RowTaskOpen =>
         busy || renamingKey is not null || armedActivateKey is not null
-        || armedForgetKey is not null || armedUnlinkKey is not null;
+        || armedForgetKey is not null || armedUnlinkKey is not null
+        || passwordKey is not null;
 
     /// <summary>True for the row that owns the open task (it gets the
     /// outline; its action buttons are replaced by the confirmation).</summary>
     private bool OwnsTask(string key) =>
         renamingKey == key || armedActivateKey == key
-        || armedForgetKey == key || armedUnlinkKey == key;
+        || armedForgetKey == key || armedUnlinkKey == key || passwordKey == key;
 
     /// <summary>Disabled state of a row action: running, or another row is
     /// in the middle of a task. The owner keeps its own controls live.</summary>
@@ -237,6 +290,7 @@ else
         armedActivateKey = null;
         armedForgetKey = null;
         armedUnlinkKey = null;
+        ClosePassword();
     }
 
     // ---- add / connect ---------------------------------------------------
@@ -400,6 +454,91 @@ else
         finally
         {
             busy = false;
+        }
+    }
+
+    // ---- change password (active sync only) ------------------------------
+
+    /// <summary>The long password is a property of the active sync, so its
+    /// change is a row task: one sync at a time, no Settings section.</summary>
+    private void StartPassword(string key)
+    {
+        Disarm();
+        ClearNotice();
+        renamingKey = null;
+        passwordKey = key;
+        pwCurrent = pwNew = pwConfirm = string.Empty;
+        pwError = string.Empty;
+        pwDone = false;
+    }
+
+    /// <summary>Ends the task and never keeps a typed password around.</summary>
+    private void ClosePassword()
+    {
+        passwordKey = null;
+        armedPw = false;
+        pwCurrent = pwNew = pwConfirm = string.Empty;
+        pwError = string.Empty;
+        pwDone = false;
+    }
+
+    private void ClearPwError()
+    {
+        pwError = string.Empty;
+        pwDone = false;
+    }
+
+    private string? ValidatePasswordChange(string current, string next, string confirm)
+    {
+        if (string.IsNullOrEmpty(current)) return L.Get(Str.ValCurrentPasswordRequired);
+        if (string.IsNullOrEmpty(next)) return L.Get(Str.ValNewPasswordRequired);
+        if (next == current) return L.Get(Str.ValNewMustDiffer);
+        if (next.Length < Keepmark.Core.Crypto.BackupGuard.MinPasswordLength) return WorkflowRules.PasswordTooShort;
+        if (next != confirm) return L.Get(Str.ValNewMismatch);
+        return null;
+    }
+
+    /// <summary>Validate first: the confirmation opens only for a change that
+    /// can run (fields are locked while it is open).</summary>
+    private void ArmChangePassword()
+    {
+        pwError = string.Empty;
+        pwDone = false;
+        var invalid = ValidatePasswordChange(pwCurrent, pwNew, pwConfirm);
+        if (invalid is not null)
+        {
+            pwError = invalid;
+            return;
+        }
+
+        armedPw = true;
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        var key = passwordKey;
+        pwError = string.Empty;
+        pwDone = false;
+        pwBusy = true;
+        try
+        {
+            await Session.ChangePasswordAsync(pwCurrent, pwNew);
+            pwCurrent = pwNew = pwConfirm = string.Empty;
+            armedPw = false;
+            pwDone = true;
+            ShowNotice(key, WorkflowTexts.ChangePasswordDone);
+        }
+        catch (Exception ex)
+        {
+            // Never leave the current password or its confirmation in memory;
+            // the new one stays so only the proof has to be retyped.
+            pwCurrent = pwConfirm = string.Empty;
+            armedPw = false;
+            pwError = ex.Message;
+        }
+        finally
+        {
+            pwBusy = false;
         }
     }
 

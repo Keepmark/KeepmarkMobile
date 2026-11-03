@@ -21,6 +21,51 @@ public static class BackupGuard
     /// <summary>Backup files written by this app end with this suffix.</summary>
     public const string FileSuffix = ".xbs.json";
 
+    /// <summary>Longest slug kept from a sync name in a file name.</summary>
+    public const int MaxSlugLength = 40;
+
+    /// <summary>
+    /// Slug for a file name: lowercase, accents folded, anything that is not a
+    /// letter or digit collapsed into one underscore (spaces included), no
+    /// leading or trailing underscore. Returns '' when nothing usable is left.
+    /// Port of KeepmarkApp backupSlug.
+    /// </summary>
+    public static string Slug(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var folded = new string(value.Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray())
+            .ToLowerInvariant();
+
+        var chars = folded.Select(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' ? c : '_').ToArray();
+        var slug = new string(chars).Trim('_');
+        while (slug.Contains("__", StringComparison.Ordinal))
+        {
+            slug = slug.Replace("__", "_", StringComparison.Ordinal);
+        }
+
+        return slug.Length <= MaxSlugLength ? slug.TrimEnd('_') : slug[..MaxSlugLength].TrimEnd('_');
+    }
+
+    /// <summary>
+    /// Export file name: `xbs-backup-&lt;sync&gt;-YYYYMMDD-HHmmss.xbs.json`. The
+    /// sync name is a human label (service host fallback), so it is slugged;
+    /// without one the file keeps the plain timestamped name.
+    /// </summary>
+    public static string ExportFileName(string? syncName, DateTime utcNow)
+    {
+        var slug = Slug(syncName);
+        return slug.Length == 0
+            ? $"xbs-backup-{utcNow:yyyyMMdd-HHmmss}{FileSuffix}"
+            : $"xbs-backup-{slug}-{utcNow:yyyyMMdd-HHmmss}{FileSuffix}";
+    }
+
     public static void RequirePassword(string? password)
     {
         if (string.IsNullOrEmpty(password))

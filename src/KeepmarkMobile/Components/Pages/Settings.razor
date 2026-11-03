@@ -1,8 +1,6 @@
 @page "/settings"
-@using Keepmark.Core.Workflow
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
-@inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject KeepmarkMobile.Services.IStatusBarService StatusBar
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject KeepmarkMobile.Services.ToastState Toast
@@ -37,17 +35,33 @@
     </select>
 </div>
 
+@* Troubleshooting only: the log is not something the user reads, so it stays
+   folded behind one button and has no page of its own in the menu. *@
 <div class="mb-3">
-    <label class="form-label">@L.Get(Str.SettingsLogVerbosity)</label>
-    <select class="form-select" @bind="verbosity" @bind:after="ApplyVerbosity">
-        <option value="@Core.Logging.XbsLogLevel.Error">@L.Get(Str.LogLevelError)</option>
-        <option value="@Core.Logging.XbsLogLevel.Warning">@L.Get(Str.LogLevelWarning)</option>
-        <option value="@Core.Logging.XbsLogLevel.Info">@L.Get(Str.LogLevelInfo)</option>
-        <option value="@Core.Logging.XbsLogLevel.Debug">@L.Get(Str.LogLevelDebug)</option>
-        <option value="@Core.Logging.XbsLogLevel.Verbose">@L.Get(Str.LogLevelVerbose)</option>
-    </select>
-    <div class="form-text">@L.Get(Str.SettingsVerbosityHint)</div>
+    <label class="form-label">@L.Get(Str.NavLogs)</label>
+    <div class="form-text">@L.Get(Str.SettingsLogsHint)</div>
+    <button type="button" id="km-logs-toggle" class="btn btn-secondary btn-sm"
+            aria-expanded="@logsOpen.ToString().ToLowerInvariant()" aria-controls="km-logs-panel"
+            @onclick="ToggleLogs">
+        @L.Get(logsOpen ? Str.LogsHide : Str.LogsShow)
+    </button>
 </div>
+
+@if (logsOpen)
+{
+    <div id="km-logs-panel" class="mb-3">
+        <label class="form-label" for="km-log-verbosity">@L.Get(Str.SettingsLogVerbosity)</label>
+        <select id="km-log-verbosity" class="form-select" @bind="verbosity" @bind:after="ApplyVerbosity">
+            <option value="@Core.Logging.XbsLogLevel.Error">@L.Get(Str.LogLevelError)</option>
+            <option value="@Core.Logging.XbsLogLevel.Warning">@L.Get(Str.LogLevelWarning)</option>
+            <option value="@Core.Logging.XbsLogLevel.Info">@L.Get(Str.LogLevelInfo)</option>
+            <option value="@Core.Logging.XbsLogLevel.Debug">@L.Get(Str.LogLevelDebug)</option>
+            <option value="@Core.Logging.XbsLogLevel.Verbose">@L.Get(Str.LogLevelVerbose)</option>
+        </select>
+        <div class="form-text">@L.Get(Str.SettingsVerbosityHint)</div>
+        <LogsPanel />
+    </div>
+}
 
 <div class="mb-3">
     <label class="form-label">@L.Get(Str.SettingsTheme)</label>
@@ -92,38 +106,6 @@
 
 <button class="btn btn-primary" @onclick="Save">@L.Get(Str.CommonSave)</button>
 
-@if (linkedUrl is not null)
-{
-    <h3 class="mt-4">@L.Get(Str.SettingsChangePassword)</h3>
-    <InfoHint Text="@L.Get(Str.SettingsChangePasswordShort)" Title="@L.Get(Str.SettingsChangePassword)" Body="@L.Get(Str.SettingsChangePasswordHint)" />
-    <div class="mb-3">
-        <label class="form-label">@L.Get(Str.CommonCurrentPassword)</label>
-        <input type="password" class="form-control" @bind="pwCurrent" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
-        <input type="password" class="form-control" @bind="pwNew" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">@L.Get(Str.CommonConfirmNewPassword)</label>
-        <input type="password" class="form-control" @bind="pwConfirm" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="new-password" />
-    </div>
-    <button class="btn btn-warning" @onclick="ArmChangePassword" disabled="@(pwBusy || armedPw)">@L.Get(Str.SettingsChangePasswordBtn)</button>
-    @if (armedPw)
-    {
-        <ConfirmBlock Message="@L.Get(Str.SettingsChangePasswordMessage)" Implication="@WorkflowTexts.ChangePasswordImplication"
-                      ConfirmLabel="@L.Get(Str.CommonYesChangePassword)" Busy="pwBusy" OnConfirm="ChangePassword" OnCancel="() => armedPw = false" />
-    }
-    @if (!string.IsNullOrEmpty(pwError))
-    {
-        <div class="alert alert-danger mt-2" role="alert">@pwError</div>
-    }
-    @if (pwDone)
-    {
-        <div class="alert alert-success mt-2" role="status">@WorkflowTexts.ChangePasswordDone</div>
-    }
-}
-
 @code {
     private Core.Sync.SyncMode mode;
     private Core.Logging.XbsLogLevel verbosity;
@@ -131,14 +113,9 @@
     private string language = "system";
     private bool showRecent = true;
     private int recentCount = 5;
-    private string? linkedUrl;
-    private string pwCurrent = string.Empty;
-    private string pwNew = string.Empty;
-    private string pwConfirm = string.Empty;
-    private string pwError = string.Empty;
-    private bool pwDone;
-    private bool pwBusy;
-    private bool armedPw;
+    /// <summary>The log panel is closed by default: it is troubleshooting
+    /// material, opened on purpose.</summary>
+    private bool logsOpen;
 
     protected override void OnInitialized()
     {
@@ -156,12 +133,6 @@
         }
     }
 
-    protected override async Task OnInitializedAsync()
-    {
-        var c = await Creds.GetAsync();
-        linkedUrl = c?.ServiceUrl;
-    }
-
     /// <summary>Verbosity applies instantly (no Save needed): later entries
     /// are recorded at the new level right away.</summary>
     private void ApplyVerbosity()
@@ -173,6 +144,8 @@
     /// <summary>The language applies at once: Apply() sets the culture and the
     /// layout redraws its whole tree (no restart, no page reload).</summary>
     private static (Core.Sync.SyncMode, string, bool, int)? carry;
+
+    private void ToggleLogs() => logsOpen = !logsOpen;
 
     private void ApplyLanguage()
     {
@@ -201,85 +174,4 @@
         "BiometricAndPin" => L.Get(Str.SettingsLockBiometricPin, Keepmark.Core.Security.LockPolicy.Label(AppSettings.LockTimeoutMinutes)),
         _ => L.Get(Str.SettingsLockOff),
     };
-
-    private string? ValidatePasswordChange(string current, string next, string confirm)
-    {
-        if (string.IsNullOrEmpty(current))
-        {
-            return L.Get(Str.ValCurrentPasswordRequired);
-        }
-
-        if (string.IsNullOrEmpty(next))
-        {
-            return L.Get(Str.ValNewPasswordRequired);
-        }
-
-        if (next == current)
-        {
-            return L.Get(Str.ValNewMustDiffer);
-        }
-
-        if (next.Length < Keepmark.Core.Crypto.BackupGuard.MinPasswordLength)
-        {
-            return WorkflowRules.PasswordTooShort;
-        }
-
-        if (next != confirm)
-        {
-            return L.Get(Str.ValNewMismatch);
-        }
-
-        return null;
-    }
-
-    /// <summary>Validate first: the confirmation opens only for a change
-    /// that can run (fields are locked while it is open).</summary>
-    private void ArmChangePassword()
-    {
-        pwError = string.Empty;
-        pwDone = false;
-        var invalid = ValidatePasswordChange(pwCurrent, pwNew, pwConfirm);
-        if (invalid is not null)
-        {
-            pwError = invalid;
-            return;
-        }
-
-        armedPw = true;
-    }
-
-    /// <summary>An old error (or success) goes away once a field is edited.</summary>
-    private void ClearPwError()
-    {
-        pwError = string.Empty;
-        pwDone = false;
-    }
-
-    private async Task ChangePassword()
-    {
-        pwError = string.Empty;
-        pwDone = false;
-
-        pwBusy = true;
-        try
-        {
-            await Session.ChangePasswordAsync(pwCurrent, pwNew);
-            pwCurrent = pwNew = pwConfirm = string.Empty;
-            armedPw = false;
-            pwDone = true;
-        }
-        catch (Exception ex)
-        {
-            // Never leave the current password or its confirmation in memory;
-            // the new password stays so only the proof has to be retyped.
-            // Disarm so the fields are editable again.
-            pwCurrent = pwConfirm = string.Empty;
-            armedPw = false;
-            pwError = ex.Message;
-        }
-        finally
-        {
-            pwBusy = false;
-        }
-    }
 }

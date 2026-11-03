@@ -986,6 +986,11 @@ public sealed partial class BookmarkStore : IAsyncDisposable
     public async Task SetMetaAsync(string key, string? value) =>
         await Db.InsertOrReplaceAsync(new MetaRow { Key = key, Value = value }).ConfigureAwait(false);
 
+    /// <summary>The last synced encrypted blob: the tree both sides agreed on.
+    /// Decrypt it to measure how far a push has drifted from it.</summary>
+    public async Task<string?> GetStoredBlobAsync() =>
+        (await Db.FindAsync<BlobRow>(BlobBookmarks).ConfigureAwait(false))?.Value;
+
     /// <summary>Encrypted sync blobs are base64 ASCII, so character length equals byte length.</summary>
     public Task<int> GetStoredBlobLengthAsync() => Db.ExecuteScalarAsync<int>(
         "SELECT COALESCE((SELECT LENGTH(Value) FROM Blob WHERE Key = ?), 0)", BlobBookmarks);

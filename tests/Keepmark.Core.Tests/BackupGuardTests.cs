@@ -35,6 +35,29 @@ public sealed class BackupGuardTests
     }
 
     [Fact]
+    public void SlugsTheSyncNameForTheFileName()
+    {
+        Assert.Equal("lavoro", BackupGuard.Slug("Lavoro"));
+        Assert.Equal("casa_e_ufficio", BackupGuard.Slug("Casa e ufficio"));
+        Assert.Equal("pero_citta", BackupGuard.Slug("  Però — Città  "));
+        Assert.Equal("api_xbrowsersync_org", BackupGuard.Slug("api.xbrowsersync.org"));
+        // Nothing usable left: no stray separators in the file name.
+        Assert.Equal(string.Empty, BackupGuard.Slug("···"));
+        Assert.Equal(string.Empty, BackupGuard.Slug(null));
+        Assert.True(BackupGuard.Slug(new string('x', 80)).Length <= BackupGuard.MaxSlugLength);
+    }
+
+    [Fact]
+    public void ExportFileNameCarriesTheSyncName()
+    {
+        var when = new DateTime(2026, 11, 6, 9, 15, 0, DateTimeKind.Utc);
+        Assert.Equal("xbs-backup-casa_e_ufficio-20261106-091500.xbs.json",
+            BackupGuard.ExportFileName("Casa e ufficio", when));
+        Assert.Equal("xbs-backup-20261106-091500.xbs.json", BackupGuard.ExportFileName(null, when));
+        Assert.Equal("xbs-backup-20261106-091500.xbs.json", BackupGuard.ExportFileName("···", when));
+    }
+
+    [Fact]
     public void CountsTreeAndRejectsNullNodes()
     {
         var roots = new List<BookmarkNode>
