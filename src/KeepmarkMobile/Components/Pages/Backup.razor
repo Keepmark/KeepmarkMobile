@@ -157,11 +157,13 @@ else
     private string? armedDelete;
     private string safetyMessage = string.Empty;
     private bool safetyError;
+    private string safetyLoadMessage = string.Empty;
     private List<RemovedSyncCopyInfo> removedList = new();
     private string? armedRemovedRestore;
     private string? armedRemovedDelete;
     private string removedMessage = string.Empty;
     private bool removedError;
+    private string removedLoadMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -187,10 +189,16 @@ else
         try
         {
             safetyList = await Session.ListSafetyBackupsAsync();
+            ClearLoadError(ref safetyLoadMessage, ref safetyMessage, ref safetyError);
         }
-        catch
+        catch (Exception ex)
         {
+            // Hiding a list is not harmless: it is where the user looks for a
+            // recovery point, so a read failure must be named.
             safetyList = new();
+            safetyLoadMessage = L.Get(Str.ErrLoadFailed, ex.Message);
+            (safetyMessage, safetyError) = (safetyLoadMessage, true);
+            Session.Log.Warn("backup", $"Safety list unreadable: {ex.GetType().Name}");
         }
     }
 
@@ -199,11 +207,24 @@ else
         try
         {
             removedList = await Session.ListRemovedSyncCopiesAsync();
+            ClearLoadError(ref removedLoadMessage, ref removedMessage, ref removedError);
         }
-        catch
+        catch (Exception ex)
         {
             removedList = new();
+            removedLoadMessage = L.Get(Str.ErrLoadFailed, ex.Message);
+            (removedMessage, removedError) = (removedLoadMessage, true);
+            Session.Log.Warn("backup", $"Removed-sync list unreadable: {ex.GetType().Name}");
         }
+    }
+
+    /// <summary>Clears a message only when it is the one the refresh itself put
+    /// there: an action's outcome must survive a later list refresh.</summary>
+    private static void ClearLoadError(ref string loadMessage, ref string message, ref bool error)
+    {
+        if (loadMessage.Length == 0 || message != loadMessage) return;
+        loadMessage = string.Empty;
+        (message, error) = (string.Empty, false);
     }
 
     /// <summary>Export: a new password typed twice. The fields are cleared on

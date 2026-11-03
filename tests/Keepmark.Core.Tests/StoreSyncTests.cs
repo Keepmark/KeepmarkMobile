@@ -23,9 +23,13 @@ sealed class FakeApi : IXSyncApiClient
     /// device "pushed" in between (remote moves on each loss).</summary>
     public int ConflictsBeforeSuccess { get; set; }
     public bool Offline { get; set; }
+    /// <summary>Reads too fail as offline (the engine returns silently with
+    /// <c>SyncStatus.Offline</c> instead of throwing).</summary>
+    public bool OfflineOnRead { get; set; }
     /// <summary>Service answered 401: the sync no longer exists.</summary>
     public bool NotFound { get; set; }
     public int PushCount { get; private set; }
+    public int GetCount { get; private set; }
     public string? LastPushed { get; private set; }
     public bool V12 { get; set; }
     public long Revision { get; set; } = 7;
@@ -48,14 +52,17 @@ sealed class FakeApi : IXSyncApiClient
     public Task<ServiceInfoResponse> GetInfoV12Async(CancellationToken ct = default) => GetInfoAsync(ct);
     public Task<CreateSyncResponse> CreateSyncAsync(CancellationToken ct = default) =>
         Task.FromResult(new CreateSyncResponse { Id = "new-id", LastUpdated = LastUpdated, Version = Version });
-    public Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default) =>
-        Task.FromResult(new GetBookmarksResponse
+    public Task<GetBookmarksResponse> GetBookmarksAsync(string syncId, CancellationToken ct = default)
+    {
+        GetCount++;
+        return Task.FromResult(new GetBookmarksResponse
         {
             Bookmarks = Blob,
             Version = Version,
             LastUpdated = LastUpdated,
             Meta = V12 ? new SyncMeta { Revision = Revision, Hash = Hash } : null,
         });
+    }
     public Task<GetBookmarksResponse> GetBookmarksV12Async(string syncId, CancellationToken ct = default) =>
         GetBookmarksAsync(syncId, ct);
     public Task<GetBookmarksResponse?> GetBookmarksIfChangedAsync(string syncId, string knownHash, CancellationToken ct = default)
@@ -73,6 +80,11 @@ sealed class FakeApi : IXSyncApiClient
     }
     public Task<LastUpdatedResponse> GetLastUpdatedAsync(string syncId, CancellationToken ct = default)
     {
+        if (OfflineOnRead)
+        {
+            throw new ServiceOfflineException("offline");
+        }
+
         if (NotFound)
         {
             throw new SyncNotFoundException("not found");

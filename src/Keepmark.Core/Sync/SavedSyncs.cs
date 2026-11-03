@@ -86,15 +86,17 @@ public static class SavedSyncs
         return label.Length <= MaxLabelLength ? label : label[..MaxLabelLength];
     }
 
-    /// <summary>True when another row already uses this label (case-insensitive:
-    /// two rows named "Work" would be indistinguishable in the list).</summary>
+    /// <summary>True when another row already answers to this name
+    /// (case-insensitive). Compares the displayed name (<see cref="Name"/>), so
+    /// the host fallback is protected too: renaming a row to another row's host
+    /// would make two entries look identical.</summary>
     public static bool LabelTaken(IEnumerable<SavedSync> list, SavedSyncIdentity? target, string? label)
     {
         var needle = NormalizeLabel(label);
         if (needle is null) return false;
         return list.Any(row =>
             (target is null || !Same(row.Identity, target)) &&
-            string.Equals(row.Label?.Trim(), needle, StringComparison.OrdinalIgnoreCase));
+            string.Equals(Name(row), needle, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Insert or refresh one row (lastUsedAt wins, so the list is
@@ -217,7 +219,7 @@ public static class SavedSyncs
                     ServiceUrl = CanonicalServiceUrl(serviceUrl),
                     SyncId = syncId,
                     DerivedKey = StringField(element, "derivedKey") ?? string.Empty,
-                    Label = string.IsNullOrWhiteSpace(StringField(element, "label")) ? null : StringField(element, "label"),
+                    Label = NormalizeLabel(StringField(element, "label")),
                     SyncVersion = string.IsNullOrEmpty(StringField(element, "syncVersion")) ? null : StringField(element, "syncVersion"),
                     KeyId = string.IsNullOrEmpty(StringField(element, "keyId")) ? null : StringField(element, "keyId"),
                     LastUsedAt = DateTimeOffset.TryParse(

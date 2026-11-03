@@ -110,7 +110,7 @@ dotnet run --project tools/Keepmark.Benchmarks -c Release -- --interop /tmp/keep
 node scripts/verify-csharp-blobs.cjs /tmp/keepmark-csharp-blobs.json
 ```
 
-The Core suite is **370 tests**. Existing JSON vectors test Node→C#. The reverse
+The Core suite is **390 tests**. Existing JSON vectors test Node→C#. The reverse
 script decrypts C# output with Node AES-GCM and lzutf8@0.6.0 for ASCII, Unicode,
 bookmarks and a larger payload. Regression tests cover worker coalescing, edits
 during upload, stable RowIds, SQL query plans, targeted paths, deep

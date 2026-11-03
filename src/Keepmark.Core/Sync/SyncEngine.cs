@@ -585,10 +585,21 @@ public sealed partial class SyncEngine(
                 if (ex is SyncNotFoundException && await creds.GetAsync().ConfigureAwait(false) is { } gone)
                 {
                     NoteSyncGone(gone);
+                    throw new InvalidOperationException(str.Get(Str.ErrSavedGone), ex);
                 }
 
                 SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
-                throw new InvalidOperationException(str.Get(Str.ErrSavedNotSaved), ex);
+                // A dead connection is not "the push failed": name the cause the
+                // user can act on.
+                throw new InvalidOperationException(str.Get(
+                    ex is ServiceOfflineException ? Str.ErrSavedOffline : Str.ErrSavedNotSaved), ex);
+            }
+
+            // An offline tick returns without throwing: name the real cause
+            // instead of reporting a conflict the user cannot resolve.
+            if (Status == SyncStatus.Offline)
+            {
+                throw new InvalidOperationException(str.Get(Str.ErrSavedOffline));
             }
 
             if (Status == SyncStatus.Conflict ||
@@ -963,10 +974,14 @@ public sealed partial class SyncEngine(
 
     /// <summary>
     /// Onboarding/server-switch reconciliation: how many items on each side?
-    /// Downloads + decrypts the remote tree (password already in hand).
-    /// Also returns the raw blobs so the overwritten side can be safety-backed-up.
+    /// Downloads + decrypts the remote tree (password already in hand) on the
+    /// best contract, so the probe carries everything the follow-up link needs
+    /// (blob, timestamp, and the v1.2 revision/hash for CAS) — the download is
+    /// never repeated when the user then takes the remote side.
     /// </summary>
-    public async Task<(int Local, int Remote, string? RemoteLastUpdated, string? RemoteVersion, string RemoteBlob, string LocalBlob)> CompareAsync(
+    public async Task<(
+        int Local, int Remote, string? RemoteLastUpdated, string? RemoteVersion,
+        string RemoteBlob, string LocalBlob, long? RemoteRevision, string? RemoteHash)> CompareAsync(
         SyncCredentials candidate, CancellationToken ct = default)
     {
         var (_, localBlob, localLast, _) = await store.LoadMirrorAsync().ConfigureAwait(false);
@@ -982,7 +997,7 @@ public sealed partial class SyncEngine(
                 str.Get(Str.ErrUnsupportedApiVersion, info.Version, XbsConstants.MinApiVersion));
         }
 
-        var full = await api.GetBookmarksAsync(candidate.Id, ct).ConfigureAwait(false);
+        var full = await GetFullAsync(candidate, ct).ConfigureAwait(false);
         if (string.IsNullOrEmpty(full.Version) && !string.IsNullOrEmpty(full.Bookmarks))
         {
             // R2.3: version-less legacy syncs use the old crypto — decrypting
@@ -995,7 +1010,8 @@ public sealed partial class SyncEngine(
         var roots = ParseTree(crypto.Decrypt(full.Bookmarks ?? string.Empty, candidate.DerivedKey));
         int remote = CountNodes(roots);
         _ = localLast;
-        return (local, remote, full.LastUpdated, full.Version, full.Bookmarks ?? string.Empty, localBlob ?? string.Empty);
+        return (local, remote, full.LastUpdated, full.Version, full.Bookmarks ?? string.Empty,
+            localBlob ?? string.Empty, full.Meta?.Revision, full.Meta?.Hash);
     }
 
     private void ThrowIfVersionUnsupported(string? remoteVersion)
@@ -1175,17 +1191,35 @@ public sealed partial class SyncEngine(
         return stats with { RemoteLastUpdated = res.LastUpdated };
     }
 
+    /// <summary>A remote copy already read (and decrypted) at probe time, so a
+    /// link that adopts it never downloads the same blob twice.</summary>
+    public sealed record PrefetchedRemote(
+        string Blob, string? Version, string? LastUpdated, long? Revision, string? Hash);
+
     /// <summary>Link flow "take remote": downloads the candidate's tree and
     /// replaces the local mirror (dirty or not — the caller snapshotted it and
     /// the user chose this explicitly), then switches the stored credentials.
-    /// One gate hold: no background push can interleave the switch.</summary>
-    public async Task LinkAdoptRemoteAsync(SyncCredentials candidate, CancellationToken ct = default)
+    /// One gate hold: no background push can interleave the switch.
+    /// <paramref name="prefetched"/> is the verified blob from the probe; when
+    /// absent (or without a timestamp) the tree is fetched again.</summary>
+    public async Task LinkAdoptRemoteAsync(
+        SyncCredentials candidate, PrefetchedRemote? prefetched = null, CancellationToken ct = default)
     {
         await AcquireGateAsync("Link (take remote)", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
             SetStatus(SyncStatus.Syncing);
-            var full = await GetFullAsync(candidate, ct).ConfigureAwait(false);
+            var full = prefetched is { LastUpdated: not null }
+                ? new GetBookmarksResponse
+                {
+                    Bookmarks = prefetched.Blob,
+                    Version = prefetched.Version,
+                    LastUpdated = prefetched.LastUpdated,
+                    Meta = prefetched.Revision is null
+                        ? null
+                        : new SyncMeta { Revision = prefetched.Revision.Value, Hash = prefetched.Hash }
+                }
+                : await GetFullAsync(candidate, ct).ConfigureAwait(false);
             // Decrypts (wrong password throws) before the mirror is replaced;
             // credentials switch last.
             await ApplyPulledAsync(full, candidate, ct).ConfigureAwait(false);
@@ -1292,6 +1326,15 @@ public sealed partial class SyncEngine(
         }
 
         return c;
+    }
+
+    /// <summary>Public status nudge for the platform layer: after an unlink the
+    /// engine has no credentials, and the UI must say so without waiting for
+    /// the next poll tick.</summary>
+    public void MarkUnlinked()
+    {
+        ClearGoneSync();
+        SetStatus(SyncStatus.NoCredentials);
     }
 
     private void SetStatus(SyncStatus s)

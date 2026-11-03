@@ -10,6 +10,10 @@ namespace Keepmark.Core.Sync;
 /// </summary>
 public sealed class SavedSyncRegistry(ICredentialStore store, TimeProvider? timeProvider = null)
 {
+    /// <summary>The list is read-modify-write: without this gate two concurrent
+    /// callers (startup migration + link, rename + activation) could drop a row.</summary>
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
+
     private TimeProvider Clock => timeProvider ?? TimeProvider.System;
 
     public Task<List<SavedSync>> ListAsync() => store.GetSavedSyncsAsync();
@@ -27,9 +31,17 @@ public sealed class SavedSyncRegistry(ICredentialStore store, TimeProvider? time
             KeyId = row.KeyId ?? Fingerprint(row.DerivedKey),
             LastUsedAt = row.LastUsedAt == default ? Clock.GetUtcNow() : row.LastUsedAt
         };
-        var rows = SavedSyncs.Upsert(await store.GetSavedSyncsAsync().ConfigureAwait(false), entry);
-        await store.SetSavedSyncsAsync(rows).ConfigureAwait(false);
-        return SavedSyncs.Find(rows, entry.Identity)!;
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var rows = SavedSyncs.Upsert(await store.GetSavedSyncsAsync().ConfigureAwait(false), entry);
+            await store.SetSavedSyncsAsync(rows).ConfigureAwait(false);
+            return SavedSyncs.Find(rows, entry.Identity) ?? entry;
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     /// <summary>
@@ -40,52 +52,75 @@ public sealed class SavedSyncRegistry(ICredentialStore store, TimeProvider? time
     /// </summary>
     public async Task<SavedSync?> SyncActiveAsync(SyncCredentials? creds)
     {
-        var rows = await store.GetSavedSyncsAsync().ConfigureAwait(false);
         if (creds is null) return null;
-
-        var identity = new SavedSyncIdentity(creds.ServiceUrl, creds.Id);
-        var existing = SavedSyncs.Find(rows, identity);
-        var entry = new SavedSync
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            ServiceUrl = SavedSyncs.CanonicalServiceUrl(creds.ServiceUrl),
-            SyncId = creds.Id,
-            DerivedKey = creds.DerivedKey,
-            SyncVersion = creds.Version,
-            KeyId = Fingerprint(creds.DerivedKey),
-            LastUsedAt = existing is null || existing.LastUsedAt == default
-                ? Clock.GetUtcNow()
-                : existing.LastUsedAt
-        };
-        var next = SavedSyncs.Upsert(rows, entry);
-        if (!SameRows(rows, next)) await store.SetSavedSyncsAsync(next).ConfigureAwait(false);
-        return SavedSyncs.Find(next, entry.Identity);
+            var rows = await store.GetSavedSyncsAsync().ConfigureAwait(false);
+            var identity = new SavedSyncIdentity(creds.ServiceUrl, creds.Id);
+            var existing = SavedSyncs.Find(rows, identity);
+            var entry = new SavedSync
+            {
+                ServiceUrl = SavedSyncs.CanonicalServiceUrl(creds.ServiceUrl),
+                SyncId = creds.Id,
+                DerivedKey = creds.DerivedKey,
+                SyncVersion = creds.Version,
+                KeyId = Fingerprint(creds.DerivedKey),
+                LastUsedAt = existing is null || existing.LastUsedAt == default
+                    ? Clock.GetUtcNow()
+                    : existing.LastUsedAt
+            };
+            var next = SavedSyncs.Upsert(rows, entry);
+            if (!SameRows(rows, next)) await store.SetSavedSyncsAsync(next).ConfigureAwait(false);
+            return SavedSyncs.Find(next, entry.Identity);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     /// <summary>Forgets a dormant row. Never valid for the active sync: that
     /// one is unlinked through the credentials store.</summary>
     public async Task ForgetAsync(SavedSyncIdentity identity)
     {
-        var rows = await store.GetSavedSyncsAsync().ConfigureAwait(false);
-        await store.SetSavedSyncsAsync(SavedSyncs.Remove(rows, identity)).ConfigureAwait(false);
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var rows = await store.GetSavedSyncsAsync().ConfigureAwait(false);
+            await store.SetSavedSyncsAsync(SavedSyncs.Remove(rows, identity)).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     /// <summary>Sets (or clears, with null/empty) a row label. Returns false
     /// when another row already answers to that name.</summary>
     public async Task<bool> RenameAsync(SavedSyncIdentity identity, string? label)
     {
-        var rows = await store.GetSavedSyncsAsync().ConfigureAwait(false);
-        var current = SavedSyncs.Find(rows, identity);
         var normalized = SavedSyncs.NormalizeLabel(label);
-        if (current is null) return false;
-        if (SavedSyncs.LabelTaken(rows, identity, normalized)) return false;
-        if ((current.Label ?? string.Empty) == (normalized ?? string.Empty)) return true;
+        await _writeGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var rows = await store.GetSavedSyncsAsync().ConfigureAwait(false);
+            var current = SavedSyncs.Find(rows, identity);
+            if (current is null) return false;
+            if (SavedSyncs.LabelTaken(rows, identity, normalized)) return false;
+            if ((current.Label ?? string.Empty) == (normalized ?? string.Empty)) return true;
 
-        // Not Upsert: a null label must clear the stored one, not preserve it.
-        var key = SavedSyncs.Key(identity.ServiceUrl, identity.SyncId);
-        var next = SavedSyncs.Sort(rows.Select(row =>
-            SavedSyncs.Key(row.ServiceUrl, row.SyncId) == key ? row with { Label = normalized } : row));
-        await store.SetSavedSyncsAsync(next).ConfigureAwait(false);
-        return true;
+            // Not Upsert: a null label must clear the stored one, not preserve it.
+            var key = SavedSyncs.Key(identity.ServiceUrl, identity.SyncId);
+            var next = SavedSyncs.Sort(rows.Select(row =>
+                SavedSyncs.Key(row.ServiceUrl, row.SyncId) == key ? row with { Label = normalized } : row));
+            await store.SetSavedSyncsAsync(next).ConfigureAwait(false);
+            return true;
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     private static string? Fingerprint(string? derivedKey)

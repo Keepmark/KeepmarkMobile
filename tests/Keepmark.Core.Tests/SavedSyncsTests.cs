@@ -108,8 +108,10 @@ public class SavedSyncsTests
         Assert.False(SavedSyncs.LabelTaken(list, new("https://api.example.org", "a"), "Work"));
         Assert.False(SavedSyncs.LabelTaken(list, null, "Other"));
         Assert.False(SavedSyncs.LabelTaken(list, null, "   "));
-        // A row without a label does not "own" its host name until it takes it.
-        Assert.False(SavedSyncs.LabelTaken([Row()], null, "api.example.org"));
+        // The displayed name counts, host fallback included: two rows both
+        // showing "api.example.org" would be indistinguishable.
+        Assert.True(SavedSyncs.LabelTaken([Row()], null, "API.example.org"));
+        Assert.False(SavedSyncs.LabelTaken([Row()], new("https://api.example.org", "id-1"), "api.example.org"));
     }
 
     [Fact]
@@ -166,6 +168,12 @@ public class SavedSyncsTests
         Assert.Empty(SavedSyncs.Deserialize(""));
         Assert.Empty(SavedSyncs.Deserialize("{not json"));
         Assert.Empty(SavedSyncs.Deserialize("""{"syncUrl":"not-an-array"}"""));
+
+        // Labels are normalized on read too: a hand-edited JSON never yields
+        // a padded/overlong name that the rename path would refuse.
+        var padded = SavedSyncs.Deserialize(
+            """[{"serviceUrl":"https://x.example","syncId":"id9","label":"  Work  "}]""");
+        Assert.Equal("Work", Assert.Single(padded).Label);
     }
 
     [Fact]
@@ -228,8 +236,47 @@ public class SavedSyncRegistryTests
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
+    /// <summary>Yields on every read/write so concurrent callers interleave
+    /// exactly where a read-modify-write would lose a row.</summary>
+    private sealed class SlowStore : ICredentialStore
+    {
+        private readonly object _gate = new();
+        private List<SavedSync> _rows = [];
+        public Task<SyncCredentials?> GetAsync() => Task.FromResult<SyncCredentials?>(null);
+        public Task SetAsync(SyncCredentials c) => Task.CompletedTask;
+        public Task ClearAsync() => Task.CompletedTask;
+        public async Task<List<SavedSync>> GetSavedSyncsAsync()
+        {
+            await Task.Yield();
+            lock (_gate) return _rows.ToList();
+        }
+        public async Task SetSavedSyncsAsync(IReadOnlyList<SavedSync> rows)
+        {
+            await Task.Yield();
+            lock (_gate) _rows = rows.ToList();
+        }
+    }
+
     private static SavedSyncRegistry Registry(Store store, DateTimeOffset? now = null) =>
         new(store, new Clock(now ?? Now));
+
+    [Fact]
+    public async Task ConcurrentWritesNeverLoseARow()
+    {
+        var store = new SlowStore();
+        var registry = new SavedSyncRegistry(store, new Clock(Now));
+
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(i =>
+            registry.RememberAsync(new SavedSync
+            {
+                ServiceUrl = $"https://service{i}.example",
+                SyncId = $"id-{i}",
+                DerivedKey = KeyA,
+                LastUsedAt = Now.AddMinutes(i)
+            })));
+
+        Assert.Equal(20, (await store.GetSavedSyncsAsync()).Count);
+    }
 
     [Fact]
     public async Task SyncActiveMigratesLegacyCredentialsOnce()

@@ -64,11 +64,11 @@ Words come from `UI-TERMS.md`.
 
 | Workflow | Needs link | Steps | Confirmation | Implication line (required) |
 |---|---|---|---|---|
-| Add a sync while linked (Connect → `+ Add a sync`) | yes | Existing sync only (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict or a failed push cancels the switch and changes nothing. A brand-new sync requires unlinking first (bookmarks stay). |
-| Syncs: Activate | no | Syncs → `Activate` → device unlock when app lock is set → apply | none beyond the device unlock | Read-only check first (service/version gate + download + decrypt with the key saved in the row); only then the active side is saved and this device adopts the chosen sync's copy behind a `switch-take-remote` safety backup. The sync you leave stays in the list. The sync's own long password is never asked. |
+| Add a sync while linked (Connect → `+ Add a sync`) | yes | Existing sync only (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict, a missing connection, a sync that no longer exists on the server or a failed push cancels the switch and changes nothing, and the message names that exact cause. A brand-new sync requires unlinking first (bookmarks stay). |
+| Syncs: Activate | no | Syncs → `Activate` → device unlock when app lock is set → apply | none beyond the device unlock | Read-only check first (service/version gate + download + decrypt with the key saved in the row); only then the active side is saved and this device adopts the chosen sync's copy behind a `switch-take-remote` safety backup. If that save cannot happen the switch is cancelled with the real reason (pending conflict, no connection, sync gone from the server, push failed) and nothing is replaced. The sync you leave stays in the list. The sync's own long password is never asked. |
 | Syncs: Forget / Unlink | no | Syncs → `Forget…` (inactive) / `Unlink this device…` (active) | always | Inactive: only the row is forgotten; bookmarks, the server copy and the other rows stay. Active: this device is unlinked and the row disappears; the bookmarks stay and the sync plus its server copy stay for the other devices. Dormant rows survive an unlink. Forgetting also drops that key's safety-master wrap when no other saved sync uses it; safety backups and copies of removed syncs stay. |
 | Removed sync (401) | shown while linked | Home/Status notice → `Try again` / `Unlink and keep a copy…` / `Cancel` | always for the unlink; retry and cancel execute at once | The service no longer has this sync (expiry or another device's deletion). Nothing happens automatically and local bookmarks are untouched. Unlinking keeps a verified local copy of this device's tree, restorable from Backup → `Copies of removed syncs` and never pruned; `Cancel` keeps the notice quiet for that sync until an explicit retry. |
-| Removed-sync copy | no | Backup → `Copies of removed syncs` → `Restore` / `Delete` | always | Restore takes a `pre-restore` safety backup first and replaces the local bookmarks (pushed at the next sync while linked). Delete removes only that copy; there is no undo. Copies are never pruned automatically. |
+| Removed-sync copy | no | Backup → `Copies of removed syncs` → `Restore` / `Delete` | always | Restore takes a `pre-restore` safety backup first and replaces the local bookmarks (pushed at the next sync while linked). While a sync is linked the restore is refused until that sync has saved its pending edits, so nothing unsaved is replaced silently. Delete removes only that copy; there is no undo. Copies are never pruned automatically; a copy list that cannot be read says so instead of looking empty. |
 
 ## Extension workflows
 
@@ -149,6 +149,8 @@ Words come from `UI-TERMS.md`.
   triggers a local action. Home and Status show one notice with `Try again`,
   `Unlink and keep a copy…` and `Cancel`; nothing is unlinked, uploaded or
   snapshotted until the user chooses.
+- Unlinking puts this device into the unlinked state immediately (no waiting for
+the next sync tick), and keeps local bookmarks.
 - `Unlink and keep a copy…` asks once, then keeps a verified local copy of this
   device's tree before the credentials go: content-addressed, encrypted with the
   device key, in `Backup` → `Copies of removed syncs`, with `Restore` and

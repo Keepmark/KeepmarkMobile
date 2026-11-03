@@ -104,8 +104,35 @@ public sealed class SavedSyncActivationTests : IAsyncLifetime
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _engine.PersistActiveSideAsync());
 
-        Assert.Equal(new XbsLocalizer().Get(Str.ErrSavedNotSaved), ex.Message);
+        Assert.Equal(new XbsLocalizer().Get(Str.ErrSavedOffline), ex.Message);
+        Assert.Equal(SyncStatus.Offline, _engine.Status);
         Assert.Equal("1", await DirtyAsync());
+    }
+
+    [Fact]
+    public async Task OfflineTickAbortsTheSwitchWithTheRealCause()
+    {
+        // The engine returns from an offline tick without throwing: reporting
+        // "unsaved changes" or a conflict would hide that nothing was tried.
+        await AlignMirrorAsync();
+        _api.OfflineOnRead = true;
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _engine.PersistActiveSideAsync());
+
+        Assert.Equal(new XbsLocalizer().Get(Str.ErrSavedOffline), ex.Message);
+        Assert.Equal(SyncStatus.Offline, _engine.Status);
+        Assert.Equal(0, _api.PushCount);
+    }
+
+    [Fact]
+    public async Task GoneSyncAbortsTheSwitchWithItsOwnMessage()
+    {
+        await AlignMirrorAsync();
+        _api.NotFound = true;
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _engine.PersistActiveSideAsync());
+
+        Assert.Equal(new XbsLocalizer().Get(Str.ErrSavedGone), ex.Message);
     }
 
     [Fact]

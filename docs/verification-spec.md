@@ -95,14 +95,14 @@ Each flow states preconditions, mutations in order, and the REQUIRED user-visibl
 | R6.3 | Link existing, pull (`ProbeLinkAsync` + `ApplyRemoteAsync`) | Password verified by decrypting remote BEFORE any overwrite (wrong → `InvalidCredentials`, zero mutations). Safety-backup local side. `0/0` items → auto-apply; else explicit Download/Upload/Merge choice with counts. |
 | R6.4 | Link existing, push (`ApplyLocalAsync`) | Same verify-first; safety-backup remote side; PUT on remote base (409 honest). |
 | R6.4b | Link existing, merge (`GetMergePreviewAsync` + `ApplyMergeAsync`, `connect-merge`) | Same verify-first. Preview is a dry-run of the same pure union (`BookmarkMerge`): local-only upload / remote-only download / title-conflict (server wins) / folders-created / separators counts. Preview is locked: changing direction or re-verifying invalidates it. Apply snapshots BOTH sides first (fail closed), then writes the union locally and pushes (409 honest, both snapshots intact). Merge never deletes. |
-| R6.5 | Saved syncs and activation (Syncs page; Connect `+ Add a sync`) | One active sync owns the local tree; dormant rows keep the service URL, sync ID and derived key (platform store), never the long password, and the list is local to the device. Activate: device unlock when app lock is set, read-only probe/decrypt before any write (`VerifySavedSyncAsync`), fail-closed save of the active side (`PrepareForLinkAsync`), then a `switch-take-remote` safety backup and adopt; the previous sync stays listed. Forget/Unlink confirm; Forget keeps bookmarks, the server copy, other rows and all backups, and only prunes dead safety-master wraps; Unlink removes the active row and keeps dormant rows. Adding while linked offers only an existing sync (manual or QR), upserts by canonical URL + sync ID, is fail-closed (pending conflict or failed push cancels), and writes the Connect tags (`take-remote`/`upload-local`/`connect-merge`), not `switch-take-remote`. No server-side sync list; no delete-from-server. |
+| R6.5 | Saved syncs and activation (Syncs page; Connect `+ Add a sync`) | One active sync owns the local tree; dormant rows keep the service URL, sync ID and derived key (platform store), never the long password, and the list is local to the device. Activate: device unlock when app lock is set, read-only probe/decrypt before any write (`VerifySavedSyncAsync`), fail-closed save of the active side (`PrepareForLinkAsync`) whose message names the real cause (`ErrSavedConflict` pending conflict, `ErrSavedOffline` no connection, `ErrSavedGone` sync deleted on the server, `ErrSavedNotSaved` other push/service failure), then a `switch-take-remote` safety backup and adopt from the blob the probe already read (one download); the previous sync stays listed. Forget/Unlink confirm; Forget keeps bookmarks, the server copy, other rows and all backups, and only prunes dead safety-master wraps; Unlink removes the active row and keeps dormant rows. Adding while linked offers only an existing sync (manual or QR), upserts by canonical URL + sync ID, is fail-closed (pending conflict or failed push cancels), and writes the Connect tags (`take-remote`/`upload-local`/`connect-merge`), not `switch-take-remote`. No server-side sync list; no delete-from-server. |
 | R6.6 | Unlink | Clears credentials ONLY; local items stay; sync stops. Requires explicit confirm. |
 | R6.7 | Backup export/import/preview | Envelope R2.5; import = preview (count and consequences) → Restore backup → safety-backup local → dirty mirror (auto-push/conflict, never pull-over). 50 MiB stream cap, tmp cleanup. |
 | R6.8 | Change password (`ChangePasswordAsync`) | Guards: current required, new required; current derived key MUST equal stored (else `InvalidCredentials`, zero mutations/downloads/queue). Then, in ONE engine gate hold (`SyncEngine.ChangeKeyAsync`): download the server copy (remote moved since the last sync → `DataOutOfSync`, zero mutations) → safety-backup of the REAL server copy → push re-encrypted under the new key on that remote base → store the new derived key ONLY after the PUT landed (a failed push keeps the old password working) → rotate safety master (R7.3, best-effort). Old password stops working everywhere. |
 | R6.9 | Duplicates bulk delete (`DeleteBookmarksAsync`) | Safety backup (local, `duplicates-cleanup`) BEFORE delete; one transaction + one push; result toast names the backup location. Last-copy-locked plan (never wipe a group). |
 | R6.10 | Conflict resolution (`ResolveConflictPullAsync` / `ResolveConflictPushAsync` / `ResolveConflictMergeAsync`) | Precondition: status = Conflict + linked sync. Preview: `GetConflictMergePreviewAsync` → counts + samples (localOnly/remoteOnly/titleConflicts/foldersCreated/separatorsAdopted + RemoteLastUpdated). UI presents 3 choices: Pull (take remote, backup local → `conflict-pull`), Push (upload local, backup remote → `conflict-push`), Merge (union both, backup both → `conflict-merge`). Safety backup of destroyed side(s) taken FIRST (fail closed). On success: conflict state cleared, status refreshed. |
 | R6.11 | Removed sync (401) notice (`SyncGoneNotice` on Home and Status; `XbsSession.UnlinkGoneSyncAsync` / `RetrySyncAsync`) | Exactly three actions: **Try again**, **Unlink and keep a copy…**, **Cancel**. Try again clears the dismissal and runs an explicit `ForceSyncAsync`; a repeated 401 keeps quiet. Cancel dismisses that sync until an explicit retry or a different sync. Nothing is unlinked, uploaded, snapshotted or retried automatically. Unlink-and-keep asks once, then (1) loads the local tree, validates it with `BackupGuard.ValidateTree` and counts items, (2) writes `removed-syncs/removed-<sha256(tree)>.json` = `{Format:1, CreatedAtUtc, ServiceUrl, Items, Tree}` encrypted with the device DB key (`xbs_db_key`, which survives an unlink), (3) decrypts and re-hashes to VERIFY (a failed check deletes the temp file and aborts), (4) unlinks and clears the 401 state. Zero local items → straight unlink, no empty file. |
-| R6.12 | Removed-sync copies (Backup → **Copies of removed syncs**) | Listed with local time, service host and item count; damaged/foreign files are skipped, never listed or deleted. **Restore** (confirmed) first snapshots the current local tree (`pre-restore`), replaces the local tree and marks it dirty (pushed at the next sync while linked). **Delete** (confirmed) removes only that file. Copies are content-addressed (identical trees stored once) and are NEVER pruned automatically. |
+| R6.12 | Removed-sync copies (Backup → **Copies of removed syncs**) | Listed with local time, service host and item count; damaged/foreign files are skipped, never listed or deleted. **Restore** (confirmed) first snapshots the current local tree (`pre-restore`), replaces the local tree and marks it dirty (pushed at the next sync while linked); while linked it is fail-closed (the active sync is saved first, otherwise `ErrRestoreActivePending` and nothing is replaced). A list that cannot be read says so (`ErrLoadFailed`) and logs a warning instead of looking empty. **Delete** (confirmed) removes only that file. Copies are content-addressed (identical trees stored once) and are NEVER pruned automatically. |
 
 ### Merge rules (normative — port of KeepmarkApp `src/shared/merge.ts`)
 
@@ -149,7 +149,7 @@ the applied result. Rules:
 | R8.6 | About page declares v1.1 + v1.2 extended contract (with fallback) + encryption + independence + proprietary license (© Yari Melzani). Bug-report mail includes app/API versions. |
 | R8.7 | Error evidence belongs to the step that produced it: Connect renders one error surface per action cluster (check / verify-link / apply-review) adjacent to its action, with `role="alert"`, instead of a single shared box. The check cluster reports inside the service status card (see "Service status card (v1.0.210)"): a failed check turns the card red with `role="alert"` and the message verbatim; verify-link and apply-review keep their adjacent boxes. Multi-outcome successes restate WHAT ran (mode + direction + target) via the pure `MoveResult.Describe` helper (unit-pinned), never a bare "Done". |
 | R8.8 | HTTP warning: choosing `http` in the custom-service editor must immediately show `Str.ServiceCleartext` next to the picker (`ServiceSelector`, icon + sentence, `role="status"`), stating that the sync ID and the encrypted bookmarks travel unprotected. The warning is not an error and does not block; it disappears when the URL returns to `https`. **[KNOWN GAP]** the QR review for an `http://` payload shows the URL without repeating this warning. |
-| R8.9 | Syncs page: active row marked `Active`, dormant rows marked `Inactive` with Activate / Rename / Forget / Unlink. Activation is refused with an inline message when the row has no key (`ErrSavedNoKey`), when app lock is set and the unlock is cancelled, or when the sync is already active. The intro states that one sync is active at a time and that the sync you leave stays in the list. |
+| R8.9 | Syncs page: active row marked `Active`, dormant rows marked `Inactive` with Activate / Rename / Forget / Unlink. Activation is refused with an inline message when the row has no key (`ErrSavedNoKey`), when app lock is set and the unlock is cancelled, or when the sync is already active. The intro states that one sync is active at a time and that the sync you leave stays in the list. An unreadable list shows `ErrLoadFailed` (with a log warning) instead of the empty state; the rename field's placeholder is the name the row would get from its host. |
 | R8.10 | Removed-sync notice: Home and Status show the same `SyncGoneNotice` (one notice, not two) with the three actions of R6.11; the body explains that the service no longer has this sync and that nothing on the device changed. **[KNOWN GAP]** the body hardcodes the common three-week expiry even when a v1.2 service advertises a different `syncExpiryDays`. |
 
 ## 9. Logging (`Logging.cs`, `InMemoryLogger`, Logs page)
@@ -162,7 +162,7 @@ R9.1 levels Error→Verbose, persisted verbosity, 200-entry viewer. R9.2 NEVER l
 
 ## 11. Test matrix (what proves what)
 
-`dotnet test` runs **370 tests** (xUnit, no device) after
+`dotnet test` runs **390 tests** (xUnit, no device) after
 `python3 scripts/prepare-sqlcipher.py --linux`; `node tests/js/gestures.test.cjs`
 runs the gesture suite (node:test, no browser).
 
@@ -279,7 +279,7 @@ fails the review.
 
 ### 13.5 Release checklist (Keepmark Android)
 
-- [ ] `dotnet test` green (370 Core tests)
+- [ ] `dotnet test` green (390 Core tests)
 - [ ] `dotnet build src/KeepmarkMobile -f net10.0-android -c Debug` 0 errors
 - [ ] Device deploy via `dotnet build -t:Run` (a Debug APK installed with plain
       `adb install` aborts: “No assemblies found … Fast Deployment”)
@@ -451,6 +451,15 @@ TalkBack, rotation and font scaling still require device QA.
   sync requires unlinking first; bookmarks stay.
 - Forget prunes only safety-master wraps whose key no saved sync (active
   included) still holds, never the last wrap and never a backup file.
+- The registry is read-modify-write and its writes are serialized, so the
+  startup migration and a concurrent link/rename never drop a row. The
+  migration itself is best-effort: a storage failure is logged, the app starts.
+- Label uniqueness compares the displayed names (host fallback included) and
+  the rename field shows the suggested name as its placeholder. The saved-sync
+  list surfaces a read failure (`ErrLoadFailed`) instead of rendering the
+  empty state.
+- Unlinking puts the engine straight into `NoCredentials` instead of waiting
+  for the next poll tick to notice the missing credentials.
 - A 401 surfaces `SyncGoneNotice` on Home and Status with Try again / Unlink and
   keep a copy… / Cancel. Unlink-and-keep writes a verified, content-addressed
   `removed-<sha256>.json` under the device key before unlinking; copies are

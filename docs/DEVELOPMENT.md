@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.210 (211)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.211 (212)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -34,7 +34,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (370 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (390 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -258,8 +258,9 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
   `SavedSyncs`/`SavedSyncRegistry` (pure registry + storage-facing registry),
   `BookmarkMerge` (pure union), `MoveResult` (result text), `SelectionBatch`.
 - `src/Keepmark.Core/Safety/` — `SafetyBackups` (files, index, naming),
-  `SafetyMaster` (wrapped master key), `RemovedSyncCopies` (content-addressed
-  copies).
+  `SafetyMaster` (wrapped master key), `RemovedSyncCopies` (shapes, hash, text)
+  and `RemovedSyncCopyStore` (validate → encrypt → write → verify → list/read →
+  delete pipeline, path guard, dedupe with relabel).
 - `src/Keepmark.Core/Workflow/` — `ServiceCatalog`, `ServiceCheckState`,
   `ConnectQrPayload`/`ConnectQrCandidateState`, `WorkflowRules`,
   `WorkflowTexts`.
@@ -636,7 +637,8 @@ activation probe.
 There is no schema change and no data migration: the active sync keeps using
 the historical keys, and the registry is additive. On the first start after the
 upgrade, `SavedSyncRegistry.SyncActiveAsync` registers the live credentials as
-the first row (a no-op once it exists).
+the first row (a no-op once it exists). That migration is best-effort: a
+storage failure is logged and the app still starts.
 
 ### 9.2 Registry rules (`SavedSyncs`, `SavedSyncRegistry`)
 
@@ -646,12 +648,18 @@ the first row (a no-op once it exists).
   case.
 - **Label** ≤ 40 characters, optional, unique case-insensitively; empty clears
   it. The display name is the label, or the service host when absent.
-  `SuggestName` proposes the host, then "host 2", "host 3"…
+  `SuggestName` proposes the host, then "host 2", "host 3"… and is the rename
+  field's placeholder. Uniqueness is checked against the **displayed** names,
+  host fallback included, so no two rows can look identical.
 - **Order**: last used first, then label, then sync ID (deterministic).
 - **Upsert** refreshes `LastUsedAt` and preserves a label/version/fingerprint
   the caller did not supply.
+- **Writes are serialized** (`SemaphoreSlim`): the list is read-modify-write, so
+  two concurrent callers (startup migration + link, rename + activation) must
+  not drop a row.
 - **Deserialize** is defensive: malformed JSON → empty list; rows without service
-  URL or sync ID dropped; duplicates collapsed to the most recently used.
+  URL or sync ID dropped; labels normalized on read; duplicates collapsed to
+  the most recently used.
 - `KeyId` is `SafetyMaster.Fingerprint(derivedKey)` (first 8 hex of
   SHA-256), so the safety master can be pruned without holding keys.
 
@@ -669,11 +677,16 @@ and the app is unlocked (when app lock is configured).
    password is never asked again.
 3. **Fail-closed save of the active side** (`PrepareForLinkAsync` →
    `SaveActiveSideAsync` → `PersistActiveSideAsync`): pending conflict, offline
-   service or failed push aborts the whole switch; the local tree is not replaced.
+   service, vanished sync or failed push aborts the whole switch; the local tree
+   is not replaced. Each cause keeps its own message (`ErrSavedConflict`,
+   `ErrSavedOffline`, `ErrSavedGone`, `ErrSavedNotSaved`), so an offline device
+   is never told to resolve a conflict it cannot resolve.
 4. **Snapshot** the local tree (`switch-take-remote`) through the safety
    subsystem. No snapshot → no switch.
-5. **Adopt** the target tree (`LinkAdoptRemoteAsync`: download, decrypt, replace
-   the mirror, then switch credentials).
+5. **Adopt** the target tree (`LinkAdoptRemoteAsync`: replace the mirror, then
+   switch credentials). The probe already downloaded and decrypted the blob, so
+   it is handed over as `PrefetchedRemote`: the same tree is never downloaded
+   twice.
 6. **Rotate** the safety master from the old key to the new one (best effort,
    never fails the switch) and **remember** the target row (it becomes active).
 7. The previously active sync stays in the list, dormant, ready to reactivate.
@@ -711,9 +724,11 @@ max-3 list. The last wrap is never dropped; no backup is deleted
 (`safety-master` keeps every file readable through any remaining wrap).
 
 **Unlink this device** (active row): clears the four active credential keys,
-removes the active row, clears the 401 state. The local tree stays, the server
-copy stays, dormant rows stay. Safety wraps stay (deterministic PBKDF2 means
-re-linking the same sync+password opens the backups again).
+removes the active row, clears the 401 state and puts the engine straight into
+`NoCredentials` (the next poll tick would otherwise leave the UI showing the
+linked state). The local tree stays, the server copy stays, dormant rows stay.
+Safety wraps stay (deterministic PBKDF2 means re-linking the same sync+password
+opens the backups again).
 
 **Removed sync (401)** — the service no longer has the sync:
 
@@ -729,13 +744,24 @@ re-linking the same sync+password opens the backups again).
   2. hashes the serialized tree; the file name is `removed-<sha256>.json`
      (content-addressed, so identical trees are stored once);
   3. writes `{Format:1, CreatedAtUtc, ServiceUrl, Items, Tree}` encrypted with
-     the device key, then **verifies** by decrypting and re-hashing; a failed
-     verification deletes the temp file and aborts before the unlink;
+     the device key (`RemovedSyncCopyStore`), then **verifies** by decrypting
+     and re-hashing; a failed verification deletes the temp file and aborts
+     before the unlink. An identical tree from another service rewrites the
+     same file with the new `ServiceUrl` instead of adding a second one;
   4. unlinks the device (credentials + active row).
 - Copies are listed in Backup → **Copies of removed syncs** with restore and
-  delete (both confirmed), and are **never pruned automatically**. Restore
-  first snapshots the current local tree (`pre-restore`), replaces the local
-  tree and marks it dirty; while linked, it is pushed at the next sync.
+  delete (both confirmed), and are **never pruned automatically**. A damaged or
+  foreign file is skipped with a warning, never listed and never deleted. File
+  names are opaque to callers: only bare `removed-*.json` names inside the
+  directory are accepted (no traversal, no absolute paths).
+- Restore first snapshots the current local tree (`pre-restore`), replaces the
+  local tree and marks it dirty; while linked, it is pushed at the next sync.
+  Restore while linked is **fail-closed**: the active sync is saved first, and
+  a pending conflict, offline service or unsaved push aborts with
+  `ErrRestoreActivePending` before anything is replaced.
+- If the copy list cannot be read, the section says so (`ErrLoadFailed`) and
+  logs a warning instead of looking empty; the same applies to the safety
+  backups list.
 
 ---
 
@@ -1195,7 +1221,7 @@ lock 2000.
 
 ## 15. Tests and verification
 
-### Automated suites (370 tests, no device)
+### Automated suites (390 tests, no device)
 
 | Suite | Proves |
 |---|---|
@@ -1207,9 +1233,10 @@ lock 2000.
 | `BookmarkMergeTests` | union rules, ids, folder paths, empty sides, URL identity, flatten, `MoveResult` |
 | `ConflictResolutionTests` | fake server with real base semantics, 409 handling, merge retry |
 | `SafetyBackupTests` | naming, describe, prune-5, legacy parse, index round-trip/damage, fingerprint, wrap trim |
-| `SavedSyncsTests` | identity, canonical URL, labels, upsert, sort, defensive JSON |
+| `SavedSyncsTests` | identity, canonical URL, labels (host fallback), upsert, sort, serialized concurrent writes, defensive JSON |
 | `SavedSyncActivationTests` | read-only activation probe, fail-closed switch, previous row kept |
 | `RemovedSyncNoticeTests` | 401 notice state, dismiss/retry, copy-before-unlink, dedupe |
+| `RemovedSyncCopyStoreTests` | copy pipeline: validation, encrypt/verify, dedupe + relabel, damaged/foreign files, path guard, wrong device key |
 | `ServiceCatalogTests` | catalog, normalization, saved metadata, stale checks |
 | `ConnectQrTests` | strict parser, bounded sizes, candidate generations/timeout/consume |
 | `WorkflowTests` | URL split/compose, password rules, short IDs, cleartext detection |

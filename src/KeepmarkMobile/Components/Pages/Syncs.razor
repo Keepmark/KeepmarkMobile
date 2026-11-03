@@ -1,3 +1,4 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
 @page "/syncs"
 @using Keepmark.Core.Sync
 @using Keepmark.Core.Workflow
@@ -15,11 +16,16 @@
 
 <p class="text-muted">@L.Get(Str.SyncsIntro)</p>
 
+@if (!string.IsNullOrEmpty(loadError))
+{
+    <div class="alert alert-danger" role="alert">@loadError</div>
+}
+
 @if (!loaded)
 {
     <p role="status"><em>@L.Get(Str.CommonLoading)</em></p>
 }
-else if (rows.Count == 0)
+else if (rows.Count == 0 && string.IsNullOrEmpty(loadError))
 {
     <p class="text-muted">@L.Get(Str.SyncsEmpty)</p>
     <a class="btn btn-primary" href="connect">@L.Get(Str.NavConnect)</a>
@@ -51,6 +57,7 @@ else
                     <div class="mt-2">
                         <label class="form-label" for="sync-name-@i">@L.Get(Str.SyncsNameLabel)</label>
                         <input id="sync-name-@i" class="form-control" @bind="renameText"
+                               placeholder="@RenameSuggestion(row)"
                                maxlength="@SavedSyncs.MaxLabelLength" disabled="@busy" />
                         @if (nameTaken)
                         {
@@ -136,6 +143,7 @@ else
     private string? noticeKey;
     private string notice = string.Empty;
     private bool noticeError;
+    private string loadError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -158,16 +166,25 @@ else
         {
             active = await Creds.GetAsync();
             rows = Session.Registry is null ? new List<SavedSync>() : await Session.Registry.ListAsync();
+            loadError = string.Empty;
         }
-        catch
+        catch (Exception ex)
         {
+            // An unreadable registry must not look like "no saved syncs".
             rows = [];
+            loadError = L.Get(Str.ErrLoadFailed, ex.Message);
+            Session.Log.Warn("syncs", $"Saved-sync list unreadable: {ex.GetType().Name}");
         }
         finally
         {
             loaded = true;
         }
     }
+
+    /// <summary>Name the row would get from its host: shown as the rename
+    /// placeholder so "empty" is explained instead of looking like a bug.</summary>
+    private string RenameSuggestion(SavedSync row) =>
+        SavedSyncs.SuggestName(row.ServiceUrl, rows, row.Identity);
 
     private bool IsActive(SavedSync row) =>
         active is not null && SavedSyncs.Same(row.Identity, new SavedSyncIdentity(active.ServiceUrl, active.Id));
@@ -196,7 +213,7 @@ else
         noticeError = false;
     }
 
-    private void ShowNotice(string key, string text, bool error = false)
+    private void ShowNotice(string? key, string text, bool error = false)
     {
         noticeKey = key;
         notice = text;

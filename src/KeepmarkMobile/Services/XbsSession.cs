@@ -83,8 +83,17 @@ public sealed class XbsSession : IAsyncDisposable
         Engine = engine;
         Registry = new SavedSyncRegistry(_creds);
         // Migration from single-sync installs: the live credentials become the
-        // first registered row (no-op once the row exists).
-        await Registry.SyncActiveAsync(await _creds.GetAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        // first registered row (no-op once the row exists). Additive, so a
+        // storage failure here must never keep the app from starting.
+        try
+        {
+            await Registry.SyncActiveAsync(await _creds.GetAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _log.Warn("session", $"Saved-sync migration skipped: {ex.GetType().Name}");
+        }
+
         Ready = true;
         _log.Info("session", $"Log started (level {_log.MinLevel}, mode {_settings.Mode})");
         engine.AutoSyncEnabled = _foreground;
@@ -153,10 +162,11 @@ public sealed class XbsSession : IAsyncDisposable
     {
         var derived = _crypto.DeriveKey(password, syncId, Core.XbsConstants.SyncClientVersion);
         var candidate = new SyncCredentials(syncId, serviceUrl, derived, Core.XbsConstants.SyncClientVersion);
-        var (local, remote, remoteLast, remoteVer, remoteBlob, localBlob) =
+        var (local, remote, remoteLast, remoteVer, remoteBlob, localBlob, remoteRev, remoteHash) =
             await Engine!.CompareAsync(candidate, ct).ConfigureAwait(false);
         _log.Info("session", $"Probe: local={local} remote={remote}");
-        return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob);
+        return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob,
+            remoteRev, remoteHash);
     }
 
     /// <summary>Before this device adopts another sync's tree, save whatever the
@@ -304,8 +314,11 @@ public sealed class XbsSession : IAsyncDisposable
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         _log.Info("session", "Link: taking remote tree");
         // Replaces the mirror even when dirty (the user chose take-remote and
-        // the local side is snapshotted), then switches credentials.
-        await Engine!.LinkAdoptRemoteAsync(info.Candidate, ct).ConfigureAwait(false);
+        // the local side is snapshotted), then switches credentials. The blob
+        // is the one the probe already read and verified: no second download.
+        await Engine!.LinkAdoptRemoteAsync(info.Candidate, new SyncEngine.PrefetchedRemote(
+            info.RemoteBlob, info.RemoteVersion, info.RemoteLastUpdated,
+            info.RemoteRevision, info.RemoteHash), ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
         await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
@@ -393,7 +406,9 @@ public sealed class XbsSession : IAsyncDisposable
             await Registry.ForgetAsync(new SavedSyncIdentity(current.ServiceUrl, current.Id)).ConfigureAwait(false);
         }
 
-        Engine?.ClearGoneSync();
+        // Tell the engine now: without this the UI keeps showing the linked
+        // state until the next poll tick finds no credentials.
+        Engine?.MarkUnlinked();
         _log.Info("session", "Device unlinked");
     }
 
@@ -418,10 +433,11 @@ public sealed class XbsSession : IAsyncDisposable
             SavedSyncs.CanonicalServiceUrl(row.ServiceUrl),
             row.DerivedKey,
             row.SyncVersion);
-        var (local, remote, remoteLast, remoteVer, remoteBlob, localBlob) =
+        var (local, remote, remoteLast, remoteVer, remoteBlob, localBlob, remoteRev, remoteHash) =
             await Engine!.CompareAsync(candidate, ct).ConfigureAwait(false);
         _log.Info("session", $"Activation probe: local={local} remote={remote}");
-        return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob);
+        return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob,
+            remoteRev, remoteHash);
     }
 
     /// <summary>Makes a verified dormant sync the active one. Fail-closed: the
@@ -1086,79 +1102,32 @@ public sealed class XbsSession : IAsyncDisposable
         }
 
         var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
-        var count = BackupGuard.ValidateTree(roots);
-        if (count == 0)
-        {
-            return null;
-        }
-
-        var treeJson = System.Text.Json.JsonSerializer.Serialize(roots);
-        var hash = RemovedSyncCopies.Hash(treeJson);
-        var dir = RemovedDir();
-        Directory.CreateDirectory(dir);
-        var name = RemovedSyncCopies.FileName(hash);
-        var path = Path.Combine(dir, name);
-        if (File.Exists(path) && await MatchesRemovedCopyAsync(path, hash).ConfigureAwait(false))
-        {
-            _log.Info("session", "Removed-sync copy already kept (same tree)");
-            return (name, count);
-        }
-
-        var envelope = new RemovedSyncCopyFile(
-            RemovedSyncCopies.CurrentFormat, DateTime.UtcNow, creds.ServiceUrl, count, roots);
-        var payload = _crypto.Encrypt(
-            System.Text.Json.JsonSerializer.Serialize(envelope), await CopyKeyAsync().ConfigureAwait(false));
-        var tmp = path + ".tmp";
-        await File.WriteAllTextAsync(tmp, payload, ct).ConfigureAwait(false);
-        if (!await MatchesRemovedCopyAsync(tmp, hash).ConfigureAwait(false))
-        {
-            File.Delete(tmp);
-            throw new InvalidOperationException(_str.Get(Str.ErrCopyVerify));
-        }
-
-        File.Move(tmp, path, overwrite: true);
-        _log.Info("session", $"Kept local copy of removed sync ({count} items)");
-        return (name, count);
+        return await RemovedCopies.KeepAsync(creds.ServiceUrl, roots, ct).ConfigureAwait(false);
     }
 
-    public async Task<List<RemovedSyncCopyInfo>> ListRemovedSyncCopiesAsync()
-    {
-        var dir = RemovedDir();
-        if (!Directory.Exists(dir))
-        {
-            return [];
-        }
+    public Task<List<RemovedSyncCopyInfo>> ListRemovedSyncCopiesAsync() => RemovedCopies.ListAsync();
 
-        var list = new List<RemovedSyncCopyInfo>();
-        foreach (var file in new DirectoryInfo(dir).GetFiles(RemovedSyncCopies.FilePrefix + "*.json"))
+    /// <summary>Puts a kept copy back as this device's tree. Fail-closed while
+    /// linked: the active sync is saved first, so unsaved edits are never
+    /// replaced silently. While linked the restored tree is pushed at the next
+    /// sync (replacing that sync's server copy), as the confirmation says.</summary>
+    public async Task<int> RestoreRemovedSyncCopyAsync(string fileName, CancellationToken ct = default)
+    {
+        var copy = await RemovedCopies.ReadAsync(fileName, ct).ConfigureAwait(false);
+        var count = BackupGuard.ValidateTree(copy.Tree);
+
+        if (await _creds.GetAsync().ConfigureAwait(false) is not null)
         {
             try
             {
-                var copy = await OpenRemovedCopyAsync(file.FullName).ConfigureAwait(false);
-                list.Add(new RemovedSyncCopyInfo(file.Name, copy.CreatedAtUtc, copy.Items, copy.ServiceUrl));
+                await Engine!.PersistActiveSideAsync(ct).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (InvalidOperationException ex)
             {
-                // A damaged or foreign file is skipped, never listed or deleted.
-                _log.Warn("session", $"Removed-sync copy unreadable ({file.Name}): {ex.GetType().Name}");
+                throw new InvalidOperationException(_str.Get(Str.ErrRestoreActivePending), ex);
             }
         }
 
-        return list.OrderByDescending(c => c.CreatedAtUtc).ToList();
-    }
-
-    /// <summary>Puts a kept copy back as this device's tree, with the usual
-    /// pre-restore safety backup. While linked it is pushed at the next sync.</summary>
-    public async Task<int> RestoreRemovedSyncCopyAsync(string fileName, CancellationToken ct = default)
-    {
-        var path = RemovedPath(fileName);
-        if (!File.Exists(path))
-        {
-            throw new InvalidOperationException(Loc.Get(Str.ErrBackupPruned));
-        }
-
-        var copy = await OpenRemovedCopyAsync(path).ConfigureAwait(false);
-        var count = BackupGuard.ValidateTree(copy.Tree);
         var (local, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(local),
             SafetyOperations.PreRestore, CountBackupNodes(local)).ConfigureAwait(false);
@@ -1170,41 +1139,8 @@ public sealed class XbsSession : IAsyncDisposable
     /// <summary>Deletes one kept copy (confirmed in UI). Never automatic.</summary>
     public Task DeleteRemovedSyncCopyAsync(string fileName)
     {
-        var path = RemovedPath(fileName);
-        if (!File.Exists(path))
-        {
-            throw new InvalidOperationException(Loc.Get(Str.ErrBackupPruned));
-        }
-
-        File.Delete(path);
-        _log.Info("session", "Removed-sync copy deleted");
+        RemovedCopies.Delete(fileName);
         return Task.CompletedTask;
-    }
-
-    private async Task<RemovedSyncCopyFile> OpenRemovedCopyAsync(string path, CancellationToken ct = default)
-    {
-        var raw = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
-        var json = _crypto.Decrypt(raw, await CopyKeyAsync().ConfigureAwait(false));
-        var copy = System.Text.Json.JsonSerializer.Deserialize<RemovedSyncCopyFile>(json);
-        if (copy is null || copy.Format != RemovedSyncCopies.CurrentFormat || copy.Tree is null)
-        {
-            throw new InvalidOperationException(_str.Get(Str.ErrBackupUnreadable));
-        }
-
-        return copy;
-    }
-
-    private async Task<bool> MatchesRemovedCopyAsync(string path, string expectedHash)
-    {
-        try
-        {
-            var copy = await OpenRemovedCopyAsync(path).ConfigureAwait(false);
-            return RemovedSyncCopies.Hash(System.Text.Json.JsonSerializer.Serialize(copy.Tree)) == expectedHash;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
     }
 
     /// <summary>Device key that never rotates on unlink, so a kept copy stays
@@ -1212,27 +1148,13 @@ public sealed class XbsSession : IAsyncDisposable
     private async Task<string> CopyKeyAsync() =>
         Convert.ToBase64String(Convert.FromHexString(await _creds.GetOrCreateDbKeyAsync().ConfigureAwait(false)));
 
-    private static string RemovedDir() =>
-        Path.Combine(FileSystem.AppDataDirectory, RemovedSyncCopies.DirName);
+    /// <summary>Copies of removed syncs, in the app-private directory (created
+    /// on first write). Encrypted with the device key, addressable by name.</summary>
+    private RemovedSyncCopyStore RemovedCopies => _removedCopies ??= new RemovedSyncCopyStore(
+        Path.Combine(FileSystem.AppDataDirectory, RemovedSyncCopies.DirName),
+        _crypto, CopyKeyAsync, _str, _log);
 
-    private static string RemovedPath(string fileName)
-    {
-        if (string.IsNullOrWhiteSpace(fileName) || fileName != Path.GetFileName(fileName) ||
-            !fileName.StartsWith(RemovedSyncCopies.FilePrefix, StringComparison.Ordinal) ||
-            !fileName.EndsWith(".json", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(Loc.Get(Str.ErrUnknownBackup));
-        }
-
-        var dir = RemovedDir();
-        var full = Path.GetFullPath(Path.Combine(dir, fileName));
-        if (full != Path.Combine(dir, fileName))
-        {
-            throw new InvalidOperationException(Loc.Get(Str.ErrUnknownBackup));
-        }
-
-        return full;
-    }
+    private RemovedSyncCopyStore? _removedCopies;
 
     private static string SafetyDir() =>
         Path.Combine(FileSystem.AppDataDirectory, "safety-backups");
@@ -1357,6 +1279,7 @@ public sealed class XbsSession : IAsyncDisposable
 public sealed record ReconcileInfo(
     SyncCredentials Candidate, int LocalCount, int RemoteCount,
     string? RemoteLastUpdated, string? RemoteVersion,
-    string RemoteBlob, string LocalBlob);
+    string RemoteBlob, string LocalBlob,
+    long? RemoteRevision = null, string? RemoteHash = null);
 
 public sealed record BackupEnvelope(string App, int Format, string Salt, string Blob);

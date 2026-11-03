@@ -287,6 +287,10 @@ public static partial class Str
     public const string ErrSavedAlreadyActive = nameof(ErrSavedAlreadyActive);
     public const string ErrSavedConflict = nameof(ErrSavedConflict);
     public const string ErrSavedNotSaved = nameof(ErrSavedNotSaved);
+    public const string ErrSavedOffline = nameof(ErrSavedOffline);
+    public const string ErrSavedGone = nameof(ErrSavedGone);
+    public const string ErrRestoreActivePending = nameof(ErrRestoreActivePending);
+    public const string ErrLoadFailed = nameof(ErrLoadFailed);
     public const string SyncsTitle = nameof(SyncsTitle);
     public const string SyncsIntro = nameof(SyncsIntro);
     public const string SyncsActive = nameof(SyncsActive);

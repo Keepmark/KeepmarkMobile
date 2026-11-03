@@ -71,7 +71,7 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 | **Safety backups** | Automatic snapshot before every overwrite (newest 5 kept) |
 | **Duplicates** | Find links saved more than once; one copy of each always survives |
 | **Syncs** | Keep several syncs on the phone with one active at a time; activate another, rename or forget it, or add an existing sync with its ID and password (or the browser QR) |
-| **Removed syncs** | If a sync disappears from its service, unlink and keep a verified local copy you can restore or delete from Backup |
+| **Removed syncs** | If a sync disappears from its service, unlink and keep a verified local copy you can restore or delete from Backup (a restore while another sync is linked waits until that sync has saved its edits) |
 | **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch, 日本語, Português (Brasil), Русский, 简体中文 |
 | **Logs** | Built-in viewer with share export, sync IDs and secrets redacted |
 

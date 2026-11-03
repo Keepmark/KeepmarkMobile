@@ -312,6 +312,26 @@ public sealed class ConflictResolutionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task LinkAdoptRemote_WithTheProbedBlob_DoesNotDownloadItTwice()
+    {
+        await _store.ReplaceAllAsync(Tree((1, "Old", "https://old.example")), "b", "base", "1.8.0");
+        _api.Blob = Enc(Tree((9, "Remote", "https://remote.example")), OtherKey);
+        var candidate = new SyncCredentials("new-sync", "https://example.test", OtherKey, "1.8.0");
+
+        var probe = await _engine.CompareAsync(candidate);
+        Assert.Equal(1, _api.GetCount);
+
+        await _engine.LinkAdoptRemoteAsync(candidate, new SyncEngine.PrefetchedRemote(
+            probe.RemoteBlob, probe.RemoteVersion, probe.RemoteLastUpdated,
+            probe.RemoteRevision, probe.RemoteHash));
+
+        Assert.Equal(1, _api.GetCount);
+        Assert.Equal(["https://remote.example"], await LocalUrlsAsync());
+        Assert.Equal("new-sync", (await _creds.GetAsync())!.Id);
+        Assert.Equal(_api.LastUpdated, (await _store.LoadMirrorAsync()).LastUpdated);
+    }
+
+    [Fact]
     public async Task LinkAdoptRemote_WrongPassword_ChangesNothing()
     {
         await _store.ReplaceAllAsync(Tree((1, "Old", "https://old.example")), "b", "base", "1.8.0");
