@@ -67,7 +67,7 @@ Words come from `UI-TERMS.md`.
 
 | Workflow | Needs link | Steps | Confirmation | Implication line (required) |
 |---|---|---|---|---|
-| Add a sync while linked (Connect → `+ Add a sync`) | yes | Existing sync only (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict, a missing connection, a sync that no longer exists on the server or a failed push cancels the switch and changes nothing, and the message names that exact cause. A brand-new sync requires unlinking first (bookmarks stay). |
+| Add a sync while linked (Connect → `+ Add a sync`) | yes | Sync-change password gate (only if set) → existing sync only (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict, a missing connection, a sync that no longer exists on the server or a failed push cancels the switch and changes nothing, and the message names that exact cause. A brand-new sync requires unlinking first (bookmarks stay). With a sync-change password, the wizard is gated: one field and `Continue` come first (a wrong password fails there, cleared), and only then the form opens — the password is never asked again inside it. |
 | Syncs: Activate | no | Syncs → `Activate` → device unlock when app lock is set → apply | none beyond the device unlock | Read-only check first (service/version gate + download + decrypt with the key saved in the row); only then the active side is saved and this device adopts the chosen sync's copy behind a `switch-take-remote` safety backup. If that save cannot happen the switch is cancelled with the real reason (pending conflict, no connection, sync gone from the server, push failed) and nothing is replaced. The sync you leave stays in the list. The sync's own long password is never asked. |
 | Syncs: Forget / Unlink | no | Syncs → `Forget…` (inactive) / `Unlink this device…` (active) | always | Inactive: only the row is forgotten; bookmarks, the server copy and the other rows stay. Active: this device is unlinked and the row disappears; the bookmarks stay and the sync plus its server copy stay for the other devices. Dormant rows survive an unlink. Forgetting also drops that key's safety-master wrap when no other saved sync uses it; safety backups and copies of removed syncs stay. |
 | Removed sync (401) | shown while linked | Home/Status notice → `Try again` / `Unlink and keep a copy…` / `Cancel` | always for the unlink; retry and cancel execute at once | The service no longer has this sync (expiry or another device's deletion). Nothing happens automatically and local bookmarks are untouched. Unlinking keeps a verified local copy of this device's tree, restorable from Backup → `Copies of removed syncs` and never pruned; `Cancel` keeps the notice quiet for that sync until an explicit retry. |
@@ -81,7 +81,7 @@ Words come from `UI-TERMS.md`.
 | Activate a saved sync (popup) | no (unlinked) / yes (linked) | `Syncs` list → `Activate` → sync-change password (only if set) → apply | none beyond the dialog | The password is proved first (it unwraps the row's key, then a read-only version gate + GET + decrypt); only then is the sync that is active right now saved (`fail-closed`: a pending conflict cancels the switch). The sync's own long password is never asked at activation. Without a sync-change password the dialog is a plain confirmation. |
 | Forget or unlink a saved sync (manager) | manager only | Manager → Sync → `Forget…` (inactive) / `Unlink this device…` (active) | always | Inactive: only the row is forgotten and the server copy stays; safety backups only that key could open are deleted with it. Active: this device is unlinked and the row disappears; its bookmarks stay and the sync plus its server copy stay for the other devices. Deleting it for everyone is `Delete from server…`. |
 | Delete sync from server (service v1.2) | yes | Manager → Sync → `Delete from server…` on the active row | once | The server copy is gone for every device; they stop syncing at their next sync. No undelete, and this browser keeps no copy: local bookmarks stay, no safety backup is taken or kept, and the manager reports the outcome. |
-| Removed sync | shown while unlinked after the service no longer has the sync | Popup: informational notice + `Manage backups`; Manager → Backup: `Download copy` / `Dismiss…` | Dismiss only | Only for a sync that disappeared from the service (expiry or another device's deletion). It is the only copy of the removed sync and a plain JSON file, not encrypted. A deliberate `Delete from server…` keeps no copy. |
+| Removed sync | shown while unlinked after the service no longer has the sync | Popup: informational notice only (no actions, no backup wording); Manager → Backup: `Download copy` / `Dismiss…` | Dismiss only | Only for a sync that disappeared from the service (expiry or another device's deletion). The popup states the fact and stops there: the kept copy and its actions belong to Backup, where the user goes on their own. That copy is the only copy of the removed sync and a plain JSON file, not encrypted. A deliberate `Delete from server…` keeps no copy. |
 
 ## Step and button visibility
 
@@ -101,8 +101,10 @@ Words come from `UI-TERMS.md`.
   restart) never resumes on its final review: it restarts at the step that asks
   the password, and the service check and merge preview run again. Android has
   no resumable wizard.
-- Undo (extension): the last overwrite offers `Undo` for its kind (named in
-  words, not by key). Result text: `Undone: <what was undone>.`
+- Undo (extension): the last overwrite offers `Undo` in the manager's Status
+  section, for its kind (named in words, not by key). Result text: `Undone: <what
+  was undone>.` The popup carries no undo, backup or restore panel: it shows
+  status and `Sync now`, and `Manage` opens the place where those live.
 
 ## Multi-sync model (shared principles)
 
@@ -137,6 +139,15 @@ Words come from `UI-TERMS.md`.
   password, activation, a new link and any change that demotes the active key ask
   for it. Without one, an inactive row is a plain confirmation and the rows are
   stored in clear in this browser (same exposure as the active key).
+- The add-sync wizard is gated the same way: with a password set, `+ Add a
+  sync` asks for it first (`VerifySwitchPassword`, read-only proof), then shows
+  the rest of the flow; the form has no password field of its own.
+- The section shows only the state (`Set` / `Not set`) and the actions; one
+  action at a time opens a single panel with just the fields that action needs:
+  `Set…` (new + repeat), `Change…` (current + new + repeat), `Remove…` (current
+  alone, with the consequence as the confirmation) and `Forgot it? Reset…` (new
+  + repeat, below the actions, since it is the last resort). Cancel closes the
+  panel and clears its fields; a wrong current password is never kept.
 - Reset (forgotten password) mints a new vault and deletes every row but the
   active one; the active sync keeps working and is wrapped under the new
   password. Server copies and the undo slot are untouched; the encrypted safety
@@ -153,7 +164,7 @@ Words come from `UI-TERMS.md`.
   `Unlink and keep a copy…` and `Cancel`; nothing is unlinked, uploaded or
   snapshotted until the user chooses.
 - Unlinking puts this device into the unlinked state immediately (no waiting for
-the next sync tick), and keeps local bookmarks.
+  the next sync tick), and keeps local bookmarks.
 - `Unlink and keep a copy…` asks once, then keeps a verified local copy of this
   device's tree before the credentials go: content-addressed, encrypted with the
   device key, in `Backup` → `Copies of removed syncs`, with `Restore` and
@@ -177,8 +188,9 @@ the next sync tick), and keeps local bookmarks.
   Android uses platform secure storage plus the optional device unlock.
 - Android can add only an existing sync while linked; the extension can also
   create a new sync from the current bookmarks.
-- Undo of the last overwrite exists only in the extension; the mobile app's way
-  back is Backup → Safety backups (Home keeps a short undo for a single delete).
+- Undo of the last overwrite exists only in the extension manager (Status); the
+  popup never shows it, and the mobile app's way back is Backup → Safety backups
+  (Home keeps a short undo for a single delete).
 - Change password result: the extension adds `Undo is in Status`.
 - Backup restore: the extension needs a linked sync (the restored tree is
   uploaded right away). The mobile app also restores while unlinked, on this
@@ -218,12 +230,18 @@ accepts `https` and plain `http` only for `localhost` / `127.0.0.1` / `[::1]`.
 
 ## Browser → Android QR linking
 
-- Browser manager Status → Connect Keepmark on your phone (Android icon) → Show connection QR →
-  focused dialog → current password → Show QR. The launch button is hidden
-  while the dialog is open. Password errors stay next to the key-icon input
-  inside the dialog and allow retry. The QR includes a small Keepmark logo.
-  Outside click or Escape closes the dialog and erases the QR.
-  Local key verification and a read-only remote GET/decryption precede display.
+- Two entry points, one dialog: the Status card's Show connection QR (the
+  ACTIVE sync) and a `Show QR` button on EVERY row of Manager → Sync, so the
+  phone can join a sync that is not the one active in this browser. A row's
+  dialog names that row's service and ID, asks that sync's own long password
+  (never stored: the typed one is the proof) and decrypts one remote GET
+  read-only; the active sync, the rows and the server are untouched. The
+  dialog lives outside the sections, so a row still works while this browser is
+  unlinked. The launch button is hidden while the dialog is open. Password
+  errors stay next to the key-icon input inside the dialog and allow retry.
+  The QR includes a small Keepmark logo. Outside click or Escape closes the
+  dialog and erases the QR. Local key verification (active) or the remote
+  decrypt (row) and a read-only remote GET precede display.
 - The QR is compact Keepmark format-1 JSON with service, ID, sync data version
   and original password; 1800 UTF-8 bytes maximum. No password is persisted or
   sent to the service. Display ends after 60 seconds, close, Escape, navigation,
