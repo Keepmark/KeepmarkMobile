@@ -276,17 +276,18 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
 | `/` | `Home` | tree, search, pinned/recent, sheets, share intake, selection |
 | `/duplicates` | `Duplicates` | duplicate groups and bulk cleanup |
 | `/backup` | `Backup` | encrypted export/import, safety backups, removed copies |
-| `/syncs` | `Syncs` | saved syncs: activate, rename, forget, unlink |
-| `/connect` | `Connect` | link existing, create new, add while linked, unlink |
+| `/syncs` | `Syncs` | saved syncs (activate, rename, forget, unlink) plus `+ Add a sync`, which opens the whole connect flow in place |
+| `/connect` | `Connect` | redirect to `/syncs` (old links only) |
 | `/settings` | `Settings` | sync mode, theme, language, home sections, verbosity |
 | `/settings/security` | `Security` | app lock and relock time |
 | `/status` | `Status` | sync state, sizes, versions, removed-sync notice |
 | `/logs` | `Logs` | in-memory log viewer + share export |
 | `/help` | `Help` | user help |
 | `/about` | `About` | versions, license, bug-report mail |
-| `/switch-service`, `/migrate` | `MoveServiceLegacy` | redirect to `/connect` (old links only) |
+| `/switch-service`, `/migrate` | `MoveServiceLegacy` | redirect to `/syncs` (old links only) |
 
-- `Components/` — shared UI: `BookmarkRow`, `BookmarkSheet`, `FolderPicker`,
+- `Components/` — shared UI: `ConnectPanel` (the add/connect flow used by
+  `Syncs`), `BookmarkRow`, `BookmarkSheet`, `FolderPicker`,
   `MovePicker`, `DirectionPicker`, `ConfirmBlock`, `StepMessage`,
   `ServiceSelector`, `QrCredentialReview`, `SyncGoneNotice`, `RowTile`.
 - `Platforms/Android/` — `MainActivity` (non-edge-to-edge window, app lock on
@@ -696,7 +697,7 @@ The list is refreshed in place.
 
 ### 9.4 Add a sync while linked
 
-`Connect → + Add a sync` is available only while linked and offers **only the
+`Syncs → + Add a sync` is available only while linked and offers **only the
 existing-sync path** (manual credentials or QR). Creating a brand-new sync is a
 first-time flow: unlink first (bookmarks stay).
 
@@ -765,22 +766,27 @@ opens the backups again).
 
 ---
 
-## 10. Connect
+## 10. Connect (the `+ Add a sync` flow inside Syncs)
 
-### 10.1 Page states
+### 10.1 States
 
-`Connect` has four states:
+There is no separate connect page: the flow is a component (`ConnectPanel`)
+rendered **inside** `Syncs`, replacing the list while it is open. It owns no
+list of its own and reports back with `OnFinished` (refresh the list) and
+`OnCancel` (show the list again).
 
 1. **Session not ready** — loading status.
-2. **Linked, not adding** — the linked service (full normalized URL) and the
-   abbreviated ID, `Copia sync ID`, the last outcome (including a newly created
-   full ID + `Copia sync ID`), `+ Add a sync`, a link to `Syncs`, and
-   `Unlink this device…` with confirmation.
-3. **Mode choice** (unlinked, or after `+ Add a sync` the mode is preset) —
-   two cards: `Link an existing sync` and `Create a new sync`. While linked,
-   only the existing path is reachable.
+2. **Panel closed** — the Syncs list (rows, active badge, actions) with
+   `+ Add a sync` below it; while unlinked with no rows, the empty state with
+   the same button.
+3. **Mode choice** — only while unlinked: `Link an existing sync` and
+   `Create a new sync`. While linked the panel opens directly on the
+   existing-sync editor (the row that is active already has its own Unlink).
 4. **Editor** — service selector, credentials, QR, verification, direction
    review and apply.
+5. **Created** — the new sync ID in full, `Copia sync ID` and `Done`; the panel
+   waits for that acknowledgement instead of dropping the only readable copy of
+   the credential.
 
 ### 10.2 Service selection
 
@@ -860,7 +866,7 @@ cluster keeps its own adjacent error surface (`check` / `verify-link` /
 
 ### 10.5 Browser QR
 
-Connect → Existing sync (first link, and `+ Add a sync` while linked) places a
+Syncs → `+ Add a sync` → Existing sync (first link, and while linked) places a
 QR icon and "Scan QR from browser" before the manual fields. `IQrScanner` /
 `QrScanner` use pinned `ZXing.Net.Maui.Controls` 0.10.4.
 
@@ -888,16 +894,17 @@ QR icon and "Scan QR from browser" before the manual fields. `IQrScanner` /
 
 ### 10.6 Unlink
 
-`Unlink this device…` is armed inline (`Yes, unlink` / Cancel). It clears the
-active credentials and the active row; local bookmarks and the server copy
-stay. The result says so. Undo is cleared.
+`Unlink this device…` lives on the **active row** of `Syncs` (§9.5), not in the
+add flow. It is armed inline (`Yes, unlink` / Cancel), clears the active
+credentials and the active row, and keeps local bookmarks and the server copy.
+The result says so. Undo is cleared.
 
 ### 10.7 Retired routes
 
-`/switch-service` and `/migrate` are handled by `MoveServiceLegacy.razor`, which
-redirects to `/connect`. They exist only so old links, bookmarks and launcher
-shortcuts never hit a dead route. There is no multi-step switch wizard, no
-resume draft and no "new sync next to an existing link" path.
+`/connect`, `/switch-service` and `/migrate` all redirect to `/syncs`
+(`Connect.razor`, `MoveServiceLegacy.razor`). They exist only so old links,
+bookmarks and launcher shortcuts never hit a dead route. There is no multi-step
+switch wizard, no resume draft and no "new sync next to an existing link" path.
 
 ---
 

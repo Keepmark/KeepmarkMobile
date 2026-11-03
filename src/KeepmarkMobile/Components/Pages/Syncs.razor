@@ -25,10 +25,19 @@
 {
     <p role="status"><em>@L.Get(Str.CommonLoading)</em></p>
 }
+else if (adding)
+{
+    @* The connect/add flow lives here, not on a page of its own: one section
+       owns the syncs, and the list reappears when the panel is done. *@
+    <ConnectPanel AddingWhileLinked="@(active is not null)" AllowCreate="@(active is null)"
+                  OnFinished="FinishAddingAsync" OnCancel="CancelAdding" />
+}
 else if (rows.Count == 0 && string.IsNullOrEmpty(loadError))
 {
     <p class="text-muted">@L.Get(Str.SyncsEmpty)</p>
-    <a class="btn btn-primary" href="connect">@L.Get(Str.NavConnect)</a>
+    <div class="d-grid">
+        <button class="btn btn-primary" @onclick="StartAdding">@L.Get(Str.ConnAddSyncBtn)</button>
+    </div>
 }
 else
 {
@@ -125,6 +134,14 @@ else
             </div>
         </div>
     }
+
+    <div class="d-grid mt-3">
+        <button class="btn btn-outline-primary" @onclick="StartAdding" disabled="@busy">@L.Get(Str.ConnAddSyncBtn)</button>
+    </div>
+    @if (active is not null)
+    {
+        <p class="form-text mt-2">@L.Get(Str.ConnAddSyncHint)</p>
+    }
 }
 
 @code {
@@ -132,6 +149,9 @@ else
     private SyncCredentials? active;
     private bool loaded;
     private bool busy;
+    /// <summary>The connect/add panel replaces the list while it is open: the
+    /// page is the single place where syncs are managed.</summary>
+    private bool adding;
 
     private string? armedActivateKey;
     private string? armedForgetKey;
@@ -194,6 +214,26 @@ else
         armedActivateKey = null;
         armedForgetKey = null;
         armedUnlinkKey = null;
+    }
+
+    // ---- add / connect ---------------------------------------------------
+
+    private void StartAdding()
+    {
+        Disarm();
+        ClearNotice();
+        renamingKey = null;
+        adding = true;
+    }
+
+    private void CancelAdding() => adding = false;
+
+    /// <summary>The panel finished (linked, created or applied): the list is
+    /// the outcome, so refresh and show it again.</summary>
+    private async Task FinishAddingAsync()
+    {
+        adding = false;
+        await RefreshAsync();
     }
 
     private void Arm(string key, bool armActivate = false, bool armForget = false, bool armUnlink = false)

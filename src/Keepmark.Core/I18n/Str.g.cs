@@ -470,6 +470,7 @@ public static partial class Str
     public const string DirOffBoth = nameof(DirOffBoth);
     public const string DirOffNothingDevice = nameof(DirOffNothingDevice);
     public const string CommonSave = nameof(CommonSave);
+    public const string CommonDone = nameof(CommonDone);
     public const string CommonCurrentPassword = nameof(CommonCurrentPassword);
     public const string CommonNewPassword = nameof(CommonNewPassword);
     public const string CommonConfirmNewPassword = nameof(CommonConfirmNewPassword);
