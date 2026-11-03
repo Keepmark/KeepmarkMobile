@@ -303,25 +303,47 @@ public sealed class XbsSession : IAsyncDisposable
         File.Move(tmp, path, overwrite: true);
     }
 
-    public async Task ApplyRemoteAsync(ReconcileInfo info, string operation = SafetyOperations.TakeRemote, CancellationToken ct = default)
+    /// <summary>True when this apply leaves one linked sync for another: the
+    /// local tree being replaced is the previous sync's, and that copy is on
+    /// the server (the switch is fail-closed on pending edits), so it needs no
+    /// snapshot. Unlinked, or re-linking the same sync, keeps the backup.</summary>
+    private async Task<bool> SwitchingFromLinkedAsync(SyncCredentials candidate)
     {
+        var current = await _creds.GetAsync().ConfigureAwait(false);
+        return current is not null && !SavedSyncs.Same(
+            new SavedSyncIdentity(current.ServiceUrl, current.Id),
+            new SavedSyncIdentity(candidate.ServiceUrl, candidate.Id));
+    }
+
+    /// <summary>Adopts the verified remote tree. Returns whether a safety
+    /// backup was written (false when switching from a linked sync).</summary>
+    public async Task<bool> ApplyRemoteAsync(ReconcileInfo info, string operation = SafetyOperations.TakeRemote, CancellationToken ct = default)
+    {
+        var switching = await SwitchingFromLinkedAsync(info.Candidate).ConfigureAwait(false);
         await PrepareForLinkAsync(info.Candidate, ct).ConfigureAwait(false);
-        // Safety backup of the discarded local side (live tree as plaintext JSON).
-        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
-        await SaveSafetyBackupAsync("local",
-            System.Text.Json.JsonSerializer.Serialize(localRoots), operation,
-            CountBackupNodes(localRoots), info.Candidate.Id).ConfigureAwait(false);
+        // Safety backup of the discarded local side (live tree as plaintext
+        // JSON) — only when that tree is not already the server copy of the
+        // sync we are leaving.
+        if (!switching)
+        {
+            var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+            await SaveSafetyBackupAsync("local",
+                System.Text.Json.JsonSerializer.Serialize(localRoots), operation,
+                CountBackupNodes(localRoots), info.Candidate.Id).ConfigureAwait(false);
+        }
+
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         _log.Info("session", "Link: taking remote tree");
-        // Replaces the mirror even when dirty (the user chose take-remote and
-        // the local side is snapshotted), then switches credentials. The blob
-        // is the one the probe already read and verified: no second download.
+        // Replaces the mirror even when dirty, then switches credentials. The
+        // blob is the one the probe already read and verified: no second
+        // download.
         await Engine!.LinkAdoptRemoteAsync(info.Candidate, new SyncEngine.PrefetchedRemote(
             info.RemoteBlob, info.RemoteVersion, info.RemoteLastUpdated,
             info.RemoteRevision, info.RemoteHash), ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
         await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
+        return !switching;
     }
 
     public async Task ApplyLocalAsync(ReconcileInfo info, string operation = SafetyOperations.UploadLocal, CancellationToken ct = default)
@@ -368,21 +390,28 @@ public sealed class XbsSession : IAsyncDisposable
 
     /// <summary>Merges the local tree with the verified remote tree (two-way
     /// union, never deletes) and uploads the result. Both sides are
-    /// safety-backed-up first (fail closed); a 409 surfaces honestly with both
-    /// snapshots intact. Password verified by decrypt before any mutation.</summary>
-    public async Task ApplyMergeAsync(ReconcileInfo info, string operation, CancellationToken ct = default)
+    /// safety-backed-up first (fail closed) — except when switching from a
+    /// linked sync, where the union keeps everything and the local side is
+    /// already the server copy of the sync being left. A 409 surfaces honestly
+    /// with both snapshots intact. Password verified by decrypt before any
+    /// mutation.</summary>
+    public async Task<bool> ApplyMergeAsync(ReconcileInfo info, string operation, CancellationToken ct = default)
     {
+        var switching = await SwitchingFromLinkedAsync(info.Candidate).ConfigureAwait(false);
         await PrepareForLinkAsync(info.Candidate, ct).ConfigureAwait(false);
         var remoteRoots = DecryptTree(info);
         var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         var merged = BookmarkMerge.Merge(localRoots, remoteRoots);
 
-        await SaveSafetyBackupAsync("local",
-            System.Text.Json.JsonSerializer.Serialize(localRoots), operation,
-            CountBackupNodes(localRoots), info.Candidate.Id).ConfigureAwait(false);
-        await SaveSafetyBackupAsync("remote",
-            System.Text.Json.JsonSerializer.Serialize(remoteRoots), operation,
-            CountBackupNodes(remoteRoots), info.Candidate.Id).ConfigureAwait(false);
+        if (!switching)
+        {
+            await SaveSafetyBackupAsync("local",
+                System.Text.Json.JsonSerializer.Serialize(localRoots), operation,
+                CountBackupNodes(localRoots), info.Candidate.Id).ConfigureAwait(false);
+            await SaveSafetyBackupAsync("remote",
+                System.Text.Json.JsonSerializer.Serialize(remoteRoots), operation,
+                CountBackupNodes(remoteRoots), info.Candidate.Id).ConfigureAwait(false);
+        }
 
         var oldKek = (await _creds.GetAsync().ConfigureAwait(false))?.DerivedKey;
         _log.Info("session", "Link: merging local + remote trees");
@@ -392,6 +421,7 @@ public sealed class XbsSession : IAsyncDisposable
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
         await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
+        return !switching;
     }
 
     /// <summary>Unlink this device: the credentials and the active row go away;

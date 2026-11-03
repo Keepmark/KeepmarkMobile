@@ -552,12 +552,13 @@ else
         await RunStepAsync(async () =>
         {
             var target = reconcile!;
-            await Session.ApplyRemoteAsync(target);
+            var backedUp = await Session.ApplyRemoteAsync(target);
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
             await RefreshLocalCountAsync();
-            await FinishAsync($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyLocal)}");
+            var done = Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id);
+            await FinishAsync(backedUp ? $"{done} {L.Get(Str.ConnSafetyLocal)}" : done);
         }, err => applyError = err, "connect-apply");
     }
 
@@ -600,12 +601,13 @@ else
                 throw new InvalidOperationException(L.Get(Str.ConnPreviewFirst));
             }
 
-            await Session.ApplyMergeAsync(target, Core.Safety.SafetyOperations.ConnectMerge);
+            var backedUp = await Session.ApplyMergeAsync(target, Core.Safety.SafetyOperations.ConnectMerge);
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
             await RefreshLocalCountAsync();
-            await FinishAsync($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyBoth)}");
+            var done = Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id);
+            await FinishAsync(backedUp ? $"{done} {L.Get(Str.ConnSafetyBoth)}" : done);
         }, err => applyError = err, "connect-apply");
     }
 

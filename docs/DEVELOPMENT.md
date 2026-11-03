@@ -682,8 +682,10 @@ and the app is unlocked (when app lock is configured).
    is not replaced. Each cause keeps its own message (`ErrSavedConflict`,
    `ErrSavedOffline`, `ErrSavedGone`, `ErrSavedNotSaved`), so an offline device
    is never told to resolve a conflict it cannot resolve.
-4. **Snapshot** the local tree (`switch-take-remote`) through the safety
-   subsystem. No snapshot → no switch.
+4. **Snapshot only when this device was unlinked** (`switch-take-remote`):
+   switching from a linked sync replaces that sync's tree, which is already on
+   its server (the switch is fail-closed on pending edits), so it needs no
+   copy. A snapshot that cannot be written still aborts the switch.
 5. **Adopt** the target tree (`LinkAdoptRemoteAsync`: replace the mirror, then
    switch credentials). The probe already downloaded and decrypted the blob, so
    it is handed over as `PrefetchedRemote`: the same tree is never downloaded
@@ -705,15 +707,16 @@ The flow reuses `ProbeLinkAsync` and the normal direction review:
 
 | Direction | Behavior | Safety tags |
 |---|---|---|
-| Download | save active side (fail closed) → snapshot local → adopt remote → rotate → remember | `take-remote` |
-| Upload | save active side → snapshot remote → `LinkUploadAsync` on the probed base → rotate → remember | `upload-local` |
-| Merge | save active side → snapshot both sides → union + push → rotate → remember | `connect-merge` |
+| Download | save active side (fail closed) → adopt remote → rotate → remember | none: the copy you leave is on the server |
+| Upload | save active side → snapshot remote (the target's copy is replaced) → `LinkUploadAsync` on the probed base → rotate → remember | `upload-local` |
+| Merge | save active side → union + push → rotate → remember | none: the union keeps both sides |
 
 The added sync becomes active; the previous one stays in `Syncs`. A pending
 conflict or failed push cancels the switch and changes nothing. Re-adding the
 same canonical URL + sync ID updates the row in place, never duplicates it.
-Note that only activation writes the `switch-take-remote` tag; adding while
-linked uses the Connect tags because it is the same Connect apply path.
+Note that only activation writes the `switch-take-remote` tag, and only when
+it links an unlinked device; adding while linked is the same Connect apply
+path and writes `upload-local` only when it replaces the target's server copy.
 
 ### 9.5 Forget, Unlink, and removed syncs
 
@@ -927,10 +930,11 @@ has.
 | Connect → Upload | server copy | remote JSON | `upload-local` |
 | Connect → Merge | both sides | local + remote JSON | `connect-merge` |
 | Connect → Create empty | local tree | local JSON | `create-empty` |
-| Add while linked → Download | local tree | local JSON | `take-remote` |
+| Add while linked → Download | — | none (the copy you leave is on the server) | — |
 | Add while linked → Upload | server copy | remote JSON | `upload-local` |
-| Add while linked → Merge | both sides | local + remote JSON | `connect-merge` |
-| Activate a saved sync | local tree | local JSON | `switch-take-remote` |
+| Add while linked → Merge | — | none (the union keeps both sides) | — |
+| Activate a saved sync (from unlinked) | local tree | local JSON | `switch-take-remote` |
+| Activate from another linked sync | — | none (that copy is on the server) | — |
 | Import encrypted backup | local tree | local JSON | `import-backup` |
 | Change password | server copy | remote JSON | `change-password` |
 | Duplicates bulk delete | local tree | pre-delete JSON | `duplicates-cleanup` |
@@ -943,8 +947,9 @@ has.
 Exception: a single bookmark/folder delete on Home keeps its 6-second in-memory
 undo instead of a file (documented; no snapshot required).
 
-`switch-upload` and `switch-merge` remain known labels for old backups only.
-`switch-take-remote` is live because activation still writes it.
+`switch-upload`, `switch-merge` and `switch-take-remote` remain known labels
+for old backups; `switch-take-remote` is written only when activation links an
+unlinked device.
 `selection-move` and `selection-move-undo` are the same: older versions wrote
 them, so `SafetyOperations.Describe` still names them; nothing writes them now.
 

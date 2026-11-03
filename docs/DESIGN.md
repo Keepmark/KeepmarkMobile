@@ -312,8 +312,9 @@ Altri colori d'uso (non ridefinire a caso):
   ogni password nuova (`WorkflowRules`).
 - **Multi-sync**: un solo sync attivo possiede l'albero locale; le altre righe
   sono credenziali dormienti. L'attivazione è read-only finché il target non è
-  provato, poi salva il lato attivo fail-closed, prende un backup
-  `switch-take-remote` e adotta. Con app lock attivo il prompt di sistema è
+  provato, poi salva il lato attivo fail-closed e adotta; il backup
+  `switch-take-remote` c'è solo se il dispositivo era scollegato, perché la
+  copia del sync che lasci è già sul server. Con app lock attivo il prompt di sistema è
   obbligatorio prima di qualsiasi scrittura. Un 401 non sblocca, non carica e
   non fa snapshot: solo l'avviso con tre scelte.
 - **URL del servizio**: `https` è il default e l'unica scelta del catalogo;

@@ -14,8 +14,11 @@ public static class SafetyOperations
     public const string CreateEmpty = "create-empty";
     public const string ImportBackup = "import-backup";
     public const string ChangePassword = "change-password";
-    // Origins written by the retired Move service wizard and by activating a
-    // saved sync: kept so old backups keep a meaningful label.
+    // Legacy labels: the retired Move wizard and older sync switches. A
+    // switch no longer snapshots the side it leaves (that tree is the sync's
+    // server copy) and writes upload-local when it replaces the target's
+    // server copy, so switch-take-remote, switch-upload and switch-merge are
+    // only read from old files.
     public const string SwitchTakeRemote = "switch-take-remote";
     public const string SwitchUpload = "switch-upload";
     public const string ConnectMerge = "connect-merge";
