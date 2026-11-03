@@ -260,6 +260,13 @@ PERFORMANCE.md are independent of this engine migration.
   See [performance notes](PERFORMANCE.md) for measurements and commands.
 - `src/Keepmark.Core/Sync/SyncEngine.cs` — gated push/pull, background
   push, conflict logic, `DeleteBookmarkAsync`.
+- `src/Keepmark.Core/Sync/SavedSyncs.cs` + `SavedSyncRegistry.cs` — multi-sync
+  registry: one active sync (live `SyncCredentials`), dormant rows keep only
+  the derived key so they can be activated again. Pure helpers (canonical
+  identity = service URL + sync id, upsert, labels ≤40 chars unique
+  case-insensitively, sort by last use) plus defensive JSON sanitize;
+  `XbsSession.InitializeCoreAsync` migrates single-sync installs by
+  registering the live credentials (no schema change, no data migration).
 - `src/Keepmark.Core/Sync/BookmarkMerge.cs` — pure two-way union by URL
   (remote kept, local adopted with fresh ids, separators unioned, deletes
   never merged) + `NormalizeUrl`; same function serves preview and apply.

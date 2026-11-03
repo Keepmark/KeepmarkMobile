@@ -38,6 +38,7 @@ public sealed class XbsSession : IAsyncDisposable
 
     public BookmarkStore? Store { get; private set; }
     public SyncEngine? Engine { get; private set; }
+    public SavedSyncRegistry? Registry { get; private set; }
     public bool Ready { get; private set; }
 
     public IXbsLogger Log => _log;
@@ -80,6 +81,10 @@ public sealed class XbsSession : IAsyncDisposable
             Mode = _settings.Mode
         };
         Engine = engine;
+        Registry = new SavedSyncRegistry(_creds);
+        // Migration from single-sync installs: the live credentials become the
+        // first registered row (no-op once the row exists).
+        await Registry.SyncActiveAsync(await _creds.GetAsync().ConfigureAwait(false)).ConfigureAwait(false);
         Ready = true;
         _log.Info("session", $"Log started (level {_log.MinLevel}, mode {_settings.Mode})");
         engine.AutoSyncEnabled = _foreground;

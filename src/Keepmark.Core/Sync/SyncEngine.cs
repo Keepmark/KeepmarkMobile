@@ -42,6 +42,12 @@ public interface ICredentialStore
     Task<SyncCredentials?> GetAsync();
     Task SetAsync(SyncCredentials creds);
     Task ClearAsync();
+
+    /// <summary>All syncs known to this device (active included). Missing or
+    /// corrupt storage means an empty list, never an exception.</summary>
+    Task<List<SavedSync>> GetSavedSyncsAsync();
+
+    Task SetSavedSyncsAsync(IReadOnlyList<SavedSync> rows);
 }
 
 /// <summary>

@@ -144,9 +144,18 @@ sealed class FakeApi : IXSyncApiClient
 sealed class MemCreds(SyncCredentials? creds) : ICredentialStore
 {
     private SyncCredentials? _c = creds;
+    public List<SavedSync> Saved { get; set; } = [];
+    public int SavedWrites { get; private set; }
     public Task<SyncCredentials?> GetAsync() => Task.FromResult(_c);
     public Task SetAsync(SyncCredentials c) { _c = c; return Task.CompletedTask; }
     public Task ClearAsync() { _c = null; return Task.CompletedTask; }
+    public Task<List<SavedSync>> GetSavedSyncsAsync() => Task.FromResult(Saved.ToList());
+    public Task SetSavedSyncsAsync(IReadOnlyList<SavedSync> rows)
+    {
+        Saved = rows.ToList();
+        SavedWrites += 1;
+        return Task.CompletedTask;
+    }
 }
 
 public sealed class StoreSyncTests : IAsyncLifetime

@@ -13,6 +13,7 @@ public sealed class SecureCredentialStore : ICredentialStore
     private const string KKey = "xbs_derived_key";
     private const string KVer = "xbs_sync_version";
     private const string KDbKey = "xbs_db_key";
+    private const string KSavedSyncs = "xbs_saved_syncs";
 
     public async Task<SyncCredentials?> GetAsync()
     {
@@ -52,6 +53,25 @@ public sealed class SecureCredentialStore : ICredentialStore
         SecureStorage.Remove(KKey);
         SecureStorage.Remove(KVer);
         return Task.CompletedTask;
+    }
+
+    // Dormant syncs: JSON in the same encrypted store as the active secrets.
+    // Sanitized on read (old builds and hand-edited state are not trusted).
+    public async Task<List<SavedSync>> GetSavedSyncsAsync()
+    {
+        var json = await SecureStorage.GetAsync(KSavedSyncs).ConfigureAwait(false);
+        return SavedSyncs.Deserialize(json);
+    }
+
+    public async Task SetSavedSyncsAsync(IReadOnlyList<SavedSync> rows)
+    {
+        if (rows.Count == 0)
+        {
+            SecureStorage.Remove(KSavedSyncs);
+            return;
+        }
+
+        await SecureStorage.SetAsync(KSavedSyncs, SavedSyncs.Serialize(rows)).ConfigureAwait(false);
     }
 
     public async Task<string> GetOrCreateDbKeyAsync()
