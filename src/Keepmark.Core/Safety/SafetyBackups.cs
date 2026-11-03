@@ -14,6 +14,8 @@ public static class SafetyOperations
     public const string CreateEmpty = "create-empty";
     public const string ImportBackup = "import-backup";
     public const string ChangePassword = "change-password";
+    // Origins written by the retired Move service wizard and by activating a
+    // saved sync: kept so old backups keep a meaningful label.
     public const string SwitchTakeRemote = "switch-take-remote";
     public const string SwitchUpload = "switch-upload";
     public const string ConnectMerge = "connect-merge";

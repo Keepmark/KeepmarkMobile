@@ -156,14 +156,6 @@ public class WorkflowTests
     }
 
     [Fact]
-    public void MoveTextsSayWhatStaysBehind()
-    {
-        Assert.Contains("old sync stays available", WorkflowTexts.MoveImplication);
-        Assert.Contains("Other devices keep using it until you move them", WorkflowTexts.MoveImplication);
-        Assert.Equal("Create a new sync on example.org and upload 12 bookmarks?", WorkflowTexts.MoveNewConfirm("example.org", 12));
-    }
-
-    [Fact]
     public void DuplicateTextsMatchTheBrowser()
     {
         var c = WorkflowTexts.DupDeleteConfirm(3);

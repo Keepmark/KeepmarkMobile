@@ -152,7 +152,7 @@ Altri colori d'uso (non ridefinire a caso):
 
 ### Card di stato del servizio (`.km-service-status`)
 
-- Il risultato della verifica di un endpoint (Connect, Switch service) è una
+- Il risultato della verifica di un endpoint (Connect) è una
   card (`ServiceSelector.razor.css`): pallino colorato + parola di stato, i
   fatti dell'endpoint come chip, la nota sotto una hairline piena.
 - Il pallino riusa gli stessi token della status bar (`--km-ok-dot`, `--km-gold`,

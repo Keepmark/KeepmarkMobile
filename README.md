@@ -65,7 +65,7 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 | **Backup** | Encrypted export and import, compatible with Keepmark for browsers |
 | **Safety backups** | Automatic snapshot before every overwrite (newest 5 kept) |
 | **Duplicates** | Find links saved more than once; one copy of each always survives |
-| **Move service** | Move your bookmarks to another service, into a new or existing sync; the selector opens on the service you use now |
+| **Syncs** | Keep several syncs on the phone with one active at a time; activate another, rename or forget it, or add an existing sync with its ID and password (or the browser QR) |
 | **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch, 日本語, Português (Brasil), Русский, 简体中文 |
 | **Logs** | Built-in viewer with share export, sync IDs and secrets redacted |
 
@@ -82,8 +82,8 @@ enough:
 1. In the Keepmark browser manager, the Android card says **Connect Keepmark on
    your phone**; choose **Show connection QR** and verify the sync password there.
 2. On Android, open **Connect → Link an existing sync → Scan QR from browser**
-   (the same QR button is in **Move service**, before the manual target
-   credentials).
+   (the same QR button is in **Connect → + Add a sync** when a sync is already
+   active).
 3. Check the service and abbreviated sync ID the review shows, tap **Connect**,
    wait for verification, then choose the direction.
 

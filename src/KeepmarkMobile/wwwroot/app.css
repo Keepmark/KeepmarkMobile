@@ -2407,6 +2407,9 @@ html.xbs-typing .xbs-go-chip { visibility: hidden; }
 .xbs-verified-text span { font-size: 0.875rem; color: var(--km-ink-2); }
 .xbs-verified-text code { white-space: nowrap; }
 
+/* Full sync ID shown right after creation: long enough to wrap, tap to select. */
+.xbs-created-id { word-break: break-all; user-select: all; }
+
 /* Bottom sheets stand out from the list behind them: Vault-style hairline
    border on top and sides, a deeper scrim, and (dark) a lifted surface. */
 .xbs-sheet-backdrop { background: rgba(8, 11, 24, 0.6); }

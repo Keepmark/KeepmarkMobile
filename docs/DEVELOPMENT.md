@@ -37,7 +37,7 @@ is NOT a git repo). Solution `KeepmarkMobile.slnx`:
   names (`ItemRow.DisplayTitle` → `ContainerNames`, v1.0.170). Display only:
   `Title` keeps the synced value every client looks containers up by, and the
   edit form still shows it raw. Use `DisplayTitle` for any new title/path in the UI.
-- Status and Switch service show the server's inactive-sync expiry from the
+- Status shows the server's inactive-sync expiry from the
   v1.2 `/info` `capabilities.syncExpiryDays` (`0` = kept forever; v1.0.171):
   `XbsSession.GetSyncExpiryDaysAsync` → `WorkflowRules.DescribeSyncExpiry`.
   Display only, never stored; the line is hidden on legacy/offline services.
@@ -288,21 +288,22 @@ PERFORMANCE.md are independent of this engine migration.
 - `src/Keepmark.Core/Sync/BookmarkMerge.cs` — pure two-way union by URL
   (remote kept, local adopted with fresh ids, separators unioned, deletes
   never merged) + `NormalizeUrl`; same function serves preview and apply.
-  `MoveResult.cs` — contextual wizard success text (mode + direction + target).
+  `MoveResult.cs` — contextual result text (mode + direction + target).
 - `src/Keepmark.Core/Data/BookmarkStore.cs` — SQLCipher store, FTS5,
   duplicates query, `RestoreLocalAsync`. Pull/restore replacements rekey rows;
   ordinary pushes acknowledge blob/meta and normalize changed descriptions in
   place, preserving RowIds/FTS. UI crumbs/expansions rebase on stable `NodeId`.
   `ContentVersion` invalidates component-local derived data after mutations.
 - `src/KeepmarkMobile/Services/XbsSession.cs` — session, backup export/import,
-  create+upload. Connect = link/create + unlink; SwitchService = move-service
-  wizard (`/switch-service`, alias `/migrate`); Backup = encrypted backup
-  export/import (`/backup`).
+  create+upload. Connect = link/create + unlink, plus adding an existing sync
+  while linked; the retired `/switch-service` and `/migrate` routes redirect
+  there. Backup = encrypted backup export/import (`/backup`).
 - `src/KeepmarkMobile/Components/Pages/` — `Home` (explore, sheets, share
-  consume, sort, status bar), `Duplicates`, `Connect` (link/create + unlink),
-  `Syncs` (saved-sync list, activate/rename/forget/unlink),
+  consume, sort, status bar), `Duplicates`, `Connect` (link/create + unlink,
+  add a sync while linked), `Syncs` (saved-sync list,
+  activate/rename/forget/unlink),
   `Backup` (encrypted export/import, safety backups, copies of removed syncs),
-  `SwitchService` (move-service wizard), `Settings`, `Status`, `About`.
+  `MoveServiceLegacy` (redirect only), `Settings`, `Status`, `About`.
 - `Components/SyncGoneNotice.razor` — the 401 notice reused on Home and Status
   (Retry / Unlink and keep a copy / Cancel; nothing automatic).
 - `Components/{BookmarkSheet,BookmarkRow,FolderPicker}.razor` — edit dialog,
@@ -431,9 +432,9 @@ encrypted except legacy/pre-link files (flagged "not encrypted" in the UI).
 | Connect → create empty | local tree | current local JSON | `create-empty` |
 | Import encrypted backup | local tree | current local JSON | `import-backup` |
 | Change password | server copy | current remote JSON | `change-password` |
-| Switch → take remote | local tree | current local JSON | `switch-take-remote` |
-| Switch → upload local | server copy | current remote JSON | `switch-upload` |
-| Switch → merge both sides | both sides | current local JSON + current remote JSON | `switch-merge` |
+| Sync switch → take remote | local tree | current local JSON | `switch-take-remote` |
+| Sync switch → upload local | server copy | current remote JSON | `switch-upload` |
+| Sync switch → merge both sides | both sides | current local JSON + current remote JSON | `switch-merge` |
 | Duplicates bulk delete | local tree | pre-delete local JSON | `duplicates-cleanup` |
 | Safety restore (any) | current state | state being replaced | `pre-restore` |
 | Conflict → take remote | local tree | current local JSON | `conflict-pull` |
@@ -508,10 +509,10 @@ instead of a file (documented, no snapshot required).
   (local tree / server copy), item count, size, origin sync, encrypted flag.
 - Restore and Delete both require explicit confirm; destructive errors show
   the reason verbatim, secrets are cleared from inputs on failure.
-- Change-password and switch-existing keep their current-password /
+- Change password and linking an existing sync keep their current-password /
   verify-first gates; nothing in this spec weakens them.
-- Wizard error evidence belongs to the step that produced it: Connect and
-  Switch service render one error surface per action cluster
+- Error evidence belongs to the step that produced it: Connect renders
+  one error surface per action cluster
   (check / verify-link / apply-review) adjacent to its action
   (`role="alert"`), never a single shared box. The check cluster is the
   service status card: a failed check turns it red, `role="alert"` and the
@@ -533,17 +534,18 @@ instead of a file (documented, no snapshot required).
 4. Restore a remote entry unlinked → refused with the link message.
 5. Delete a row → file + index row gone; restore-then-delete of the same
    name → "not found".
-6. Switch service / change password → previous rows still open
+6. Sync switch / change password → previous rows still open
    (re-wrapped, same origin sync shown).
 7. Unlink → encrypted rows refuse with the origin sync named; re-link same
    credentials → they open again.
 8. Kill the app mid-rotation (or restore `.prev` over master) → master
    intact or verifiable, no silent lockout; index damage → list falls back
    to directory scan.
-9. Merge (Connect and Switch service): Preview counts match the applied
+9. Merge (Connect): Preview counts match the applied
    result (same pure `BookmarkMerge` function serves both); after apply,
-   TWO new rows appear (`connect-merge` / `switch-merge`, sides local +
-   remote) with the right counts; tree holds the union, nothing deleted.
+   TWO new rows appear (`connect-merge`, sides local + remote) with the right
+   counts; tree holds the union, nothing deleted. `switch-merge` rows from the
+   retired wizard stay readable.
 10. Merge preview-lock: preview, then change direction and back (or
     re-verify) → apply refuses with "Preview the merge first — …".
 11. Merge wrong-password: verify with a wrong password → `InvalidCredentials`,
@@ -566,9 +568,9 @@ License, third-party notices and disclaimer: see the [README](../README.md#licen
 
 ## Browser QR connection (v1.0.200)
 
-Connect → Link existing and Move service → target service / existing target
-place a QR icon and Scan QR from browser before the manual credential fields.
-Both flows use the native
+Connect → Existing sync (first link and `+ Add a sync` while linked)
+places a QR icon and Scan QR from browser before the manual credential fields.
+It uses the native
 `IQrScanner` / `QrScanner` modal, pinned `ZXing.Net.Maui.Controls` **0.10.4**
 (net10.0-android). CAMERA is requested only on the scan action; camera hardware
 is optional. No photographs, gallery, clipboard or image import are used.
@@ -583,20 +585,18 @@ network access: 1,800 UTF-8 bytes, strict markers/types/duplicate names/depth,
 safe ID, supported numeric sync version, HTTPS URL without credentials,
 query/fragment/backslash/controls. Debug alone accepts HTTP localhost/127.0.0.1.
 Its representation is redacted; passwords remain literal and are never stored.
-A valid scan only produces an in-memory candidate. Both pages render the
+A valid scan only produces an in-memory candidate. Connect renders the
 shared `QrCredentialReview` exclusively while `ConnectQrCandidateState.ShowReview`
 is pending or verifying: service URL and abbreviated sync ID, acquired-credentials
 message, and separate, spaced primary/cancel actions. Manual credentials,
-service controls and subsequent wizard headings (including “Where?”) stay
+service controls and later Connect headings stay
 hidden. Explicit verification switches the same review to the localized
 “Verifying sync…” status; `BeginVerification` consumes the raw secret without
 removing the review, so no manual form or next-stage heading flashes during
 the probe. Reconciliation/direction controls appear only after verification
 succeeds; failures return to a cleared candidate and adjacent safe error. Connect explicitly calls the same ProbeLinkAsync/reconcile/apply path as
-manual entry, including backups and the final informed action. SwitchService similarly uses
-its existing VerifyExistingCredentials/probe and service-check path, then its
-normal direction/review/confirmed move. A scan never bypasses the linked-user
-gate or commits a move. The pending secret clears
+manual entry, including backups and the final informed action. A scan never
+bypasses the app-lock gate or commits a direction on its own. The pending secret clears
 on consumption, failure, edits, cancellation, background, lock or 60-second
 local timeout. This timeout does not expire credentials or invalidate copies.
 
@@ -667,7 +667,7 @@ drafts), MovePicker, recent move shortcuts and the bookmark form folder button.
 
 ## Service selection (v1.0.208)
 
-Connect (existing/new) and Switch service share `ServiceSelector`. The bundled
+Connect (existing/new) uses `ServiceSelector`. The bundled
 eight-service catalog keeps api.xbrowsersync.org first and default; country codes,
 sync limits and API versions are advertised reference data. Selection probes only
 the chosen endpoint; automatic checks gate continuation and unavailable or
@@ -688,30 +688,28 @@ path case, so equivalent addresses cannot create duplicate entries.
 
 ## Service selection refinements (v1.0.209)
 
-Switch service opens on the service this device is linked to, so the current
+Connect opens on the service this device is linked to, so the current
 destination is recognisable before changing it; the catalog keeps its order and
-its default for unlinked setups. Destination names in the move review and in the
-confirm that precedes the definitive move use the full normalized URL, matching
+its default for unlinked setups. Destination names in the Connect review and in the
+confirm that precedes the definitive apply use the full normalized URL, matching
 the completion messages. The verified-endpoint summary of that release is
 superseded by the status card in "Service status card (v1.0.210)".
 
 ## Connect mode choice (v1.0.210)
 
-Switch service picks new vs existing sync with the segmented control `.xbs-seg`
-(`app.css`): the question `SwIntoWhich` above it, the two labels inside it and one
-line of explanation below (`SwANewText` / `SwExistingText`, `role="status"`).
-Both options stay visible in the vertical room of a single select row, and the
-labels are short (`Nuova` / `Esistente`) because the question already carries the
-noun; the chosen side is the filled accent pill (`aria-pressed="true"`), as on
-the active sort button. The group is `role="group"` + `aria-labelledby` and the
-buttons join the global `:focus-visible` ring. `ChooseSlot` routes through
-`Unverify`, so a sync verified in one branch can never be applied from the other
-one. The long card descriptions and their plural forms (`SwANewText_one/_other`)
-were dropped with the switch; Connect keeps its two cards.
+The retired Switch service picked new vs existing sync with the segmented control
+`.xbs-seg` (`app.css`): the question `SwIntoWhich` above it, the two labels inside
+it and one line of explanation below (`SwANewText` / `SwExistingText`,
+`role="status"`). Both options stayed visible in the vertical room of a single
+select row, and the labels were short (`Nuova` / `Esistente`) because the question
+already carried the noun; the chosen side was the filled accent pill
+(`aria-pressed="true"`). The wizard, its strings and its resume draft are gone in
+the multi-sync release: Connect keeps its two cards (`Link an existing sync`,
+`Create a new sync`) and adding while linked offers only the existing-sync path.
 
 ## Service status card (v1.0.210)
 
-The endpoint check result under `ServiceSelector` (Connect and Switch service) is
+The endpoint check result under `ServiceSelector` (Connect) is
 one card, `.km-service-status` in `ServiceSelector.razor.css`, instead of loose
 helper lines: a coloured dot and the state word, the endpoint facts as chips, and
 the server note under a solid hairline. The dot reuses the status-bar tokens and
@@ -721,8 +719,8 @@ pulsing grey `#8a90a8` while `ServiceChecking`, green `--km-ok-dot` for
 (`ServiceStatusNoNew`), red `--km-danger` for `Offline`/`Error` and for a check
 that failed (`ServiceUnavailable`). Colour never carries the state alone — the
 word beside the dot says the same thing; the card is `role="status"` with
-`aria-live="polite"`, and a failed check becomes `role="alert"` instead, so the
-wizard keeps the R8.7 rule that each action cluster owns its error surface.
+`aria-live="polite"`, and a failed check becomes `role="alert"` instead, so
+Connect keeps the R8.7 rule that each action cluster owns its error surface.
 
 The facts are three chips: `ServiceApi {0}` and the location are dropped when
 the service omits them (self-hosted services often have no location), which is

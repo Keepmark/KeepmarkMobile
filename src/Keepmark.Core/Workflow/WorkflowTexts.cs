@@ -30,7 +30,7 @@ public static class WorkflowTexts
 
     public static string CreateEmptyImplication => Loc.Get(Str.WfCreateEmptyImplication);
 
-    // Direction choice (Connect, Move, Conflict): picker order and confirms.
+    // Direction choice (Connect, Conflict): picker order and confirms.
     /// <summary>Keep the server copy / Merge both / Keep this device's copy.</summary>
     public static readonly string[] DirectionOrder = ["download", "merge", "upload"];
 
@@ -42,13 +42,6 @@ public static class WorkflowTexts
         "merge" => new(Loc.Get(Str.WfDirMergeMessage), Loc.Get(Str.WfDirMergeImplication), Loc.Get(Str.CommonYesMerge)),
         _ => new(Loc.Get(Str.WfDirDownloadMessage), Loc.Get(Str.WfDirDownloadImplication), Loc.Get(Str.CommonYesDownload)),
     };
-
-    // Move service.
-    public static string MoveImplication => Loc.Get(Str.WfMoveImplication);
-
-    public static string MoveNewConfirm(string service, int count) => Loc.Plural(Str.WfMoveNewConfirm, count, service);
-
-    public static string MoveDoneNext => Loc.Get(Str.WfMoveDoneNext);
 
     // Backup → Export.
     public static string BackupPasswordHint => Loc.Get(Str.WfBackupPasswordHint);

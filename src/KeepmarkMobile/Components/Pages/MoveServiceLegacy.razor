@@ -1,0 +1,11 @@
+@page "/switch-service"
+@page "/migrate"
+@inject NavigationManager Nav
+
+@* The Move service wizard is retired: its old links land on Connect, where
+   "+ Add a sync" links an existing sync (the previous one stays in Syncs).
+   Kept as a page so bookmarks and launcher shortcuts never hit a dead route. *@
+
+@code {
+    protected override void OnInitialized() => Nav.NavigateTo("connect", replace: true);
+}

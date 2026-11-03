@@ -50,14 +50,6 @@
             <NavLink class="xbs-nav" href="syncs" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /><circle cx="7" cy="7" r="1.4" fill="currentColor" /><circle cx="7" cy="12" r="1.4" fill="currentColor" /><circle cx="7" cy="17" r="1.4" fill="currentColor" /></svg><span class="xbs-nav-label">@L.Get(Str.SyncsTitle)</span></NavLink>
             <NavLink class="xbs-nav" href="connect" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg><span class="xbs-nav-label">@L.Get(Str.NavConnect)</span></NavLink>
             <NavLink class="xbs-nav" href="status" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l3-7 4 14 3-7h4" /></svg><span class="xbs-nav-label">@L.Get(Str.CommonStatus)</span></NavLink>
-        @if (linked)
-        {
-            <NavLink class="xbs-nav" href="switch-service" title="@SwitchTitle" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">@L.Get(Str.NavMoveService)</span></NavLink>
-        }
-        else
-        {
-            <span class="xbs-nav disabled" aria-disabled="true" title="@SwitchTitle"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg><span class="xbs-nav-label">@L.Get(Str.NavMoveService)</span></span>
-        }
         <div class="xbs-nav-group">@L.Get(Str.NavGroupApp)</div>
             <NavLink class="xbs-nav" href="settings" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></svg><span class="xbs-nav-label">@L.Get(Str.NavSettings)</span></NavLink>
             <NavLink class="xbs-nav" href="logs" @onclick="CloseMenu"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h9l3 3v13H6zM9 10h6M9 14h6M9 18h3" /></svg><span class="xbs-nav-label">@L.Get(Str.NavLogs)</span></NavLink>
@@ -74,7 +66,6 @@
     private bool collapseNavMenu = true;
 
     private string NavMenuCssClass => collapseNavMenu ? "collapse" : string.Empty;
-    private string SwitchTitle => linked ? L.Get(Str.NavMoveTitle) : L.Get(Str.NavLinkFirst);
 
     protected override async Task OnInitializedAsync()
     {
@@ -90,7 +81,7 @@
         await RefreshDupCountAsync();
     }
 
-    /// <summary>Switch service needs an existing link: refresh on init, on
+    /// <summary>The drawer shows a link and a live status: refresh on init, on
     /// engine changes, and on every drawer open (link/unlink elsewhere).</summary>
     private async Task RefreshLinkedAsync()
     {

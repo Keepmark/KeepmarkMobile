@@ -22,16 +22,26 @@ else if (linked && !addingWhileLinked)
         @L.Get(Str.ConnLinkedTo) <strong>@linkedUrl</strong> (@L.Get(Str.BackupSyncWord) <code>@WorkflowRules.ShortId(linkedId)</code>).
         <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="CopyLinkedId">@L.Get(Str.ConnCopySyncId)</button>
     </div>
-    <p>@L.Get(Str.ConnMoveHintA) <a href="switch-service">@L.Get(Str.NavMoveService)</a>@L.Get(Str.ConnMoveHintB) <a href="backup">@L.Get(Str.NavBackup)</a>.</p>
     @if (!string.IsNullOrEmpty(message))
     {
-        <div class="alert mt-2 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
+        <div class="alert mt-2 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">
+            <p class="@(string.IsNullOrEmpty(createdId) ? "mb-0" : "mb-1")">@message</p>
+            @if (!string.IsNullOrEmpty(createdId))
+            {
+                <p class="mb-1">@L.Get(Str.ConnSyncId) <code class="xbs-created-id">@createdId</code>
+                    <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="CopyCreatedId">@L.Get(Str.ConnCopySyncId)</button></p>
+                <p class="mb-0">@WorkflowTexts.CreatedNext</p>
+            }
+        </div>
     }
 
     <hr />
     <h2>@L.Get(Str.SyncsTitle)</h2>
     <p class="text-muted">@L.Get(Str.ConnAddSyncHint)</p>
-    <button class="btn btn-primary" @onclick="StartAddSync" disabled="@busy">@L.Get(Str.ConnAddSyncBtn)</button>
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-primary" @onclick="StartAddSync" disabled="@busy">@L.Get(Str.ConnAddSyncBtn)</button>
+        <a class="btn btn-outline-secondary" href="syncs">@L.Get(Str.SyncsTitle)</a>
+    </div>
 
     <hr />
     <h2>@L.Get(Str.ConnUnlinkH)</h2>
@@ -225,6 +235,9 @@ else
     private bool addingWhileLinked;
     private string? linkedUrl;
     private string? linkedId;
+    /// <summary>ID of the sync created in this session: shown in full right
+    /// after creation, because that is when the user must store it.</summary>
+    private string? createdId;
     private int localCount;
     private string? armed;
     private bool armedUnlink;
@@ -284,6 +297,7 @@ else
     private void StartAddSync()
     {
         addingWhileLinked = true;
+        createdId = null;
         mode = "existing";
         reconcile = null;
         mergeStats = null;
@@ -451,16 +465,20 @@ else
 
     private void Disarm() => armed = null;
 
-    private async Task CopyLinkedId()
+    private async Task CopyLinkedId() => await CopyId(linkedId);
+
+    private async Task CopyCreatedId() => await CopyId(createdId);
+
+    private async Task CopyId(string? id)
     {
-        if (string.IsNullOrEmpty(linkedId))
+        if (string.IsNullOrEmpty(id))
         {
             return;
         }
 
         try
         {
-            await Clipboard.Default.SetTextAsync(linkedId);
+            await Clipboard.Default.SetTextAsync(id);
             _ = Toast.ShowAsync(L.Get(Str.ConnCopied));
         }
         catch
@@ -475,6 +493,8 @@ else
         {
             await Session.UnlinkAsync();
             armedUnlink = false;
+            createdId = null;
+            mode = null;
             await RefreshStateAsync();
             Ok(WorkflowTexts.UnlinkDone);
         }, err => unlinkError = err, "connect-unlink");
@@ -535,14 +555,15 @@ else
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
-            await Session.CreateNewSyncAsync(ServiceUrlClean, newPassword);
+            createdId = await Session.CreateNewSyncAsync(ServiceUrlClean, newPassword);
 
             reconcile = null;
             armed = null;
+            mode = null;
             newPassword = string.Empty;
             confirmPassword = string.Empty;
             await RefreshStateAsync();
-            Ok($"{L.Get(Str.ConnCreatedEmpty)} {WorkflowTexts.CreatedNext}");
+            Ok(L.Get(Str.ConnCreatedEmpty));
         }, err => linkError = err, "connect-create");
     }
 
@@ -552,13 +573,14 @@ else
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
-            await Session.CreateNewSyncWithUploadAsync(ServiceUrlClean, newPassword);
+            createdId = await Session.CreateNewSyncWithUploadAsync(ServiceUrlClean, newPassword);
 
             reconcile = null;
+            mode = null;
             newPassword = string.Empty;
             confirmPassword = string.Empty;
             await RefreshStateAsync();
-            Ok($"{L.Get(Str.ConnCreatedUpload)} {WorkflowTexts.CreatedNext}");
+            Ok(L.Get(Str.ConnCreatedUpload));
         }, err => linkError = err, "connect-create");
     }
 

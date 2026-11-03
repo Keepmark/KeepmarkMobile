@@ -61,7 +61,7 @@ only as method arguments, never stored, never logged.
 | R4.1 | Whole-blob only (API has no deltas). `Mode` Auto (foreground-only polling + one coalesced push worker with 250 ms grouping) / Manual (explicit only). Statuses: Idle/Syncing/Offline/Conflict/Error/NoCredentials + `DataChanged`/`StatusChanged` events; UI preserves scroll/query across events. |
 | R4.2 | v1.2 capability probed via `/info` capabilities per service URL, cached; legacy → timestamp path. Conditional GET (304) skips download when hash known. Revision CAS on push when revision stored; 409 on races, never overwrite. |
 | R4.3 | v1.2 capability probed on the 1.2.0 contract (`GetInfoV12Async` — the legacy contract strips capabilities, so probing there could never succeed), cached per service URL; 412 / missing capabilities = legacy. A service older than MinApiVersion throws instead of being silently used. Verifier: against a v1.2 server, conditional GET and revision CAS must be observed in logs. |
-| R4.3b | `capabilities.syncExpiryDays` (v1.2 `/info`) is display only: integer ≥ 0 shown on Status and Switch service (`0` = kept forever), anything else ignored. A malformed value MUST NOT fail the capability probe (`ApiClientTests.SyncExpiryDays_MalformedNeverBreaksTheProbe`). |
+| R4.3b | `capabilities.syncExpiryDays` (v1.2 `/info`) is display only: integer ≥ 0 shown on Status (`0` = kept forever), anything else ignored. A malformed value MUST NOT fail the capability probe (`ApiClientTests.SyncExpiryDays_MalformedNeverBreaksTheProbe`). |
 | R4.4 | Pull MUST refuse when the mirror is dirty (unpushed edits): status Conflict + `DataOutOfSyncException`, never silent discard. |
 | R4.5 | `ForceSyncAsync` matrix: remote≠local + dirty → Conflict (no auto-merge); remote≠local + clean → pull; equal + dirty → push; equal + clean → stamp `LastSyncAt`. Offline → Offline status, no throw to UI. |
 | R4.6 | **Conflict resolution**: when status is Conflict, engine exposes `ResolveConflictPullAsync`, `ResolveConflictPushAsync`, `ResolveConflictMergeAsync`, and `GetConflictMergePreviewAsync`. UI MUST present 3 choices (Pull/Push/Merge) with preview counts from `GetConflictMergePreviewAsync`. Safety backup of destroyed side(s) taken BEFORE resolution (R7.1). Pull replaces local with remote; Push overwrites remote with local; Merge unions both sides (never deletes). |
@@ -88,7 +88,7 @@ Each flow states preconditions, mutations in order, and the REQUIRED user-visibl
 | R6.3 | Link existing, pull (`ProbeLinkAsync` + `ApplyRemoteAsync`) | Password verified by decrypting remote BEFORE any overwrite (wrong → `InvalidCredentials`, zero mutations). Safety-backup local side. `0/0` items → auto-apply; else explicit Download/Upload/Merge choice with counts. |
 | R6.4 | Link existing, push (`ApplyLocalAsync`) | Same verify-first; safety-backup remote side; PUT on remote base (409 honest). |
 | R6.4b | Link existing, merge (`GetMergePreviewAsync` + `ApplyMergeAsync`, `connect-merge`) | Same verify-first. Preview is a dry-run of the same pure union (`BookmarkMerge`): local-only upload / remote-only download / title-conflict (server wins) / folders-created / separators counts. Preview is locked: changing direction or re-verifying invalidates it. Apply snapshots BOTH sides first (fail closed), then writes the union locally and pushes (409 honest, both snapshots intact). Merge never deletes. |
-| R6.5 | Switch service (wizard: new / existing-pull / existing-push / existing-merge) | Nothing syncs before explicit confirm; safety-backup of the scrapped side first (merge: both sides, `switch-merge`); password verified by decrypt before mutation; wizard never deletes local data; draft survives navigation (no secrets in draft), cleared on complete/start-over. |
+| R6.5 | Saved syncs and sync switch (Syncs page; Connect `+ Add a sync`) | One active sync owns the local tree; dormant rows keep only their derived key and sync ID (in the platform store), never the long password, and the list is local to the device. Activate: app-lock prompt when set, read-only probe/decrypt before any write, then a `switch-take-remote` safety backup and adopt; the previous sync stays listed. Forget/Unlink confirm; Forget keeps bookmarks and the server copy and prunes only dead safety-master wraps; Unlink removes the active row and keeps dormant rows. Adding while linked offers only an existing sync (manual or QR), upserts by canonical URL + sync ID, and is fail-closed (pending conflict or failed push cancels). No server-side sync list; no delete-from-server in v1. |
 | R6.6 | Unlink | Clears credentials ONLY; local items stay; sync stops. Requires explicit confirm. |
 | R6.7 | Backup export/import/preview | Envelope R2.5; import = preview (count and consequences) → Restore backup → safety-backup local → dirty mirror (auto-push/conflict, never pull-over). 50 MB stream cap, tmp cleanup. |
 | R6.8 | Change password (`ChangePasswordAsync`) | Guards: current required, new required; current derived key MUST equal stored (else `InvalidCredentials`, zero mutations/downloads/queue). Then, in ONE engine gate hold (`SyncEngine.ChangeKeyAsync`): download the server copy (remote moved since the last sync → `DataOutOfSync`, zero mutations) → safety-backup of the REAL server copy → push re-encrypted under the new key on that remote base → store the new derived key ONLY after the PUT landed (a failed push keeps the old password working) → rotate safety master (R7.3, best-effort). Old password stops working everywhere. |
@@ -133,13 +133,13 @@ the applied result. Rules:
 
 | R | Requirement |
 |---|---|
-| R8.1 | Validation catalog (exact strings): "Current password is required.", "A new password is required.", "The new password must be different from the current one.", "New passwords do not match.", "Use a password of at least 8 characters.", "Passwords do not match — retype the confirmation.", "Enter both the sync ID and its password.", "Sync ID is required for an existing sync.", "Choose the sync direction above." (reconcile), "Verify the existing sync first.", "Re-check the target service first.", "Preview the merge first — counts must match the verified sync." (switch), "Preview the merge first — counts must match the linked sync." (connect) |
-| R8.2 | Destructive confirms: unlink (1), delete server-side n/a (no client), create-empty (armed), import (preview with consequences + Restore backup), switch (review + Move and connect), merge (automatic preview + direct apply, preview-locked), bulk delete (armed), safety restore/delete (armed inline). |
+| R8.1 | Validation catalog (exact strings): "Current password is required.", "A new password is required.", "The new password must be different from the current one.", "New passwords do not match.", "Use a password of at least 8 characters.", "Passwords do not match — retype the confirmation.", "Enter both the sync ID and its password.", "Sync ID is required for an existing sync.", "Choose the sync direction above." (reconcile), "Verify the existing sync first.", "Re-check the target service first.", "Preview the merge first — counts must match the linked sync." (connect) |
+| R8.2 | Destructive confirms: unlink (1), delete server-side n/a (no client), create-empty (armed), import (preview with consequences + Restore backup), add-an-existing-sync while linked (direction confirmation + direct apply), merge (automatic preview + direct apply, preview-locked), bulk delete (armed), safety restore/delete (armed inline). |
 | R8.3 | Secrets hygiene: password fields cleared on success AND failure (keep-new convenience only where stated); password never in logs, toasts, or backup filenames. |
-| R8.4 | Gating matrix: Switch-service menu + page require an existing link (disabled + guard page); Sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty; merge disabled unless both sides hold items); danger buttons outline-first/solid-confirm. |
+| R8.4 | Gating matrix: `+ Add a sync` appears only while linked and offers only the existing-sync path; sync-now disabled unlinked; change-password section only when linked; reconcile direction defaults to take-remote (safe side first, other disabled when its side is empty; merge disabled unless both sides hold items); danger buttons outline-first/solid-confirm. |
 | R8.5 | Status page: mode/state/last-sync/service (+version) / local DB bytes / server copy bytes + max + % + bar (one `/info` probe per visit, offline = "unknown") / content stats / app + sync-format + API versions. |
 | R8.6 | About page declares v1.1 + v1.2 extended contract (with fallback) + encryption + independence + proprietary license (© Yari Melzani). Bug-report mail includes app/API versions. |
-| R8.7 | Error evidence belongs to the step that produced it: wizard pages (Connect, Switch service) render one error surface per action cluster (check / verify-link / apply-review) adjacent to its action, with `role="alert"`, instead of a single shared box. The check cluster reports inside the service status card (see "Service status card (v1.0.210)"): a failed check turns the card red with `role="alert"` and the message verbatim; verify-link and apply-review keep their adjacent boxes. Multi-outcome successes restate WHAT ran (mode + direction + target) via the pure `MoveResult.Describe` helper (unit-pinned), never a bare "Done". |
+| R8.7 | Error evidence belongs to the step that produced it: Connect renders one error surface per action cluster (check / verify-link / apply-review) adjacent to its action, with `role="alert"`, instead of a single shared box. The check cluster reports inside the service status card (see "Service status card (v1.0.210)"): a failed check turns the card red with `role="alert"` and the message verbatim; verify-link and apply-review keep their adjacent boxes. Multi-outcome successes restate WHAT ran (mode + direction + target) via the pure `MoveResult.Describe` helper (unit-pinned), never a bare "Done". |
 
 ## 9. Logging (`Logging.cs`, `InMemoryLogger`, Logs page)
 
@@ -172,7 +172,8 @@ fails the review.
 | View | Checks |
 |---|---|
 | `Connect.razor` (R6.1–R6.4b, R8.1–R8.4, R8.7) | Check service ok/offline (status card by the selector; a failed check is red with the message). Link existing: wrong password → `InvalidCredentials`, zero mutations; `0/0` → auto-apply. Direction pull/push/merge each applied once: success restates mode+direction+target (`MoveResult`), safety row appears. Merge: preview counts = applied result; change direction → preview invalidated and recomputed automatically for Merge; apply waits for a current preview; merge radio disabled when either side is empty. Create new + create-with-upload: new ID shown + Copy. Unlink: confirm armed, creds cleared, local kept. Each step's error appears in ITS surface (`role="alert"`), never a shared one. |
-| `SwitchService.razor` (R6.5, R8.1–R8.4, R8.7) | Unlinked → guard page. Step 1 check error in the status card by the selector. Step 2 new-mode passwords mismatch/short → verify-box error (no navigation); existing-mode verify wrong password → zero mutations. All 3 directions reviewed in step 3 with counts; merge requires fresh preview. Execute → step 4 success names outcome + safety location; draft cleared (navigate away/back → wizard reset). Start over resets everything incl. errors. |
+| `Syncs.razor` (R6.5, R8.1–R8.4, R8.7) | Active row marked, dormant rows offer Activate/Rename/Forget/Unlink. Activate asks device unlock when app lock is set, verifies read-only (no writes on failure), then adopts the target behind a `switch-take-remote` safety row; the previous sync stays listed. Forget confirms (`Dimentica` wording), keeps bookmarks and the server copy, drops the row and prunes only dead safety-master wraps. Unlink this device confirms, unlinks, removes the active row and keeps dormant rows. Re-adding the same canonical URL + sync ID updates the row in place, never a duplicate. |
+| `MoveServiceLegacy.razor` (R6.5) | `/switch-service` and `/migrate` redirect to `/connect`: old links, bookmarks and launcher shortcuts never hit a dead route. |
 | `Backup.razor` (R6.7, R7) | Export → file created, envelope `{App:"xBrowserSyncNg",Format:1}`. Preview with wrong password vs damaged file → distinct errors. Import → preview and consequences → Restore backup executes directly, safety row first, count matches. Safety list shows all `connect-merge`/`switch-merge` rows (both sides). Restore local → pre-restore row; restore remote unlinked → refused; delete → file + index row gone. |
 | `Duplicates.razor` (R6.9) | Groups listed; last copy locked (never deletable); per-group + global delete armed; ONE safety row per cleanup; ONE push (no sync storm — check logs); toast names backup location. |
 | `Status.razor` (R8.5) | Mode/state/last-sync/service + version, DB bytes, server bytes + max + % + bar (one `/info` per visit; offline = "unknown"), content stats, app + sync-format + API versions. No `.ToString("0.#")` leaks into percents. |
@@ -285,16 +286,15 @@ fails the review.
   unknown fields ignored, representation redacted (`ConnectQrTests`). Candidate
   tests use a fake clock and delayed scanner: 59/60 seconds, duplicate/late
   generations, cancellation and consume-before-probe (including failed probe).
-- Connect and Move service show a QR icon with scan action and translated
-  helper before service/ID/password entry. Move retains its existing
-  linked-user gate, combined destination/credentials verification, direction and review.
-  Move and connect executes directly from the review.
-- QR review is exclusive in Connect and Move: only service URL, abbreviated
+- Connect (first link and `+ Add a sync` while linked → Existing sync) shows a
+  QR icon with scan action and translated helper before service/ID/password
+  entry. Adding while linked keeps the usual verification, direction and apply.
+- QR review is exclusive in Connect: only service URL, abbreviated
   sync ID, acquired-credentials summary and spaced actions. Manual inputs,
-  service controls and later wizard headings stay hidden while pending and
+  service controls and later Connect headings stay hidden while pending and
   verifying. `BeginVerification` consumes the secret but keeps `ShowReview`
-  active with localized progress; no “Where?” or manual form flashes before
-  the probe succeeds. Failure clears the candidate and shows the adjacent error.
+  active with localized progress; no manual form flashes before the probe
+  succeeds. Failure clears the candidate and shows the adjacent error.
 - Scan alone performs no probe/settings/credential/bookmark writes; service
   and abbreviated ID are reviewed before Connect. The native scanner requests
   CAMERA on demand, decodes only QR and releases its handler in every exit.
@@ -354,7 +354,7 @@ evidence; native keyboard, TalkBack and device behavior still require Android QA
 
 ## Service selection — v1.0.208/209
 
-- Connect (existing/new) and Switch service use `ServiceSelector`: a button with
+- Connect uses `ServiceSelector`: a button with
   the current service, then the eight public services, the saved ones and
   “Custom URL…”. Each row shows the host (or the saved URL) with country, size
   limit and API version; the selected row is marked for assistive technology
@@ -372,9 +372,9 @@ evidence; native keyboard, TalkBack and device behavior still require Android QA
   `ServiceCatalog.Normalize` ignores host case and default ports, keeps path case
   and rejects credentials/query/fragment, so equivalent addresses cannot create a
   second entry (`CanonicalServiceIdentityIgnoresHostCaseAndDefaultPort`).
-- Switch service opens on the service this device is linked to; the catalog
-  default applies while no sync is linked. The move review and the confirm that
-  precedes the move name the destination with its full normalized URL, matching
+- Connect opens on the service this device is linked to; the catalog
+  default applies while no sync is linked. The Connect review and the confirm that
+  precedes the apply name the destination with its full normalized URL, matching
   the completion message. The endpoint check result is the status card of
   "Service status card (v1.0.210)": dot + state word, endpoint chips (API, size,
   location; version and location dropped when the service omits them) and the
@@ -387,30 +387,16 @@ the other endpoint.
 
 ## Connect mode choice — v1.0.210
 
-- Switch service shows new vs existing sync as the segmented control `.xbs-seg`
-  (both labels visible, chosen one filled with the accent colour), with the
-  explanation line under it; no dropdown is left in the wizard.
-- The explanation follows the selection (`SwANewText` / `SwExistingText`), and
-  the password or sync-ID fields of the other branch disappear with it.
-- Switching branch drops a sync that was already verified in the other one
-  (`ChooseSlot` → `Unverify`): the review can never apply a probe taken on the
-  abandoned branch.
-- The two buttons are ≥ 48px tall, reachable with TalkBack (`role="group"` with
-  the question as its label, `aria-pressed` on each side) and keyboard-focusable,
-  with the group still legible at the largest text scale without horizontal
-  overflow.
+- Connect offers two cards: `Link an existing sync` and `Create a new sync`.
+  While linked, `+ Add a sync` offers only the existing-sync path, so a new sync
+  is always created from an unlinked state.
+- The retired Switch service segmented control (`SwIntoWhich`, `SwANewText` /
+  `SwExistingText`) is gone with its page, nav item, strings and resume draft:
+  `/switch-service` and `/migrate` redirect to `/connect`.
 
-Regression check on a device: in Switch service pick an existing sync, verify it,
-switch to “Nuova” and back — the verified line is gone and the password fields
-come back; rotate the device and open the keyboard: the segment stays on one row
-and both labels stay readable in light and dark theme.
-
-Evidence (2026-10-18): on device (1080×2412, dark theme) the segment shows both
-labels with the note switching per side, and the status card shows the state word,
-the translated location and the server message; the status page reports the same
-run as v1.0.210 (build 211). The four card states (checking / ok / warn / error)
-and the light theme were rendered in headless Chromium from the component's real
-stylesheet. The isolated layout matrix used for MovePicker (widths × heights ×
-themes × text scales, no horizontal overflow) has NOT been re-run for these two
-surfaces: run it before release. Native TalkBack, rotation and font scaling still
-require device QA.
+Regression check on a device: while linked, `+ Add a sync` shows no “new sync”
+option and a scan still asks for review before any network write; after creating
+a new sync while unlinked, the full sync ID is shown with `Copy sync ID` and the
+safety backup note. The status card shows the state word, the translated location
+and the server message; the status page reports the same run (build 211). Native
+TalkBack, rotation and font scaling still require device QA.

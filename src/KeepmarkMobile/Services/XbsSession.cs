@@ -458,7 +458,9 @@ public sealed class XbsSession : IAsyncDisposable
         return System.Text.Json.JsonSerializer.Deserialize<List<BookmarkNode>>(json) ?? [];
     }
 
-    public async Task CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
+    /// <summary>Creates an empty sync and adopts it. Returns the new sync ID (the
+    /// caller must show it: it is the credential's only readable form).</summary>
+    public async Task<string> CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
     {
         // Creating replaces the local tree: save the sync in use first (no-op
         // when unlinked), then snapshot what is about to be destroyed.
@@ -477,6 +479,7 @@ public sealed class XbsSession : IAsyncDisposable
         RememberService(serviceUrl);
         await RememberActiveAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version)).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
+        return created.Id!;
     }
 
     /// <summary>Creates the sync on the service, then uploads the current local tree into it.
@@ -1349,25 +1352,11 @@ public sealed class XbsSession : IAsyncDisposable
             await Store.DisposeAsync().ConfigureAwait(false);
         }
     }
-
-    /// <summary>Unfinished Switch-service wizard, kept while the user inspects
-    /// other pages (e.g. the bookmarks) mid-review. In-memory only, never
-    /// persisted: secrets are re-asked on return, the probe (with its derived
-    /// key + pre-images) survives navigation. Cleared when the switch
-    /// completes or the user starts over.</summary>
-    public SwitchDraft? PendingSwitch { get; set; }
 }
 
 public sealed record ReconcileInfo(
     SyncCredentials Candidate, int LocalCount, int RemoteCount,
     string? RemoteLastUpdated, string? RemoteVersion,
     string RemoteBlob, string LocalBlob);
-
-/// <summary>Draft of an unfinished Switch-service wizard (see
-/// <see cref="XbsSession.PendingSwitch"/>). Secrets are deliberately absent:
-/// passwords are always retyped after navigation.</summary>
-public sealed record SwitchDraft(
-    string TargetUrl, string Slot, string SyncId, string Direction,
-    ReconcileInfo? Probe, string? VerifiedFor, int Step);
 
 public sealed record BackupEnvelope(string App, int Format, string Salt, string Blob);
