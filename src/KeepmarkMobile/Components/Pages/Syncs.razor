@@ -1,0 +1,370 @@
+@page "/syncs"
+@using Keepmark.Core.Sync
+@using Keepmark.Core.Workflow
+@inject KeepmarkMobile.Services.XbsSession Session
+@inject KeepmarkMobile.Services.SecureCredentialStore Creds
+@inject KeepmarkMobile.Services.XbsSettings AppSettings
+@inject KeepmarkMobile.Services.AppLockState AppLock
+@inject KeepmarkMobile.Services.IAppLockService LockPrompt
+@inject KeepmarkMobile.Services.ToastState Toast
+@implements IDisposable
+
+<PageTitle>@L.Get(Str.SyncsTitle)</PageTitle>
+
+<h1>@L.Get(Str.SyncsTitle)</h1>
+
+<p class="text-muted">@L.Get(Str.SyncsIntro)</p>
+
+@if (!loaded)
+{
+    <p role="status"><em>@L.Get(Str.CommonLoading)</em></p>
+}
+else if (rows.Count == 0)
+{
+    <p class="text-muted">@L.Get(Str.SyncsEmpty)</p>
+}
+else
+{
+    @for (var i = 0; i < rows.Count; i++)
+    {
+        var row = rows[i];
+        var key = SavedSyncs.Key(row.ServiceUrl, row.SyncId);
+        var name = SavedSyncs.Name(row);
+        var isActive = IsActive(row);
+        <div class="card mb-2" @key="key">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div><strong>@name</strong></div>
+                        <div class="form-text">
+                            @SavedSyncs.ServiceHost(row.ServiceUrl) · ID <code>@SavedSyncs.ShortSyncId(row.SyncId)</code>
+                        </div>
+                    </div>
+                    <span class="badge @(isActive ? "text-bg-success" : "text-bg-secondary")">
+                        @L.Get(isActive ? Str.SyncsActive : Str.SyncsInactive)
+                    </span>
+                </div>
+
+                @if (renamingKey == key)
+                {
+                    <div class="mt-2">
+                        <label class="form-label" for="sync-name-@i">@L.Get(Str.SyncsNameLabel)</label>
+                        <input id="sync-name-@i" class="form-control" @bind="renameText"
+                               maxlength="@SavedSyncs.MaxLabelLength" disabled="@busy" />
+                        @if (nameTaken)
+                        {
+                            <div class="form-text text-danger" role="alert">@L.Get(Str.SyncsNameTaken)</div>
+                        }
+                        <div class="mt-2 d-flex gap-2">
+                            <button class="btn btn-primary" @onclick="SaveRenameAsync" disabled="@busy">@L.Get(Str.CommonSave)</button>
+                            <button class="btn btn-secondary" @onclick="CancelRename" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                        </div>
+                    </div>
+                }
+                else if (armedActivateKey == key)
+                {
+                    <ConfirmBlock Message="@L.Get(Str.SyncsActivateMessage, name)"
+                                  Implication="@L.Get(Str.SyncsActivateHint, name)"
+                                  ConfirmLabel="@L.Get(Str.SyncsActivate)" Danger="false" Busy="busy"
+                                  OnConfirm="ActivateAsync" OnCancel="Disarm" />
+                }
+                else if (armedForgetKey == key)
+                {
+                    <ConfirmBlock Message="@L.Get(Str.SyncsForgetMessage, name)"
+                                  Implication="@L.Get(Str.SyncsForgetImplication)"
+                                  ConfirmLabel="@L.Get(Str.CommonYesForget)" Busy="busy"
+                                  OnConfirm="ForgetAsync" OnCancel="Disarm" />
+                }
+                else if (armedUnlinkKey == key)
+                {
+                    <ConfirmBlock Message="@L.Get(Str.SyncsUnlinkMessage, name)"
+                                  Implication="@WorkflowTexts.UnlinkImplication"
+                                  ConfirmLabel="@L.Get(Str.CommonYesUnlink)" Busy="busy"
+                                  OnConfirm="UnlinkAsync" OnCancel="Disarm" />
+                }
+                else
+                {
+                    <div class="mt-2 d-flex flex-wrap gap-2">
+                        @if (!isActive)
+                        {
+                            <button class="btn btn-primary btn-sm" @onclick="() => Arm(key, armActivate: true)" disabled="@busy"
+                                    title="@L.Get(Str.SyncsActivateHint, name)">
+                                @L.Get(Str.SyncsActivate)
+                            </button>
+                        }
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => StartRename(key, row)" disabled="@busy">
+                            @L.Get(Str.SyncsRename)
+                        </button>
+                        @if (isActive)
+                        {
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armUnlink: true)" disabled="@busy">
+                                @L.Get(Str.ConnUnlinkBtn)
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armForget: true)" disabled="@busy">
+                                @L.Get(Str.SyncsForget)
+                            </button>
+                        }
+                    </div>
+                }
+
+                @if (noticeKey == key && !string.IsNullOrEmpty(notice))
+                {
+                    <StepMessage Text="@notice" Error="noticeError" />
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<SavedSync> rows = [];
+    private SyncCredentials? active;
+    private bool loaded;
+    private bool busy;
+
+    private string? armedActivateKey;
+    private string? armedForgetKey;
+    private string? armedUnlinkKey;
+    private string? renamingKey;
+    private string renameText = string.Empty;
+    private bool nameTaken;
+
+    private string? noticeKey;
+    private string notice = string.Empty;
+    private bool noticeError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await WaitForSessionAsync(Session)) return;
+        AppLock.Changed += OnLockChanged;
+        await RefreshAsync();
+    }
+
+    public override void Dispose()
+    {
+        AppLock.Changed -= OnLockChanged;
+        base.Dispose();
+    }
+
+    private void OnLockChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            active = await Creds.GetAsync();
+            rows = Session.Registry is null ? new List<SavedSync>() : await Session.Registry.ListAsync();
+        }
+        catch
+        {
+            rows = [];
+        }
+        finally
+        {
+            loaded = true;
+        }
+    }
+
+    private bool IsActive(SavedSync row) =>
+        active is not null && SavedSyncs.Same(row.Identity, new SavedSyncIdentity(active.ServiceUrl, active.Id));
+
+    private void Disarm()
+    {
+        armedActivateKey = null;
+        armedForgetKey = null;
+        armedUnlinkKey = null;
+    }
+
+    private void Arm(string key, bool armActivate = false, bool armForget = false, bool armUnlink = false)
+    {
+        Disarm();
+        renamingKey = null;
+        if (armActivate) armedActivateKey = key;
+        if (armForget) armedForgetKey = key;
+        if (armUnlink) armedUnlinkKey = key;
+        ClearNotice();
+    }
+
+    private void ClearNotice()
+    {
+        noticeKey = null;
+        notice = string.Empty;
+        noticeError = false;
+    }
+
+    private void ShowNotice(string key, string text, bool error = false)
+    {
+        noticeKey = key;
+        notice = text;
+        noticeError = error;
+    }
+
+    // ---- activation -------------------------------------------------------
+
+    /// <summary>Activation asks for the device PIN/biometric when app lock is
+    /// configured: the saved key is enough to switch, so the step itself must
+    /// be the proof it is the owner.</summary>
+    private async Task<bool> ConfirmWithAppLockAsync()
+    {
+        if (AppSettings.AppLock == "Off") return true;
+        if (!AppLock.Foreground) return false;
+        var ok = false;
+        AppLock.BeginAuth();
+        try
+        {
+            ok = await LockPrompt.AuthenticateAsync(L.Get(Str.SyncsUnlockTitle), requireDeviceCredential: false);
+        }
+        catch
+        {
+            ok = false;
+        }
+        finally
+        {
+            // Success also counts as an unlock; a cancel here never locks.
+            AppLock.EndAuth(ok);
+        }
+
+        return ok;
+    }
+
+    private async Task ActivateAsync()
+    {
+        var key = armedActivateKey;
+        var row = rows.FirstOrDefault(r => SavedSyncs.Key(r.ServiceUrl, r.SyncId) == key);
+        if (busy || row is null) return;
+        busy = true;
+        ClearNotice();
+        var name = SavedSyncs.Name(row);
+        try
+        {
+            if (!await ConfirmWithAppLockAsync())
+            {
+                Disarm();
+                return;
+            }
+
+            // Read-only preflight first: a wrong key, an expired sync or an
+            // unreachable service changes nothing. Then the switch itself is
+            // fail-closed: unsaved edits block it.
+            var info = await Session.VerifySavedSyncAsync(row.Identity, Lifetime);
+            await Session.ActivateSavedSyncAsync(info);
+            Disarm();
+            await RefreshAsync();
+            ShowNotice(key, L.Get(Str.SyncsActivated, name));
+            _ = Toast.ShowAsync(L.Get(Str.SyncsActivated, name));
+        }
+        catch (OperationCanceledException) when (IsDisposed)
+        {
+            // Page left while verifying: nothing was written.
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(key, ex.Message, error: true);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    // ---- forget / unlink -------------------------------------------------
+
+    private async Task ForgetAsync()
+    {
+        var key = armedForgetKey;
+        var row = rows.FirstOrDefault(r => SavedSyncs.Key(r.ServiceUrl, r.SyncId) == key);
+        if (busy || row is null || IsActive(row)) return;
+        busy = true;
+        ClearNotice();
+        var name = SavedSyncs.Name(row);
+        try
+        {
+            if (Session.Registry is not null) await Session.Registry.ForgetAsync(row.Identity);
+            Disarm();
+            await RefreshAsync();
+            _ = Toast.ShowAsync(L.Get(Str.SyncsForgot, name));
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(key, ex.Message, error: true);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task UnlinkAsync()
+    {
+        var key = armedUnlinkKey;
+        var row = rows.FirstOrDefault(r => SavedSyncs.Key(r.ServiceUrl, r.SyncId) == key);
+        if (busy || row is null) return;
+        busy = true;
+        ClearNotice();
+        var name = SavedSyncs.Name(row);
+        try
+        {
+            await Session.UnlinkAsync();
+            Disarm();
+            await RefreshAsync();
+            _ = Toast.ShowAsync(L.Get(Str.SyncsUnlinked, name));
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(key, ex.Message, error: true);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    // ---- rename ----------------------------------------------------------
+
+    private void StartRename(string key, SavedSync row)
+    {
+        Disarm();
+        ClearNotice();
+        renamingKey = key;
+        renameText = row.Label ?? string.Empty;
+        nameTaken = false;
+    }
+
+    private void CancelRename()
+    {
+        renamingKey = null;
+        nameTaken = false;
+    }
+
+    private async Task SaveRenameAsync()
+    {
+        var key = renamingKey;
+        var row = rows.FirstOrDefault(r => SavedSyncs.Key(r.ServiceUrl, r.SyncId) == key);
+        if (busy || row is null) return;
+        busy = true;
+        nameTaken = false;
+        try
+        {
+            var ok = Session.Registry is not null && await Session.Registry.RenameAsync(row.Identity, renameText);
+            if (!ok)
+            {
+                nameTaken = true;
+                return;
+            }
+
+            renamingKey = null;
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowNotice(key, ex.Message, error: true);
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

@@ -267,6 +267,16 @@ PERFORMANCE.md are independent of this engine migration.
   case-insensitively, sort by last use) plus defensive JSON sanitize;
   `XbsSession.InitializeCoreAsync` migrates single-sync installs by
   registering the live credentials (no schema change, no data migration).
+  Activation (`VerifySavedSyncAsync` → `ActivateSavedSyncAsync`) is read-only
+  first (service/version gate + GET + decrypt with the row's stored key, never
+  the long password), then saves the active side fail-closed
+  (`SyncEngine.PersistActiveSideAsync`: pending conflict or failed push aborts
+  the switch), then adopts the target tree behind a `switch-take-remote`
+  safety backup and rotates the safety master. Unlink removes the active row;
+  dormant rows survive it. Connect can also add a sync while the device is
+  linked (only the "existing sync" path, QR included): it runs the same
+  fail-closed activation with the usual direction choice and keeps the
+  previous sync in the list.
 - `src/Keepmark.Core/Sync/BookmarkMerge.cs` — pure two-way union by URL
   (remote kept, local adopted with fresh ids, separators unioned, deletes
   never merged) + `NormalizeUrl`; same function serves preview and apply.

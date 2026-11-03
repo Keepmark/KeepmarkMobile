@@ -16,7 +16,7 @@
 {
     <p role="status"><em>@L.Get(Str.BackupStarting)</em></p>
 }
-else if (linked)
+else if (linked && !addingWhileLinked)
 {
     <div class="alert alert-success">
         @L.Get(Str.ConnLinkedTo) <strong>@linkedUrl</strong> (@L.Get(Str.BackupSyncWord) <code>@WorkflowRules.ShortId(linkedId)</code>).
@@ -27,6 +27,11 @@ else if (linked)
     {
         <div class="alert mt-2 @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
     }
+
+    <hr />
+    <h2>@L.Get(Str.SyncsTitle)</h2>
+    <p class="text-muted">@L.Get(Str.ConnAddSyncHint)</p>
+    <button class="btn btn-primary" @onclick="StartAddSync" disabled="@busy">@L.Get(Str.ConnAddSyncBtn)</button>
 
     <hr />
     <h2>@L.Get(Str.ConnUnlinkH)</h2>
@@ -48,6 +53,10 @@ else if (linked)
 }
 else
 {
+    @if (addingWhileLinked)
+    {
+        <div class="alert alert-info" role="status">@L.Get(Str.ConnAddSyncHint)</div>
+    }
     @if (mode is null)
     {
         @* Outcome that brought us here (e.g. "Device unlinked"), shown at the top of the choice. *@
@@ -213,6 +222,7 @@ else
     private Core.Api.ServiceInfoResponse? serviceInfo;
     private Services.ReconcileInfo? reconcile;
     private bool linked;
+    private bool addingWhileLinked;
     private string? linkedUrl;
     private string? linkedId;
     private int localCount;
@@ -263,6 +273,26 @@ else
         password = string.Empty;
         newPassword = string.Empty;
         confirmPassword = string.Empty;
+        addingWhileLinked = false;
+    }
+
+    /// <summary>Multi-sync: add one more sync while the device is already linked.
+    /// Only the "existing sync" path applies — creating a new sync stays a
+    /// first-time flow. On success the target becomes active and the previous
+    /// sync stays in the Syncs list (activation is fail-closed: unsaved edits
+    /// are pushed first, or nothing switches).</summary>
+    private void StartAddSync()
+    {
+        addingWhileLinked = true;
+        mode = "existing";
+        reconcile = null;
+        mergeStats = null;
+        mergeStatsFor = null;
+        linkError = string.Empty;
+        applyError = string.Empty;
+        message = string.Empty;
+        password = string.Empty;
+        ClearQr();
     }
 
     private async Task SetDirection(string value)
@@ -324,7 +354,7 @@ else
 
     private async Task ScanQr()
     {
-        if (busy || linked || AppLock.Locked || !AppLock.Foreground) return;
+        if (busy || AppLock.Locked || !AppLock.Foreground) return;
         ClearQr();
         var generation = qrGeneration;
         busy = true; qrError = string.Empty;
@@ -371,7 +401,7 @@ else
 
     private async Task LinkQr()
     {
-        if (busy || linked || pendingQr is null || AppLock.Locked || !AppLock.Foreground) return;
+        if (busy || pendingQr is null || AppLock.Locked || !AppLock.Foreground) return;
         var candidate = qrState.BeginVerification();
         StopQrExpiry();
         if (candidate is null) { qrError = L.Get(Str.ConnQrCleared); return; }
@@ -409,6 +439,8 @@ else
         linked = c is not null;
         linkedUrl = c?.ServiceUrl;
         linkedId = c?.Id;
+        // The add-while-linked flow only exists on top of a link.
+        if (!linked) addingWhileLinked = false;
         if (Session.Store is not null)
         {
             var stats = await Session.Store.GetStatsAsync();
@@ -441,10 +473,9 @@ else
     {
         await RunStepAsync(async () =>
         {
-            await Creds.ClearAsync();
+            await Session.UnlinkAsync();
             armedUnlink = false;
             await RefreshStateAsync();
-            Session.Log.Info("connect", "Device unlinked");
             Ok(WorkflowTexts.UnlinkDone);
         }, err => unlinkError = err, "connect-unlink");
     }
@@ -482,6 +513,7 @@ else
             {
                 await Session.ApplyRemoteAsync(reconcile);
                 reconcile = null;
+                addingWhileLinked = false;
                 await RefreshStateAsync();
                 Ok(L.Get(Str.ConnLinkedEmpty));
             }
@@ -553,6 +585,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
+            addingWhileLinked = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "pull", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyLocal)}");
         }, err => applyError = err, "connect-apply");
@@ -567,6 +600,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
+            addingWhileLinked = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "push", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyRemote)}");
         }, err => applyError = err, "connect-apply");
@@ -601,6 +635,7 @@ else
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
+            addingWhileLinked = false;
             await RefreshStateAsync();
             Ok($"{Core.Sync.MoveResult.Describe("existing", "merge", target.Candidate.ServiceUrl, target.Candidate.Id)} {L.Get(Str.ConnSafetyBoth)}");
         }, err => applyError = err, "connect-apply");

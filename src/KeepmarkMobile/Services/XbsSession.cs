@@ -159,8 +159,43 @@ public sealed class XbsSession : IAsyncDisposable
         return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob);
     }
 
+    /// <summary>Before this device adopts another sync's tree, save whatever the
+    /// active sync has not uploaded yet and keep its row. Fail-closed: a pending
+    /// conflict or a failed push aborts the link. No-op when unlinked or when the
+    /// target is the active sync itself (a plain re-link).</summary>
+    public async Task PrepareForLinkAsync(SyncCredentials candidate, CancellationToken ct = default)
+    {
+        var current = await _creds.GetAsync().ConfigureAwait(false);
+        if (current is null) return;
+        if (SavedSyncs.Same(new SavedSyncIdentity(current.ServiceUrl, current.Id),
+                new SavedSyncIdentity(candidate.ServiceUrl, candidate.Id)))
+        {
+            return;
+        }
+
+        await Engine!.PersistActiveSideAsync(ct).ConfigureAwait(false);
+        if (Registry is not null)
+        {
+            await Registry.SyncActiveAsync(current).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>The sync just activated becomes the active registry row.</summary>
+    private async Task RememberActiveAsync(SyncCredentials candidate)
+    {
+        if (Registry is null) return;
+        await Registry.RememberAsync(new SavedSync
+        {
+            ServiceUrl = candidate.ServiceUrl,
+            SyncId = candidate.Id,
+            DerivedKey = candidate.DerivedKey,
+            SyncVersion = candidate.Version
+        }).ConfigureAwait(false);
+    }
+
     public async Task ApplyRemoteAsync(ReconcileInfo info, string operation = SafetyOperations.TakeRemote, CancellationToken ct = default)
     {
+        await PrepareForLinkAsync(info.Candidate, ct).ConfigureAwait(false);
         // Safety backup of the discarded local side (live tree as plaintext JSON).
         var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local",
@@ -173,10 +208,12 @@ public sealed class XbsSession : IAsyncDisposable
         await Engine!.LinkAdoptRemoteAsync(info.Candidate, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
+        await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
     }
 
     public async Task ApplyLocalAsync(ReconcileInfo info, string operation = SafetyOperations.UploadLocal, CancellationToken ct = default)
     {
+        await PrepareForLinkAsync(info.Candidate, ct).ConfigureAwait(false);
         // Safety backup of the overwritten remote side: the server blob
         // decrypted with the verified candidate key (plaintext tree JSON).
         // Empty remote (fresh slot) backs up as an empty tree.
@@ -202,6 +239,7 @@ public sealed class XbsSession : IAsyncDisposable
         await Engine!.LinkUploadAsync(info.Candidate, roots, info.RemoteLastUpdated ?? string.Empty, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
+        await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
     }
 
     /// <summary>Merge preview (dry-run): union counts without mutating
@@ -221,6 +259,7 @@ public sealed class XbsSession : IAsyncDisposable
     /// snapshots intact. Password verified by decrypt before any mutation.</summary>
     public async Task ApplyMergeAsync(ReconcileInfo info, string operation, CancellationToken ct = default)
     {
+        await PrepareForLinkAsync(info.Candidate, ct).ConfigureAwait(false);
         var remoteRoots = DecryptTree(info);
         var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         var merged = BookmarkMerge.Merge(localRoots, remoteRoots);
@@ -239,6 +278,61 @@ public sealed class XbsSession : IAsyncDisposable
         await Engine!.LinkUploadAsync(info.Candidate, merged.Tree, info.RemoteLastUpdated ?? string.Empty, ct).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
+        await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
+    }
+
+    /// <summary>Unlink this device: the credentials and the active row go away;
+    /// the local tree and the server copy stay. Dormant rows are untouched, so
+    /// they can still be activated later.</summary>
+    public async Task UnlinkAsync()
+    {
+        var current = await _creds.GetAsync().ConfigureAwait(false);
+        await _creds.ClearAsync().ConfigureAwait(false);
+        if (current is not null && Registry is not null)
+        {
+            await Registry.ForgetAsync(new SavedSyncIdentity(current.ServiceUrl, current.Id)).ConfigureAwait(false);
+        }
+
+        _log.Info("session", "Device unlinked");
+    }
+
+    /// <summary>Activation preflight for a dormant saved sync: read-only service
+    /// version gate + GET + decrypt with the row's stored key (the sync's long
+    /// password is never asked again). Nothing is written, so a wrong or
+    /// expired row changes nothing.</summary>
+    public async Task<ReconcileInfo> VerifySavedSyncAsync(SavedSyncIdentity identity, CancellationToken ct = default)
+    {
+        var registry = Registry ?? throw new InvalidOperationException("Session not ready");
+        var row = await registry.FindAsync(identity).ConfigureAwait(false);
+        if (row is null) throw new XbsException(_str.Get(Str.ErrSavedNotFound));
+        if (!row.CanActivate) throw new XbsException(_str.Get(Str.ErrSavedNoKey));
+        if (await _creds.GetAsync().ConfigureAwait(false) is { } active &&
+            SavedSyncs.Same(new SavedSyncIdentity(active.ServiceUrl, active.Id), identity))
+        {
+            throw new XbsException(_str.Get(Str.ErrSavedAlreadyActive));
+        }
+
+        var candidate = new SyncCredentials(
+            row.SyncId,
+            SavedSyncs.CanonicalServiceUrl(row.ServiceUrl),
+            row.DerivedKey,
+            row.SyncVersion);
+        var (local, remote, remoteLast, remoteVer, remoteBlob, localBlob) =
+            await Engine!.CompareAsync(candidate, ct).ConfigureAwait(false);
+        _log.Info("session", $"Activation probe: local={local} remote={remote}");
+        return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob);
+    }
+
+    /// <summary>Makes a verified dormant sync the active one. Fail-closed: the
+    /// active side is saved first (pending conflict or failed push = nothing
+    /// switches), then the target tree replaces this device's tree behind the
+    /// usual safety backup + key rotation. The previous sync stays in the list.</summary>
+    public async Task ActivateSavedSyncAsync(ReconcileInfo info, CancellationToken ct = default)
+    {
+        // ApplyRemoteAsync persists + registers the active side first (fail
+        // closed) and remembers the target as the new active row.
+        await ApplyRemoteAsync(info, SafetyOperations.SwitchTakeRemote, ct).ConfigureAwait(false);
+        _log.Info("session", "Activated saved sync");
     }
 
     /// <summary>Decrypts the verified remote blob into a tree. Throws on a

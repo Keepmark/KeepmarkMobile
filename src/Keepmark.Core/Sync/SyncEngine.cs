@@ -524,6 +524,44 @@ public sealed partial class SyncEngine(
         }
     }
 
+    /// <summary>Multi-sync switch: make sure the active sync holds every local
+    /// change before this device adopts another sync's tree. Fail-closed: an
+    /// offline/failed push or a pending conflict throws, because the local
+    /// tree is about to be replaced. Returns silently when unlinked.</summary>
+    public async Task PersistActiveSideAsync(CancellationToken ct = default)
+    {
+        await AcquireGateAsync("Save active sync", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+        try
+        {
+            if (_resolvingConflict) throw new InvalidOperationException(Loc.Get(Str.ErrConflictInProgress));
+            if (await creds.GetAsync().ConfigureAwait(false) is null) return;
+            try
+            {
+                await ForceSyncInternalAsync(ct, isAutoSync: false).ConfigureAwait(false);
+            }
+            catch (DataOutOfSyncException)
+            {
+                SetStatus(SyncStatus.Conflict);
+                throw new InvalidOperationException(str.Get(Str.ErrSavedConflict));
+            }
+            catch (XbsException ex)
+            {
+                SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
+                throw new InvalidOperationException(str.Get(Str.ErrSavedNotSaved), ex);
+            }
+
+            if (Status == SyncStatus.Conflict ||
+                await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1")
+            {
+                throw new InvalidOperationException(str.Get(Str.ErrSavedConflict));
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     /// <summary>Internal sync logic shared by auto and manual sync. The caller
     /// holds <c>_gate</c> and releases it; this method never does.</summary>
     private async Task ForceSyncInternalAsync(CancellationToken ct, bool isAutoSync)

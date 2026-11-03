@@ -7,7 +7,7 @@ Words come from `UI-TERMS.md`. Platform differences are listed at the end.
 
 ## Rules that apply to every workflow
 
-1. **Gating first.** A workflow that needs a linked sync (Move service, Change
+1. **Gating first.** A workflow that needs a linked sync (Add a sync, Change
    password, Backup import, Unlink, Delete sync) shows, when the device is not
    linked, one notice with a link to Connect and disables its action. The user
    never learns about a missing link from an error after submit.
@@ -54,6 +54,9 @@ Words come from `UI-TERMS.md`. Platform differences are listed at the end.
 | Delete sync from server (extension, service v1.2) | yes | `Delete sync from server…` | once | The server copy is gone for every device; they stop syncing at their next sync. No undelete. A plaintext copy of the server data is kept for download (the removed-sync card). |
 | Removed sync (extension) | shown while unlinked after the sync was deleted or removed from the service | `Download copy` / `Dismiss…` | Dismiss only | The kept copy is the only copy of the removed sync; the download is a plain JSON file, not encrypted. |
 | Sync conflict | conflict | direction with consequences → apply | Android: apply executes; extension: one inline confirmation | Same direction text as Connect. |
+| Add a sync while linked (Android Connect) | yes | Connect → `+ Add a sync` → existing sync (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict or a failed push cancels the switch and changes nothing. |
+| Syncs: Activate | no | Syncs → `Activate` → device unlock when app lock is set → apply | none beyond the unlock | Read-only check first (service/version gate + download + decrypt with the key saved in the row); only then the active sync is saved and this device adopts the chosen sync's copy behind a `switch-take-remote` safety backup. The sync you leave stays in the list. The sync's own long password is never asked. |
+| Syncs: Forget / Unlink | no | Syncs → `Forget…` (inactive) / `Unlink this device…` (active) | always | Inactive: only the row is forgotten; bookmarks and the server copy stay. Active: this device is unlinked and the row disappears; the bookmarks stay and the sync plus its server copy stay for the other devices. Dormant rows survive an unlink. |
 | Duplicates | no | mark → `Delete marked` (per URL or all marked) | always | One copy of each URL always stays. While linked the deletion is uploaded and the other devices get it at their next sync. A safety backup is saved first. |
 
 ## Step and button visibility
@@ -148,7 +151,32 @@ host.
   and retain its verification/review gates.
 
 
-## Android: organize multiple items
+## Android: multiple saved syncs
+
+- One sync is active at a time and owns the local tree (`xbs.db`, no schema
+  change). The other rows are inactive: they hold the derived key of their sync
+  (encrypted at rest by the platform store) and the sync ID, never the long
+  password. The list is local to this device; nothing is stored on the service.
+- `Syncs` (nav, before Connect) lists every known sync with its label, service
+  host and short ID, marks the active one, and offers `Activate`, `Rename`
+  (metadata only), `Forget…` on inactive rows and `Unlink this device…` on the
+  active row. Every confirmation comes from the same inline block.
+- `Activate` is the only action with an extra gate: when app lock is configured
+  the device PIN/biometric prompt must pass first, because the saved key alone is
+  enough to switch. Without app lock there is just the confirmation.
+- Adding a sync happens in Connect: `+ Add a sync` while linked (only the
+  "existing sync" path, manual or QR) or the ordinary first-time choice while
+  unlinked. The direction is chosen as in Connect and the previous sync stays in
+  `Syncs`, ready to be activated again. Creating a brand-new sync stays a
+  first-time flow (there is no "new sync" option next to an existing link).
+- A sync already present in the list is never duplicated: identity is the
+  canonical service URL plus the sync ID and the row is updated in place.
+- `Forget…` removes the inactive row only: bookmarks and the server copy stay,
+  and so do the other rows. `Unlink this device…` unlinks this device and removes
+  the active row; local bookmarks and the server copy stay, and dormant rows are
+  untouched.
+
+
 
 Hold a bookmark/folder, or choose Select from its action menu. Tap more rows or All;
 folders include their contents. Move opens the destination tree: choose a folder or
