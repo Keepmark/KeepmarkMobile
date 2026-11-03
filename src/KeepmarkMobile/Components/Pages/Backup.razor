@@ -18,7 +18,7 @@ else
 {
     <div class="mb-3">
         <h4>@L.Get(Str.BackupExportH)</h4>
-        <p class="text-muted">@Loc.Plural(Str.BackupExportIntro, localCount) @WorkflowTexts.BackupPasswordHint</p>
+        <InfoHint Text="@L.Get(Str.BackupExportShort)" Title="@L.Get(Str.BackupExportH)" Body="@ExportBody" />
         <label class="form-label">@L.Get(Str.BackupPassword)</label>
         <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
         <label class="form-label mt-2">@L.Get(Str.BackupConfirmPassword)</label>
@@ -52,7 +52,7 @@ else
 
     <div class="mb-3">
         <h4>@L.Get(Str.BackupSafetyH)</h4>
-        <p class="text-muted">@L.Get(Str.BackupSafetyIntro)</p>
+        <InfoHint Text="@L.Get(Str.BackupSafetyShort)" Title="@L.Get(Str.BackupSafetyH)" Body="@L.Get(Str.BackupSafetyIntro)" />
         <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">@L.Get(Str.BackupRefreshList)</button>
         <StepMessage Text="@safetyMessage" Error="safetyError" />
         @if (safetyList.Count == 0)
@@ -98,7 +98,7 @@ else
 
     <div class="mb-3">
         <h4>@L.Get(Str.BackupRemovedH)</h4>
-        <p class="text-muted">@L.Get(Str.BackupRemovedIntro)</p>
+        <InfoHint Text="@L.Get(Str.BackupRemovedShort)" Title="@L.Get(Str.BackupRemovedH)" Body="@L.Get(Str.BackupRemovedIntro)" />
         <button class="btn btn-outline-secondary mb-2" @onclick="RefreshRemoved" disabled="@busy">@L.Get(Str.BackupRefreshList)</button>
         <StepMessage Text="@removedMessage" Error="removedError" />
         @if (removedList.Count == 0)
@@ -173,6 +173,11 @@ else
         await RefreshSafetyListAsync();
         await RefreshRemovedListAsync();
     }
+
+    /// <summary>Export explanation for the sheet: the counted intro plus the
+    /// password rule, kept together as one block of reading.</summary>
+    private string ExportBody =>
+        Loc.Plural(Str.BackupExportIntro, localCount) + " " + WorkflowTexts.BackupPasswordHint;
 
     private async Task RefreshCountsAsync()
     {

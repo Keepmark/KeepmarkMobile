@@ -1,0 +1,63 @@
+@* One short line plus an info icon: the sentence that is enough, the whole
+   text in a bottom sheet. The page keeps only what the user needs now; the
+   rest waits one tap away instead of pushing the content below the fold.
+   Never used on destructive confirmations: there the consequence is the
+   thing being confirmed, so it stays visible. *@
+<div class="xbs-infohint">
+    <p class="xbs-infohint-text">@Text</p>
+    <button type="button" class="xbs-infobtn" aria-label="@L.Get(Str.InfoOpen, Title)"
+            aria-haspopup="dialog" aria-expanded="@(open ? "true" : "false")" @onclick="Open">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" /><path d="M12 11v5.2M12 8.1h.01" /></svg>
+    </button>
+</div>
+
+@if (open)
+{
+    <div class="xbs-sheet-backdrop" data-back="30" @onclick="Close">
+        <div class="xbs-sheet" role="dialog" aria-modal="true" aria-labelledby="@titleId" @onclick:stopPropagation="true">
+            <div class="xbs-sheet-handle" aria-hidden="true"></div>
+            <div class="xbs-sheet-head">
+                <span class="xbs-info-ico" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" /><path d="M12 11v5.2M12 8.1h.01" /></svg>
+                </span>
+                <h2 id="@titleId" class="xbs-sheet-title">@Title</h2>
+            </div>
+            @foreach (var paragraph in Paragraphs())
+            {
+                <p class="xbs-info-body">@paragraph</p>
+            }
+            @if (!string.IsNullOrEmpty(GuideHref))
+            {
+                <a class="xbs-info-link" href="@GuideHref">
+                    @L.Get(Str.InfoGuide)
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                </a>
+            }
+            <button type="button" class="btn btn-secondary w-100 mt-3" @onclick="Close">@L.Get(Str.InfoClose)</button>
+        </div>
+    </div>
+}
+
+@code {
+    private readonly string titleId = "xbs-info-" + Guid.NewGuid().ToString("N")[..8];
+    private bool open;
+
+    /// <summary>The sentence shown on the page: what happens, in one breath.</summary>
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+
+    /// <summary>Topic of the sheet: the section the hint belongs to.</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    /// <summary>The whole explanation. Blank lines start a new paragraph.</summary>
+    [Parameter, EditorRequired] public string Body { get; set; } = string.Empty;
+
+    /// <summary>Where "Open the guide" goes; null hides the link.</summary>
+    [Parameter] public string? GuideHref { get; set; } = "help";
+
+    private void Open() => open = true;
+
+    private void Close() => open = false;
+
+    private IEnumerable<string> Paragraphs() =>
+        Body.Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}

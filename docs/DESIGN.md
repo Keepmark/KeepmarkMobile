@@ -216,6 +216,25 @@ Altri colori d'uso (non ridefinire a caso):
   `fieldError` + `role="alert"`; URL solo `http/https` assoluti.
 - Toggle Bookmark/Cartella non distruttivo: i campi nascosti si conservano.
 
+### Spiegazione breve + icona info (`InfoHint`)
+
+- Regola: sulla pagina resta **una frase** (≤ 90 caratteri) che dice cosa
+  succede; il testo lungo vive nel foglio, a un tocco. Poche informazioni
+  chiare alla volta, non tutto insieme.
+- Struttura: `.xbs-infohint` (testo + bottone) e, all'apertura, un
+  `.xbs-sheet` con icona, titolo della sezione, corpo completo, link
+  `Apri la guida` e `Chiudi`.
+- Icona: glifo ⓘ 21px, tratto 1,7, colore `--km-ink-2`; area di tocco
+  44×44 (margine negativo per allinearla alla prima riga). Non è un accento:
+  informa, non compete con l'azione.
+- Il bottone **non espande la pagina**: apre il foglio. Nessun salto di
+  layout, nessun pulsante che scivola mentre lo si sta per toccare.
+- **Mai sulle conferme distruttive** né sugli avvisi di sicurezza (HTTP in
+  chiaro, sync rimosso): le conseguenze restano visibili perché sono ciò che
+  l'utente conferma.
+- Chiavi i18n: `*Short` per la riga, la chiave lunga esistente per il corpo,
+  `InfoOpen`/`InfoGuide`/`InfoClose` per il foglio.
+
 ### Albero cartelle (`FolderPicker`)
 
 - Riga = gutter expander fisso (32px, placeholder invisibile per le foglie)

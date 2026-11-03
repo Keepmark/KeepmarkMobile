@@ -702,6 +702,104 @@ html.xbs-locked, body.xbs-locked {
 
 .xbs-hint { color: var(--km-ink-2); padding: 0.5rem; }
 
+/* ---- Info hint (v1.0.213): one short line plus an icon that opens the whole
+   explanation in a sheet. The icon never expands the page, so nothing jumps
+   and no button slides away under the finger. 44px target, 21px glyph: the
+   circle stays small, the tap area does not. Never on destructive confirms. */
+.xbs-infohint {
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    padding-left: 6px;
+    margin: 0 0 0.5rem;
+}
+
+.xbs-infohint-text {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding-top: 11px;
+    color: var(--km-ink-2);
+    font-size: 0.90625rem;
+    line-height: 1.45;
+}
+
+.xbs-infobtn {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    margin-right: -6px;
+    padding: 0;
+    border: 0;
+    border-radius: 22px;
+    background: transparent;
+    color: var(--km-ink-2);
+    display: grid;
+    place-items: center;
+}
+
+.xbs-infobtn svg {
+    width: 21px;
+    height: 21px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.xbs-infobtn:active,
+.xbs-infobtn[aria-expanded="true"] { background: var(--km-surface-2); color: var(--km-tint-ink); }
+
+.xbs-info-ico {
+    width: 38px;
+    height: 38px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--km-tint);
+    color: var(--km-tint-ink);
+}
+
+.xbs-info-ico svg {
+    width: 21px;
+    height: 21px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.xbs-info-body {
+    margin: 0 0 0.625rem;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--km-ink);
+}
+
+.xbs-info-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 0.25rem;
+    color: var(--km-accent);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.xbs-info-link svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 /* ---- Compact page bar (v1.0.124): one navy bar over the app bar with
    back, folder path, search and sort. Search opens inside the bar; path and
    sort are popover menus. Leaves the hamburger (fixed, 48px) uncovered. ---- */

@@ -94,7 +94,7 @@
 @if (linkedUrl is not null)
 {
     <h3 class="mt-4">@L.Get(Str.SettingsChangePassword)</h3>
-    <p class="text-muted">@L.Get(Str.SettingsChangePasswordHint)</p>
+    <InfoHint Text="@L.Get(Str.SettingsChangePasswordShort)" Title="@L.Get(Str.SettingsChangePassword)" Body="@L.Get(Str.SettingsChangePasswordHint)" />
     <div class="mb-3">
         <label class="form-label">@L.Get(Str.CommonCurrentPassword)</label>
         <input type="password" class="form-control" @bind="pwCurrent" @bind:after="ClearPwError" disabled="@(armedPw || pwBusy)" autocomplete="current-password" />

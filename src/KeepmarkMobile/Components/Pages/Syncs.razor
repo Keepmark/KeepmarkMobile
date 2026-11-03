@@ -14,7 +14,9 @@
 
 <h1>@L.Get(Str.SyncsTitle)</h1>
 
-<p class="text-muted">@L.Get(Str.SyncsIntro)</p>
+@* The intro stays one line: the rest is a tap away, so the list and the
+   button are visible without scrolling. *@
+<InfoHint Text="@L.Get(Str.SyncsIntroShort)" Title="@L.Get(Str.SyncsTitle)" Body="@L.Get(Str.SyncsIntro)" />
 
 @if (!string.IsNullOrEmpty(loadError))
 {
@@ -140,7 +142,7 @@ else
     </div>
     @if (active is not null)
     {
-        <p class="form-text mt-2">@L.Get(Str.ConnAddSyncHint)</p>
+        <InfoHint Text="@L.Get(Str.ConnAddSyncHintShort)" Title="@L.Get(Str.ConnAddSyncBtn)" Body="@L.Get(Str.ConnAddSyncHint)" />
     }
 }
 

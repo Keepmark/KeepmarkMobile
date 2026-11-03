@@ -110,6 +110,7 @@ public static partial class Str
     public const string BackupExportH = nameof(BackupExportH);
     public const string BackupExportIntro_one = nameof(BackupExportIntro_one);
     public const string BackupExportIntro_other = nameof(BackupExportIntro_other);
+    public const string BackupExportShort = nameof(BackupExportShort);
     public const string BackupPassword = nameof(BackupPassword);
     public const string BackupConfirmPassword = nameof(BackupConfirmPassword);
     public const string BackupExportBtn = nameof(BackupExportBtn);
@@ -123,6 +124,7 @@ public static partial class Str
     public const string BackupReplaceBtn = nameof(BackupReplaceBtn);
     public const string BackupSafetyH = nameof(BackupSafetyH);
     public const string BackupSafetyIntro = nameof(BackupSafetyIntro);
+    public const string BackupSafetyShort = nameof(BackupSafetyShort);
     public const string BackupRefreshList = nameof(BackupRefreshList);
     public const string BackupNoSafety = nameof(BackupNoSafety);
     public const string BackupSyncWord = nameof(BackupSyncWord);
@@ -185,6 +187,7 @@ public static partial class Str
     public const string ConnLinkedTo = nameof(ConnLinkedTo);
     public const string ConnAddSyncBtn = nameof(ConnAddSyncBtn);
     public const string ConnAddSyncHint = nameof(ConnAddSyncHint);
+    public const string ConnAddSyncHintShort = nameof(ConnAddSyncHintShort);
     public const string ConnCopySyncId = nameof(ConnCopySyncId);
     public const string ConnUnlinkH = nameof(ConnUnlinkH);
     public const string ConnUnlinkIntro_one = nameof(ConnUnlinkIntro_one);
@@ -214,15 +217,18 @@ public static partial class Str
     public const string ConnItemsCounts = nameof(ConnItemsCounts);
     public const string ConnSyncId = nameof(ConnSyncId);
     public const string ConnPasswordHint = nameof(ConnPasswordHint);
+    public const string ConnPasswordShort = nameof(ConnPasswordShort);
     public const string ConnApplyServer = nameof(ConnApplyServer);
     public const string ConnApplyMerge = nameof(ConnApplyMerge);
     public const string ConnApplyDevice = nameof(ConnApplyDevice);
     public const string ConnOpenSync = nameof(ConnOpenSync);
     public const string ConnConfirmPassword = nameof(ConnConfirmPassword);
     public const string ConnPwNewHint = nameof(ConnPwNewHint);
+    public const string ConnPwNewShort = nameof(ConnPwNewShort);
     public const string ConnCreateUpload_one = nameof(ConnCreateUpload_one);
     public const string ConnCreateUpload_other = nameof(ConnCreateUpload_other);
     public const string ConnCreateUploadHint = nameof(ConnCreateUploadHint);
+    public const string ConnCreateUploadShort = nameof(ConnCreateUploadShort);
     public const string ConnCreateEmptyInstead = nameof(ConnCreateEmptyInstead);
     public const string ConnReplaceEmptyMessage_one = nameof(ConnReplaceEmptyMessage_one);
     public const string ConnReplaceEmptyMessage_other = nameof(ConnReplaceEmptyMessage_other);
@@ -245,6 +251,7 @@ public static partial class Str
     public const string ConnPreviewFirst = nameof(ConnPreviewFirst);
     public const string DupTitle = nameof(DupTitle);
     public const string DupIntro = nameof(DupIntro);
+    public const string DupShort = nameof(DupShort);
     public const string DupClean = nameof(DupClean);
     public const string DupMarkedLine_one = nameof(DupMarkedLine_one);
     public const string DupMarkedLine_other = nameof(DupMarkedLine_other);
@@ -293,6 +300,7 @@ public static partial class Str
     public const string ErrLoadFailed = nameof(ErrLoadFailed);
     public const string SyncsTitle = nameof(SyncsTitle);
     public const string SyncsIntro = nameof(SyncsIntro);
+    public const string SyncsIntroShort = nameof(SyncsIntroShort);
     public const string SyncsActive = nameof(SyncsActive);
     public const string SyncsInactive = nameof(SyncsInactive);
     public const string SyncsActivate = nameof(SyncsActivate);
@@ -471,6 +479,9 @@ public static partial class Str
     public const string DirOffNothingDevice = nameof(DirOffNothingDevice);
     public const string CommonSave = nameof(CommonSave);
     public const string CommonDone = nameof(CommonDone);
+    public const string InfoOpen = nameof(InfoOpen);
+    public const string InfoGuide = nameof(InfoGuide);
+    public const string InfoClose = nameof(InfoClose);
     public const string CommonCurrentPassword = nameof(CommonCurrentPassword);
     public const string CommonNewPassword = nameof(CommonNewPassword);
     public const string CommonConfirmNewPassword = nameof(CommonConfirmNewPassword);
@@ -502,6 +513,7 @@ public static partial class Str
     public const string SettingsSaved = nameof(SettingsSaved);
     public const string SettingsChangePassword = nameof(SettingsChangePassword);
     public const string SettingsChangePasswordHint = nameof(SettingsChangePasswordHint);
+    public const string SettingsChangePasswordShort = nameof(SettingsChangePasswordShort);
     public const string SettingsChangePasswordBtn = nameof(SettingsChangePasswordBtn);
     public const string SettingsChangePasswordMessage = nameof(SettingsChangePasswordMessage);
     public const string HelpGesturesH = nameof(HelpGesturesH);
@@ -762,6 +774,7 @@ public static partial class Str
     public const string GoneUnlinkedNoCopy = nameof(GoneUnlinkedNoCopy);
     public const string BackupRemovedH = nameof(BackupRemovedH);
     public const string BackupRemovedIntro = nameof(BackupRemovedIntro);
+    public const string BackupRemovedShort = nameof(BackupRemovedShort);
     public const string BackupRemovedEmpty = nameof(BackupRemovedEmpty);
     public const string BackupRemovedRestoreMessage = nameof(BackupRemovedRestoreMessage);
     public const string BackupRemovedRestoreImplication = nameof(BackupRemovedRestoreImplication);
