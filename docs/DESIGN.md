@@ -143,7 +143,7 @@ Altri colori d'uso (non ridefinire a caso):
 - FAB `+`: cerchio 60px, fisso sopra la status bar, ombra, `opacity: 0.85`.
 - Status bar inferiore (`.xbs-statusbar`): fissa, `44px` (contiene target da
   44px), testo
-  `0.8rem` secondario con ellipsis; pill di sync solo in modalità Manuale.
+  `0.8rem` secondario con ellipsis; pill di avanzamento durante la sincronizzazione.
 - Toast: centrato, `max 480px`, bordo-sinistro spesso (blu ok / rosso
   errore), icona `✓/⚠`, `role="status"`, auto-dismiss 3.5s, sempre
   fire-and-forget dopo `StateHasChanged`, mai bloccante.
@@ -312,7 +312,10 @@ Altri colori d'uso (non ridefinire a caso):
   ogni password nuova (`WorkflowRules`).
 - **Multi-sync**: un solo sync attivo possiede l'albero locale; le altre righe
   sono credenziali dormienti. L'attivazione è read-only finché il target non è
-  provato, poi salva il lato attivo fail-closed e adotta; il backup
+  provato, poi salva il lato attivo fail-closed e adotta sotto lo stesso gate
+  del motore, impedendo modifiche intermedie; il rollback ripristina anche
+  lo stato dirty. La sincronizzazione mobile è sempre automatica mentre
+  l’app è visibile; resta disponibile “Sincronizza ora”. Il backup
   `switch-take-remote` c'è solo se il dispositivo era scollegato, perché la
   copia del sync che lasci è già sul server. Con app lock attivo il prompt di sistema è
   obbligatorio prima di qualsiasi scrittura. Un 401 non sblocca, non carica e

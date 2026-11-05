@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.221 (222)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.222 (223)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -65,9 +65,9 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 ### Product requirements
 
 - **Android only**, API 29+.
-- **Nine UI languages**: English (source), Italiano, Français, Español, Deutsch,
-  日本語, Português (Brasil), Русский, 简体中文 (internal codes `ja`, `pt`, `ru`,
-  `zh`; `zh-TW`/`zh-HK` fall back to Simplified). Default follows the Android
+- **Ten UI languages**: English (source), Italiano, Français, Español, Deutsch,
+  日本語, Português (Brasil), Русский, 简体中文, Română (internal codes `ja`, `pt`, `ru`,
+  `zh`, `ro`; `zh-TW`/`zh-HK` fall back to Simplified). Default follows the Android
   language; override in Settings → Language (the UI reloads without restart).
   Logs stay English. Every UI string is a `Str` key in
   `Keepmark.Core/I18n`; parity is enforced by `I18nTests`.
@@ -278,7 +278,7 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
 | `/backup` | `Backup` | encrypted export/import, safety backups, removed copies |
 | `/syncs` | `Syncs` | saved syncs (activate, rename, forget, unlink, `Change password` on the active row) plus `+ Add a sync`, which opens the whole connect flow in place |
 | `/connect` | `Connect` | redirect to `/syncs` (old links only) |
-| `/settings` | `Settings` | sync mode, theme, language, home sections, and the log panel folded behind one "Show logs" button (verbosity + current log inside) |
+| `/settings` | `Settings` | theme, language, home sections, and the log panel folded behind one "Show logs" button (verbosity + current log inside) |
 | `/settings/security` | `Security` | app lock and relock time |
 | `/status` | `Status` | sync state, sizes, versions, removed-sync notice |
 | `/help` | `Help` | user help |
@@ -367,9 +367,12 @@ store.
 ### Preferences (`XbsSettings`)
 
 Non-secret settings: `service_url`, `saved_services`, `saved_service_info`,
-`sync_mode`, `log_verbosity`, `app_lock`, `lock_timeout_min`, `theme`,
+`log_verbosity`, `app_lock`, `lock_timeout_min`, `theme`,
 `ui_language`, `open_mode`, `home_show_recent`, `home_recent_count`,
 `home_recent_open`, `list_sort`.
+
+The legacy `sync_mode` preference is ignored: mobile always uses automatic
+synchronization while visible; Settings no longer offers a mode selector.
 
 ### App-private files
 
@@ -519,12 +522,14 @@ The app cannot erase a server copy; `Unlink` only removes local credentials.
 service. It never resolves a conflict, never overwrites after a 409 and never
 acts on a 401 without the user.
 
-### Modes and status
+### Automatic sync and status
 
-- `SyncMode.Auto` (default): a foreground-only poller ticks 500 ms after the
+- Mobile always uses `SyncMode.Auto`: a foreground-only poller ticks 500 ms after the
   app becomes visible, then every 15 minutes **after the previous tick
   completes** (fixed delay, no catch-up storm).
-- `SyncMode.Manual`: no poll; only an explicit Sync now.
+- Local edits queue a coalesced push worker (250 ms grouping). **Sync now**
+  remains available for an explicit attempt.
+- `SyncMode.Manual` remains an internal Core API for tests, not a mobile setting.
 - Statuses: `Idle`, `Syncing`, `Offline`, `Conflict`, `Error`, `NoCredentials`.
   `DataChanged` and `StatusChanged` events drive the UI; pages preserve scroll
   and query across events.
@@ -668,17 +673,18 @@ storage failure is logged and the app still starts.
 ### 9.3 Activate a dormant sync
 
 Preconditions: the row exists and has a key, the sync is not already active,
-and the app is unlocked (when app lock is configured).
+and no other row operation is open.
 
-1. **Device proof first**: with app lock on, the PIN/biometric prompt must
+1. **Inline confirmation first**: Activate opens the row’s `ConfirmBlock`.
+   Only confirming it starts activation. With app lock on, the PIN/biometric prompt must
    succeed because the saved key alone is enough to switch. Without app lock
    there is no extra prompt beyond the inline confirmation.
 2. **Read-only preflight** (`VerifySavedSyncAsync`): service `/info` version
    gate, full GET, decrypt with the row's stored key. A wrong/stale key, an
    expired sync or an unreachable service changes nothing. The sync's long
    password is never asked again.
-3. **Fail-closed save of the active side** (`PrepareForLinkAsync` →
-   `SaveActiveSideAsync` → `PersistActiveSideAsync`): pending conflict, offline
+3. **Fail-closed save of the active side** (`LinkAdoptRemoteAsync` →
+   `PersistActiveSideCoreAsync`, under the same engine gate as adoption): pending conflict, offline
    service, vanished sync or failed push aborts the whole switch; the local tree
    is not replaced. Each cause keeps its own message (`ErrSavedConflict`,
    `ErrSavedOffline`, `ErrSavedGone`, `ErrSavedNotSaved`), so an offline device
@@ -686,11 +692,14 @@ and the app is unlocked (when app lock is configured).
 4. **Snapshot only when this device was unlinked** (`switch-take-remote`):
    switching from a linked sync replaces that sync's tree, which is already on
    its server (the switch is fail-closed on pending edits), so it needs no
-   copy. A snapshot that cannot be written still aborts the switch.
+   switch snapshot. Only an unlinked-device activation needs this snapshot;
+   failure to write that required snapshot aborts adoption. Saving the old
+   linked side may separately require a massive-change `sync-push` snapshot.
 5. **Adopt** the target tree (`LinkAdoptRemoteAsync`: replace the mirror, then
    switch credentials). The probe already downloaded and decrypted the blob, so
    it is handed over as `PrefetchedRemote`: the same tree is never downloaded
-   twice.
+   twice. If adoption fails, rollback restores the previous dirty flag as well
+   as the tree and sync metadata, so pending edits remain eligible for upload.
 6. **Rotate** the safety master from the old key to the new one (best effort,
    never fails the switch) and **remember** the target row (it becomes active).
 7. The previously active sync stays in the list, dormant, ready to reactivate.
@@ -1193,7 +1202,7 @@ disposal. Shared components are presentation-only: data in through
   them by `NodeId`, with folder path; Settings controls on/off, 5/10/20 and the
   open state. "See all recent" is a virtual crumb level (up to 50).
 - Floating Add FAB and a fixed status bar; sync progress uses an indeterminate
-  top loader + dark `Syncing…` pill (Manual mode only).
+  top loader + dark `Syncing…` pill.
 - Folders first; display sort (Default/Asc/Desc) is UI-only and never written
   to the sync blob.
 - `DisplayTitle` localizes top-level `[xbs]` containers; edit forms show the raw

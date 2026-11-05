@@ -256,10 +256,7 @@ else
                 <text>@(lastSync is null ? L.Get(Str.NavNotSyncedYet) : L.Get(Str.NavSynced, FormatLastSync(lastSync)))</text>
             }
         </span>
-        @if (Session.Engine?.Mode == Core.Sync.SyncMode.Manual)
-        {
-            <button class="xbs-statusbar-sync" @onclick="SyncNow">@L.Get(Str.CommonSyncNow)</button>
-        }
+        <button class="xbs-statusbar-sync" @onclick="SyncNow">@L.Get(Str.CommonSyncNow)</button>
     </div>
     }
 }
@@ -581,8 +578,7 @@ else if (moved is not null)
     private bool StatusVisible =>
         statusFlash
         || engineStatus == Core.Sync.SyncStatus.Conflict
-        || (troubleShown && engineStatus is Core.Sync.SyncStatus.Offline or Core.Sync.SyncStatus.Error)
-        || (Session.Engine is { Mode: Core.Sync.SyncMode.Manual, PendingEdits: > 0 });
+        || (troubleShown && engineStatus is Core.Sync.SyncStatus.Offline or Core.Sync.SyncStatus.Error);
 
     // Offline/Error start a timer; retries (Syncing) in between keep it
     // running, only a successful Idle clears it.

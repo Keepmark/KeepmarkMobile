@@ -23,7 +23,7 @@ public sealed class SafetyBackupTests
     [Theory]
     [InlineData(SafetyOperations.TakeRemote, "Connect")]
     [InlineData(SafetyOperations.UploadLocal, "Connect")]
-    [InlineData(SafetyOperations.ChangePassword, "Settings")]
+    [InlineData(SafetyOperations.ChangePassword, "Syncs")]
     [InlineData(SafetyOperations.DuplicatesCleanup, "duplicates")]
     [InlineData(SafetyOperations.SwitchMerge, "Sync switch")]
     [InlineData(SafetyOperations.ConnectMerge, "Connect")]

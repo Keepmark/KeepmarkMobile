@@ -12,7 +12,8 @@ single initialization task rather than 100 ms readiness polling. Component
 lifetimes prevent late subscriptions and timers. Auto synchronization runs only
 while the window is visible; its first check is delayed 500 ms to let local
 content paint, and later checks wait 15 minutes **after the previous tick
-completes** (fixed delay, no catch-up storm). Manual mode has no poll.
+completes** (fixed delay, no catch-up storm). Mobile always uses automatic
+sync; the legacy mode preference is ignored and Sync now remains available.
 
 Stopping cancels reads and retries; a PUT already sent by the edit worker may
 complete, to preserve its outcome. Dirty edits remain durable and are checked on
@@ -23,7 +24,13 @@ Successful ordinary uploads update metadata/blob and only changed normalized
 descriptions, without deleting and reinserting every Item or rebuilding FTS.
 Pull and restore keep their full-replacement semantics. Creating, activating or
 adding a saved sync costs one `/info` probe, one full GET and one decrypt — no
-background polling of dormant rows happens at all.
+background polling of dormant rows happens at all. Saving the active side and
+adopting the next tree share one engine gate hold, so edits cannot interleave.
+
+Every push normalizes Menu/Other/Toolbar and persists any added roots locally.
+Ordinary sync changes affecting more than 10 nodes snapshot the replaced side
+first; smaller changes take no snapshot. Switching between linked syncs saves
+the old side first and takes no switch snapshot.
 
 ## Store and rendering
 

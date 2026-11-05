@@ -1,7 +1,6 @@
 @inherits KeepmarkMobile.Components.SessionComponentBase
 @page "/status"
 @inject KeepmarkMobile.Services.XbsSession Session
-@inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @using Keepmark.Core.Workflow
 @implements IDisposable
@@ -171,9 +170,7 @@ else
         _ => L.Get(Str.StatusMergeBoth),
     };
 
-    private string ModeLabel => AppSettings.Mode == Core.Sync.SyncMode.Manual
-        ? L.Get(Str.StatusModeManual)
-        : L.Get(Str.StatusModeAuto);
+    private string ModeLabel => L.Get(Str.StatusModeAuto);
 
     private string MergeHint() => conflictPreview is { } p && p.LocalOnly + p.RemoteOnly + p.TitleConflicts > 0
         ? (p.TitleConflicts > 0

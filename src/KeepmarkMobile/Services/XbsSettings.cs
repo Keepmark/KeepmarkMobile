@@ -8,7 +8,6 @@ namespace KeepmarkMobile.Services;
 public sealed class XbsSettings
 {
     private const string KServiceUrl = "service_url";
-    private const string KSyncMode = "sync_mode";
     private const string KVerbosity = "log_verbosity";
     private const string KAppLock = "app_lock";
     private const string KLockTimeoutMin = "lock_timeout_min";
@@ -59,11 +58,9 @@ public sealed class XbsSettings
         if (info is not null) UpdateSavedServiceInfo(url, info);
     }
 
-    public SyncMode Mode
-    {
-        get => Enum.TryParse<SyncMode>(Preferences.Get(KSyncMode, SyncMode.Auto.ToString()), out var m) ? m : SyncMode.Auto;
-        set => Preferences.Set(KSyncMode, value.ToString());
-    }
+    // Sync is always automatic, including upgrades that stored sync_mode=Manual.
+    // Never read the retired preference: it must not disable polling or pushes.
+    public SyncMode Mode => SyncMode.Auto;
 
     public Core.Logging.XbsLogLevel Verbosity
     {

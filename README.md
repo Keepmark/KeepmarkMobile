@@ -61,19 +61,23 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 
 | | |
 |---|---|
-| **Sync** | Automatic or manual, with clear status and honest conflict handling |
+| **Sync** | Automatic while the app is open, plus Sync now, with clear status and honest conflict handling |
 | **Link a browser** | Scan the connection QR from the Keepmark browser manager; the service is reviewed before linking |
 | **Select many** | Hold an item to select it, tap more rows or All, then move or delete the selection together |
 | **Choose a service** | Eight public services with country, size limit and API version, plus the custom URLs that worked before |
 | **Browse** | Search, pinned and recently added sections, breadcrumb, folder tree picker |
 | **Edit** | Add, edit, move and delete bookmarks and folders, with undo; new folder right from the picker; "already saved" hint when you add a page you have |
 | **Backup** | Encrypted export and import, compatible with Keepmark for browsers |
-| **Safety backups** | Automatic snapshot before every overwrite (newest 5 kept) |
+| **Safety backups** | Snapshots before destructive operations and sync changes affecting more than 10 nodes (newest 5 kept); switching between linked syncs saves the old sync first |
 | **Duplicates** | Find links saved more than once; one copy of each always survives |
-| **Syncs** | Keep several syncs on the phone with one active at a time; activate another, rename or forget it, or add an existing sync with its ID and password (or the browser QR) |
+| **Syncs** | Keep several syncs on the phone with one active at a time; switching saves pending edits first and stops on conflicts or failed saves. Rename or forget a saved sync, or add an existing sync with its ID and password (or the browser QR) |
 | **Removed syncs** | If a sync disappears from its service, unlink and keep a verified local copy you can restore or delete from Backup (a restore while another sync is linked waits until that sync has saved its edits) |
-| **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch, 日本語, Português (Brasil), Русский, 简体中文 |
+| **Look and feel** | Light, dark or system theme; English, Italiano, Français, Español, Deutsch, 日本語, Português (Brasil), Русский, 简体中文, Română |
 | **Logs** | Built-in viewer with share export, sync IDs and secrets redacted |
+
+All three bookmark containers — Menu, Other and Toolbar — synchronize together.
+The phone has no server-side sync deletion action; targeted operations on saved
+syncs in the browser manager are browser features.
 
 With **Keepmark Server** you also get revision-based conflict detection and
 faster "nothing changed" checks. On other services Keepmark falls back
@@ -88,7 +92,7 @@ enough:
 1. In the Keepmark browser manager, the Android card says **Connect Keepmark on
    your phone**; choose **Show connection QR** and verify the sync password there.
 2. On Android, open **Connect → Link an existing sync → Scan QR from browser**
-   (the same QR button is in **Connect → + Add a sync** when a sync is already
+   (the same QR button is in **Syncs → + Add a sync** when a sync is already
    active).
 3. Check the service and abbreviated sync ID the review shows, tap **Continue**,
    wait for verification, then choose the direction.

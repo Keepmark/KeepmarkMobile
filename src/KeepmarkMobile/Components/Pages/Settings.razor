@@ -27,14 +27,6 @@
     </select>
 </div>
 
-<div class="mb-3">
-    <label class="form-label">@L.Get(Str.SettingsSyncMode)</label>
-    <select class="form-select" @bind="mode">
-        <option value="@Core.Sync.SyncMode.Auto">@L.Get(Str.SettingsModeAuto)</option>
-        <option value="@Core.Sync.SyncMode.Manual">@L.Get(Str.SettingsModeManual)</option>
-    </select>
-</div>
-
 @* Troubleshooting only: the log is not something the user reads, so it stays
    folded behind one button and has no page of its own in the menu. *@
 <div class="mb-3">
@@ -107,7 +99,6 @@
 <button class="btn btn-primary" @onclick="Save">@L.Get(Str.CommonSave)</button>
 
 @code {
-    private Core.Sync.SyncMode mode;
     private Core.Logging.XbsLogLevel verbosity;
     private string theme = "System";
     private string language = "system";
@@ -119,7 +110,6 @@
 
     protected override void OnInitialized()
     {
-        mode = AppSettings.Mode;
         verbosity = AppSettings.Verbosity;
         theme = AppSettings.Theme;
         language = AppSettings.Language;
@@ -128,7 +118,7 @@
         if (carry is { } c)
         {
             // Language change rebuilt the tree: put back the unsaved edits.
-            (mode, theme, showRecent, recentCount) = c;
+            (theme, showRecent, recentCount) = c;
             carry = null;
         }
     }
@@ -143,20 +133,19 @@
 
     /// <summary>The language applies at once: Apply() sets the culture and the
     /// layout redraws its whole tree (no restart, no page reload).</summary>
-    private static (Core.Sync.SyncMode, string, bool, int)? carry;
+    private static (string, bool, int)? carry;
 
     private void ToggleLogs() => logsOpen = !logsOpen;
 
     private void ApplyLanguage()
     {
-        carry = (mode, theme, showRecent, recentCount);
+        carry = (theme, showRecent, recentCount);
         AppSettings.Language = language is "en" or "it" or "fr" or "es" or "de" or "ja" or "pt" or "ro" or "ru" or "zh" ? language : "system";
         LangSvc.Apply();
     }
 
     private async Task Save()
     {
-        AppSettings.Mode = mode;
         AppSettings.Verbosity = verbosity;
         AppSettings.Theme = theme is "Light" or "Dark" ? theme : "System";
         theme = AppSettings.Theme;
