@@ -34,6 +34,25 @@ public static class TreeMagnitude
         return magnitude;
     }
 
+    /// <summary>The same count split by direction: <paramref name="before"/> →
+    /// <paramref name="after"/> added and removed nodes (a move is one of each).</summary>
+    public static Keepmark.Core.Safety.SafetyChanges ChangeCounts(List<BookmarkNode> before, List<BookmarkNode> after)
+    {
+        var left = Buckets(before);
+        var right = Buckets(after);
+        var keys = new HashSet<string>(left.Keys, StringComparer.Ordinal);
+        keys.UnionWith(right.Keys);
+        int added = 0, removed = 0;
+        foreach (var key in keys)
+        {
+            left.TryGetValue(key, out var l);
+            right.TryGetValue(key, out var r);
+            if (r > l) added += r - l; else removed += l - r;
+        }
+
+        return new(added, removed);
+    }
+
     private static Dictionary<string, int> Buckets(List<BookmarkNode> tree)
     {
         var map = new Dictionary<string, int>(StringComparer.Ordinal);

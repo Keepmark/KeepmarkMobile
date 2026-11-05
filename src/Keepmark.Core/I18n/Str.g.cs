@@ -669,6 +669,14 @@ public static partial class Str
     public const string SafetyItems_other = nameof(SafetyItems_other);
     public const string SafetyEncrypted = nameof(SafetyEncrypted);
     public const string SafetyNotEncrypted = nameof(SafetyNotEncrypted);
+    public const string SafetyAdded = nameof(SafetyAdded);
+    public const string SafetyRemoved = nameof(SafetyRemoved);
+    public const string SafetyToday = nameof(SafetyToday);
+    public const string SafetyYesterday = nameof(SafetyYesterday);
+    public const string SafetyNoSync = nameof(SafetyNoSync);
+    public const string BackupExportOpen = nameof(BackupExportOpen);
+    public const string BackupRestoreShort = nameof(BackupRestoreShort);
+    public const string BackupRestoreOpen = nameof(BackupRestoreOpen);
     public const string MoveResultNew = nameof(MoveResultNew);
     public const string MoveResultPush = nameof(MoveResultPush);
     public const string MoveResultMerge = nameof(MoveResultMerge);

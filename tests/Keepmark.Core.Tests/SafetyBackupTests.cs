@@ -1,4 +1,6 @@
+using Keepmark.Core.Models;
 using Keepmark.Core.Safety;
+using Keepmark.Core.Sync;
 using Xunit;
 
 namespace Keepmark.Core.Tests;
@@ -123,5 +125,65 @@ public sealed class SafetyBackupTests
         wraps = SafetyMaster.AddWrap(wraps, "ddd", "w4");
         Assert.Equal(SafetyMaster.MaxWraps, wraps.Count);
         Assert.DoesNotContain(wraps, w => w.KekId == "bbb"); // oldest trimmed
+    }
+
+    private static List<BookmarkNode> Other(int count) =>
+    [
+        new BookmarkNode
+        {
+            Title = "[xbs] Other",
+            Children = Enumerable.Range(0, count)
+                .Select(i => new BookmarkNode { Id = 100 + i, Title = $"m{i}", Url = $"https://m{i}.example/" })
+                .ToList(),
+        },
+    ];
+
+    [Fact]
+    public void ChangeCounts_SplitAddedAndRemoved()
+    {
+        Assert.Equal(new SafetyChanges(2, 0), TreeMagnitude.ChangeCounts(Other(3), Other(5)));
+        Assert.Equal(new SafetyChanges(0, 12), TreeMagnitude.ChangeCounts(Other(12), Other(0)));
+        var c = TreeMagnitude.ChangeCounts(Other(4), Other(1));
+        Assert.Equal(c.Added + c.Removed, TreeMagnitude.ChangedNodeCount(Other(4), Other(1)));
+    }
+
+    [Fact]
+    public void WithSyncNames_UsesUniqueSavedSyncMatch()
+    {
+        var id = "abcdef0123456789abcdef0123456789";
+        var entry = new SafetyBackupEntry("a.json", DateTime.UtcNow, SafetyOperations.SyncPull, "local", 3, 10,
+            SafetyBackupFiles.ShortSyncId(id), "master", "Old name", 14, 2);
+        var saved = new[] { new SavedSync { ServiceUrl = "https://api.example", SyncId = id, Label = "Work" } };
+        var named = SafetyBackupFiles.WithSyncNames([entry], saved).Single();
+        Assert.Equal("Work", named.SyncName);
+        Assert.Equal(14, named.Added);
+        // No (or an ambiguous) match keeps the name recorded at write time.
+        Assert.Equal("Old name", SafetyBackupFiles.WithSyncNames([entry], []).Single().SyncName);
+        Assert.Equal("abcd…89", entry.SyncId);
+    }
+
+    [Fact]
+    public void Index_RoundTripsNameAndCounts()
+    {
+        var entry = new SafetyBackupEntry("a.json", new DateTime(2026, 11, 6, 8, 0, 0, DateTimeKind.Utc),
+            SafetyOperations.SyncPush, "remote", 40, 2048, "abcd…ef", "master", "Home", 12, 3);
+        var back = SafetyBackupFiles.ParseIndex(SafetyBackupFiles.SerializeIndex([entry])).Single();
+        Assert.Equal(entry, back);
+        // Old manifests without the new fields still parse.
+        var legacy = SafetyBackupFiles.ParseIndex(
+            "[{\"FileName\":\"b.json\",\"CreatedAtUtc\":\"2026-01-01T00:00:00Z\",\"Operation\":\"take-remote\",\"Side\":\"local\",\"Items\":1,\"SizeBytes\":5,\"SyncId\":null}]").Single();
+        Assert.Null(legacy.SyncName);
+        Assert.Null(legacy.Added);
+    }
+
+    [Fact]
+    public void DayLabel_TodayYesterdayOrDate()
+    {
+        var now = new DateTime(2026, 11, 6, 15, 0, 0, DateTimeKind.Local);
+        Assert.Equal(Keepmark.Core.I18n.Loc.Get(Keepmark.Core.I18n.Str.SafetyToday),
+            SafetyBackupFiles.DayLabel(now.AddHours(-1).ToUniversalTime(), now));
+        Assert.Equal(Keepmark.Core.I18n.Loc.Get(Keepmark.Core.I18n.Str.SafetyYesterday),
+            SafetyBackupFiles.DayLabel(now.AddDays(-1).ToUniversalTime(), now));
+        Assert.Contains("2026", SafetyBackupFiles.DayLabel(now.AddDays(-5).ToUniversalTime(), now));
     }
 }

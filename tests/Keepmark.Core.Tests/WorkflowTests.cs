@@ -6,6 +6,17 @@ namespace Keepmark.Core.Tests;
 public class WorkflowTests
 {
     [Theory]
+    [InlineData("State: {0}", "State")]
+    [InlineData("État : {0}", "État")]
+    [InlineData("状态：{0}", "状态")]
+    [InlineData("Folders:", "Folders")]
+    [InlineData("Synced · {0}", "Synced")]
+    [InlineData("Dossiers :", "Dossiers")]
+    [InlineData("Server copy (last sync):", "Server copy (last sync)")]
+    public void LabelOfText_DropsPlaceholderAndColon(string text, string expected) =>
+        Assert.Equal(expected, WorkflowTexts.LabelOfText(text));
+
+    [Theory]
     [InlineData("short", "short", "Use a password of at least 8 characters.")]
     [InlineData("long-enough", "long-enouGh", "Passwords do not match.")]
     [InlineData("long-enough", "long-enough", null)]

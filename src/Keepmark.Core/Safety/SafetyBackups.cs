@@ -70,7 +70,12 @@ public static class SafetyOperations
 /// writes; otherwise encrypted under the safety Master Key.</summary>
 public sealed record SafetyBackupEntry(
     string FileName, DateTime CreatedAtUtc, string Operation, string Side,
-    int Items, long SizeBytes, string? SyncId, string? Enc = null);
+    int Items, long SizeBytes, string? SyncId, string? Enc = null,
+    string? SyncName = null, int? Added = null, int? Removed = null);
+
+/// <summary>What the snapshotted operation changed, when the writer knew the
+/// trees before and after (large syncs, deletes). Display only.</summary>
+public sealed record SafetyChanges(int Added, int Removed);
 
 public static class SafetyBackupFiles
 {
@@ -103,6 +108,43 @@ public static class SafetyBackupFiles
         $"{e.CreatedAtUtc.ToLocalTime():g} · {SafetyOperations.Describe(e.Operation)} · " +
         $"{Loc.Get(e.Side == "local" ? Str.SafetySideLocal : Str.SafetySideServer)} · {Loc.Plural(Str.SafetyItems, e.Items)} · " +
         Loc.Get(e.Enc == "master" ? Str.SafetyEncrypted : Str.SafetyNotEncrypted);
+
+    /// <summary>Truncated sync ID as stored in the manifest (bearer token:
+    /// never the full one).</summary>
+    public static string? ShortSyncId(string? id) =>
+        id is null ? null : id.Length <= 8 ? id : $"{id[..4]}…{id[^2..]}";
+
+    /// <summary>Current name of each entry's sync: a saved sync whose
+    /// truncated ID matches exactly one row lends its (possibly renamed) name;
+    /// otherwise the name recorded at write time stays.</summary>
+    public static List<SafetyBackupEntry> WithSyncNames(
+        IEnumerable<SafetyBackupEntry> entries, IEnumerable<Keepmark.Core.Sync.SavedSync> saved)
+    {
+        var rows = saved.ToList();
+        return entries.Select(e =>
+        {
+            if (e.SyncId is null) return e;
+            var matches = rows.Where(r => ShortSyncId(r.SyncId) == e.SyncId).Take(2).ToList();
+            return matches.Count == 1 ? e with { SyncName = Keepmark.Core.Sync.SavedSyncs.Name(matches[0]) } : e;
+        }).ToList();
+    }
+
+    /// <summary>Day heading for the list: Today / Yesterday / a local date.</summary>
+    public static string DayLabel(DateTime createdUtc, DateTime nowLocal)
+    {
+        var day = createdUtc.ToLocalTime().Date;
+        var diff = (nowLocal.Date - day).Days;
+        return diff switch
+        {
+            0 => Loc.Get(Str.SafetyToday),
+            1 => Loc.Get(Str.SafetyYesterday),
+            _ => day.ToString("ddd d MMM yyyy", System.Globalization.CultureInfo.CurrentCulture),
+        };
+    }
+
+    /// <summary>"side · N items · size" line under the entry title.</summary>
+    public static string Meta(SafetyBackupEntry e, string size) =>
+        $"{Loc.Get(e.Side == "local" ? Str.SafetySideLocal : Str.SafetySideServer)} · {Loc.Plural(Str.SafetyItems, e.Items)} · {size}";
 
     /// <summary>Filenames to delete: everything beyond the newest KeepCount.</summary>
     public static List<string> Prune(IEnumerable<SafetyBackupEntry> entries) =>

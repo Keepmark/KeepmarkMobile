@@ -37,7 +37,7 @@ public sealed class ConflictResolutionTests : IAsyncLifetime
         _api = new FakeApi { EnforceTimestampBase = true };
         _creds = new MemCreds(new SyncCredentials("sync-id", "https://example.test", Key, "1.8.0"));
         _engine = new SyncEngine(_ => _api, _crypto, _store, _creds, new XbsLocalizer(), new InMemoryLogger(),
-            saveSafetyBackup: (side, _, op, items, id) =>
+            saveSafetyBackup: (side, _, op, items, id, _) =>
             {
                 _snapshots.Add((side, op, items, id ?? string.Empty));
                 return Task.CompletedTask;

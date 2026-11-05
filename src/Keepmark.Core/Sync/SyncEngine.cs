@@ -62,7 +62,7 @@ public sealed partial class SyncEngine(
     ICredentialStore creds,
     IXbsLocalizer str,
     IXbsLogger log,
-    Func<string, string, string, int, string?, Task>? saveSafetyBackup = null,
+    Func<string, string, string, int, string?, Keepmark.Core.Safety.SafetyChanges?, Task>? saveSafetyBackup = null,
     Action? suspendAutoSync = null,
     Action? resumeAutoSync = null,
     TimeProvider? timeProvider = null)
@@ -108,7 +108,7 @@ public sealed partial class SyncEngine(
     private readonly Dictionary<string, bool> _v12 = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Optional callback for safety backups (provided by XbsSession).</summary>
-    private readonly Func<string, string, string, int, string?, Task>? _saveSafetyBackup = saveSafetyBackup;
+    private readonly Func<string, string, string, int, string?, Keepmark.Core.Safety.SafetyChanges?, Task>? _saveSafetyBackup = saveSafetyBackup;
 
     /// <summary>Callback to suspend auto-sync timer during conflict resolution.</summary>
     private readonly Action? _suspendAutoSync = suspendAutoSync;
@@ -1155,13 +1155,14 @@ public sealed partial class SyncEngine(
     private async Task GuardMassivePullAsync(SyncCredentials c, List<BookmarkNode> remote)
     {
         var (localRoots, _, _, _) = await store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
-        var magnitude = TreeMagnitude.ChangedNodeCount(localRoots, remote);
+        var changes = TreeMagnitude.ChangeCounts(localRoots, remote);
+        var magnitude = changes.Added + changes.Removed;
         if (magnitude <= XbsConstants.MaxSilentSyncChanges)
         {
             return;
         }
 
-        await SnapshotAsync("local", localRoots, SafetyOperations.SyncPull, c.Id).ConfigureAwait(false);
+        await SnapshotAsync("local", localRoots, SafetyOperations.SyncPull, c.Id, changes).ConfigureAwait(false);
         log.Warn("sync", $"Massive download ({magnitude} nodes): local copy snapshotted");
     }
 
@@ -1187,21 +1188,23 @@ public sealed partial class SyncEngine(
             return;
         }
 
-        var magnitude = TreeMagnitude.ChangedNodeCount(previous, next);
+        var changes = TreeMagnitude.ChangeCounts(previous, next);
+        var magnitude = changes.Added + changes.Removed;
         if (magnitude <= XbsConstants.MaxSilentSyncChanges)
         {
             return;
         }
 
         var (_, remoteRoots) = await FetchRemoteTreeAsync(c, ct).ConfigureAwait(false);
-        await SnapshotAsync("remote", remoteRoots, SafetyOperations.SyncPush, c.Id).ConfigureAwait(false);
+        await SnapshotAsync("remote", remoteRoots, SafetyOperations.SyncPush, c.Id, changes).ConfigureAwait(false);
         log.Warn("sync", $"Massive upload ({magnitude} nodes): server copy snapshotted");
     }
 
-    private Task SnapshotAsync(string side, List<BookmarkNode> tree, string operation, string syncId) =>
+    private Task SnapshotAsync(string side, List<BookmarkNode> tree, string operation, string syncId,
+        Keepmark.Core.Safety.SafetyChanges? changes = null) =>
         _saveSafetyBackup is null
             ? Task.CompletedTask
-            : _saveSafetyBackup(side, JsonSerializer.Serialize(tree, Json), operation, CountNodes(tree), syncId);
+            : _saveSafetyBackup(side, JsonSerializer.Serialize(tree, Json), operation, CountNodes(tree), syncId, changes);
 
     /// <summary>Resolves a conflict by taking the remote tree (pull). The local
     /// side is snapshotted first, then the dirty mirror is replaced explicitly

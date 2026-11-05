@@ -753,12 +753,13 @@ public sealed class XbsSession : IAsyncDisposable
     /// app-private dir). The filename carries UTC time + operation so the user
     /// can pick the right one for rollback; a manifest tracks the rest.</summary>
     public async Task<string> SaveSafetyBackupAsync(
-        string side, string plaintextJson, string operation, int items = 0, string? syncId = null)
+        string side, string plaintextJson, string operation, int items = 0, string? syncId = null,
+        SafetyChanges? changes = null)
     {
         await _safetyGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            return await SaveSafetyBackupCoreAsync(side, plaintextJson, operation, items, syncId).ConfigureAwait(false);
+            return await SaveSafetyBackupCoreAsync(side, plaintextJson, operation, items, syncId, changes).ConfigureAwait(false);
         }
         finally
         {
@@ -767,7 +768,7 @@ public sealed class XbsSession : IAsyncDisposable
     }
 
     private async Task<string> SaveSafetyBackupCoreAsync(
-        string side, string plaintextJson, string operation, int items, string? syncId)
+        string side, string plaintextJson, string operation, int items, string? syncId, SafetyChanges? changes)
     {
         var dir = SafetyDir();
         Directory.CreateDirectory(dir);
@@ -792,6 +793,25 @@ public sealed class XbsSession : IAsyncDisposable
             }
         }
 
+        // A snapshot without an explicit sync belongs to the linked one (the
+        // local tree is that sync's copy); pre-link backups stay sync-less.
+        syncId ??= creds?.Id;
+        string? syncName = null;
+        if (syncId is not null && Registry is not null)
+        {
+            try
+            {
+                var rows = await Registry.ListAsync().ConfigureAwait(false);
+                var row = rows.FirstOrDefault(r => r.SyncId == syncId);
+                syncName = row is null ? null : SavedSyncs.Name(row);
+            }
+            catch (Exception ex)
+            {
+                // The name is display only: never let it block a safety backup.
+                _log.Warn("session", $"Safety backup: sync name lookup failed ({ex.GetType().Name})");
+            }
+        }
+
         var now = DateTime.UtcNow;
         var name = SafetyBackupFiles.BuildFileName(now, operation);
         for (int dup = 2; File.Exists(Path.Combine(dir, name)) && dup < 100; dup++)
@@ -807,7 +827,7 @@ public sealed class XbsSession : IAsyncDisposable
         // Sync IDs are bearer tokens: the manifest only ever stores the
         // truncated form (R7.2), whatever the caller passed.
         entries.Add(new SafetyBackupEntry(name, now, operation, side, items,
-            new FileInfo(path).Length, ShortSyncId(syncId), enc));
+            new FileInfo(path).Length, ShortSyncId(syncId), enc, syncName, changes?.Added, changes?.Removed));
         MergeLegacySafetyBackups(dir, entries);
         // Decide the prune set first, update the index, and only then delete
         // files: a crash can leave an orphan payload, never an index row
@@ -1103,7 +1123,8 @@ public sealed class XbsSession : IAsyncDisposable
 
         var (roots, _, _, _) = await Store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
-            SafetyOperations.DuplicatesCleanup, CountBackupNodes(roots)).ConfigureAwait(false);
+            SafetyOperations.DuplicatesCleanup, CountBackupNodes(roots),
+            changes: new SafetyChanges(0, ids.Count)).ConfigureAwait(false);
         return await Engine.DeleteBookmarksByNodeIdsAsync(ids, ct).ConfigureAwait(false);
     }
 
@@ -1275,8 +1296,7 @@ public sealed class XbsSession : IAsyncDisposable
         }
     }
 
-    private static string? ShortSyncId(string? id) =>
-        id is null ? null : id.Length <= 8 ? id : $"{id[..4]}…{id[^2..]}";
+    private static string? ShortSyncId(string? id) => SafetyBackupFiles.ShortSyncId(id);
 
     /// <summary>Suspends the auto-sync background timer.
     /// Called when conflict resolution starts to prevent interference.</summary>

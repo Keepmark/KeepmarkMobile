@@ -13,6 +13,18 @@ public static class WorkflowTexts
     // Every text reads the active UI language at call time (Loc): none of
     // these may be a const or a static readonly field.
 
+    /// <summary>Bare label of a "Label: {0}" / "Label:" string ("State: {0}" →
+    /// "State"), for layouts that show the value apart from its label. Drops
+    /// the placeholder and the trailing colon, ASCII or full-width.</summary>
+    public static string LabelOf(string key) => LabelOfText(Loc.Get(key));
+
+    public static string LabelOfText(string text)
+    {
+        var cut = text.IndexOf("{0}", StringComparison.Ordinal);
+        var head = cut >= 0 ? text[..cut] : text;
+        return head.TrimEnd(' ', '\u00A0', '\u202F', ':', '：', '·');
+    }
+
     // Change password.
     public static string ChangePasswordImplication => Loc.Get(Str.WfChangePasswordImplication);
 

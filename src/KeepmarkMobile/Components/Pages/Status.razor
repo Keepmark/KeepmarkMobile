@@ -75,64 +75,80 @@ else
         </section>
     }
 
-    <h3>@L.Get(Str.StatusSyncH)</h3>
-    <ul>
-        <li>@L.Get(Str.StatusModeLine, ModeLabel)</li>
-        <li>@L.Get(Str.StatusStateLine, Core.Sync.SyncStatusText.Label(status))</li>
-        <li>@L.Get(Str.StatusLastSyncLine, lastSync?.ToLocalTime().ToString("g") ?? L.Get(Str.StatusNever))</li>
-        <li>@L.Get(Str.StatusServiceLine, serviceUrl is null ? L.Get(Str.StatusNotLinkedLower) : WorkflowRules.NormalizeServiceUrl(serviceUrl))</li>
-        <li>@L.Get(Str.StatusServiceVersionLine, serviceVersion ?? (serviceUrl is null ? "—" : L.Get(Str.StatusUnknownOffline)))</li>
+    @* Summary first: state word + dot (colour never alone) and the last sync.
+       Everything else is grouped in compact cards; no figure was dropped. *@
+    <section class="km-st-hero @StateClass" aria-labelledby="km-st-state">
+        <span class="km-st-dot" aria-hidden="true"></span>
+        <div class="km-st-hero-text">
+            <strong id="km-st-state">@StateWord</strong>
+            <span class="km-st-sub">@WorkflowTexts.LabelOf(Str.StatusLastSyncLine): @LastSyncText</span>
+        </div>
+        @if (pending > 0)
+        {
+            <span class="km-st-badge" title="@L.Get(Str.StatusPendingNote)">@WorkflowTexts.LabelOf(Str.StatusPendingLabel) @pending</span>
+        }
+    </section>
+
+    <h2 class="km-st-h">@L.Get(Str.StatusContentH)</h2>
+    <div class="km-st-tiles">
+        <div class="km-st-tile"><strong>@stats?.Bookmarks</strong><span>@WorkflowTexts.LabelOf(Str.StatusBookmarks)</span></div>
+        <div class="km-st-tile"><strong>@stats?.Folders</strong><span>@WorkflowTexts.LabelOf(Str.StatusFolders)</span></div>
+        <div class="km-st-tile"><strong>@stats?.Separators</strong><span>@WorkflowTexts.LabelOf(Str.StatusSeparators)</span></div>
+        <div class="km-st-tile"><strong>@stats?.DistinctTags</strong><span>@WorkflowTexts.LabelOf(Str.StatusTags)</span></div>
+        <div class="km-st-tile"><strong>@stats?.MaxDepth</strong><span>@WorkflowTexts.LabelOf(Str.StatusDepth)</span></div>
+        @if ((stats?.DuplicateUrls ?? 0) > 0)
+        {
+            <a class="km-st-tile km-st-warn" href="duplicates"><strong>@stats?.DuplicateUrls</strong><span>@WorkflowTexts.LabelOf(Str.StatusDupUrls)</span><em>@L.Get(Str.StatusResolveLink)</em></a>
+        }
+        else
+        {
+            <div class="km-st-tile"><strong>@(stats?.DuplicateUrls ?? 0)</strong><span>@WorkflowTexts.LabelOf(Str.StatusDupUrls)</span></div>
+        }
+    </div>
+
+    <h2 class="km-st-h">@L.Get(Str.StatusStorageH)</h2>
+    <div class="km-st-card">
+        <div class="km-st-row km-st-stack">
+            <span>@WorkflowTexts.LabelOf(Str.StatusServerCopyLabel)</span>
+            <strong>@ServerCopyText</strong>
+        </div>
+        @if (serverBytes is not null && maxSyncSize is not null && maxSyncSize.Value > 0)
+        {
+            <div class="progress km-st-bar" role="progressbar" aria-label="@L.Get(Str.StatusSpaceAria)" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" style="width: @ServerPctText%"></div>
+            </div>
+        }
+        <small class="km-st-note">@StorageNote</small>
+        <div class="km-st-row">
+            <span>@WorkflowTexts.LabelOf(Str.StatusLocalDb)</span>
+            <strong>@WorkflowRules.FormatBytes(dbSize)</strong>
+        </div>
+    </div>
+
+    <h2 class="km-st-h">@L.Get(Str.StatusSyncH)</h2>
+    <div class="km-st-card">
+        <div class="km-st-row">
+            <span>@WorkflowTexts.LabelOf(Str.StatusServiceLine)</span>
+            <strong class="km-st-url">@(serviceUrl is null ? L.Get(Str.StatusNotLinkedLower) : WorkflowRules.NormalizeServiceUrl(serviceUrl))</strong>
+        </div>
+        <div class="km-st-row">
+            <span>@WorkflowTexts.LabelOf(Str.StatusServiceVersionLine)</span>
+            <strong>@(serviceVersion ?? (serviceUrl is null ? "—" : L.Get(Str.StatusUnknownOffline)))</strong>
+        </div>
         @if (syncExpiryDays is not null)
         {
-            <li>@L.Get(Str.StatusSyncExpiryLine, WorkflowRules.DescribeSyncExpiry(syncExpiryDays))</li>
+            <div class="km-st-row">
+                <span>@WorkflowTexts.LabelOf(Str.StatusSyncExpiryLine)</span>
+                <strong>@WorkflowRules.DescribeSyncExpiry(syncExpiryDays)</strong>
+            </div>
         }
-    </ul>
+    </div>
 
-    <h3>@L.Get(Str.StatusStorageH)</h3>
-    <ul>
-        <li>@L.Get(Str.StatusLocalDb, WorkflowRules.FormatBytes(dbSize))</li>
-        <li>@L.Get(Str.StatusServerCopyLabel) @(serverBytes is null ? L.Get(Str.StatusNeverSynced) : WorkflowRules.FormatBytes(serverBytes.Value))
-            @if (serverBytes is not null)
-            {
-                @($" {L.Get(Str.StatusOf)} {(maxSyncSize is null ? L.Get(Str.StatusUnknownMax) : WorkflowRules.FormatBytes(maxSyncSize.Value))}")
-                @if (maxSyncSize is not null && maxSyncSize.Value > 0)
-                {
-                    @(" ")<text>(@ServerPctNow.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture)%)</text>
-                }
-            }
-            <small class="text-muted"> @L.Get(Str.StatusExactBytes)</small>
-            @if (serverBytes is not null && maxSyncSize is not null && maxSyncSize.Value > 0)
-            {
-                @* After the note, so the dash follows the figure instead of opening a line under the bar. *@
-                <div class="progress mt-1" role="progressbar" aria-label="@L.Get(Str.StatusSpaceAria)" aria-valuenow="@ServerPctNow" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar" style="width: @ServerPctText%"></div>
-                </div>
-            }
-        </li>
-        <li>@L.Get(Str.StatusPendingLabel) @pending
-            @if (pending > 0)
-            {
-                <small class="text-muted"> @L.Get(Str.StatusPendingNote)</small>
-            }
-        </li>
-    </ul>
-
-    <h3>@L.Get(Str.StatusContentH)</h3>
-    <ul>
-        <li>@L.Get(Str.StatusFolders) @stats?.Folders · @L.Get(Str.StatusBookmarks) @stats?.Bookmarks · @L.Get(Str.StatusSeparators) @stats?.Separators</li>
-        <li>@L.Get(Str.StatusTags) @stats?.DistinctTags · @L.Get(Str.StatusDepth) @stats?.MaxDepth · @L.Get(Str.StatusDupUrls) @stats?.DuplicateUrls
-            @if ((stats?.DuplicateUrls ?? 0) > 0)
-            {
-                @(" ")<a href="duplicates">@L.Get(Str.StatusResolveLink)</a>
-            }
-        </li>
-    </ul>
-
-    <h3>@L.Get(Str.StatusAppH)</h3>
-    <ul>
-        <li>@L.Get(Str.StatusVersion) @AppInfo.VersionString (@L.Get(Str.StatusBuild) @AppInfo.BuildString)</li>
-        <li>@L.Get(Str.StatusSyncFormat) @Core.XbsConstants.SyncClientVersion · @L.Get(Str.StatusApi) @Core.XbsConstants.ApiVersion</li>
-    </ul>
+    <p class="km-st-foot">
+        @L.Get(Str.StatusAppH) @AppInfo.VersionString (@L.Get(Str.StatusBuild) @AppInfo.BuildString)
+        · @WorkflowTexts.LabelOf(Str.StatusSyncFormat) @Core.XbsConstants.SyncClientVersion
+        · @WorkflowTexts.LabelOf(Str.StatusApi) @Core.XbsConstants.ApiVersion
+    </p>
 }
 
 @code {
@@ -170,7 +186,47 @@ else
         _ => L.Get(Str.StatusMergeBoth),
     };
 
-    private string ModeLabel => L.Get(Str.StatusModeAuto);
+    /// <summary>Hero tint per state; the state word always says it too.</summary>
+    private string StateClass => status switch
+    {
+        Core.Sync.SyncStatus.Idle => "is-ok",
+        Core.Sync.SyncStatus.Syncing => "is-busy",
+        Core.Sync.SyncStatus.Conflict or Core.Sync.SyncStatus.Error => "is-bad",
+        _ => "is-warn",
+    };
+
+    /// <summary>Same word as the drawer: an idle sync that has run is "Synced".</summary>
+    private string StateWord => status == Core.Sync.SyncStatus.Idle && lastSync is not null
+        ? WorkflowTexts.LabelOf(Str.NavSynced)
+        : Core.Sync.SyncStatusText.Label(status);
+
+    private string LastSyncText => lastSync is { } t
+        ? RelativeTime.Detail(t.ToUnixTimeMilliseconds()) ?? L.Get(Str.StatusNever)
+        : L.Get(Str.StatusNever);
+
+    /// <summary>The figure's footnote, without the dash the old list used.</summary>
+    private string StorageNote
+    {
+        get
+        {
+            var note = L.Get(Str.StatusExactBytes).TrimStart('—', '-', ' ');
+            return pending > 0 ? $"{note} · {L.Get(Str.StatusPendingNote).TrimStart('—', '-', ' ')}" : note;
+        }
+    }
+
+    /// <summary>"120 KB of 1 MB (11.7%)", built in code so Razor never eats a space.</summary>
+    private string ServerCopyText
+    {
+        get
+        {
+            if (serverBytes is null) return L.Get(Str.StatusNeverSynced);
+            var text = $"{WorkflowRules.FormatBytes(serverBytes.Value)} {L.Get(Str.StatusOf)} "
+                + (maxSyncSize is null ? L.Get(Str.StatusUnknownMax) : WorkflowRules.FormatBytes(maxSyncSize.Value));
+            if (maxSyncSize is > 0)
+                text += $" ({ServerPctNow.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture)}%)";
+            return text;
+        }
+    }
 
     private string MergeHint() => conflictPreview is { } p && p.LocalOnly + p.RemoteOnly + p.TitleConflicts > 0
         ? (p.TitleConflicts > 0

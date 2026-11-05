@@ -36,7 +36,7 @@ public sealed class SyncGuardTests : IAsyncLifetime
         var creds = new SyncCredentials("sync-id", "https://example.test", Key, "1.8.0");
         _engine = new SyncEngine(_ => _api, _crypto, _store, new MemCreds(creds), new XbsLocalizer(),
             new InMemoryLogger(),
-            saveSafetyBackup: (side, _, operation, items, _) =>
+            saveSafetyBackup: (side, _, operation, items, _, _) =>
             {
                 _snapshots.Add((side, operation, items));
                 return Task.CompletedTask;

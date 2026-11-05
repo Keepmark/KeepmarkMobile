@@ -16,38 +16,66 @@
 }
 else
 {
-    <div class="mb-3">
-        <h4>@L.Get(Str.BackupExportH)</h4>
-        <InfoHint Text="@L.Get(Str.BackupExportShort)" Title="@L.Get(Str.BackupExportH)" Body="@ExportBody" />
-        <label class="form-label">@L.Get(Str.BackupPassword)</label>
-        <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
-        <label class="form-label mt-2">@L.Get(Str.BackupConfirmPassword)</label>
-        <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
-        <button class="btn btn-outline-primary mt-2" @onclick="ExportBackup" disabled="@busy">@L.Get(Str.BackupExportBtn)</button>
-        <StepMessage Text="@bkpMessage" Error="bkpError" />
-    </div>
-
-    <div class="mb-3">
-        <h4>@L.Get(Str.BackupRestoreH)</h4>
-        <button class="btn btn-outline-secondary" @onclick="PickBackup" disabled="@busy">@L.Get(Str.BackupChooseFile)</button>
-        @if (impPath is not null)
-        {
-            <p class="mt-2 mb-1">@L.Get(Str.BackupFileLabel) <strong>@impFileName</strong></p>
-            @if (impCount is null)
+    @* Two compact actions: the parameters open inline under the one chosen,
+       so the page stays a short overview (same model as the browser manager). *@
+    <div class="km-bk-actions">
+        <section class="km-bk-action @(exportOpen ? "is-open" : "")">
+            <div class="km-bk-action-head">
+                <h4>@L.Get(Str.BackupExportH)</h4>
+                <InfoHint Text="@L.Get(Str.BackupExportShort)" Title="@L.Get(Str.BackupExportH)" Body="@ExportBody" />
+            </div>
+            @if (!exportOpen)
             {
-                <label class="form-label">@L.Get(Str.BackupFilePassword)</label>
-                <input type="password" class="form-control" @bind="impPassword" autocomplete="off" />
-                <button class="btn btn-primary mt-2" @onclick="PreviewImport" disabled="@busy">@L.Get(Str.BackupCheckBtn)</button>
+                <button class="btn btn-outline-primary" @onclick="OpenExport" disabled="@busy">@L.Get(Str.BackupExportOpen)</button>
             }
             else
             {
-                <p class="text-muted mb-1">@WorkflowTexts.ImportChecked(impFileName ?? L.Get(Str.BackupFallbackName), impCount.Value)</p>
-                <p>@L.Get(Str.BackupReplaceMessage, localCount, impCount)</p>
-                <p class="text-muted">@WorkflowTexts.ImportImplication(linked)</p>
-                <button class="btn btn-danger mt-1" @onclick="ExecuteImport" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
+                <label class="form-label">@L.Get(Str.BackupPassword)</label>
+                <input type="password" class="form-control" @bind="bkpPassword" autocomplete="new-password" />
+                <label class="form-label mt-2">@L.Get(Str.BackupConfirmPassword)</label>
+                <input type="password" class="form-control" @bind="bkpConfirm" autocomplete="new-password" />
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-primary" @onclick="ExportBackup" disabled="@busy">@L.Get(Str.BackupExportBtn)</button>
+                    <button class="btn btn-outline-secondary" @onclick="CloseExport" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                </div>
             }
-        }
-        <StepMessage Text="@impMessage" Error="impError" />
+            <StepMessage Text="@bkpMessage" Error="bkpError" />
+        </section>
+
+        <section class="km-bk-action @(impPath is not null ? "is-open" : "")">
+            <div class="km-bk-action-head">
+                <h4>@L.Get(Str.BackupRestoreH)</h4>
+            </div>
+            <p class="km-bk-hint">@L.Get(Str.BackupRestoreShort)</p>
+            @if (impPath is null)
+            {
+                <button class="btn btn-outline-primary" @onclick="PickBackup" disabled="@busy">@L.Get(Str.BackupRestoreOpen)</button>
+            }
+            else
+            {
+                <p class="mb-1">@L.Get(Str.BackupFileLabel) <strong>@impFileName</strong></p>
+                @if (impCount is null)
+                {
+                    <label class="form-label">@L.Get(Str.BackupFilePassword)</label>
+                    <input type="password" class="form-control" @bind="impPassword" autocomplete="off" />
+                    <div class="d-flex gap-2 mt-2">
+                        <button class="btn btn-primary" @onclick="PreviewImport" disabled="@busy">@L.Get(Str.BackupCheckBtn)</button>
+                        <button class="btn btn-outline-secondary" @onclick="CancelImport" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted mb-1">@WorkflowTexts.ImportChecked(impFileName ?? L.Get(Str.BackupFallbackName), impCount.Value)</p>
+                    <p>@L.Get(Str.BackupReplaceMessage, localCount, impCount)</p>
+                    <p class="text-muted">@WorkflowTexts.ImportImplication(linked)</p>
+                    <div class="d-flex gap-2 mt-1">
+                        <button class="btn btn-danger" @onclick="ExecuteImport" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
+                        <button class="btn btn-outline-secondary" @onclick="CancelImport" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                    </div>
+                }
+            }
+            <StepMessage Text="@impMessage" Error="impError" />
+        </section>
     </div>
 
     <div class="mb-3">
@@ -59,16 +87,46 @@ else
         {
             <p class="text-muted">@L.Get(Str.BackupNoSafety)</p>
         }
-        @foreach (var sb in safetyList)
+        @foreach (var day in safetyList.GroupBy(e => SafetyBackupFiles.DayLabel(e.CreatedAtUtc, DateTime.Now)))
         {
-            <div class="card mb-2">
-                <div class="card-body py-2">
-                    <div><strong>@SafetyBackupFiles.Describe(sb)</strong></div>
-                    <div class="form-text">@sb.FileName · @WorkflowRules.FormatBytes(sb.SizeBytes)
-                        @if (sb.SyncId is not null)
+            <h5 class="km-sb-day">@day.Key</h5>
+            @foreach (var sb in day)
+            {
+                <div class="km-sb-item" @key="sb.FileName">
+                    <div class="km-sb-head">
+                        <strong>@SafetyOperations.Describe(sb.Operation)</strong>
+                        <time>@sb.CreatedAtUtc.ToLocalTime().ToString("t")</time>
+                    </div>
+                    @if (sb.Added > 0 || sb.Removed > 0)
+                    {
+                        <div class="km-sb-chips">
+                            @if (sb.Added > 0)
+                            {
+                                <span class="km-sb-chip is-add">@L.Get(Str.SafetyAdded, sb.Added)</span>
+                            }
+                            @if (sb.Removed > 0)
+                            {
+                                <span class="km-sb-chip is-del">@L.Get(Str.SafetyRemoved, sb.Removed)</span>
+                            }
+                        </div>
+                    }
+                    <div class="km-sb-sync">
+                        @if (sb.SyncId is null)
                         {
-                            <text> · @L.Get(Str.BackupSyncWord) <code>@sb.SyncId</code></text>
+                            <span>@L.Get(Str.SafetyNoSync)</span>
                         }
+                        else
+                        {
+                            @if (sb.SyncName is not null)
+                            {
+                                <span class="km-sb-name">@sb.SyncName</span>
+                            }
+                            <code>@sb.SyncId</code>
+                        }
+                    </div>
+                    <div class="km-sb-meta">
+                        <span>@SafetyBackupFiles.Meta(sb, WorkflowRules.FormatBytes(sb.SizeBytes))</span>
+                        <span class="km-sb-chip @(sb.Enc == "master" ? "is-enc" : "")">@L.Get(sb.Enc == "master" ? Str.SafetyEncrypted : Str.SafetyNotEncrypted)</span>
                     </div>
                     @if (armedRestore == sb.FileName)
                     {
@@ -86,13 +144,13 @@ else
                     }
                     else
                     {
-                        <div class="mt-2 d-flex gap-2">
-                            <button class="btn btn-outline-primary" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
-                            <button class="btn btn-outline-danger" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">@L.Get(Str.CommonDelete)</button>
+                        <div class="km-sb-actions">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">@L.Get(Str.CommonDelete)</button>
                         </div>
                     }
                 </div>
-            </div>
+            }
         }
     </div>
 
@@ -141,6 +199,7 @@ else
 @code {
     private int localCount;
     private bool linked;
+    private bool exportOpen;
     private bool busy;
     private string bkpPassword = string.Empty;
     private string bkpConfirm = string.Empty;
@@ -193,7 +252,9 @@ else
     {
         try
         {
-            safetyList = await Session.ListSafetyBackupsAsync();
+            var entries = await Session.ListSafetyBackupsAsync();
+            var saved = Session.Registry is null ? new List<Keepmark.Core.Sync.SavedSync>() : await Session.Registry.ListAsync();
+            safetyList = SafetyBackupFiles.WithSyncNames(entries, saved);
             ClearLoadError(ref safetyLoadMessage, ref safetyMessage, ref safetyError);
         }
         catch (Exception ex)
@@ -232,6 +293,27 @@ else
         (message, error) = (string.Empty, false);
     }
 
+    private void OpenExport()
+    {
+        (bkpMessage, bkpError) = (string.Empty, false);
+        exportOpen = true;
+    }
+
+    /// <summary>Closing the export never keeps a typed password around.</summary>
+    private void CloseExport()
+    {
+        bkpPassword = string.Empty;
+        bkpConfirm = string.Empty;
+        (bkpMessage, bkpError) = (string.Empty, false);
+        exportOpen = false;
+    }
+
+    private void CancelImport()
+    {
+        ForgetImport();
+        (impMessage, impError) = (string.Empty, false);
+    }
+
     /// <summary>Export: a new password typed twice. The fields are cleared on
     /// success only, so a failed export can be retried as is.</summary>
     private async Task ExportBackup()
@@ -242,6 +324,7 @@ else
             var path = await Session.ExportBackupAsync(bkpPassword);
             bkpPassword = string.Empty;
             bkpConfirm = string.Empty;
+            exportOpen = false;
             try
             {
                 await Share.Default.RequestAsync(new ShareFileRequest(
