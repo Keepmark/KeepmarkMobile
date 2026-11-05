@@ -5,8 +5,8 @@
 <h1 align="center">Keepmark for Android</h1>
 
 <p align="center">
-  <b>Your bookmarks on your phone, synced and end-to-end encrypted.</b><br />
-  An independent app compatible with xBrowserSync.
+  <b>All your bookmark syncs on your phone: work, home, family.</b><br />
+  Switch in a tap, end-to-end encrypted, and nothing is ever lost silently.
 </p>
 
 <p align="center">
@@ -21,41 +21,58 @@
 
 ---
 
-Keepmark keeps the same bookmarks on your browsers and your phone. Everything
-is encrypted on the device before it leaves: the service that stores your
-data sees only ciphertext, and your password never leaves the phone. Linking a
-browser by QR is the one exception, and it stays between your own devices: the
-password goes from that browser to this phone, never through the service.
+Keepmark keeps your bookmarks in sync between your phone and your browsers,
+and lets the phone hold **several independent syncs**. Work, home, a shared
+family collection, a test server: each keeps its own password and bookmarks,
+and you switch between them in a tap. Everything is encrypted on the device
+before it leaves, and every risky change leaves a way back.
 
-It works with **any xBrowserSync service** (the official one, a community
-host or your own) and with the official xBrowserSync apps. A sync created in
-Keepmark opens there, and the other way round. Nothing to migrate.
+## Why Keepmark
 
-## Highlights
-
+- **Multi-sync, built in.** Several syncs saved on the phone, exactly one
+  active. Each row shows **Activate** first; rarer commands live in its **⋮**
+  menu, with unlinking kept apart at the bottom. Switching saves pending edits
+  first and stops on a conflict or failed save instead of losing anything.
 - **Private by design.** PBKDF2-SHA256 and AES-GCM on the device. The local
   database is encrypted too (SQLCipher), and the credentials live in the
-  Android KeyStore. No telemetry. HTTPS is the default; a self-hosted plain
-  HTTP service is an explicit choice and Keepmark warns you before using it.
-- **Never lose a bookmark silently.** Conflicts are never resolved behind
-  your back: you pick download, upload or merge, and merge shows a preview
-  first. Before overwriting your bookmarks Keepmark saves an encrypted
-  safety backup you can restore; single deletes have Undo, and deleting a
-  folder with 5 or more bookmarks asks first.
+  Android KeyStore. Optional app lock with fingerprint or device PIN. No
+  telemetry; HTTPS by default, plain HTTP only as an explicit, warned choice.
+- **Fault tolerant.** Before anything replaces your bookmarks Keepmark keeps
+  an encrypted safety backup you can restore in one tap. Conflicts are never
+  resolved behind your back, single deletes have Undo, and a sync that
+  disappears from its server leaves you a verified local copy.
+- **One scan from your browser.** The Keepmark browser manager shows a
+  connection QR: scan it here and the service, sync ID and password arrive
+  together, ready to review. Nothing from the QR is saved.
+
+## Never lose a bookmark silently
+
+- **Safety backups.** Before a destructive change (taking the server copy,
+  restoring a backup, deleting a selection or duplicates, changing password)
+  and before any sync that changes more than 10 items, Keepmark stores an
+  encrypted snapshot of what is replaced. The newest 10 are kept.
+- **Conflicts are a choice, not a guess.** You pick download, upload or
+  merge, and merge shows a preview first.
+- **Safe switching.** The sync you leave is saved before the next one is
+  activated; if that save fails, nothing is replaced.
 - **A sync that disappears does not take your bookmarks with it.** If the
   service no longer has your sync (it expired, or another device deleted it),
-  Keepmark says so instead of guessing. You can unlink and keep a verified
-  local copy, then restore it whenever you want.
-- **Link a browser with one scan.** The Keepmark browser manager shows a
-  connection QR: scan it here and the service, sync ID and password arrive
-  together, ready to review. Nothing from the QR is saved, and an unused scan
-  is discarded after 60 seconds.
-- **Made for the phone.** Fast full-text search, pinned bookmarks, recently
-  added bookmarks on Home, a clickable breadcrumb, folders first, swipe for
-  details and one menu for every action. Hold an item to select several and
-  move or delete them together.
+  Keepmark says so instead of guessing. Unlink and keep a verified local copy,
+  then restore it whenever you want.
+- **Undo and second thoughts.** Single deletes have Undo; deleting a folder
+  with 5 or more bookmarks asks first.
+- **Encrypted backups you own.** Export a password-protected file at any time
+  and restore it here or in the browser.
+
+## Made for the phone
+
+- **Fast to find.** Full-text search, pinned bookmarks, recently added on
+  Home, a clickable breadcrumb, folders first.
+- **Fast to act.** Swipe for details, one menu for every action; hold an item
+  to select several and move or delete them together.
 - **Share to Keepmark** from any app: the add form opens already filled in.
-- **App lock** with fingerprint or device PIN, with a relock time you choose.
+- **Status at a glance.** A compact Status screen with sync state, counts,
+  server storage and versions.
 
 ## Features
 
@@ -78,10 +95,6 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 All three bookmark containers — Menu, Other and Toolbar — synchronize together.
 The phone has no server-side sync deletion action; targeted operations on saved
 syncs in the browser manager are browser features.
-
-With **Keepmark Server** you also get revision-based conflict detection and
-faster "nothing changed" checks. On other services Keepmark falls back
-automatically.
 
 ## Link a browser by QR
 
@@ -132,12 +145,18 @@ backups. A brief touch response and visible checkboxes confirm selection.
 |---|---|
 | **Keepmark for Android** | This app (Android 10+) |
 | **Keepmark for browsers** | Extension for Firefox and Chromium-based browsers (Chrome, Edge, Brave): [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/keepmark/), [Chrome Web Store](https://chromewebstore.google.com/detail/jaaekkbgpeiikepahjelfbkfgpjphbhb) |
-| **Keepmark Server** | Drop-in xBrowserSync-compatible sync service with opt-in extended features |
+| **Keepmark Server** | Self-hostable sync service with atomic writes and revisions, compatible with existing xBrowserSync services |
 
 All three share the same encryption, the same backup format and the same
 wording, so moving between them feels the same.
 
 ## Compatibility
+
+Keepmark builds on the open xBrowserSync protocol, so it needs no new
+infrastructure: it runs on any xBrowserSync service (the official one, a
+community host or your own) and syncs open both ways with the official
+xBrowserSync apps. On **Keepmark Server** it also uses revision-based conflict
+detection and cheap change checks; elsewhere it falls back automatically.
 
 - **Services:** any xBrowserSync API service, version 1.1.9 or later.
   HTTPS is the default; a self-hosted service over plain HTTP is an explicit,
@@ -200,6 +219,3 @@ implied, including the implied warranties of merchantability and fitness for
 a particular purpose. Use it at your own risk: the authors are not liable for
 any loss of data (including bookmarks), damage or other consequences arising
 from its use. See `LICENSE.md`. Keep your own backups.
-
-
-Saved syncs put **Activate** first; less frequent commands live in the row’s **⋮** menu, with unlinking and destructive actions separated at the bottom.
