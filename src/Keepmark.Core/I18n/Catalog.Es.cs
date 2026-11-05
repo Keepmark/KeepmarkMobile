@@ -124,7 +124,7 @@ internal static partial class Catalogs
         [Str.BackupReplaceMessage] = "¿Reemplazar tus marcadores (elementos: {0}) con esta copia (elementos: {1})?",
         [Str.BackupReplaceBtn] = "Restaurar copia",
         [Str.BackupSafetyH] = "Copias de seguridad preventivas",
-        [Str.BackupSafetyIntro] = "Instantáneas automáticas antes de un paso destructivo: descarga, subida, importación, restauración, cambio de contraseña o limpieza de duplicados (cifradas cuando hay una sincronización vinculada, si no en texto plano; se guardan en la carpeta de la app). Restaura una para deshacer ese paso — o elimínala para liberar espacio. Cambiar de sync no crea copia: la copia del sync que dejas sigue en el servidor. Las más recientes primero; las más antiguas más allá de cinco se borran automáticamente.",
+        [Str.BackupSafetyIntro] = "Instantáneas automáticas antes de un paso destructivo: descarga, subida, importación, restauración, cambio de contraseña o limpieza de duplicados (cifradas cuando hay una sincronización vinculada, si no en texto plano; se guardan en la carpeta de la app). Restaura una para deshacer ese paso — o elimínala para liberar espacio. Cambiar de sync no crea copia: la copia del sync que dejas sigue en el servidor. Las más recientes primero; las más antiguas más allá de 10 se borran automáticamente.",
         [Str.BackupSafetyShort] = "Copias automáticas antes de pasos destructivos, no en cada cambio.",
         [Str.BackupRefreshList] = "Actualizar lista",
         [Str.BackupNoSafety] = "Todavía no hay copias preventivas.",

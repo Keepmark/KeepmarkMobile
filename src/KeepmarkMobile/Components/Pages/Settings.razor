@@ -27,34 +27,6 @@
     </select>
 </div>
 
-@* Troubleshooting only: the log is not something the user reads, so it stays
-   folded behind one button and has no page of its own in the menu. *@
-<div class="mb-3">
-    <label class="form-label">@L.Get(Str.NavLogs)</label>
-    <div class="form-text">@L.Get(Str.SettingsLogsHint)</div>
-    <button type="button" id="km-logs-toggle" class="btn btn-secondary btn-sm"
-            aria-expanded="@logsOpen.ToString().ToLowerInvariant()" aria-controls="km-logs-panel"
-            @onclick="ToggleLogs">
-        @L.Get(logsOpen ? Str.LogsHide : Str.LogsShow)
-    </button>
-</div>
-
-@if (logsOpen)
-{
-    <div id="km-logs-panel" class="mb-3">
-        <label class="form-label" for="km-log-verbosity">@L.Get(Str.SettingsLogVerbosity)</label>
-        <select id="km-log-verbosity" class="form-select" @bind="verbosity" @bind:after="ApplyVerbosity">
-            <option value="@Core.Logging.XbsLogLevel.Error">@L.Get(Str.LogLevelError)</option>
-            <option value="@Core.Logging.XbsLogLevel.Warning">@L.Get(Str.LogLevelWarning)</option>
-            <option value="@Core.Logging.XbsLogLevel.Info">@L.Get(Str.LogLevelInfo)</option>
-            <option value="@Core.Logging.XbsLogLevel.Debug">@L.Get(Str.LogLevelDebug)</option>
-            <option value="@Core.Logging.XbsLogLevel.Verbose">@L.Get(Str.LogLevelVerbose)</option>
-        </select>
-        <div class="form-text">@L.Get(Str.SettingsVerbosityHint)</div>
-        <LogsPanel />
-    </div>
-}
-
 <div class="mb-3">
     <label class="form-label">@L.Get(Str.SettingsTheme)</label>
     <select class="form-select" @bind="theme">
@@ -95,6 +67,34 @@
         <span aria-hidden="true">›</span>
     </a>
 </div>
+
+@* Troubleshooting only: the log is not something the user reads, so it stays
+   folded behind one button and has no page of its own in the menu. *@
+<div class="mb-3">
+    <label class="form-label">@L.Get(Str.NavLogs)</label>
+    <div class="form-text">@L.Get(Str.SettingsLogsHint)</div>
+    <button type="button" id="km-logs-toggle" class="btn btn-secondary btn-sm"
+            aria-expanded="@logsOpen.ToString().ToLowerInvariant()" aria-controls="km-logs-panel"
+            @onclick="ToggleLogs">
+        @L.Get(logsOpen ? Str.LogsHide : Str.LogsShow)
+    </button>
+</div>
+
+@if (logsOpen)
+{
+    <div id="km-logs-panel" class="mb-3">
+        <label class="form-label" for="km-log-verbosity">@L.Get(Str.SettingsLogVerbosity)</label>
+        <select id="km-log-verbosity" class="form-select" @bind="verbosity" @bind:after="ApplyVerbosity">
+            <option value="@Core.Logging.XbsLogLevel.Error">@L.Get(Str.LogLevelError)</option>
+            <option value="@Core.Logging.XbsLogLevel.Warning">@L.Get(Str.LogLevelWarning)</option>
+            <option value="@Core.Logging.XbsLogLevel.Info">@L.Get(Str.LogLevelInfo)</option>
+            <option value="@Core.Logging.XbsLogLevel.Debug">@L.Get(Str.LogLevelDebug)</option>
+            <option value="@Core.Logging.XbsLogLevel.Verbose">@L.Get(Str.LogLevelVerbose)</option>
+        </select>
+        <div class="form-text">@L.Get(Str.SettingsVerbosityHint)</div>
+        <LogsPanel />
+    </div>
+}
 
 <button class="btn btn-primary" @onclick="Save">@L.Get(Str.CommonSave)</button>
 

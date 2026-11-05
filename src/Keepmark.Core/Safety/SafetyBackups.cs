@@ -76,7 +76,7 @@ public static class SafetyBackupFiles
 {
     public const string IndexFileName = "safety-index.json";
     public const string FilePrefix = "safety-";
-    public const int KeepCount = 5;
+    public const int KeepCount = 10;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
 

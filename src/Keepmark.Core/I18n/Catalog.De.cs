@@ -124,7 +124,7 @@ internal static partial class Catalogs
         [Str.BackupReplaceMessage] = "Deine Lesezeichen (Elemente: {0}) durch diese Sicherung (Elemente: {1}) ersetzen?",
         [Str.BackupReplaceBtn] = "Sicherung wiederherstellen",
         [Str.BackupSafetyH] = "Sicherheitskopien",
-        [Str.BackupSafetyIntro] = "Automatische Schnappschüsse vor einem zerstörenden Schritt: Download, Upload, Import, Wiederherstellung, Passwortänderung oder Duplikatbereinigung (verschlüsselt, wenn eine Synchronisierung verknüpft ist, sonst im Klartext; im App-Ordner gespeichert). Stelle einen wieder her, um diesen Schritt rückgängig zu machen – oder lösche ihn, um Platz zu schaffen. Ein Sync-Wechsel legt keine Kopie an: die Kopie des verlassenen Syncs bleibt auf dem Server. Neueste zuerst; ältere über fünf hinaus werden automatisch entfernt.",
+        [Str.BackupSafetyIntro] = "Automatische Schnappschüsse vor einem zerstörenden Schritt: Download, Upload, Import, Wiederherstellung, Passwortänderung oder Duplikatbereinigung (verschlüsselt, wenn eine Synchronisierung verknüpft ist, sonst im Klartext; im App-Ordner gespeichert). Stelle einen wieder her, um diesen Schritt rückgängig zu machen – oder lösche ihn, um Platz zu schaffen. Ein Sync-Wechsel legt keine Kopie an: die Kopie des verlassenen Syncs bleibt auf dem Server. Neueste zuerst; ältere über 10 hinaus werden automatisch entfernt.",
         [Str.BackupSafetyShort] = "Automatische Kopien vor zerstörenden Schritten, nicht bei jeder Änderung.",
         [Str.BackupRefreshList] = "Liste aktualisieren",
         [Str.BackupNoSafety] = "Noch keine Sicherheitskopien.",

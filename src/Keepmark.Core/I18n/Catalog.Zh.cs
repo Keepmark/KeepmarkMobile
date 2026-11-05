@@ -125,7 +125,7 @@ internal static partial class Catalogs
         [Str.BackupReplaceMessage] = "用此备份（{1} 个项目）替换您的书签（{0} 个项目）？",
         [Str.BackupReplaceBtn] = "恢复备份",
         [Str.BackupSafetyH] = "安全备份",
-        [Str.BackupSafetyIntro] = "在破坏性操作（下载、上传、导入、恢复、更改密码或清理重复项）之前自动创建的快照（关联同步时加密，否则为明文；保存在应用文件夹中）。恢复其中一个即可撤销该操作，也可以删除以释放空间。切换同步不会创建备份：你离开的同步副本仍保存在服务器上。最新的排在前面；超过五个的旧副本会自动删除。",
+        [Str.BackupSafetyIntro] = "在破坏性操作（下载、上传、导入、恢复、更改密码或清理重复项）之前自动创建的快照（关联同步时加密，否则为明文；保存在应用文件夹中）。恢复其中一个即可撤销该操作，也可以删除以释放空间。切换同步不会创建备份：你离开的同步副本仍保存在服务器上。最新的排在前面；超过10个的旧副本会自动删除。",
         [Str.BackupSafetyShort] = "仅在破坏性操作前自动创建副本，而不是每次修改都创建。",
         [Str.BackupRefreshList] = "刷新列表",
         [Str.BackupNoSafety] = "暂无安全备份。",

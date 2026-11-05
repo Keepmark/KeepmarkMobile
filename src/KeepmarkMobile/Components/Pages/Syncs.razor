@@ -12,6 +12,7 @@
 
 <PageTitle>@L.Get(Str.SyncsTitle)</PageTitle>
 
+<div @onclick="CloseMenu" @onkeydown="CloseMenuOnEscape">
 <h1>@L.Get(Str.SyncsTitle)</h1>
 
 @* The intro stays one line: the rest is a tap away, so the list and the
@@ -145,31 +146,39 @@ else
                 }
                 else
                 {
-                    <div class="mt-2 d-flex flex-wrap gap-2">
-                        @if (!isActive)
-                        {
-                            <button class="btn btn-primary btn-sm" @onclick="() => Arm(key, armActivate: true)" disabled="@RowBusy(key)"
-                                    title="@L.Get(Str.SyncsActivateHint, name)">
-                                @L.Get(Str.SyncsActivate)
-                            </button>
-                        }
-                        <button class="btn btn-outline-secondary btn-sm" @onclick="() => StartRename(key, row)" disabled="@RowBusy(key)">
-                            @L.Get(Str.SyncsRename)
+                    <div class="mt-2 d-flex flex-wrap align-items-start gap-2">
+                        <button class="btn btn-primary xbs-sync-activate" @onclick="() => Arm(key, armActivate: true)"
+                                disabled="@(isActive || RowBusy(key))" title="@L.Get(Str.SyncsActivateHint, name)">
+                            @L.Get(Str.SyncsActivate)
                         </button>
-                        @if (isActive)
+                        <div class="xbs-sync-actions" @onclick:stopPropagation="true">
+                            <button type="button" class="btn btn-outline-secondary xbs-sync-more"
+                                    aria-label="@L.Get(Str.RowActionsFor, name)"
+                                    aria-expanded="@((menuKey == key).ToString().ToLowerInvariant())"
+                                    aria-controls="sync-actions-@i" disabled="@RowBusy(key)"
+                                    @onclick="() => ToggleMenu(key)">
+                                <span aria-hidden="true">⋮</span>
+                            </button>
+                        </div>
+                        @if (menuKey == key)
                         {
-                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => StartPassword(key)" disabled="@RowBusy(key)">
-                                @L.Get(Str.SettingsChangePasswordBtn)
-                            </button>
-                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armUnlink: true)" disabled="@RowBusy(key)">
-                                @L.Get(Str.ConnUnlinkBtn)
-                            </button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-outline-danger btn-sm" @onclick="() => Arm(key, armForget: true)" disabled="@RowBusy(key)">
-                                @L.Get(Str.SyncsForget)
-                            </button>
+                            <div id="sync-actions-@i" class="xbs-sync-action-list" role="group" @onclick:stopPropagation="true"
+                                 aria-label="@L.Get(Str.RowActionsFor, name)">
+                                <button type="button" @onclick="() => StartRename(key, row)">@L.Get(Str.SyncsRename)</button>
+                                @if (isActive)
+                                {
+                                    <button type="button" @onclick="() => StartPassword(key)">@L.Get(Str.SettingsChangePasswordBtn)</button>
+                                }
+                                <hr />
+                                @if (isActive)
+                                {
+                                    <button type="button" class="text-danger" @onclick="() => Arm(key, armUnlink: true)">@L.Get(Str.ConnUnlinkBtn)</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="text-danger" @onclick="() => Arm(key, armForget: true)">@L.Get(Str.SyncsForget)</button>
+                                }
+                            </div>
                         }
                     </div>
                 }
@@ -193,6 +202,8 @@ else
     }
 }
 
+</div>
+
 @code {
     private List<SavedSync> rows = [];
     private SyncCredentials? active;
@@ -201,6 +212,21 @@ else
     /// <summary>The connect/add panel replaces the list while it is open: the
     /// page is the single place where syncs are managed.</summary>
     private bool adding;
+
+    private string? menuKey;
+
+    private void CloseMenu() => menuKey = null;
+
+    private void ToggleMenu(string key)
+    {
+        if (RowBusy(key)) return;
+        menuKey = menuKey == key ? null : key;
+    }
+
+    private void CloseMenuOnEscape(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") menuKey = null;
+    }
 
     private string? armedActivateKey;
     private string? armedForgetKey;
@@ -287,6 +313,7 @@ else
 
     private void Disarm()
     {
+        menuKey = null;
         armedActivateKey = null;
         armedForgetKey = null;
         armedUnlinkKey = null;

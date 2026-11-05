@@ -124,7 +124,7 @@ internal static partial class Catalogs
         [Str.BackupReplaceMessage] = "Remplacer vos favoris (éléments : {0}) par cette sauvegarde (éléments : {1}) ?",
         [Str.BackupReplaceBtn] = "Restaurer la sauvegarde",
         [Str.BackupSafetyH] = "Sauvegardes de sécurité",
-        [Str.BackupSafetyIntro] = "Instantanés automatiques pris avant une étape destructrice : téléchargement, envoi, importation, restauration, changement de mot de passe ou nettoyage de doublons (chiffrés quand une synchronisation est associée, sinon en clair ; conservés dans le dossier de l'application). Restaurez-en un pour annuler cette étape — ou supprimez-le pour libérer de l'espace. Changer de sync ne crée aucune sauvegarde : la copie du sync que vous quittez reste sur le serveur. Les plus récents d'abord ; les plus anciens au-delà de cinq sont supprimés automatiquement.",
+        [Str.BackupSafetyIntro] = "Instantanés automatiques pris avant une étape destructrice : téléchargement, envoi, importation, restauration, changement de mot de passe ou nettoyage de doublons (chiffrés quand une synchronisation est associée, sinon en clair ; conservés dans le dossier de l'application). Restaurez-en un pour annuler cette étape — ou supprimez-le pour libérer de l'espace. Changer de sync ne crée aucune sauvegarde : la copie du sync que vous quittez reste sur le serveur. Les plus récents d'abord ; les plus anciens au-delà de 10 sont supprimés automatiquement.",
         [Str.BackupSafetyShort] = "Copies automatiques avant les étapes destructrices, pas à chaque modification.",
         [Str.BackupRefreshList] = "Actualiser la liste",
         [Str.BackupNoSafety] = "Aucune sauvegarde de sécurité pour l'instant.",

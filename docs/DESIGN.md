@@ -255,7 +255,9 @@ Altri colori d'uso (non ridefinire a caso):
 - App lock: overlay navy full-screen (`z-index: 2000`, sopra tutto) con card
   centrata; blocco immediato se timeout 0, altrimenti su `OnResume` oltre
   soglia; sblocco con PIN/biometria di sistema.
-- Log: filtro livello + testo `oninput` immediato sugli ultimi 300;
+- Sync salvate: Attiva come pulsante principale (disabilitato sulla sync attiva);
+  menu ⋮ per Rinomina/Cambia password e, separati in fondo, Dimentica/Scollega.
+- Log: ultimo blocco nelle Impostazioni, subito prima di Salva; filtro livello + testo `oninput` immediato sugli ultimi 300;
   esportazione via condivisione file di sistema.
 
 ---

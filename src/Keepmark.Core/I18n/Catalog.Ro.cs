@@ -124,7 +124,7 @@ internal static partial class Catalogs
         [Str.BackupReplaceMessage] = "Înlocuiești marcajele tale (elemente: {0}) cu această copie (elemente: {1})?",
         [Str.BackupReplaceBtn] = "Restaurează copia",
         [Str.BackupSafetyH] = "Copii de siguranță",
-        [Str.BackupSafetyIntro] = "Fotografii automate făcute înainte de un pas distructiv: o descărcare, încărcare, import, restaurare, schimbare de parolă sau curățare de duplicate (criptate când o sincronizare este conectată, altfel în clar; păstrate în folderul aplicației). Restaurează una pentru a anula acel pas — sau șterge-o pentru a elibera spațiu. Schimbarea sincronizării nu salvează nicio copie: copia sincronizării pe care o părăsești rămâne pe server. Cele mai noi primele, cele mai vechi se șterg automat peste cinci.",
+        [Str.BackupSafetyIntro] = "Fotografii automate făcute înainte de un pas distructiv: o descărcare, încărcare, import, restaurare, schimbare de parolă sau curățare de duplicate (criptate când o sincronizare este conectată, altfel în clar; păstrate în folderul aplicației). Restaurează una pentru a anula acel pas — sau șterge-o pentru a elibera spațiu. Schimbarea sincronizării nu salvează nicio copie: copia sincronizării pe care o părăsești rămâne pe server. Cele mai noi primele, cele mai vechi se șterg automat peste 10.",
         [Str.BackupSafetyShort] = "Copii automate înainte de pașii distructivi, nu la fiecare modificare.",
         [Str.BackupRefreshList] = "Reîmprospătează lista",
         [Str.BackupNoSafety] = "Încă nicio copie de siguranță.",

@@ -68,7 +68,7 @@ Keepmark opens there, and the other way round. Nothing to migrate.
 | **Browse** | Search, pinned and recently added sections, breadcrumb, folder tree picker |
 | **Edit** | Add, edit, move and delete bookmarks and folders, with undo; new folder right from the picker; "already saved" hint when you add a page you have |
 | **Backup** | Encrypted export and import, compatible with Keepmark for browsers |
-| **Safety backups** | Snapshots before destructive operations and sync changes affecting more than 10 nodes (newest 5 kept); switching between linked syncs saves the old sync first |
+| **Safety backups** | Snapshots before destructive operations and sync changes affecting more than 10 nodes (newest 10 kept); switching between linked syncs saves the old sync first |
 | **Duplicates** | Find links saved more than once; one copy of each always survives |
 | **Syncs** | Keep several syncs on the phone with one active at a time; switching saves pending edits first and stops on conflicts or failed saves. Rename or forget a saved sync, or add an existing sync with its ID and password (or the browser QR) |
 | **Removed syncs** | If a sync disappears from its service, unlink and keep a verified local copy you can restore or delete from Backup (a restore while another sync is linked waits until that sync has saved its edits) |
@@ -201,3 +201,5 @@ a particular purpose. Use it at your own risk: the authors are not liable for
 any loss of data (including bookmarks), damage or other consequences arising
 from its use. See `LICENSE.md`. Keep your own backups.
 
+
+Saved syncs put **Activate** first; less frequent commands live in the row’s **⋮** menu, with unlinking and destructive actions separated at the bottom.

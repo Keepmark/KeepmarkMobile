@@ -1000,7 +1000,7 @@ them, so `SafetyOperations.Describe` still names them; nothing writes them now.
   `SyncId` is truncated (`ab12…ef`); `Enc` is `"master"` or absent (plaintext).
 - Legacy files (`safety-local-<ts>.json` / `safety-remote-<ts>.json`, no
   manifest entry) are still listed, restorable and deletable as "Older backup".
-- Retention: newest 5 kept; older files and index rows are pruned together.
+- Retention: newest 10 kept; older files and index rows are pruned together.
   Manual delete is always allowed with two-tap confirmation.
 - A corrupt index is treated as empty (the directory scan still lists files).
   A damaged payload refuses to open ("damaged"), never half-restores.
@@ -1059,7 +1059,7 @@ them, so `SafetyOperations.Describe` still names them; nothing writes them now.
 
 ### 11.6 Third-party verification checklist
 
-1. `dotnet test` green (safety suite: naming, describe, prune-5, legacy parse,
+1. `dotnet test` green (safety suite: naming, describe, prune-10, legacy parse,
    index round-trip/damage, fingerprint, wrap trim).
 2. Trigger each flow in §11.1 → Backup → Safety backups shows a row with the
    right operation/side/count; the filename matches on disk.
@@ -1291,7 +1291,7 @@ lock 2000.
 | `StoreSyncTests` | mirror/meta/dirty, pull/push, stable RowIds, restore |
 | `BookmarkMergeTests` | union rules, ids, folder paths, empty sides, URL identity, flatten, `MoveResult` |
 | `ConflictResolutionTests` | fake server with real base semantics, 409 handling, merge retry |
-| `SafetyBackupTests` | naming, describe, prune-5, legacy parse, index round-trip/damage, fingerprint, wrap trim |
+| `SafetyBackupTests` | naming, describe, prune-10, legacy parse, index round-trip/damage, fingerprint, wrap trim |
 | `SavedSyncsTests` | identity, canonical URL, labels (host fallback), upsert, sort, serialized concurrent writes, defensive JSON |
 | `SavedSyncActivationTests` | read-only activation probe, fail-closed switch, previous row kept |
 | `RemovedSyncNoticeTests` | 401 notice state, dismiss/retry, copy-before-unlink, dedupe |
@@ -1398,3 +1398,9 @@ Dan); BouncyCastle (MIT); SQLCipher Community (BSD-style), SQLite (public
 domain), LibTomCrypt (public-domain option); Figtree (OFL). See
 [`native/sqlcipher/THIRD-PARTY-NOTICES.txt`](../native/sqlcipher/THIRD-PARTY-NOTICES.txt),
 also bundled in the app.
+
+Saved-sync rows use a prominent Activate button, disabled on the active row.
+Secondary actions open from an accessible ⋮ menu: Rename and active-row Change
+password first; Forget/Unlink in a separate final group. Settings places the
+complete log controls last, immediately before Save. See WORKFLOWS.md for the
+shared presentation and confirmation contract.

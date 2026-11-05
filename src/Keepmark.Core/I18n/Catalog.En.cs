@@ -124,7 +124,7 @@ internal static partial class Catalogs
         [Str.BackupReplaceMessage] = "Replace your bookmarks (items: {0}) with this backup (items: {1})?",
         [Str.BackupReplaceBtn] = "Restore backup",
         [Str.BackupSafetyH] = "Safety backups",
-        [Str.BackupSafetyIntro] = "Automatic snapshots taken before a destructive step: a download, upload, import, restore, password change or duplicates cleanup (encrypted when a sync is linked, otherwise plaintext; kept in the app folder). Restore one to undo that step — or delete it to free space. Switching sync saves no backup: the copy of the sync you leave stays on the server. Newest first, oldest auto-pruned beyond five.",
+        [Str.BackupSafetyIntro] = "Automatic snapshots taken before a destructive step: a download, upload, import, restore, password change or duplicates cleanup (encrypted when a sync is linked, otherwise plaintext; kept in the app folder). Restore one to undo that step — or delete it to free space. Switching sync saves no backup: the copy of the sync you leave stays on the server. Newest first, oldest auto-pruned beyond 10.",
         [Str.BackupSafetyShort] = "Automatic copies before destructive steps, not on every edit.",
         [Str.BackupRefreshList] = "Refresh list",
         [Str.BackupNoSafety] = "No safety backups yet.",

@@ -35,14 +35,14 @@ public sealed class SafetyBackupTests
     }
 
     [Fact]
-    public void Prune_KeepsNewestFive()
+    public void Prune_KeepsNewestTen()
     {
-        var entries = Enumerable.Range(0, 8).Select(i => new SafetyBackupEntry(
+        var entries = Enumerable.Range(0, 13).Select(i => new SafetyBackupEntry(
             $"safety-{i}.json", new DateTime(2026, 1, i + 1, 0, 0, 0, DateTimeKind.Utc),
             SafetyOperations.TakeRemote, "local", i, i, null)).ToList();
         var drop = SafetyBackupFiles.Prune(entries);
         Assert.Equal(3, drop.Count);
-        Assert.DoesNotContain("safety-7.json", drop);
+        Assert.DoesNotContain("safety-12.json", drop);
         Assert.Contains("safety-0.json", drop);
     }
 
