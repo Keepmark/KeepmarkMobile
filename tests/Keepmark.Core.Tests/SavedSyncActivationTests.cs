@@ -55,6 +55,86 @@ public sealed class SavedSyncActivationTests : IAsyncLifetime
 
     private Task<string?> DirtyAsync() => _store.GetMetaAsync(BookmarkStore.MetaDirty);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SwitchSavesOldSideAndKeepsGateUntilReplacement(bool upload)
+    {
+        await AlignMirrorAsync();
+        await _store.AddNodeAsync(null, new BookmarkNode { Title = "Before switch", Url = "https://before.example" });
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var candidate = _creds.Creds! with { Id = "other-sync" };
+        async Task Prepare(SyncCredentials? _, bool changed)
+        {
+            Assert.True(changed);
+            Assert.Contains("Before switch", _crypto.Decrypt(_api.LastPushed!, Key));
+            reached.SetResult();
+            await resume.Task;
+        }
+        var switching = upload
+            ? _engine.LinkUploadAsync(candidate, [], _api.LastUpdated,
+                prepareRoots: async (current, changed) =>
+                {
+                    await Prepare(current, changed);
+                    var (liveRoots, _, _, _) = await _store.LoadMirrorAsync(includeBlob: false);
+                    return liveRoots;
+                })
+            : _engine.LinkAdoptRemoteAsync(candidate,
+                new SyncEngine.PrefetchedRemote(_crypto.Encrypt("[]", Key), "1.8.0", "remote-time", null, null),
+                beforeReplace: Prepare);
+        await reached.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var edit = _engine.AddBookmarkAsync(null,
+            new BookmarkNode { Title = "Queued edit", Url = "https://queued.example" });
+        Assert.False(edit.IsCompleted);
+        resume.SetResult();
+        await switching;
+        await edit;
+        Assert.Equal("other-sync", _creds.Creds!.Id);
+        var (roots, _, _, _) = await _store.LoadMirrorAsync(includeBlob: false);
+        Assert.Contains(roots, node => node.Title == "Queued edit");
+    }
+
+    [Fact]
+    public async Task OfflineOldSideRefusesAdoptionWithoutReplacingTreeOrCredentials()
+    {
+        await AlignMirrorAsync();
+        await _store.AddNodeAsync(null, new BookmarkNode { Title = "Unsaved", Url = "https://unsaved.example" });
+        _api.Offline = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _engine.LinkAdoptRemoteAsync(
+            _creds.Creds! with { Id = "other-sync" },
+            new SyncEngine.PrefetchedRemote(_crypto.Encrypt("[]", Key), "1.8.0", "remote-time", null, null)));
+        Assert.Equal("sync-id", _creds.Creds!.Id);
+        Assert.Equal("1", await DirtyAsync());
+        var (roots, _, _, _) = await _store.LoadMirrorAsync(includeBlob: false);
+        Assert.Contains(roots, node => node.Title == "Unsaved");
+    }
+
+    [Fact]
+    public async Task FailedAdoptionRestoresDirtyMirrorAndAllSyncMetadata()
+    {
+        await AlignMirrorAsync();
+        await _store.SetMetaAsync(BookmarkStore.MetaRevision, "42");
+        await _store.SetMetaAsync(BookmarkStore.MetaHash, "previous-hash");
+        await _store.AddNodeAsync(null, new BookmarkNode { Title = "Unsaved", Url = "https://unsaved.example" });
+        var (before, blob, updated, version) = await _store.LoadMirrorAsync(includeBlob: true);
+        _creds.FailSet = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _engine.LinkAdoptRemoteAsync(
+            _creds.Creds!, new SyncEngine.PrefetchedRemote(_crypto.Encrypt("[]", Key), "1.8.0", "new-time", 99, "new-hash")));
+        var (after, afterBlob, afterUpdated, afterVersion) = await _store.LoadMirrorAsync(includeBlob: true);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before), System.Text.Json.JsonSerializer.Serialize(after));
+        Assert.Equal(blob, afterBlob);
+        Assert.Equal(updated, afterUpdated);
+        Assert.Equal(version, afterVersion);
+        Assert.Equal("42", await _store.GetMetaAsync(BookmarkStore.MetaRevision));
+        Assert.Equal("previous-hash", await _store.GetMetaAsync(BookmarkStore.MetaHash));
+        Assert.Equal("1", await DirtyAsync());
+        _creds.FailSet = false;
+        await _engine.PersistActiveSideAsync();
+        Assert.Contains("Unsaved", _crypto.Decrypt(_api.LastPushed!, Key));
+        Assert.Equal("0", await DirtyAsync());
+    }
+
     [Fact]
     public async Task UpToDateActiveSideNeedsNoPush()
     {

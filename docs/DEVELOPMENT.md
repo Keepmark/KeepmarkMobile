@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.211 (212)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.221 (222)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -769,6 +769,14 @@ opens the backups again).
   backups list.
 
 ---
+
+Remote adoption, upload and merge save the previous active side and replace
+the mirror under one engine gate hold. Registry refresh, live tree capture and
+any required safety snapshots run inside that same hold; queued edits cannot
+interleave. New-sync upload also rechecks the active side inside this gate.
+If remote adoption fails while switching credentials, its rollback restores the
+tree, blob, timestamp, version, revision, hash and dirty flag together, keeping
+pending edits eligible for upload.
 
 ## 10. Connect (the `+ Add a sync` flow inside Syncs)
 

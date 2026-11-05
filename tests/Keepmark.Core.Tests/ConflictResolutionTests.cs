@@ -298,23 +298,23 @@ public sealed class ConflictResolutionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task LinkAdoptRemote_ReplacesEvenADirtyMirror_ThenSwitchesCreds()
+    public async Task LinkAdoptRemote_SameSyncRelinkReplacesDirtyMirrorAndKey()
     {
         await _store.ReplaceAllAsync(Tree((1, "Old", "https://old.example")), "b", "previous-link-base", "1.8.0");
         await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1");
         _api.Blob = Enc(Tree((9, "Remote", "https://remote.example")), OtherKey);
-        var candidate = new SyncCredentials("new-sync", "https://example.test", OtherKey, "1.8.0");
+        var candidate = new SyncCredentials("sync-id", "https://example.test", OtherKey, "1.8.0");
 
         await _engine.LinkAdoptRemoteAsync(candidate);
 
         Assert.Equal(["https://remote.example"], await LocalUrlsAsync());
-        Assert.Equal("new-sync", (await _creds.GetAsync())!.Id);
+        Assert.Equal("sync-id", (await _creds.GetAsync())!.Id);
     }
 
     [Fact]
     public async Task LinkAdoptRemote_WithTheProbedBlob_DoesNotDownloadItTwice()
     {
-        await _store.ReplaceAllAsync(Tree((1, "Old", "https://old.example")), "b", "base", "1.8.0");
+        await _store.ReplaceAllAsync(Tree((1, "Old", "https://old.example")), "b", _api.LastUpdated, "1.8.0");
         _api.Blob = Enc(Tree((9, "Remote", "https://remote.example")), OtherKey);
         var candidate = new SyncCredentials("new-sync", "https://example.test", OtherKey, "1.8.0");
 
@@ -334,7 +334,7 @@ public sealed class ConflictResolutionTests : IAsyncLifetime
     [Fact]
     public async Task LinkAdoptRemote_WrongPassword_ChangesNothing()
     {
-        await _store.ReplaceAllAsync(Tree((1, "Old", "https://old.example")), "b", "base", "1.8.0");
+        await _store.ReplaceAllAsync(Tree((1, "Old", "https://old.example")), "b", _api.LastUpdated, "1.8.0");
         _api.Blob = Enc(Tree((9, "Remote", "https://remote.example")), OtherKey);
         var wrong = new SyncCredentials("new-sync", "https://example.test", Key, "1.8.0");
 

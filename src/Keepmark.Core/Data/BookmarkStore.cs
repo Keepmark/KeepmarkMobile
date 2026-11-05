@@ -146,7 +146,7 @@ public sealed partial class BookmarkStore : IAsyncDisposable
 
     public async Task ReplaceAllAsync(
         List<BookmarkNode> roots, string encryptedBlob, string lastUpdated, string? version,
-        long? revision = null, string? hash = null)
+        long? revision = null, string? hash = null, bool dirty = false)
     {
         var db = Db;
         await db.RunInTransactionAsync(tran =>
@@ -162,7 +162,7 @@ public sealed partial class BookmarkStore : IAsyncDisposable
             tran.InsertOrReplace(new BlobRow { Key = BlobBookmarks, Value = encryptedBlob });
             tran.InsertOrReplace(new MetaRow { Key = MetaLastUpdated, Value = lastUpdated });
             tran.InsertOrReplace(new MetaRow { Key = MetaVersion, Value = version });
-            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "0" });
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = dirty ? "1" : "0" });
             // v1.2 meta: stored when the server speaks it, cleared otherwise
             // so a legacy pull never leaves a stale revision behind.
             if (revision.HasValue)

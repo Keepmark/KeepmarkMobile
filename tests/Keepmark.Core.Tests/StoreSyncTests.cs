@@ -169,7 +169,13 @@ sealed class MemCreds(SyncCredentials? creds) : ICredentialStore
     public List<SavedSync> Saved { get; set; } = [];
     public int SavedWrites { get; private set; }
     public Task<SyncCredentials?> GetAsync() => Task.FromResult(Creds);
-    public Task SetAsync(SyncCredentials c) { Creds = c; return Task.CompletedTask; }
+    public bool FailSet { get; set; }
+    public Task SetAsync(SyncCredentials c)
+    {
+        if (FailSet) throw new InvalidOperationException("credential write failed");
+        Creds = c;
+        return Task.CompletedTask;
+    }
     public Task ClearAsync() { Creds = null; return Task.CompletedTask; }
     public Task<List<SavedSync>> GetSavedSyncsAsync() => Task.FromResult(Saved.ToList());
     public Task SetSavedSyncsAsync(IReadOnlyList<SavedSync> rows)

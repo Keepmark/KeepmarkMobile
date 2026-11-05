@@ -591,48 +591,54 @@ public sealed partial class SyncEngine(
         await AcquireGateAsync("Save active sync", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
-            if (_resolvingConflict) throw new InvalidOperationException(Loc.Get(Str.ErrConflictInProgress));
-            if (await creds.GetAsync().ConfigureAwait(false) is null) return;
-            try
-            {
-                await ForceSyncInternalAsync(ct, isAutoSync: false).ConfigureAwait(false);
-            }
-            catch (DataOutOfSyncException)
-            {
-                SetStatus(SyncStatus.Conflict);
-                throw new InvalidOperationException(str.Get(Str.ErrSavedConflict));
-            }
-            catch (XbsException ex)
-            {
-                if (ex is SyncNotFoundException && await creds.GetAsync().ConfigureAwait(false) is { } gone)
-                {
-                    NoteSyncGone(gone);
-                    throw new InvalidOperationException(str.Get(Str.ErrSavedGone), ex);
-                }
-
-                SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
-                // A dead connection is not "the push failed": name the cause the
-                // user can act on.
-                throw new InvalidOperationException(str.Get(
-                    ex is ServiceOfflineException ? Str.ErrSavedOffline : Str.ErrSavedNotSaved), ex);
-            }
-
-            // An offline tick returns without throwing: name the real cause
-            // instead of reporting a conflict the user cannot resolve.
-            if (Status == SyncStatus.Offline)
-            {
-                throw new InvalidOperationException(str.Get(Str.ErrSavedOffline));
-            }
-
-            if (Status == SyncStatus.Conflict ||
-                await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1")
-            {
-                throw new InvalidOperationException(str.Get(Str.ErrSavedConflict));
-            }
+            await PersistActiveSideCoreAsync(ct).ConfigureAwait(false);
         }
         finally
         {
             _gate.Release();
+        }
+    }
+
+    // Caller holds _gate through the subsequent mirror replacement.
+    private async Task PersistActiveSideCoreAsync(CancellationToken ct)
+    {
+        if (_resolvingConflict) throw new InvalidOperationException(Loc.Get(Str.ErrConflictInProgress));
+        if (await creds.GetAsync().ConfigureAwait(false) is null) return;
+        try
+        {
+            await ForceSyncInternalAsync(ct, isAutoSync: false).ConfigureAwait(false);
+        }
+        catch (DataOutOfSyncException)
+        {
+            SetStatus(SyncStatus.Conflict);
+            throw new InvalidOperationException(str.Get(Str.ErrSavedConflict));
+        }
+        catch (XbsException ex)
+        {
+            if (ex is SyncNotFoundException && await creds.GetAsync().ConfigureAwait(false) is { } gone)
+            {
+                NoteSyncGone(gone);
+                throw new InvalidOperationException(str.Get(Str.ErrSavedGone), ex);
+            }
+
+            SetStatus(ex is ServiceOfflineException ? SyncStatus.Offline : SyncStatus.Error);
+            // A dead connection is not "the push failed": name the cause the
+            // user can act on.
+            throw new InvalidOperationException(str.Get(
+                ex is ServiceOfflineException ? Str.ErrSavedOffline : Str.ErrSavedNotSaved), ex);
+        }
+
+        // An offline tick returns without throwing: name the real cause
+        // instead of reporting a conflict the user cannot resolve.
+        if (Status == SyncStatus.Offline)
+        {
+            throw new InvalidOperationException(str.Get(Str.ErrSavedOffline));
+        }
+
+        if (Status == SyncStatus.Conflict ||
+            await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1")
+        {
+            throw new InvalidOperationException(str.Get(Str.ErrSavedConflict));
         }
     }
 
@@ -1274,15 +1280,23 @@ public sealed partial class SyncEngine(
     /// <summary>Link flow "take remote": downloads the candidate's tree and
     /// replaces the local mirror (dirty or not — the caller snapshotted it and
     /// the user chose this explicitly), then switches the stored credentials.
-    /// One gate hold: no background push can interleave the switch.
+    /// One gate hold: save the departing linked sync, run the caller's registry/
+    /// snapshot work, then replace; neither edits nor pushes can interleave.
     /// <paramref name="prefetched"/> is the verified blob from the probe; when
     /// absent (or without a timestamp) the tree is fetched again.</summary>
     public async Task LinkAdoptRemoteAsync(
-        SyncCredentials candidate, PrefetchedRemote? prefetched = null, CancellationToken ct = default)
+        SyncCredentials candidate, PrefetchedRemote? prefetched = null, CancellationToken ct = default,
+        Func<SyncCredentials?, bool, Task>? beforeReplace = null)
     {
         await AcquireGateAsync("Link (take remote)", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
+            var current = await creds.GetAsync().ConfigureAwait(false);
+            var switching = current is not null && !SavedSyncs.Same(
+                new SavedSyncIdentity(current.ServiceUrl, current.Id),
+                new SavedSyncIdentity(candidate.ServiceUrl, candidate.Id));
+            if (switching) await PersistActiveSideCoreAsync(ct).ConfigureAwait(false);
+            if (beforeReplace is not null) await beforeReplace(current, switching).ConfigureAwait(false);
             SetStatus(SyncStatus.Syncing);
             var full = prefetched is { LastUpdated: not null }
                 ? new GetBookmarksResponse
@@ -1306,6 +1320,7 @@ public sealed partial class SyncEngine(
                 ? rev
                 : (long?)null;
             var prevHash = await store.GetMetaAsync(BookmarkStore.MetaHash).ConfigureAwait(false);
+            var prevDirty = await store.GetMetaAsync(BookmarkStore.MetaDirty).ConfigureAwait(false) == "1";
             try
             {
                 // Decrypts (wrong password throws) before the mirror is replaced;
@@ -1320,11 +1335,11 @@ public sealed partial class SyncEngine(
                 try
                 {
                     await store.ReplaceAllAsync(prevRoots, prevBlob ?? string.Empty,
-                        prevLastUpdated ?? string.Empty, prevVersion, prevRevision, prevHash).ConfigureAwait(false);
+                        prevLastUpdated ?? string.Empty, prevVersion, prevRevision, prevHash, dirty: prevDirty).ConfigureAwait(false);
                 }
-                catch
+                catch (Exception rollbackError)
                 {
-                    // Nothing more to do: the caller surfaces the original error.
+                    log.Error("sync", $"Link rollback failed: {rollbackError.GetType().Name}");
                 }
 
                 throw;
@@ -1345,13 +1360,25 @@ public sealed partial class SyncEngine(
     /// candidate sync based on <paramref name="remoteLastUpdated"/> (the base
     /// read at probe/create time — never the previous link's mirror base).
     /// Mirror + credentials switch only after the server accepted the write,
-    /// so a 409 leaves the previous link fully intact.</summary>
+    /// so a 409 leaves the previous link fully intact. When prepareRoots is
+    /// supplied, persist the departing linked sync and build/snapshot the live
+    /// tree under the same gate, preventing edits between capture and replace.</summary>
     public async Task LinkUploadAsync(
-        SyncCredentials candidate, List<BookmarkNode> roots, string remoteLastUpdated, CancellationToken ct = default)
+        SyncCredentials candidate, List<BookmarkNode> roots, string remoteLastUpdated, CancellationToken ct = default,
+        Func<SyncCredentials?, bool, Task<List<BookmarkNode>>>? prepareRoots = null)
     {
         await AcquireGateAsync("Link (upload)", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
+            if (prepareRoots is not null)
+            {
+                var current = await creds.GetAsync().ConfigureAwait(false);
+                var switching = current is not null && !SavedSyncs.Same(
+                    new SavedSyncIdentity(current.ServiceUrl, current.Id),
+                    new SavedSyncIdentity(candidate.ServiceUrl, candidate.Id));
+                if (switching) await PersistActiveSideCoreAsync(ct).ConfigureAwait(false);
+                roots = await prepareRoots(current, switching).ConfigureAwait(false);
+            }
             SetStatus(SyncStatus.Syncing);
             Normalize(roots);
             ContainerNames.EnsureContainers(roots);
