@@ -164,7 +164,7 @@ R9.1 levels Error→Verbose, persisted verbosity, 200-entry viewer. R9.2 NEVER l
 
 ## 11. Test matrix (what proves what)
 
-`dotnet test` runs **397 tests** (xUnit, no device) after
+`dotnet test` runs **418 tests** (xUnit, no device) after
 `python3 scripts/prepare-sqlcipher.py --linux`; `node tests/js/gestures.test.cjs`
 runs the gesture suite (node:test, no browser).
 

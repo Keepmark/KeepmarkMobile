@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.228 (229)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.230 (231)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -34,7 +34,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (397 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (418 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -378,7 +378,7 @@ synchronization while visible; Settings no longer offers a mode selector.
 
 | Path | Content |
 |---|---|
-| `backups/xbs-backup-[<sync>-]YYYYMMDD-HHmmss.xbs.json` | user encrypted export (§12); `<sync>` is the active sync's name slugged |
+| `backups/xbs-backup-[<sync>-]YYYYMMDD-HHmmss.xbs.json` | user encrypted export (§12); `<sync>` is the active sync's name slugged, timestamp in device local time |
 | `safety-backups/safety-*.json` + `safety-index.json` | safety snapshots (§11) |
 | `safety-backups/safety-master.json` (+ `.prev.json` during rotation) | wrapped master key |
 | `removed-syncs/removed-<sha256>.json` | copies of removed syncs (§9.5) |
@@ -1290,7 +1290,7 @@ lock 2000.
 
 ## 15. Tests and verification
 
-### Automated suites (391 tests, no device)
+### Automated suites (418 tests, no device)
 
 | Suite | Proves |
 |---|---|
