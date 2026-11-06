@@ -186,4 +186,20 @@ public sealed class SafetyBackupTests
             SafetyBackupFiles.DayLabel(now.AddDays(-1).ToUniversalTime(), now));
         Assert.Contains("2026", SafetyBackupFiles.DayLabel(now.AddDays(-5).ToUniversalTime(), now));
     }
+
+    [Fact]
+    public void Prune_HonoursTheChosenRetention()
+    {
+        var now = new DateTime(2026, 11, 6, 12, 0, 0, DateTimeKind.Utc);
+        var entries = Enumerable.Range(0, 8)
+            .Select(i => new SafetyBackupEntry($"safety-{i}.json", now.AddMinutes(-i), "sync-push", "remote", 1, 10, null))
+            .ToList();
+        Assert.Empty(SafetyBackupFiles.Prune(entries));
+        Assert.Equal(["safety-5.json", "safety-6.json", "safety-7.json"], SafetyBackupFiles.Prune(entries, 5));
+        Assert.Equal(5, SafetyBackupFiles.Prune(entries, 3).Count);
+        // Values outside the Settings choices fall back to the default (10).
+        Assert.Empty(SafetyBackupFiles.Prune(entries, 7));
+        Assert.Equal(10, SafetyBackupFiles.NormalizeKeep(0));
+        Assert.Equal(50, SafetyBackupFiles.NormalizeKeep(50));
+    }
 }

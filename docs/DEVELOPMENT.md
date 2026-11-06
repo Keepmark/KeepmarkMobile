@@ -1000,7 +1000,7 @@ them, so `SafetyOperations.Describe` still names them; nothing writes them now.
   `SyncId` is truncated (`ab12…ef`); `Enc` is `"master"` or absent (plaintext).
 - Legacy files (`safety-local-<ts>.json` / `safety-remote-<ts>.json`, no
   manifest entry) are still listed, restorable and deletable as "Older backup".
-- Retention: newest 10 kept; older files and index rows are pruned together.
+- Retention: newest N kept (Settings → "Safety backups to keep", `XbsSettings.SafetyKeep`, Preferences `safety_keep`, choices `SafetyBackupFiles.KeepChoices`, default 10); older files and index rows are pruned together, on every write and at once when the setting is lowered (`XbsSession.SetSafetyKeepAsync`, confirmed in the UI first).
   Manual delete is always allowed with two-tap confirmation.
 - A corrupt index is treated as empty (the directory scan still lists files).
   A damaged payload refuses to open ("damaged"), never half-restores.

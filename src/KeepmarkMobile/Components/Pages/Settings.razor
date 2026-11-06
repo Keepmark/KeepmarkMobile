@@ -68,6 +68,26 @@
     </a>
 </div>
 
+@* Applies at once, like the log verbosity: lowering it below what is stored
+   deletes the oldest backups, so that case asks first. *@
+<div class="mb-3">
+    <label class="form-label" for="km-safety-keep">@L.Get(Str.SettingsSafetyKeep)</label>
+    <select id="km-safety-keep" class="form-select" value="@safetyKeep" @onchange="OnSafetyKeepChanged" disabled="@safetyBusy">
+        @foreach (var n in Keepmark.Core.Safety.SafetyBackupFiles.KeepChoices)
+        {
+            <option value="@n">@(n == Keepmark.Core.Safety.SafetyBackupFiles.KeepCount ? L.Get(Str.SettingsSafetyKeepDefault) : n.ToString())</option>
+        }
+    </select>
+    <div class="form-text">@L.Get(Str.SettingsSafetyKeepHint)</div>
+    @if (pendingKeep is int pk)
+    {
+        <ConfirmBlock Message="@Loc.Plural(Str.SafetyKeepPrune, safetyCount - pk)"
+                      Implication="@L.Get(Str.SafetyKeepPruneImplication)"
+                      ConfirmLabel="@L.Get(Str.CommonYesDelete)" Busy="safetyBusy"
+                      OnConfirm="() => ApplySafetyKeep(pk)" OnCancel="() => { pendingKeep = null; safetyKeep = AppSettings.SafetyKeep; }" />
+    }
+</div>
+
 @* Troubleshooting only: the log is not something the user reads, so it stays
    folded behind one button and has no page of its own in the menu. *@
 <div class="mb-3">
@@ -107,6 +127,56 @@
     /// <summary>The log panel is closed by default: it is troubleshooting
     /// material, opened on purpose.</summary>
     private bool logsOpen;
+    private int safetyKeep = Keepmark.Core.Safety.SafetyBackupFiles.KeepCount;
+    private int safetyCount;
+    /// <summary>A lower limit waiting for the user's yes (it deletes backups now).</summary>
+    private int? pendingKeep;
+    private bool safetyBusy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        safetyKeep = AppSettings.SafetyKeep;
+        try { safetyCount = (await Session.ListSafetyBackupsAsync()).Count; } catch { safetyCount = 0; }
+    }
+
+    private async Task OnSafetyKeepChanged(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var keep))
+        {
+            return;
+        }
+
+        if (safetyCount > keep)
+        {
+            // Track the pick so Cancel's revert is a real change Blazor re-renders.
+            safetyKeep = keep;
+            pendingKeep = keep;
+            return;
+        }
+
+        await ApplySafetyKeep(keep);
+    }
+
+    private async Task ApplySafetyKeep(int keep)
+    {
+        safetyBusy = true;
+        try
+        {
+            var removed = await Session.SetSafetyKeepAsync(keep);
+            safetyKeep = AppSettings.SafetyKeep;
+            safetyCount = Math.Max(0, safetyCount - removed);
+            _ = Toast.ShowAsync(L.Get(Str.SafetyKeepSet, safetyKeep));
+        }
+        catch (Exception ex)
+        {
+            _ = Toast.ShowAsync(ex.Message);
+        }
+        finally
+        {
+            pendingKeep = null;
+            safetyBusy = false;
+        }
+    }
 
     protected override void OnInitialized()
     {

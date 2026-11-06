@@ -3,6 +3,7 @@
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject KeepmarkMobile.Services.ToastState Toast
+@inject KeepmarkMobile.Services.XbsSettings AppSettings
 @using Keepmark.Core.Safety
 @using Keepmark.Core.Workflow
 
@@ -80,7 +81,7 @@ else
 
     <div class="mb-3">
         <h4>@L.Get(Str.BackupSafetyH)</h4>
-        <InfoHint Text="@L.Get(Str.BackupSafetyShort)" Title="@L.Get(Str.BackupSafetyH)" Body="@L.Get(Str.BackupSafetyIntro)" />
+        <InfoHint Text="@L.Get(Str.BackupSafetyShort)" Title="@L.Get(Str.BackupSafetyH)" Body="@L.Get(Str.BackupSafetyIntro, AppSettings.SafetyKeep)" />
         <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">@L.Get(Str.BackupRefreshList)</button>
         <StepMessage Text="@safetyMessage" Error="safetyError" />
         @if (safetyList.Count == 0)

@@ -114,6 +114,13 @@ public sealed class XbsSettings
     }
 
     /// <summary>Bookmarks in the Home "Recently added" section: 5, 10 or 20. Default 5.</summary>
+    /// <summary>How many safety backups to keep (newest first). Default 10.</summary>
+    public int SafetyKeep
+    {
+        get => Core.Safety.SafetyBackupFiles.NormalizeKeep(Preferences.Get("safety_keep", Core.Safety.SafetyBackupFiles.KeepCount));
+        set => Preferences.Set("safety_keep", Core.Safety.SafetyBackupFiles.NormalizeKeep(value));
+    }
+
     public int RecentCount
     {
         get => Preferences.Get("home_recent_count", 5) is var n && n is 5 or 10 or 20 ? n : 5;

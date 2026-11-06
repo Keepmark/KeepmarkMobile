@@ -832,7 +832,7 @@ public sealed class XbsSession : IAsyncDisposable
         // Decide the prune set first, update the index, and only then delete
         // files: a crash can leave an orphan payload, never an index row
         // pointing at a deleted backup.
-        var drops = SafetyBackupFiles.Prune(entries);
+        var drops = SafetyBackupFiles.Prune(entries, _settings.SafetyKeep);
         entries.RemoveAll(e => drops.Contains(e.FileName));
         await WriteSafetyIndexAsync(dir, entries).ConfigureAwait(false);
         foreach (var drop in drops)
@@ -996,6 +996,38 @@ public sealed class XbsSession : IAsyncDisposable
 
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(entries.OrderByDescending(e => e.CreatedAtUtc).ToList());
+    }
+
+    /// <summary>Sets the safety-backup retention and deletes the oldest beyond
+    /// it now (the UI confirmed first when that removes any). Index first, files
+    /// after, like the write path. Returns how many were deleted.</summary>
+    public async Task<int> SetSafetyKeepAsync(int keep)
+    {
+        _settings.SafetyKeep = keep;
+        keep = _settings.SafetyKeep;
+        var dir = SafetyDir();
+        if (!Directory.Exists(dir))
+        {
+            return 0;
+        }
+
+        var all = await ListSafetyBackupsAsync().ConfigureAwait(false);
+        var drops = SafetyBackupFiles.Prune(all, keep);
+        if (drops.Count == 0)
+        {
+            return 0;
+        }
+
+        var entries = await ReadSafetyIndexAsync(dir).ConfigureAwait(false);
+        entries.RemoveAll(e => drops.Contains(e.FileName));
+        await WriteSafetyIndexAsync(dir, entries).ConfigureAwait(false);
+        foreach (var drop in drops)
+        {
+            try { File.Delete(Path.Combine(dir, drop)); } catch { }
+        }
+
+        _log.Info("session", $"Safety backups: kept {keep}, removed {drops.Count} oldest");
+        return drops.Count;
     }
 
     /// <summary>Deletes one safety backup (confirmed in UI). Unknown names rejected.</summary>

@@ -677,6 +677,13 @@ public static partial class Str
     public const string BackupExportOpen = nameof(BackupExportOpen);
     public const string BackupRestoreShort = nameof(BackupRestoreShort);
     public const string BackupRestoreOpen = nameof(BackupRestoreOpen);
+    public const string SettingsSafetyKeep = nameof(SettingsSafetyKeep);
+    public const string SettingsSafetyKeepHint = nameof(SettingsSafetyKeepHint);
+    public const string SettingsSafetyKeepDefault = nameof(SettingsSafetyKeepDefault);
+    public const string SafetyKeepPrune_one = nameof(SafetyKeepPrune_one);
+    public const string SafetyKeepPrune_other = nameof(SafetyKeepPrune_other);
+    public const string SafetyKeepPruneImplication = nameof(SafetyKeepPruneImplication);
+    public const string SafetyKeepSet = nameof(SafetyKeepSet);
     public const string MoveResultNew = nameof(MoveResultNew);
     public const string MoveResultPush = nameof(MoveResultPush);
     public const string MoveResultMerge = nameof(MoveResultMerge);
@@ -799,4 +806,6 @@ public static partial class Str
     public const string SafetyItems = nameof(SafetyItems);
     /// <summary>Base for Loc.Plural (GoneUnlinkedCopy_one / GoneUnlinkedCopy_other).</summary>
     public const string GoneUnlinkedCopy = nameof(GoneUnlinkedCopy);
+    /// <summary>Base for Loc.Plural (SafetyKeepPrune_one / SafetyKeepPrune_other).</summary>
+    public const string SafetyKeepPrune = nameof(SafetyKeepPrune);
 }

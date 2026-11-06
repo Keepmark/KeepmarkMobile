@@ -81,7 +81,14 @@ public static class SafetyBackupFiles
 {
     public const string IndexFileName = "safety-index.json";
     public const string FilePrefix = "safety-";
+    /// <summary>Default retention; the user picks another from KeepChoices in Settings.</summary>
     public const int KeepCount = 10;
+
+    /// <summary>Retention values offered in Settings (same list as the browser extension).</summary>
+    public static readonly int[] KeepChoices = [3, 5, 10, 20, 30, 50];
+
+    /// <summary>A stored retention, or the default when it is not one of the choices.</summary>
+    public static int NormalizeKeep(int keep) => Array.IndexOf(KeepChoices, keep) >= 0 ? keep : KeepCount;
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = false };
 
@@ -146,10 +153,10 @@ public static class SafetyBackupFiles
     public static string Meta(SafetyBackupEntry e, string size) =>
         $"{Loc.Get(e.Side == "local" ? Str.SafetySideLocal : Str.SafetySideServer)} · {Loc.Plural(Str.SafetyItems, e.Items)} · {size}";
 
-    /// <summary>Filenames to delete: everything beyond the newest KeepCount.</summary>
-    public static List<string> Prune(IEnumerable<SafetyBackupEntry> entries) =>
+    /// <summary>Filenames to delete: everything beyond the newest <paramref name="keep"/>.</summary>
+    public static List<string> Prune(IEnumerable<SafetyBackupEntry> entries, int keep = KeepCount) =>
         entries.OrderByDescending(e => e.CreatedAtUtc)
-            .Skip(KeepCount)
+            .Skip(NormalizeKeep(keep))
             .Select(e => e.FileName)
             .ToList();
 
