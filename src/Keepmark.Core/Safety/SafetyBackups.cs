@@ -77,6 +77,9 @@ public sealed record SafetyBackupEntry(
 /// trees before and after (large syncs, deletes). Display only.</summary>
 public sealed record SafetyChanges(int Added, int Removed);
 
+/// <summary>Why a safety backup cannot be restored with the current link.</summary>
+public enum SafetyLock { None, OtherSync, NeedsLink }
+
 public static class SafetyBackupFiles
 {
     public const string IndexFileName = "safety-index.json";
@@ -120,6 +123,34 @@ public static class SafetyBackupFiles
     /// never the full one).</summary>
     public static string? ShortSyncId(string? id) =>
         id is null ? null : id.Length <= 8 ? id : $"{id[..4]}…{id[^2..]}";
+
+    /// <summary>Whether this link can restore the entry. Unlinked, an
+    /// encrypted or server-side entry needs a link first; linked, an entry
+    /// recorded under another sync is refused: restoring it would push that
+    /// sync's bookmarks into this one (the master key opens every encrypted
+    /// file, so decryption alone cannot tell). Entries with no recorded sync
+    /// (pre-link, plaintext local) restore anywhere.</summary>
+    public static SafetyLock Lock(SafetyBackupEntry entry, string? activeSyncId)
+    {
+        if (activeSyncId is null)
+        {
+            return entry.Side == "remote" || entry.Enc == "master" ? SafetyLock.NeedsLink : SafetyLock.None;
+        }
+
+        return entry.SyncId is not null && entry.SyncId != ShortSyncId(activeSyncId)
+            ? SafetyLock.OtherSync
+            : SafetyLock.None;
+    }
+
+    /// <summary>The saved sync a locked entry belongs to, when exactly one
+    /// inactive row matches its truncated ID: the UI offers to activate it.</summary>
+    public static Keepmark.Core.Sync.SavedSync? Owner(
+        SafetyBackupEntry entry, IEnumerable<Keepmark.Core.Sync.SavedSync> saved, string? activeSyncId)
+    {
+        if (entry.SyncId is null) return null;
+        var matches = saved.Where(r => ShortSyncId(r.SyncId) == entry.SyncId).Take(2).ToList();
+        return matches.Count == 1 && matches[0].SyncId != activeSyncId ? matches[0] : null;
+    }
 
     /// <summary>Current name of each entry's sync: a saved sync whose
     /// truncated ID matches exactly one row lends its (possibly renamed) name;

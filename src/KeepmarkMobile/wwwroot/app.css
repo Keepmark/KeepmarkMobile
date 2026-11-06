@@ -3059,3 +3059,12 @@ a.xbs-back { text-decoration: none; }
 .km-sb-chip.is-add, .km-sb-chip.is-enc { background: color-mix(in srgb, var(--km-green) 16%, transparent); color: var(--km-green); }
 .km-sb-chip.is-del { background: color-mix(in srgb, var(--km-gold) 16%, transparent); color: var(--km-gold); }
 .km-sb-actions { display: flex; gap: .5rem; margin-top: .375rem; }
+/* "Restorable here / All": only shown when some backups are locked. */
+.km-sb-filter { margin: .25rem 0 .5rem; }
+.km-sb-filter button { min-height: 44px; font-size: .875rem; }
+/* A backup this link cannot restore: dimmed, neutral edge, the reason on a
+   lock line; its actions stay full-strength (Delete, Activate owner). */
+.km-sb-item.is-locked { border-left-color: var(--km-line-strong); background: var(--km-surface-2); }
+.km-sb-item.is-locked > :not(.km-sb-actions):not(.km-sb-lock):not(.alert) { opacity: .6; }
+.km-sb-lock { display: flex; gap: .375rem; align-items: center; margin: 0; font-size: .8rem; color: var(--km-ink-2); }
+.km-sb-lock .km-ico { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; }

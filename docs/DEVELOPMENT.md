@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.222 (223)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.227 (228)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -1039,6 +1039,15 @@ them, so `SafetyOperations.Describe` still names them; nothing writes them now.
   sync this backup belongs to first"), snapshots the **real** server copy,
   replaces the local tree and pushes under the current key with revision CAS.
   A 409 surfaces; nothing is clobbered.
+- **Restorable here** (`SafetyBackupFiles.Lock`): the master key opens every
+  encrypted file, so decryption cannot tell syncs apart. Linked, an entry whose
+  truncated `SyncId` differs from the active sync's is `OtherSync` (restoring it
+  would push that sync's bookmarks into this one); unlinked, an encrypted or
+  remote-side entry is `NeedsLink`. Backup hides locked rows behind a
+  "Restorable here / All" filter (shown only when some exist), dims them with
+  the reason, keeps Delete and offers `Activate <name>…` (→ Syncs) when
+  `SafetyBackupFiles.Owner` finds one inactive saved row.
+  `RestoreSafetyBackupAsync` refuses both states as a backstop.
 - The used entry is never deleted. Counts shown before confirm come from
   `ValidateTree` (bounded tree, no nulls).
 
@@ -1402,5 +1411,5 @@ also bundled in the app.
 Saved-sync rows use a prominent Activate button, disabled on the active row.
 Secondary actions open from an accessible ⋮ menu: Rename and active-row Change
 password first; Forget/Unlink in a separate final group. Settings places the
-complete log controls last, immediately before Save. See WORKFLOWS.md for the
+complete log controls last; every setting applies on change (no Save). See WORKFLOWS.md for the
 shared presentation and confirmation contract.

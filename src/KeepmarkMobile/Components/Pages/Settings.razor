@@ -9,6 +9,9 @@
 <PageTitle>@L.Get(Str.SettingsTitle)</PageTitle>
 
 <h1>@L.Get(Str.SettingsTitle)</h1>
+@* Every setting applies the moment it changes: no Save at the bottom of a
+   long page, no unsaved state to lose. Destructive ones confirm inline. *@
+<p class="text-muted small mb-3">@L.Get(Str.SettingsAppliesNow)</p>
 
 <div class="mb-3">
     <label class="form-label">@L.Get(Str.SettingsLanguage)</label>
@@ -28,18 +31,19 @@
 </div>
 
 <div class="mb-3">
-    <label class="form-label">@L.Get(Str.SettingsTheme)</label>
-    <select class="form-select" @bind="theme">
-        <option value="System">@L.Get(Str.SettingsThemeSystem)</option>
-        <option value="Light">@L.Get(Str.SettingsThemeLight)</option>
-        <option value="Dark">@L.Get(Str.SettingsThemeDark)</option>
-    </select>
+    <label class="form-label" id="km-theme-label">@L.Get(Str.SettingsTheme)</label>
+    <div class="xbs-seg km-settings-seg" role="group" aria-labelledby="km-theme-label">
+        @foreach (var (value, key) in Themes)
+        {
+            <button type="button" aria-pressed="@((theme == value).ToString().ToLowerInvariant())" @onclick="() => ApplyTheme(value)">@L.Get(key)</button>
+        }
+    </div>
 </div>
 
 <div class="mb-3">
     <label class="form-label">@L.Get(Str.SettingsHome)</label>
     <div class="form-check form-switch">
-        <input class="form-check-input" type="checkbox" role="switch" id="km-show-recent" @bind="showRecent" />
+        <input class="form-check-input" type="checkbox" role="switch" id="km-show-recent" @bind="showRecent" @bind:after="ApplyHome" />
         <label class="form-check-label" for="km-show-recent">@L.Get(Str.SettingsShowRecent)</label>
     </div>
     <div class="form-text">@L.Get(Str.SettingsShowRecentHint)</div>
@@ -48,12 +52,13 @@
 @if (showRecent)
 {
     <div class="mb-3">
-        <label class="form-label" for="km-recent-count">@L.Get(Str.SettingsRecentCount)</label>
-        <select id="km-recent-count" class="form-select" @bind="recentCount">
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="20">20</option>
-        </select>
+        <label class="form-label" id="km-recent-count-label">@L.Get(Str.SettingsRecentCount)</label>
+        <div class="xbs-seg km-settings-seg" role="group" aria-labelledby="km-recent-count-label">
+            @foreach (var n in new[] { 5, 10, 20 })
+            {
+                <button type="button" aria-pressed="@((recentCount == n).ToString().ToLowerInvariant())" @onclick="() => ApplyRecentCount(n)">@n</button>
+            }
+        </div>
     </div>
 }
 
@@ -115,8 +120,6 @@
         <LogsPanel />
     </div>
 }
-
-<button class="btn btn-primary" @onclick="Save">@L.Get(Str.CommonSave)</button>
 
 @code {
     private Core.Logging.XbsLogLevel verbosity;
@@ -185,13 +188,14 @@
         language = AppSettings.Language;
         showRecent = AppSettings.ShowRecent;
         recentCount = AppSettings.RecentCount;
-        if (carry is { } c)
-        {
-            // Language change rebuilt the tree: put back the unsaved edits.
-            (theme, showRecent, recentCount) = c;
-            carry = null;
-        }
     }
+
+    private static readonly (string Value, string Key)[] Themes =
+    [
+        ("System", Str.SettingsThemeSystem),
+        ("Light", Str.SettingsThemeLight),
+        ("Dark", Str.SettingsThemeDark),
+    ];
 
     /// <summary>Verbosity applies instantly (no Save needed): later entries
     /// are recorded at the new level right away.</summary>
@@ -203,28 +207,36 @@
 
     /// <summary>The language applies at once: Apply() sets the culture and the
     /// layout redraws its whole tree (no restart, no page reload).</summary>
-    private static (string, bool, int)? carry;
 
     private void ToggleLogs() => logsOpen = !logsOpen;
 
     private void ApplyLanguage()
     {
-        carry = (theme, showRecent, recentCount);
         AppSettings.Language = language is "en" or "it" or "fr" or "es" or "de" or "ja" or "pt" or "ro" or "ru" or "zh" ? language : "system";
         LangSvc.Apply();
     }
 
-    private async Task Save()
+    /// <summary>The theme is its own preview: the page repaints at once.</summary>
+    private async Task ApplyTheme(string value)
     {
-        AppSettings.Verbosity = verbosity;
-        AppSettings.Theme = theme is "Light" or "Dark" ? theme : "System";
-        theme = AppSettings.Theme;
-        AppSettings.ShowRecent = showRecent;
-        AppSettings.RecentCount = recentCount;
+        theme = value is "Light" or "Dark" ? value : "System";
+        AppSettings.Theme = theme;
         Session.NotifySettingsChanged();
         try { await JS.InvokeVoidAsync("xbsSetTheme", theme); } catch { }
         try { StatusBar.ApplyTheme(theme); } catch { }
-        _ = Toast.ShowAsync(L.Get(Str.SettingsSaved));
+    }
+
+    private void ApplyHome()
+    {
+        AppSettings.ShowRecent = showRecent;
+        AppSettings.RecentCount = recentCount;
+        Session.NotifySettingsChanged();
+    }
+
+    private void ApplyRecentCount(int n)
+    {
+        recentCount = n;
+        ApplyHome();
     }
 
     private string LockSummary => AppSettings.AppLock switch

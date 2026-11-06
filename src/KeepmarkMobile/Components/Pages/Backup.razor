@@ -4,6 +4,7 @@
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
+@inject NavigationManager Nav
 @using Keepmark.Core.Safety
 @using Keepmark.Core.Workflow
 
@@ -84,16 +85,32 @@ else
         <InfoHint Text="@L.Get(Str.BackupSafetyShort)" Title="@L.Get(Str.BackupSafetyH)" Body="@L.Get(Str.BackupSafetyIntro, AppSettings.SafetyKeep)" />
         <button class="btn btn-outline-secondary mb-2" @onclick="RefreshSafety" disabled="@busy">@L.Get(Str.BackupRefreshList)</button>
         <StepMessage Text="@safetyMessage" Error="safetyError" />
+        @if (LockedCount > 0)
+        {
+            @* Only when something is filtered out: backups of other syncs (or
+               needing a link) cannot be restored here, so they stay hidden
+               by default and come back, locked, under "All". *@
+            <div class="xbs-seg km-sb-filter" role="group" aria-label="@L.Get(Str.SafetyFilterLabel)">
+                <button type="button" aria-pressed="@((!safetyShowAll).ToString().ToLowerInvariant())" @onclick="() => safetyShowAll = false">@L.Get(Str.SafetyFilterHere, safetyList.Count - LockedCount)</button>
+                <button type="button" aria-pressed="@safetyShowAll.ToString().ToLowerInvariant()" @onclick="() => safetyShowAll = true">@L.Get(Str.SafetyFilterAll, safetyList.Count)</button>
+            </div>
+        }
         @if (safetyList.Count == 0)
         {
             <p class="text-muted">@L.Get(Str.BackupNoSafety)</p>
         }
-        @foreach (var day in safetyList.GroupBy(e => SafetyBackupFiles.DayLabel(e.CreatedAtUtc, DateTime.Now)))
+        else if (VisibleSafety.Count == 0)
+        {
+            <p class="text-muted">@Loc.Plural(Str.SafetyNoneHere, LockedCount)</p>
+        }
+        @foreach (var day in VisibleSafety.GroupBy(e => SafetyBackupFiles.DayLabel(e.CreatedAtUtc, DateTime.Now)))
         {
             <h5 class="km-sb-day">@day.Key</h5>
             @foreach (var sb in day)
             {
-                <div class="km-sb-item" @key="sb.FileName">
+                var sbLock = SafetyBackupFiles.Lock(sb, activeSyncId);
+                var sbOwner = sbLock == SafetyLock.OtherSync ? SafetyBackupFiles.Owner(sb, savedRows, activeSyncId) : null;
+                <div class="km-sb-item @(sbLock != SafetyLock.None ? "is-locked" : "")" @key="sb.FileName">
                     <div class="km-sb-head">
                         <strong>@SafetyOperations.Describe(sb.Operation)</strong>
                         <time>@sb.CreatedAtUtc.ToLocalTime().ToString("t")</time>
@@ -129,6 +146,13 @@ else
                         <span>@SafetyBackupFiles.Meta(sb, WorkflowRules.FormatBytes(sb.SizeBytes))</span>
                         <span class="km-sb-chip @(sb.Enc == "master" ? "is-enc" : "")">@L.Get(sb.Enc == "master" ? Str.SafetyEncrypted : Str.SafetyNotEncrypted)</span>
                     </div>
+                    @if (sbLock != SafetyLock.None)
+                    {
+                        <p class="km-sb-lock">
+                            <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                            <span>@LockText(sbLock, sbOwner)</span>
+                        </p>
+                    }
                     @if (armedRestore == sb.FileName)
                     {
                         <ConfirmBlock Message="@L.Get(Str.BackupRestoreMessage)"
@@ -146,7 +170,14 @@ else
                     else
                     {
                         <div class="km-sb-actions">
-                            <button class="btn btn-sm btn-outline-primary" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
+                            @if (sbOwner is not null)
+                            {
+                                <button class="btn btn-sm btn-primary" @onclick='() => Nav.NavigateTo("/syncs")' disabled="@busy">@L.Get(Str.SafetyActivateOwner, Keepmark.Core.Sync.SavedSyncs.Name(sbOwner))</button>
+                            }
+                            else if (sbLock == SafetyLock.None)
+                            {
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => { armedRestore = sb.FileName; armedDelete = null; }" disabled="@busy">@L.Get(Str.BackupRestoreBtn)</button>
+                            }
                             <button class="btn btn-sm btn-outline-danger" @onclick="() => { armedDelete = sb.FileName; armedRestore = null; }" disabled="@busy">@L.Get(Str.CommonDelete)</button>
                         </div>
                     }
@@ -218,6 +249,22 @@ else
     private string safetyMessage = string.Empty;
     private bool safetyError;
     private string safetyLoadMessage = string.Empty;
+    private bool safetyShowAll;
+    private string? activeSyncId;
+    private List<Keepmark.Core.Sync.SavedSync> savedRows = new();
+
+    private int LockedCount => safetyList.Count(e => SafetyBackupFiles.Lock(e, activeSyncId) != SafetyLock.None);
+
+    private List<SafetyBackupEntry> VisibleSafety => safetyShowAll || LockedCount == 0
+        ? safetyList
+        : safetyList.Where(e => SafetyBackupFiles.Lock(e, activeSyncId) == SafetyLock.None).ToList();
+
+    private string LockText(SafetyLock state, Keepmark.Core.Sync.SavedSync? owner) => state switch
+    {
+        SafetyLock.NeedsLink => L.Get(Str.SafetyLockedNeedsLink),
+        _ when owner is not null => L.Get(Str.SafetyLockedOther, Keepmark.Core.Sync.SavedSyncs.Name(owner)),
+        _ => L.Get(Str.SafetyLockedUnknown),
+    };
     private List<RemovedSyncCopyInfo> removedList = new();
     private string? armedRemovedRestore;
     private string? armedRemovedDelete;
@@ -255,6 +302,8 @@ else
         {
             var entries = await Session.ListSafetyBackupsAsync();
             var saved = Session.Registry is null ? new List<Keepmark.Core.Sync.SavedSync>() : await Session.Registry.ListAsync();
+            activeSyncId = (await Creds.GetAsync())?.Id;
+            savedRows = saved.ToList();
             safetyList = SafetyBackupFiles.WithSyncNames(entries, saved);
             ClearLoadError(ref safetyLoadMessage, ref safetyMessage, ref safetyError);
         }

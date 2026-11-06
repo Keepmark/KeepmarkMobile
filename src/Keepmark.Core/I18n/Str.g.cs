@@ -684,6 +684,16 @@ public static partial class Str
     public const string SafetyKeepPrune_other = nameof(SafetyKeepPrune_other);
     public const string SafetyKeepPruneImplication = nameof(SafetyKeepPruneImplication);
     public const string SafetyKeepSet = nameof(SafetyKeepSet);
+    public const string SettingsAppliesNow = nameof(SettingsAppliesNow);
+    public const string SafetyFilterLabel = nameof(SafetyFilterLabel);
+    public const string SafetyFilterHere = nameof(SafetyFilterHere);
+    public const string SafetyFilterAll = nameof(SafetyFilterAll);
+    public const string SafetyNoneHere_one = nameof(SafetyNoneHere_one);
+    public const string SafetyNoneHere_other = nameof(SafetyNoneHere_other);
+    public const string SafetyLockedOther = nameof(SafetyLockedOther);
+    public const string SafetyLockedUnknown = nameof(SafetyLockedUnknown);
+    public const string SafetyLockedNeedsLink = nameof(SafetyLockedNeedsLink);
+    public const string SafetyActivateOwner = nameof(SafetyActivateOwner);
     public const string MoveResultNew = nameof(MoveResultNew);
     public const string MoveResultPush = nameof(MoveResultPush);
     public const string MoveResultMerge = nameof(MoveResultMerge);
@@ -808,4 +818,6 @@ public static partial class Str
     public const string GoneUnlinkedCopy = nameof(GoneUnlinkedCopy);
     /// <summary>Base for Loc.Plural (SafetyKeepPrune_one / SafetyKeepPrune_other).</summary>
     public const string SafetyKeepPrune = nameof(SafetyKeepPrune);
+    /// <summary>Base for Loc.Plural (SafetyNoneHere_one / SafetyNoneHere_other).</summary>
+    public const string SafetyNoneHere = nameof(SafetyNoneHere);
 }

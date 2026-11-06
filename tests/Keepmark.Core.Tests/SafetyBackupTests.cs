@@ -188,6 +188,35 @@ public sealed class SafetyBackupTests
     }
 
     [Fact]
+    public void Lock_RefusesAnotherSyncAndNeedsALinkForEncryptedOrServerSide()
+    {
+        var at = DateTime.UtcNow;
+        SafetyBackupEntry E(string side, string? sync, string? enc) => new("f.json", at, "sync-pull", side, 1, 10, sync, enc);
+        const string active = "abcdefghij12";
+        var mine = SafetyBackupFiles.ShortSyncId(active);
+        Assert.Equal(SafetyLock.None, SafetyBackupFiles.Lock(E("local", mine, "master"), active));
+        Assert.Equal(SafetyLock.None, SafetyBackupFiles.Lock(E("remote", mine, "master"), active));
+        Assert.Equal(SafetyLock.OtherSync, SafetyBackupFiles.Lock(E("local", "wxyz…99", "master"), active));
+        Assert.Equal(SafetyLock.OtherSync, SafetyBackupFiles.Lock(E("local", "wxyz…99", null), active));
+        // No recorded sync (pre-link, plaintext): restores anywhere.
+        Assert.Equal(SafetyLock.None, SafetyBackupFiles.Lock(E("local", null, null), active));
+        Assert.Equal(SafetyLock.None, SafetyBackupFiles.Lock(E("local", null, null), null));
+        Assert.Equal(SafetyLock.NeedsLink, SafetyBackupFiles.Lock(E("local", mine, "master"), null));
+        Assert.Equal(SafetyLock.NeedsLink, SafetyBackupFiles.Lock(E("remote", mine, null), null));
+    }
+
+    [Fact]
+    public void Owner_IsTheOnlyInactiveSavedRowWithThatShortId()
+    {
+        var entry = new SafetyBackupEntry("f.json", DateTime.UtcNow, "sync-pull", "local", 1, 10, "work…99");
+        var work = new Keepmark.Core.Sync.SavedSync { ServiceUrl = "https://a.test", SyncId = "workSync99" };
+        var home = new Keepmark.Core.Sync.SavedSync { ServiceUrl = "https://a.test", SyncId = "homeSync11" };
+        Assert.Same(work, SafetyBackupFiles.Owner(entry, [work, home], "homeSync11"));
+        Assert.Null(SafetyBackupFiles.Owner(entry, [work, home], "workSync99"));
+        Assert.Null(SafetyBackupFiles.Owner(entry, [home], "homeSync11"));
+    }
+
+    [Fact]
     public void Prune_HonoursTheChosenRetention()
     {
         var now = new DateTime(2026, 11, 6, 12, 0, 0, DateTimeKind.Utc);

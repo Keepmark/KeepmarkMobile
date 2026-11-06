@@ -81,8 +81,11 @@ supported. A menu opens only that row's existing task; confirmations and stable
 sync identity checks still apply. Only one menu is open at a time; Escape and
 clicking outside close it. The extension popup remains a minimal activation list.
 
-On Android, Settings places the complete log block after all other preferences,
-immediately before `Save`.
+On Android, Settings places the complete log block after all other preferences.
+There is no `Save`: every setting (Settings and Settings → Security) applies the
+moment it changes. Lowering the safety-backup limit confirms inline first;
+weakening the app lock asks for the device PIN and reverts on refusal. Theme and
+the recent count are segmented controls.
 
 ## Shared workflows
 
@@ -93,7 +96,7 @@ immediately before `Save`.
 | Change password | yes | Syncs → `Change password` on the active sync's row → Current, New, Confirm new → `Change password` | one inline confirmation | Other devices stop syncing until they are unlinked and linked again with the new password. Unsynced local edits are uploaded now. Older backup files keep their own password. The long password belongs to the sync, so this is a row action in Syncs, never a Settings section, and the sync lock is not asked again: the saved key is re-wrapped under the previous one. |
 | Backup: export | no | Backup password + confirm → `Export encrypted backup` | none | The backup password is not the sync password and cannot be recovered. |
 | Backup: import | yes (extension) / no (Android) | `Choose backup file…` → password of that backup → `Check backup` (dry run: item count, nothing changes) → consequences → `Restore backup` | Review is the only confirmation; final button executes | Replaces local bookmarks and, while linked, the server copy; the other devices receive it at their next sync. A wrong password clears only the password; the file stays chosen. |
-| Safety backup: restore | no | `Restore` | always | What is replaced (local bookmarks or server copy) and that a pre-restore backup is taken. |
+| Safety backup: restore | no | `Restore` | always | What is replaced (local bookmarks or server copy) and that a pre-restore backup is taken. Backups of another sync (or needing a link while unlinked) cannot be restored here: they are hidden behind the `Restorable here / All` filter, shown dimmed with the reason, with no `Restore` and, when their sync is saved, `Activate <name>…` (opens Syncs) instead. |
 | Safety backup: delete | no | `Delete` | always | There is no undo. |
 | Unlink this device | yes | `Unlink this device…` | always | Local bookmarks stay. Linking again needs the sync ID and password. Edits not yet synced stay only on this device. Undo is cleared. |
 | Sync conflict | conflict | direction with consequences → apply | Android: apply executes; extension: one inline confirmation | Same direction text as Connect. |

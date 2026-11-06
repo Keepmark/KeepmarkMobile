@@ -483,5 +483,5 @@ service with the amber warning visible; Debug only reaches loopback through
 `adb reverse`. Native TalkBack, rotation, font scaling and camera cases still
 require device QA.
 
-Settings layout: the complete log block is the final functionality, immediately
-before Save; all other preference blocks precede it.
+Settings layout: the complete log block is the final functionality; all other
+preference blocks precede it. No Save button: each setting applies on change.

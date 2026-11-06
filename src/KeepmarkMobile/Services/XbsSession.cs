@@ -1056,6 +1056,20 @@ public sealed class XbsSession : IAsyncDisposable
         var entry = (await ListSafetyBackupsAsync(ct).ConfigureAwait(false))
             .FirstOrDefault(e => e.FileName == fileName)
             ?? throw new InvalidOperationException(Loc.Get(Str.ErrBackupPruned));
+        // The list already hides these; this is the backstop. Another sync's
+        // backup would overwrite this sync with that sync's bookmarks.
+        var lockState = SafetyBackupFiles.Lock(entry, (await _creds.GetAsync().ConfigureAwait(false))?.Id);
+        if (lockState == SafetyLock.OtherSync)
+        {
+            throw new InvalidOperationException(
+                Loc.Get(Str.ErrBackupLockedTo, entry.SyncId is null ? "" : $" ({entry.SyncId})"));
+        }
+
+        if (lockState == SafetyLock.NeedsLink)
+        {
+            throw new InvalidOperationException(Loc.Get(Str.ErrLinkBackupSync));
+        }
+
         var roots = await OpenSafetyBackupAsync(entry, ct).ConfigureAwait(false);
         var count = BackupGuard.ValidateTree(roots);
         if (entry.Side == "local")
