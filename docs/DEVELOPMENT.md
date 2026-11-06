@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.230 (231)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.231 (232)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -34,7 +34,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (418 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (420 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -1290,7 +1290,7 @@ lock 2000.
 
 ## 15. Tests and verification
 
-### Automated suites (418 tests, no device)
+### Automated suites (420 tests, no device)
 
 | Suite | Proves |
 |---|---|

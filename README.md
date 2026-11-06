@@ -30,7 +30,8 @@ before it leaves, and every risky change leaves a way back.
 ## Why Keepmark
 
 - **Multi-sync, built in.** Several syncs saved on the phone, exactly one
-  active. Each row shows **Activate** first; rarer commands live in its **⋮**
+  active. From the bookmark list, tap the sync's name in the top bar to
+  switch from a sheet of coloured ribbons. In Syncs each row shows **Activate** first; rarer commands live in its **⋮**
   menu, with unlinking kept apart at the bottom. Switching saves pending edits
   first and stops on a conflict or failed save instead of losing anything.
 - **Private by design.** PBKDF2-SHA256 and AES-GCM on the device. The local

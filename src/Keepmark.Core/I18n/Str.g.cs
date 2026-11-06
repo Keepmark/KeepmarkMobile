@@ -616,6 +616,13 @@ public static partial class Str
     public const string WfDirDownloadImplication = nameof(WfDirDownloadImplication);
     public const string WfDirDownloadImplicationSwitch = nameof(WfDirDownloadImplicationSwitch);
     public const string WfDirMergeImplicationSwitch = nameof(WfDirMergeImplicationSwitch);
+    public const string SwitchTitle = nameof(SwitchTitle);
+    public const string SwitchOpenAria = nameof(SwitchOpenAria);
+    public const string SwitchUsed = nameof(SwitchUsed);
+    public const string SwitchManage = nameof(SwitchManage);
+    public const string SwitchBusy = nameof(SwitchBusy);
+    public const string SwitchNoKey = nameof(SwitchNoKey);
+    public const string SwitchActivating = nameof(SwitchActivating);
     public const string WfBackupPasswordHint = nameof(WfBackupPasswordHint);
     public const string WfExportDone_one = nameof(WfExportDone_one);
     public const string WfExportDone_other = nameof(WfExportDone_other);

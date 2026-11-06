@@ -1,0 +1,232 @@
+@using Keepmark.Core.Sync
+@inject KeepmarkMobile.Services.XbsSession Session
+@inject KeepmarkMobile.Services.XbsSettings AppSettings
+@inject KeepmarkMobile.Services.AppLockState AppLock
+@inject KeepmarkMobile.Services.IAppLockService LockPrompt
+@implements IDisposable
+
+@* Quick sync switch from Explore (v1.0.231): the same activation as Syncs →
+   Activate (inline confirm, device unlock when app lock is set, read-only
+   verify, fail-closed switch), shown as a bottom sheet of ribbons. Errors
+   stay inside the row that failed and the sheet stays open. *@
+@if (Visible)
+{
+    <div class="xbs-sheet-backdrop" data-back="30" @onclick="RequestClose">
+        <div class="xbs-sheet km-switch" role="dialog" aria-modal="true" aria-labelledby="km-switch-title" @onclick:stopPropagation="true">
+            <div class="xbs-sheet-handle" aria-hidden="true"></div>
+            <div class="km-switch-head">
+                <h2 id="km-switch-title" class="xbs-sheet-title">@L.Get(Str.SwitchTitle)</h2>
+                <button type="button" class="km-switch-close" @onclick="RequestClose" disabled="@busy" aria-label="@L.Get(Str.InfoClose)">
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+                </button>
+            </div>
+            @if (Syncing)
+            {
+                <p class="km-switch-note" role="status">@L.Get(Str.SwitchBusy)</p>
+            }
+            <ul class="km-switch-list">
+                @foreach (var row in Ordered)
+                {
+                    var key = SavedSyncs.Key(row.ServiceUrl, row.SyncId);
+                    var isActive = IsActive(row);
+                    var name = SavedSyncs.Name(row);
+                    var armed = armedKey == key;
+                    var locked = !isActive && (!row.CanActivate || Syncing || (busy && !armed) || (armedKey is not null && !armed));
+                    <li class="km-switch-row @(isActive ? "active" : string.Empty) @(armed ? "armed" : string.Empty) @(errorKey == key ? "failed" : string.Empty)">
+                        <button type="button" class="km-switch-pick" disabled="@(isActive || locked)"
+                                aria-current="@(isActive ? "true" : null)" @onclick="() => Arm(key)">
+                            <span class="km-ribbon km-sync-c@(SavedSyncs.ColorSlot(row.SyncId))" aria-hidden="true">@SavedSyncs.Initial(row)</span>
+                            <span class="km-switch-text">
+                                <span class="km-switch-name">@name</span>
+                                @if (isActive)
+                                {
+                                    <span class="km-switch-meta on">@ActiveLine</span>
+                                }
+                                else if (!row.CanActivate)
+                                {
+                                    <span class="km-switch-meta">@L.Get(Str.SwitchNoKey)</span>
+                                }
+                                else
+                                {
+                                    <span class="km-switch-meta">@L.Get(Str.SwitchUsed, RelativeTime.Format(row.LastUsedAt.ToUnixTimeMilliseconds()) ?? string.Empty)</span>
+                                }
+                                <span class="km-switch-meta">@SavedSyncs.ServiceHost(row.ServiceUrl) · @SavedSyncs.ShortSyncId(row.SyncId, 6).TrimEnd('…')</span>
+                            </span>
+                            @if (isActive)
+                            {
+                                <svg class="km-ico km-switch-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                            }
+                        </button>
+                        @if (armed)
+                        {
+                            <div class="km-switch-confirm">
+                                @if (busy)
+                                {
+                                    <p class="km-switch-busy" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.SwitchActivating)</p>
+                                }
+                                else
+                                {
+                                    <ConfirmBlock Message="@L.Get(Str.SyncsActivateMessage, name)"
+                                                  Implication="@L.Get(Str.SyncsActivateHint, name)"
+                                                  ConfirmLabel="@L.Get(Str.SyncsActivate)" Danger="false" Busy="busy"
+                                                  OnConfirm="ActivateAsync" OnCancel="Disarm" />
+                                }
+                            </div>
+                        }
+                        @if (errorKey == key && !string.IsNullOrEmpty(error))
+                        {
+                            <div class="alert alert-danger km-switch-error" role="alert">@error</div>
+                        }
+                    </li>
+                }
+            </ul>
+            <button type="button" class="km-switch-manage" disabled="@busy" @onclick="Manage">
+                @L.Get(Str.SwitchManage)
+                <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public List<SavedSync> Rows { get; set; } = [];
+    [Parameter] public SavedSyncIdentity? Active { get; set; }
+    /// <summary>"Sincronizzato · 20:02 · 812 segnalibri" for the active row.</summary>
+    [Parameter] public string ActiveDetail { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnManage { get; set; }
+    /// <summary>Raised after a switch succeeded, with the new sync's name.</summary>
+    [Parameter] public EventCallback<string> OnSwitched { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private string? armedKey;
+    private string? errorKey;
+    private string error = string.Empty;
+    private bool busy;
+    private bool wasVisible;
+
+    private bool Syncing => Session.Engine?.Status == Core.Sync.SyncStatus.Syncing;
+
+    private string ActiveLine => string.IsNullOrEmpty(ActiveDetail)
+        ? L.Get(Str.SyncsActive)
+        : $"{L.Get(Str.SyncsActive)} · {ActiveDetail}";
+
+    /// <summary>Active first, then the most recently used.</summary>
+    private IEnumerable<SavedSync> Ordered => Rows
+        .OrderByDescending(IsActive)
+        .ThenByDescending(r => r.LastUsedAt);
+
+    private bool IsActive(SavedSync row) =>
+        Active is not null && SavedSyncs.Same(row.Identity, Active);
+
+    protected override void OnParametersSet()
+    {
+        // Every opening starts clean: no armed row, no stale error.
+        if (Visible && !wasVisible)
+        {
+            armedKey = null;
+            errorKey = null;
+            error = string.Empty;
+        }
+
+        wasVisible = Visible;
+    }
+
+    private void Arm(string key)
+    {
+        if (busy) return;
+        armedKey = key;
+        errorKey = null;
+        error = string.Empty;
+    }
+
+    private void Disarm()
+    {
+        if (busy) return;
+        armedKey = null;
+    }
+
+    private async Task RequestClose()
+    {
+        if (busy) return;
+        armedKey = null;
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task Manage()
+    {
+        if (busy) return;
+        await OnManage.InvokeAsync();
+    }
+
+    /// <summary>Same proof as Syncs → Activate: the saved key is enough to
+    /// switch, so the device unlock (when app lock is on) is the owner check.</summary>
+    private async Task<bool> ConfirmWithAppLockAsync()
+    {
+        if (AppSettings.AppLock == "Off") return true;
+        if (!AppLock.Foreground) return false;
+        var ok = false;
+        AppLock.BeginAuth();
+        try
+        {
+            ok = await LockPrompt.AuthenticateAsync(L.Get(Str.SyncsUnlockTitle), requireDeviceCredential: false);
+        }
+        catch
+        {
+            ok = false;
+        }
+        finally
+        {
+            AppLock.EndAuth(ok);
+        }
+
+        return ok;
+    }
+
+    private async Task ActivateAsync()
+    {
+        var key = armedKey;
+        var row = Rows.FirstOrDefault(r => SavedSyncs.Key(r.ServiceUrl, r.SyncId) == key);
+        if (busy || row is null || IsActive(row)) return;
+        busy = true;
+        errorKey = null;
+        error = string.Empty;
+        var name = SavedSyncs.Name(row);
+        try
+        {
+            if (!await ConfirmWithAppLockAsync())
+            {
+                armedKey = null;
+                return;
+            }
+
+            // Read-only preflight, then the fail-closed switch: unsaved edits,
+            // a conflict or a missing connection cancel it with the real cause.
+            var info = await Session.VerifySavedSyncAsync(row.Identity, lifetime.Token);
+            await Session.ActivateSavedSyncAsync(info);
+            armedKey = null;
+            await OnSwitched.InvokeAsync(name);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        {
+            // Page left while verifying: nothing was written.
+        }
+        catch (Exception ex)
+        {
+            armedKey = null;
+            errorKey = key;
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

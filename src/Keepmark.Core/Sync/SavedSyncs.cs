@@ -155,6 +155,39 @@ public static class SavedSyncs
     public static string ShortSyncId(string syncId, int length = 8) =>
         syncId.Length <= length ? syncId : $"{syncId[..length]}…";
 
+    /// <summary>Number of ribbon colours the sync switcher cycles through.</summary>
+    public const int ColorSlots = 4;
+
+    /// <summary>Stable ribbon colour slot (0..<see cref="ColorSlots"/>-1) for a
+    /// sync: derived from the sync ID (FNV-1a), never from the editable name,
+    /// so a rename keeps the colour. Two syncs may share a slot; the initial,
+    /// name and short ID still tell them apart.</summary>
+    public static int ColorSlot(string syncId)
+    {
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var c in (syncId ?? string.Empty).ToLowerInvariant())
+            {
+                hash = (hash ^ c) * 16777619u;
+            }
+
+            return (int)(hash % ColorSlots);
+        }
+    }
+
+    /// <summary>Initial shown on the sync's ribbon: first letter or digit of
+    /// its UI name, upper-cased; "?" when the name has none.</summary>
+    public static string Initial(SavedSync entry)
+    {
+        foreach (var c in Name(entry))
+        {
+            if (char.IsLetterOrDigit(c)) return char.ToUpperInvariant(c).ToString();
+        }
+
+        return "?";
+    }
+
     /// <summary>Row name in the UI: the user label when set, otherwise the service host.</summary>
     public static string Name(SavedSync entry)
     {

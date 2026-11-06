@@ -3078,3 +3078,71 @@ a.xbs-back { text-decoration: none; }
 .km-sb-item.is-locked > :not(.km-sb-actions):not(.km-sb-lock):not(.alert) { opacity: .6; }
 .km-sb-lock { display: flex; gap: .375rem; align-items: center; margin: 0; font-size: .8rem; color: var(--km-ink-2); }
 .km-sb-lock .km-ico { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; }
+
+/* ---- Quick sync switch (v1.0.231): the bar names the active sync, a tap
+   opens a sheet of ribbons. Ribbon colour = SavedSyncs.ColorSlot(syncId),
+   stable across renames; light uses the deep variants so white initials read. */
+:root, [data-bs-theme="light"] {
+    --km-sync-c0: #1f6f5c; --km-sync-c1: #3d4fb0; --km-sync-c2: #9a6a0a; --km-sync-c3: #b4502e;
+    --km-sync-ink: #ffffff;
+}
+[data-bs-theme="dark"] {
+    --km-sync-c0: #4cc9a4; --km-sync-c1: #8c9bf0; --km-sync-c2: #e3b808; --km-sync-c3: #f0997b;
+    --km-sync-ink: #0e1226;
+}
+
+.km-switch-open-row { display: flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; }
+.km-switch-chev { flex: none; opacity: 0.85; }
+
+.km-switch-head { display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem; }
+.km-switch-head .xbs-sheet-title { flex: 1; min-width: 0; }
+.km-switch-close {
+    flex: none; width: 40px; height: 40px; border: 0; border-radius: 12px;
+    background: transparent; color: var(--km-ink-2);
+    display: flex; align-items: center; justify-content: center;
+}
+.km-switch-close:active { background: var(--km-surface-2); }
+.km-switch-note { font-size: 0.85rem; color: var(--km-ink-2); margin: 0 0 0.5rem; }
+
+.km-switch-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.km-switch-row { border-radius: 14px; }
+.km-switch-row.active { background: var(--km-tint); }
+.km-switch-row.armed { outline: 1.5px solid var(--km-accent); }
+.km-switch-row.failed { outline: 1.5px solid var(--km-danger); }
+
+.km-switch-pick {
+    width: 100%; border: 0; background: transparent; color: inherit;
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px; text-align: left; border-radius: 14px;
+}
+.km-switch-pick:not(:disabled):active { background: var(--km-surface-2); }
+.km-switch-pick:disabled { opacity: 1; }
+.km-switch-row:not(.active) .km-switch-pick:disabled { opacity: 0.55; }
+
+.km-ribbon {
+    flex: none; width: 30px; height: 40px; padding-top: 7px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%);
+    display: flex; justify-content: center; align-items: flex-start;
+    font-weight: 700; font-size: 0.95rem; line-height: 1; color: var(--km-sync-ink);
+}
+.km-sync-c0 { background: var(--km-sync-c0); }
+.km-sync-c1 { background: var(--km-sync-c1); }
+.km-sync-c2 { background: var(--km-sync-c2); }
+.km-sync-c3 { background: var(--km-sync-c3); }
+
+.km-switch-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.km-switch-name { font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.km-switch-meta { font-size: 0.8rem; color: var(--km-ink-2); line-height: 1.35; overflow-wrap: anywhere; }
+.km-switch-meta.on { color: var(--km-green); font-weight: 600; }
+.km-switch-check { flex: none; color: var(--km-green); margin-top: 2px; }
+
+.km-switch-confirm { padding: 0 10px 8px 52px; }
+.km-switch-busy { margin: 0 0 4px; font-size: 0.9rem; color: var(--km-ink-2); display: flex; align-items: center; gap: 8px; }
+.km-switch-error { margin: 0 10px 10px 52px; font-size: 0.85rem; }
+
+.km-switch-manage {
+    margin-top: 0.75rem; padding: 12px 10px 4px; width: 100%;
+    border: 0; border-top: 1px solid var(--km-line); background: transparent;
+    color: var(--km-accent); font-weight: 600; text-align: left;
+    display: flex; align-items: center; gap: 6px;
+}

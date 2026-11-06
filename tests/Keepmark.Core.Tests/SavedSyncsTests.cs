@@ -407,4 +407,25 @@ public class SavedSyncRegistryTests
 
         Assert.Equal(new[] { "new", "old" }, (await registry.ListAsync()).Select(r => r.SyncId));
     }
+
+    [Fact]
+    public void ColorSlotIsStableAndIgnoresCase()
+    {
+        var id = "6ac2f614d6c04fe2a9729824697291fa";
+        var slot = SavedSyncs.ColorSlot(id);
+        Assert.InRange(slot, 0, SavedSyncs.ColorSlots - 1);
+        Assert.Equal(slot, SavedSyncs.ColorSlot(id));
+        Assert.Equal(slot, SavedSyncs.ColorSlot(id.ToUpperInvariant()));
+        // The slots are actually spread, not all the same.
+        var slots = Enumerable.Range(0, 40).Select(i => SavedSyncs.ColorSlot($"sync-{i}")).Distinct().Count();
+        Assert.Equal(SavedSyncs.ColorSlots, slots);
+    }
+
+    [Fact]
+    public void InitialComesFromTheUiName()
+    {
+        Assert.Equal("C", SavedSyncs.Initial(new SavedSync { Label = "  casa", ServiceUrl = "https://x.example", SyncId = "a" }));
+        Assert.Equal("A", SavedSyncs.Initial(new SavedSync { ServiceUrl = "https://api.xbrowsersync.org", SyncId = "a" }));
+        Assert.Equal("?", SavedSyncs.Initial(new SavedSync { Label = "···", ServiceUrl = "https://x.example", SyncId = "a" }));
+    }
 }

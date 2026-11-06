@@ -9,6 +9,7 @@
 @inject KeepmarkMobile.Services.SharedImportService SharedImport
 @inject NavigationManager Nav
 @inject KeepmarkMobile.Services.AppLockState AppLock
+@inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject IJSRuntime JS
 @inject KeepmarkMobile.Services.ISelectionFeedback SelectionFeedback
 @implements IDisposable
@@ -49,7 +50,23 @@ else
         else
         {
             <BrandMark Class="xbs-bar-mark" />
-            <span class="xbs-barpath"><span class="xbs-barpath-name">Keepmark</span></span>
+            @if (CanSwitch)
+            {
+                @* Quick switch (v1.0.231): the bar names the active sync; a tap
+                   opens the ribbon sheet. One sync only keeps "Keepmark". *@
+                <button type="button" class="xbs-barpath km-switch-open" @onclick="OpenSwitch"
+                        aria-haspopup="dialog" aria-expanded="@switchOpen.ToString().ToLowerInvariant()"
+                        aria-label="@L.Get(Str.SwitchOpenAria, ActiveSyncName)">
+                    <span class="km-switch-open-row">
+                        <span class="xbs-barpath-name">@ActiveSyncName</span>
+                        <svg class="km-ico sm km-switch-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="@(switchOpen ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6")" /></svg>
+                    </span>
+                </button>
+            }
+            else
+            {
+                <span class="xbs-barpath"><span class="xbs-barpath-name">Keepmark</span></span>
+            }
             <button class="xbs-barbtn" @onclick="OpenSearch" aria-label="@L.Get(Str.HomeSearchPlaceholder)"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></svg></button>
             @if (!recentView)
             {
@@ -315,6 +332,9 @@ else
     <div class="xbs-undo xbs-batch-undo" role="status"><span>@batchResultText</span><button class="xbs-undo-btn" disabled="@batchUndoBusy" @onclick="UndoBatchMove">@L.Get(Str.CommonUndo)</button></div>
 }
 
+<SyncSwitchSheet Visible="switchOpen" Rows="savedSyncs" Active="activeIdentity" ActiveDetail="@switchActiveDetail"
+                 OnClose="CloseSwitch" OnManage="ManageSyncs" OnSwitched="OnSyncSwitched" />
+
 @if (sheetFor is not null)
 {
     <BookmarkSheet @key="sharedSheetGeneration" Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
@@ -500,6 +520,74 @@ else if (moved is not null)
 
     private int? CurrentParent => crumbs.Count == 0 ? null : crumbs.Peek().RowId;
 
+    // ---- quick sync switch (bar title + ribbon sheet) ----------------------
+    private List<Core.Sync.SavedSync> savedSyncs = [];
+    private Core.Sync.SavedSyncIdentity? activeIdentity;
+    private bool switchOpen;
+    private string switchActiveDetail = string.Empty;
+
+    private Core.Sync.SavedSync? ActiveSaved => activeIdentity is null ? null
+        : savedSyncs.FirstOrDefault(r => Core.Sync.SavedSyncs.Same(r.Identity, activeIdentity));
+
+    /// <summary>Two or more saved syncs, one of them active, outside search and selection.</summary>
+    private bool CanSwitch => savedSyncs.Count >= 2 && ActiveSaved is not null;
+
+    private string ActiveSyncName => ActiveSaved is { } a ? Core.Sync.SavedSyncs.Name(a) : "Keepmark";
+
+    private async Task LoadSwitcherAsync()
+    {
+        try
+        {
+            var creds = await Creds.GetAsync();
+            activeIdentity = creds is null ? null : new Core.Sync.SavedSyncIdentity(creds.ServiceUrl, creds.Id);
+            savedSyncs = Session.Registry is null ? [] : await Session.Registry.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            // An unreadable registry only hides the shortcut; Syncs reports it.
+            savedSyncs = [];
+            Session.Log.Warn("ui", $"Switcher list unreadable: {ex.GetType().Name}");
+        }
+    }
+
+    private async Task OpenSwitch()
+    {
+        await LoadSwitcherAsync();
+        if (!CanSwitch) return;
+        var detail = lastSync is null ? L.Get(Str.NavNotSyncedYet) : L.Get(Str.NavSynced, FormatLastSync(lastSync));
+        try
+        {
+            var stats = await Session.Store.GetStatsAsync();
+            detail += " · " + Loc.Plural(Str.HomeCountBookmarks, stats.Bookmarks);
+        }
+        catch
+        {
+            // The count is a nicety: the row still says it is active.
+        }
+
+        switchActiveDetail = detail;
+        switchOpen = true;
+    }
+
+    private void CloseSwitch() => switchOpen = false;
+
+    private void ManageSyncs()
+    {
+        switchOpen = false;
+        Nav.NavigateTo("syncs");
+    }
+
+    /// <summary>The new sync's tree replaced the old one: start from its root,
+    /// with no search, selection or undo left over from the previous sync.</summary>
+    private async Task OnSyncSwitched(string name)
+    {
+        switchOpen = false;
+        moved = null;
+        await LoadSwitcherAsync();
+        await GoRoot();
+        _ = Toast.ShowAsync(L.Get(Str.SyncsActivated, name));
+    }
+
     private sealed record SheetTarget(ItemRow? Row, int? Parent, string? PresetUrl = null, string? PresetTitle = null);
 
     protected override async Task OnInitializedAsync()
@@ -513,6 +601,7 @@ else if (moved is not null)
         }
 
         pinned = Pins.Load();
+        await LoadSwitcherAsync();
         sortMode = AppSettings.ListSort;
         recentOpen = AppSettings.RecentOpen;
         await RefreshAsync(initial: true);
