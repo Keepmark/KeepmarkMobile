@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.227 (228)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.228 (229)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -763,7 +763,8 @@ opens the backups again).
      before the unlink. An identical tree from another service rewrites the
      same file with the new `ServiceUrl` instead of adding a second one;
   4. unlinks the device (credentials + active row).
-- Copies are listed in Backup → **Copies of removed syncs** with restore and
+- Copies are listed in Backup → **Copies of removed syncs** (the section is
+  hidden while there are none and nothing to report) with restore and
   delete (both confirmed), and are **never pruned automatically**. A damaged or
   foreign file is skipped with a warning, never listed and never deleted. File
   names are opaque to callers: only bare `removed-*.json` names inside the
