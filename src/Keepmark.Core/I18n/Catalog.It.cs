@@ -306,7 +306,7 @@ internal static partial class Catalogs
         [Str.SyncsInactive] = "Inattivo",
         [Str.SyncsActivate] = "Attiva",
         [Str.SyncsActivateHint] = "Il cambio sostituisce i segnalibri di questo dispositivo con la copia di {0}. Sul server non viene eliminato nulla.",
-        [Str.SyncsActivated] = "Passato a {0}.",
+        [Str.SyncsActivated] = "{0} attivato.",
         [Str.SyncsForget] = "Dimentica…",
         [Str.CommonYesForget] = "Sì, dimentica",
         [Str.SyncsForgetMessage] = "Dimenticare {0}?",
