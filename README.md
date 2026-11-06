@@ -135,7 +135,7 @@ backups. A brief touch response and visible checkboxes confirm selection.
 
 <p align="center">
   <img src="docs/img/screens/05-backup.png" width="24%" alt="Encrypted backups" />
-  <img src="docs/img/screens/06-actions.png" width="24%" alt="Bookmark actions" />
+  <img src="docs/img/screens/06-switch.png" width="24%" alt="Switch syncs from the top bar" />
   <img src="docs/img/screens/07-pinned.png" width="24%" alt="Pinned bookmarks" />
   <img src="docs/img/screens/08-qr.png" width="24%" alt="Scan the connection QR from the browser" />
 </p>
