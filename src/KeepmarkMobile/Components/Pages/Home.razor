@@ -256,14 +256,16 @@ else
                 <text>@(lastSync is null ? L.Get(Str.NavNotSyncedYet) : L.Get(Str.NavSynced, FormatLastSync(lastSync)))</text>
             }
         </span>
-        <button class="xbs-statusbar-sync" @onclick="SyncNow">@L.Get(Str.CommonSyncNow)</button>
+        <button class="xbs-statusbar-sync" @onclick="SyncNow" aria-label="@L.Get(Str.CommonSyncNow)" title="@L.Get(Str.CommonSyncNow)">
+            <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5M20 4v4.5h-4.5M20 12a8 8 0 0 1-13.7 5.7L4 15.5M4 20v-4.5h4.5" /></svg>
+        </button>
     </div>
     }
 }
 
 @if (ready && Session.Engine is not null && !selection.Active)
 {
-    <button class="xbs-fab" @onclick="AddNew" aria-label="@L.Get(Str.HomeAddAria)">
+    <button class="xbs-fab @(StatusVisible ? "compact" : string.Empty)" @onclick="AddNew" aria-label="@L.Get(Str.HomeAddAria)">
         <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         <span class="xbs-fab-label" aria-hidden="true">@L.Get(Str.HomeAdd)</span>
     </button>

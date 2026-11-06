@@ -1452,8 +1452,9 @@ html.xbs-under .xbs-crumbbar {
     left: max(1rem, env(safe-area-inset-left, 0px));
     bottom: calc(var(--km-b) + 8px);
     z-index: 1070;
-    max-width: calc(100vw - 2rem - 8.5rem);
-    height: 40px;
+    /* The FAB collapses to its 56px square while the pill shows (.xbs-fab.compact). */
+    max-width: calc(100vw - 2rem - 56px - 0.5rem);
+    min-height: 40px;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1485,20 +1486,29 @@ html.xbs-under .xbs-crumbbar {
 
 @keyframes xbs-pulse { 50% { opacity: 0.35; } }
 
+/* Up to two lines: translated states are longer than the English ones. */
 .xbs-statusbar-main {
     min-width: 0;
-    white-space: nowrap;
+    padding: 3px 0;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
 }
 
 .xbs-status-link { color: var(--km-danger); font-weight: 600; text-decoration: none; }
 
 .xbs-statusbar-sync {
     flex-shrink: 0;
+    width: 44px;
     height: 40px;
-    margin-right: -0.5rem;
-    padding: 0 0.5rem;
+    margin-right: -0.625rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 0;
     background: transparent;
     color: var(--km-accent);
@@ -1530,15 +1540,15 @@ html.xbs-under .xbs-crumbbar {
 .xbs-fab:active { background: var(--km-accent-hover); }
 
 .xbs-fab-label {
-    max-width: 4rem;
+    max-width: 8rem;
     overflow: hidden;
     white-space: nowrap;
     transition: max-width 0.2s ease-out, opacity 0.2s;
 }
 
 /* Scrolled away from the top: collapse to a square + (gestures.js). */
-body.xbs-scrolled .xbs-fab { padding: 0 1rem; gap: 0; }
-body.xbs-scrolled .xbs-fab-label { max-width: 0; opacity: 0; }
+body.xbs-scrolled .xbs-fab, .xbs-fab.compact { padding: 0 1rem; gap: 0; }
+body.xbs-scrolled .xbs-fab-label, .xbs-fab.compact .xbs-fab-label { max-width: 0; opacity: 0; }
 
 /* Drawer or a modal sheet open: floating controls step aside. */
 html.xbs-locked .xbs-fab,
