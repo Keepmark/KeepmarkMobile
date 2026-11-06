@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "Conserve les favoris des deux copies. Ceux supprimés d’une seule copie peuvent réapparaître. Les deux copies sont d’abord sauvegardées.",
         [Str.WfDirDownloadMessage] = "Remplacer les favoris de cet appareil par la copie du serveur ?",
         [Str.WfDirDownloadImplication] = "Les favoris de cet appareil seront remplacés. Une copie est d’abord enregistrée dans Sauvegarde → Sauvegardes de sécurité.",
+        [Str.WfDirDownloadImplicationSwitch] = "Les favoris de cet appareil seront remplacés. La synchronisation que vous quittez les conserve sur son serveur et reste dans la liste, prête à être réactivée.",
+        [Str.WfDirMergeImplicationSwitch] = "Conserve les favoris des deux copies. Ceux supprimés d’une seule copie peuvent réapparaître. La synchronisation que vous quittez garde sa copie sur le serveur et reste dans la liste.",
         [Str.WfBackupPasswordHint] = "Ce n'est pas votre mot de passe de synchronisation et il ne peut pas être récupéré : sans lui, le fichier ne peut pas être ouvert.",
         [Str.WfExportDone_one] = "Sauvegarde de {0} élément exportée. Conservez son mot de passe : ce n'est pas votre mot de passe de synchronisation et il ne peut pas être récupéré.",
         [Str.WfExportDone_other] = "Sauvegarde de {0} éléments exportée. Conservez son mot de passe : ce n'est pas votre mot de passe de synchronisation et il ne peut pas être récupéré.",

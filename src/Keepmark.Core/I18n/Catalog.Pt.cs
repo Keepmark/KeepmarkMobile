@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "Mantém os favoritos das duas cópias. Itens apagados de apenas uma cópia podem reaparecer. As duas cópias são salvas antes.",
         [Str.WfDirDownloadMessage] = "Substituir os favoritos deste dispositivo pela cópia do servidor?",
         [Str.WfDirDownloadImplication] = "Os favoritos deste dispositivo serão substituídos. Antes é salva uma cópia em Backup → Backups de segurança.",
+        [Str.WfDirDownloadImplicationSwitch] = "Os favoritos deste dispositivo serão substituídos. A sincronização que você deixa os mantém no servidor dela e continua na lista, pronta para ser reativada.",
+        [Str.WfDirMergeImplicationSwitch] = "Mantém os favoritos das duas cópias. Itens apagados de apenas uma cópia podem reaparecer. A sincronização que você deixa mantém a cópia dela no servidor e continua na lista.",
         [Str.WfBackupPasswordHint] = "Ela não é a sua senha de sincronização e não pode ser recuperada: sem ela, o arquivo não pode ser aberto.",
         [Str.WfExportDone_one] = "Backup de {0} item exportado. Guarde a senha dele: não é a sua senha de sincronização e não pode ser recuperada.",
         [Str.WfExportDone_other] = "Backup de {0} itens exportado. Guarde a senha dele: não é a sua senha de sincronização e não pode ser recuperada.",

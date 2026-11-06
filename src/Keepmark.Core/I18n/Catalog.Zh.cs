@@ -616,6 +616,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "保留两份副本的书签。仅从一份副本删除的项目可能重新出现。操作前会备份两份副本。",
         [Str.WfDirDownloadMessage] = "用服务器副本替换此设备的书签？",
         [Str.WfDirDownloadImplication] = "将替换此设备的书签。操作前会在“备份 → 安全备份”中保存副本。",
+        [Str.WfDirDownloadImplicationSwitch] = "将替换此设备的书签。你离开的同步会在其服务器上保留这些书签，并留在列表中，可随时重新启用。",
+        [Str.WfDirMergeImplicationSwitch] = "保留两份副本的书签。仅从一份副本删除的项目可能重新出现。你离开的同步会在服务器上保留其副本，并留在列表中。",
         [Str.WfBackupPasswordHint] = "这不是您的同步密码，且无法找回：没有它就无法打开文件。",
         [Str.WfExportDone_one] = "已导出 {0} 个项目的备份。请保存其密码：这不是您的同步密码，且无法找回。",
         [Str.WfExportDone_other] = "已导出 {0} 个项目的备份。请保存其密码：这不是您的同步密码，且无法找回。",

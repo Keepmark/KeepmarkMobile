@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "Păstrează marcajele din ambele copii. Elementele șterse doar dintr-o copie pot reapărea. Ambele copii sunt salvate mai întâi în Copii de rezervă → Copii de siguranță.",
         [Str.WfDirDownloadMessage] = "Înlocuiești marcajele acestui dispozitiv cu copia de pe server?",
         [Str.WfDirDownloadImplication] = "Marcajele acestui dispozitiv vor fi înlocuite. O copie este salvată mai întâi în Copii de rezervă → Copii de siguranță.",
+        [Str.WfDirDownloadImplicationSwitch] = "Marcajele acestui dispozitiv vor fi înlocuite. Sincronizarea pe care o părăsești le păstrează pe serverul ei și rămâne în listă, gata de reactivare.",
+        [Str.WfDirMergeImplicationSwitch] = "Păstrează marcajele din ambele copii. Elementele șterse doar dintr-o copie pot reapărea. Sincronizarea pe care o părăsești își păstrează copia pe server și rămâne în listă.",
         [Str.WfBackupPasswordHint] = "Nu este parola sincronizării și nu poate fi recuperată: fără ea fișierul nu poate fi deschis.",
         [Str.WfExportDone_one] = "Copia de rezervă cu {0} element a fost exportată. Păstrează-i parola: nu este parola sincronizării și nu poate fi recuperată.",
         [Str.WfExportDone_other] = "Copia de rezervă cu {0} elemente a fost exportată. Păstrează-i parola: nu este parola sincronizării și nu poate fi recuperată.",

@@ -614,6 +614,8 @@ public static partial class Str
     public const string WfDirMergeImplication = nameof(WfDirMergeImplication);
     public const string WfDirDownloadMessage = nameof(WfDirDownloadMessage);
     public const string WfDirDownloadImplication = nameof(WfDirDownloadImplication);
+    public const string WfDirDownloadImplicationSwitch = nameof(WfDirDownloadImplicationSwitch);
+    public const string WfDirMergeImplicationSwitch = nameof(WfDirMergeImplicationSwitch);
     public const string WfBackupPasswordHint = nameof(WfBackupPasswordHint);
     public const string WfExportDone_one = nameof(WfExportDone_one);
     public const string WfExportDone_other = nameof(WfExportDone_other);

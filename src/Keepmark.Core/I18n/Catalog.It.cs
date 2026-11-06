@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "Conserva i segnalibri di entrambe le copie. Quelli eliminati da una sola copia potrebbero ricomparire. Prima entrambe le copie vengono salvate in Backup → Backup di sicurezza.",
         [Str.WfDirDownloadMessage] = "Sostituire i segnalibri di questo dispositivo con la copia sul server?",
         [Str.WfDirDownloadImplication] = "I segnalibri di questo dispositivo verranno sostituiti. Prima viene salvata una copia in Backup → Backup di sicurezza.",
+        [Str.WfDirDownloadImplicationSwitch] = "I segnalibri di questo dispositivo verranno sostituiti. Il sync che lasci li conserva sul suo server e resta in elenco, pronto da riattivare.",
+        [Str.WfDirMergeImplicationSwitch] = "Conserva i segnalibri di entrambe le copie. Quelli eliminati da una sola copia potrebbero ricomparire. Il sync che lasci conserva la sua copia sul server e resta in elenco.",
         [Str.WfBackupPasswordHint] = "Non è la password di sincronizzazione e non può essere recuperata: senza di essa il file non si apre.",
         [Str.WfExportDone_one] = "Backup di {0} elemento esportato. Conserva la sua password: non è la password di sincronizzazione e non può essere recuperata.",
         [Str.WfExportDone_other] = "Backup di {0} elementi esportato. Conserva la sua password: non è la password di sincronizzazione e non può essere recuperata.",

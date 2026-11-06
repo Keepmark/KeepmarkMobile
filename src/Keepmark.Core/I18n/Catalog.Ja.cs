@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "両方のブックマークを保持します。片方だけで削除した項目は復活する場合があります。先に両方をバックアップします。",
         [Str.WfDirDownloadMessage] = "このデバイスのブックマークをサーバーのコピーで置き換えますか？",
         [Str.WfDirDownloadImplication] = "この端末のブックマークを置き換えます。先にバックアップ → 安全バックアップにコピーを保存します。",
+        [Str.WfDirDownloadImplicationSwitch] = "この端末のブックマークを置き換えます。切り替え前の同期はサーバー上にそれを保持し、一覧に残るのでいつでも再有効化できます。",
+        [Str.WfDirMergeImplicationSwitch] = "両方のブックマークを保持します。片方だけで削除した項目は復活する場合があります。切り替え前の同期はサーバー上のコピーを保持し、一覧に残ります。",
         [Str.WfBackupPasswordHint] = "同期のパスワードとは別で、復元できません。パスワードがないとファイルを開けません。",
         [Str.WfExportDone_one] = "{0} 件のバックアップをエクスポートしました。パスワードを保管してください。同期のパスワードとは別で、復元できません。",
         [Str.WfExportDone_other] = "{0} 件のバックアップをエクスポートしました。パスワードを保管してください。同期のパスワードとは別で、復元できません。",

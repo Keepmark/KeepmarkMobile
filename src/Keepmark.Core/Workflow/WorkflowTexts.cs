@@ -48,11 +48,14 @@ public static class WorkflowTexts
 
     public sealed record Confirm(string Message, string Implication, string ConfirmLabel);
 
-    public static Confirm DirectionConfirm(string direction) => direction switch
+    /// <summary><paramref name="switching"/>: adding a sync while another one is
+    /// active. Download and merge then write no safety backup (the sync being
+    /// left keeps its copy on its server), so the text must not promise one.</summary>
+    public static Confirm DirectionConfirm(string direction, bool switching = false) => direction switch
     {
         "upload" => new(Loc.Get(Str.WfDirUploadMessage), Loc.Get(Str.WfDirUploadImplication), Loc.Get(Str.CommonYesUpload)),
-        "merge" => new(Loc.Get(Str.WfDirMergeMessage), Loc.Get(Str.WfDirMergeImplication), Loc.Get(Str.CommonYesMerge)),
-        _ => new(Loc.Get(Str.WfDirDownloadMessage), Loc.Get(Str.WfDirDownloadImplication), Loc.Get(Str.CommonYesDownload)),
+        "merge" => new(Loc.Get(Str.WfDirMergeMessage), Loc.Get(switching ? Str.WfDirMergeImplicationSwitch : Str.WfDirMergeImplication), Loc.Get(Str.CommonYesMerge)),
+        _ => new(Loc.Get(Str.WfDirDownloadMessage), Loc.Get(switching ? Str.WfDirDownloadImplicationSwitch : Str.WfDirDownloadImplication), Loc.Get(Str.CommonYesDownload)),
     };
 
     // Backup → Export.

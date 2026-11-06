@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "Behält Lesezeichen aus beiden Kopien. Einseitig gelöschte Einträge können zurückkehren. Beide Kopien werden vorher gesichert.",
         [Str.WfDirDownloadMessage] = "Lesezeichen dieses Geräts durch die Serverkopie ersetzen?",
         [Str.WfDirDownloadImplication] = "Die Lesezeichen dieses Geräts werden ersetzt. Zuvor wird eine Kopie unter Sicherung → Sicherheitssicherungen gespeichert.",
+        [Str.WfDirDownloadImplicationSwitch] = "Die Lesezeichen dieses Geräts werden ersetzt. Die Synchronisierung, die du verlässt, behält sie auf ihrem Server und bleibt in der Liste, bereit zur Reaktivierung.",
+        [Str.WfDirMergeImplicationSwitch] = "Behält Lesezeichen aus beiden Kopien. Einseitig gelöschte Einträge können zurückkehren. Die Synchronisierung, die du verlässt, behält ihre Kopie auf dem Server und bleibt in der Liste.",
         [Str.WfBackupPasswordHint] = "Es ist nicht dein Synchronisierungspasswort und kann nicht wiederhergestellt werden: Ohne es lässt sich die Datei nicht öffnen.",
         [Str.WfExportDone_one] = "Sicherung mit {0} Element exportiert. Bewahre ihr Passwort auf: Es ist nicht dein Synchronisierungspasswort und kann nicht wiederhergestellt werden.",
         [Str.WfExportDone_other] = "Sicherung mit {0} Elementen exportiert. Bewahre ihr Passwort auf: Es ist nicht dein Synchronisierungspasswort und kann nicht wiederhergestellt werden.",

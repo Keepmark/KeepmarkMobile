@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "Keeps bookmarks from both copies. Items deleted from only one copy may return. Both copies are saved to Backup → Safety backups first.",
         [Str.WfDirDownloadMessage] = "Replace this device's bookmarks with the server copy?",
         [Str.WfDirDownloadImplication] = "This device’s bookmarks will be replaced. A copy is saved to Backup → Safety backups first.",
+        [Str.WfDirDownloadImplicationSwitch] = "This device’s bookmarks will be replaced. The sync you are leaving keeps them on its server and stays in the list, ready to reactivate.",
+        [Str.WfDirMergeImplicationSwitch] = "Keeps bookmarks from both copies. Items deleted from only one copy may return. The sync you are leaving keeps its own server copy and stays in the list.",
         [Str.WfBackupPasswordHint] = "It is not your sync password and cannot be recovered: without it the file cannot be opened.",
         [Str.WfExportDone_one] = "Backup of {0} item exported. Keep its password: it is not your sync password and cannot be recovered.",
         [Str.WfExportDone_other] = "Backup of {0} items exported. Keep its password: it is not your sync password and cannot be recovered.",

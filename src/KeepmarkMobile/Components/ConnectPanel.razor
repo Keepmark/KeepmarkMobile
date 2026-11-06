@@ -157,7 +157,7 @@ else
         <DirectionPicker Name="syncDirection" Value="@direction" ValueChanged="SetDirection"
                          LocalCount="reconcile.LocalCount" RemoteCount="reconcile.RemoteCount"
                          Disabled="@busy" />
-        <p class="text-muted">@WorkflowTexts.DirectionConfirm(direction).Implication</p>
+        <p class="text-muted">@WorkflowTexts.DirectionConfirm(direction, AddingWhileLinked).Implication</p>
         @if (direction == "merge" && mergeStats is not null)
         {
             <ul class="xbs-review-list mt-2">

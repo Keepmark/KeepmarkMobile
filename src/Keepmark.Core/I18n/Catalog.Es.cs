@@ -615,6 +615,8 @@ internal static partial class Catalogs
         [Str.WfDirMergeImplication] = "Conserva los marcadores de ambas copias. Los borrados de una sola copia pueden reaparecer. Antes se guardan ambas copias.",
         [Str.WfDirDownloadMessage] = "¿Reemplazar los marcadores de este dispositivo con la copia del servidor?",
         [Str.WfDirDownloadImplication] = "Se sustituirán los marcadores de este dispositivo. Antes se guarda una copia en Copia de seguridad → Copias de seguridad automáticas.",
+        [Str.WfDirDownloadImplicationSwitch] = "Se sustituirán los marcadores de este dispositivo. La sincronización que dejas los conserva en su servidor y sigue en la lista, lista para reactivarla.",
+        [Str.WfDirMergeImplicationSwitch] = "Conserva los marcadores de ambas copias. Los borrados de una sola copia pueden reaparecer. La sincronización que dejas conserva su copia en el servidor y sigue en la lista.",
         [Str.WfBackupPasswordHint] = "No es tu contraseña de sincronización y no se puede recuperar: sin ella el archivo no se puede abrir.",
         [Str.WfExportDone_one] = "Copia de {0} elemento exportada. Conserva su contraseña: no es tu contraseña de sincronización y no se puede recuperar.",
         [Str.WfExportDone_other] = "Copia de {0} elementos exportada. Conserva su contraseña: no es tu contraseña de sincronización y no se puede recuperar.",
