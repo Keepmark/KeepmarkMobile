@@ -506,7 +506,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "Arată adăugatele recent",
         [Str.SettingsShowRecentHint] = "Ultimele marcaje create, împreună cu folderul în care se află",
         [Str.SettingsRecentCount] = "Câte să arate pe Acasă",
-        [Str.SettingsThemeSystem] = "Sistem (implicit)",
+        [Str.SettingsThemeSystem] = "Sistem",
         [Str.SettingsThemeLight] = "Luminoasă",
         [Str.SettingsThemeDark] = "Întunecată",
         [Str.SettingsSecurity] = "Securitate",

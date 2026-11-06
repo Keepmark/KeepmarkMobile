@@ -508,7 +508,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "Показывать недавно добавленные",
         [Str.SettingsShowRecentHint] = "Последние созданные закладки и их папки",
         [Str.SettingsRecentCount] = "Сколько показывать на главной",
-        [Str.SettingsThemeSystem] = "Системная (по умолчанию)",
+        [Str.SettingsThemeSystem] = "Системная",
         [Str.SettingsThemeLight] = "Светлая",
         [Str.SettingsThemeDark] = "Тёмная",
         [Str.SettingsSecurity] = "Безопасность",

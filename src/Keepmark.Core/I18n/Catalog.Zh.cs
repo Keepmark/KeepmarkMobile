@@ -507,7 +507,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "显示最近添加",
         [Str.SettingsShowRecentHint] = "最近创建的书签及其所在文件夹",
         [Str.SettingsRecentCount] = "主页显示数量",
-        [Str.SettingsThemeSystem] = "跟随系统（默认）",
+        [Str.SettingsThemeSystem] = "跟随系统",
         [Str.SettingsThemeLight] = "浅色",
         [Str.SettingsThemeDark] = "深色",
         [Str.SettingsSecurity] = "安全",

@@ -620,7 +620,7 @@ public sealed class XbsSession : IAsyncDisposable
         Directory.CreateDirectory(dir);
         // The file name carries the sync it belongs to, so two exports of
         // different syncs never look identical in the share sheet.
-        var path = Path.Combine(dir, BackupGuard.ExportFileName(await ActiveSyncNameAsync().ConfigureAwait(false), DateTime.UtcNow));
+        var path = Path.Combine(dir, BackupGuard.ExportFileName(await ActiveSyncNameAsync().ConfigureAwait(false), DateTime.Now));
         await File.WriteAllTextAsync(path, System.Text.Json.JsonSerializer.Serialize(envelope), ct).ConfigureAwait(false);
         _log.Info("session", $"Encrypted backup exported ({CountBackupNodes(roots)} nodes)");
         return path;

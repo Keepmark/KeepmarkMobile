@@ -506,7 +506,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "最近追加を表示",
         [Str.SettingsShowRecentHint] = "最近作成したブックマークとそのフォルダー",
         [Str.SettingsRecentCount] = "ホームに表示する件数",
-        [Str.SettingsThemeSystem] = "システム（既定）",
+        [Str.SettingsThemeSystem] = "システム",
         [Str.SettingsThemeLight] = "ライト",
         [Str.SettingsThemeDark] = "ダーク",
         [Str.SettingsSecurity] = "セキュリティ",

@@ -506,7 +506,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "Show recently added",
         [Str.SettingsShowRecentHint] = "The latest bookmarks created, with the folder they are in",
         [Str.SettingsRecentCount] = "How many to show on Home",
-        [Str.SettingsThemeSystem] = "System (default)",
+        [Str.SettingsThemeSystem] = "System",
         [Str.SettingsThemeLight] = "Light",
         [Str.SettingsThemeDark] = "Dark",
         [Str.SettingsSecurity] = "Security",

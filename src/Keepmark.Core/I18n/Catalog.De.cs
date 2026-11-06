@@ -506,7 +506,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "Kürzlich hinzugefügte anzeigen",
         [Str.SettingsShowRecentHint] = "Die zuletzt erstellten Lesezeichen mit ihrem Ordner",
         [Str.SettingsRecentCount] = "Anzahl auf der Startseite",
-        [Str.SettingsThemeSystem] = "System (Standard)",
+        [Str.SettingsThemeSystem] = "System",
         [Str.SettingsThemeLight] = "Hell",
         [Str.SettingsThemeDark] = "Dunkel",
         [Str.SettingsSecurity] = "Sicherheit",

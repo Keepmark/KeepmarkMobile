@@ -506,7 +506,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "Mostra aggiunti di recente",
         [Str.SettingsShowRecentHint] = "Gli ultimi segnalibri creati, con la cartella in cui si trovano",
         [Str.SettingsRecentCount] = "Quanti mostrarne nella Home",
-        [Str.SettingsThemeSystem] = "Sistema (predefinito)",
+        [Str.SettingsThemeSystem] = "Sistema",
         [Str.SettingsThemeLight] = "Chiaro",
         [Str.SettingsThemeDark] = "Scuro",
         [Str.SettingsSecurity] = "Sicurezza",

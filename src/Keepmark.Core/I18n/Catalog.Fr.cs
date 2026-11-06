@@ -506,7 +506,7 @@ internal static partial class Catalogs
         [Str.SettingsShowRecent] = "Afficher les ajouts récents",
         [Str.SettingsShowRecentHint] = "Les derniers favoris créés, avec leur dossier",
         [Str.SettingsRecentCount] = "Combien en afficher sur l'accueil",
-        [Str.SettingsThemeSystem] = "Système (par défaut)",
+        [Str.SettingsThemeSystem] = "Système",
         [Str.SettingsThemeLight] = "Clair",
         [Str.SettingsThemeDark] = "Sombre",
         [Str.SettingsSecurity] = "Sécurité",

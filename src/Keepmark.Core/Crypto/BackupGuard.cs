@@ -54,16 +54,17 @@ public static class BackupGuard
     }
 
     /// <summary>
-    /// Export file name: `xbs-backup-&lt;sync&gt;-YYYYMMDD-HHmmss.xbs.json`. The
+    /// Export file name: `xbs-backup-&lt;sync&gt;-YYYYMMDD-HHmmss.xbs.json` (device local
+    /// time: the user reads it in the file picker). The
     /// sync name is a human label (service host fallback), so it is slugged;
     /// without one the file keeps the plain timestamped name.
     /// </summary>
-    public static string ExportFileName(string? syncName, DateTime utcNow)
+    public static string ExportFileName(string? syncName, DateTime localNow)
     {
         var slug = Slug(syncName);
         return slug.Length == 0
-            ? $"xbs-backup-{utcNow:yyyyMMdd-HHmmss}{FileSuffix}"
-            : $"xbs-backup-{slug}-{utcNow:yyyyMMdd-HHmmss}{FileSuffix}";
+            ? $"xbs-backup-{localNow:yyyyMMdd-HHmmss}{FileSuffix}"
+            : $"xbs-backup-{slug}-{localNow:yyyyMMdd-HHmmss}{FileSuffix}";
     }
 
     public static void RequirePassword(string? password)
