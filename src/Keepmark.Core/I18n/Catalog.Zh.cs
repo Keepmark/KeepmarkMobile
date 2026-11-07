@@ -317,6 +317,8 @@ internal static partial class Catalogs
         [Str.SyncsNameLabel] = "名称（可选）",
         [Str.SyncsNameTaken] = "另一个同步已使用此名称：请选择其他名称。",
         [Str.SyncsNameExample] = "例如：工作、家庭、家人",
+        [Str.ConnSyncIdPlaceholder] = "在此粘贴同步 ID",
+        [Str.ServiceHostExample] = "例如：sync.yourdomain.com",
         [Str.SyncsNameEmptyHint] = "留空则使用服务名称：{0}。",
         [Str.SyncsEmpty] = "还没有已保存的同步。扫描浏览器上同步的二维码即可添加。",
         [Str.SyncsUnlockTitle] = "激活同步",

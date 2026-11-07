@@ -318,6 +318,8 @@ internal static partial class Catalogs
         [Str.SyncsNameLabel] = "Имя (необязательно)",
         [Str.SyncsNameTaken] = "Другой sync уже использует это имя: выберите другое.",
         [Str.SyncsNameExample] = "напр. Работа, Дом, Семья",
+        [Str.ConnSyncIdPlaceholder] = "Вставьте сюда ID синхронизации",
+        [Str.ServiceHostExample] = "напр. sync.yourdomain.com",
         [Str.SyncsNameEmptyHint] = "Оставьте пустым, чтобы использовать имя сервиса: {0}.",
         [Str.SyncsEmpty] = "Сохранённых sync пока нет. Добавьте его, отсканировав QR-код sync в браузере.",
         [Str.SyncsUnlockTitle] = "Активировать sync",

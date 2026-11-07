@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.234 (235)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.235 (236)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -1262,7 +1262,10 @@ disposal. Shared components are presentation-only: data in through
 ### Visual rules
 
 Design tokens, layout, components, z-index scale and the accessibility checklist
-are normative in [DESIGN.md](DESIGN.md). Highlights: never cover the status
+are normative in [DESIGN.md](DESIGN.md). Placeholders are hints, never sample
+values: a phrase or an "e.g." example (`ConnSyncIdPlaceholder`,
+`ServiceHostExample`), rendered light italic by the global
+`.form-control::placeholder` rule and hidden on focus. Highlights: never cover the status
 bar/notch (non-edge-to-edge window + safe-area + confined scroll), `--km-*`
 tokens for brand colours, `xbs-*` classes for custom behavior, `km-*` scoped
 classes for local presentation only, status bar 1070 < sheet 1100 < toast 1200 <

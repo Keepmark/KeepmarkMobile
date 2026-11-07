@@ -3150,3 +3150,12 @@ a.xbs-back { text-decoration: none; }
     color: var(--km-accent); font-weight: 600; text-align: left;
     display: flex; align-items: center; gap: 6px;
 }
+
+/* Placeholders read as hints, never as typed values: lighter, italic, and
+   gone once the field has focus (the label/hint still says what goes there). */
+.form-control::placeholder {
+    color: color-mix(in srgb, currentColor 42%, transparent);
+    font-style: italic;
+    opacity: 1;
+}
+.form-control:focus::placeholder { color: transparent; }

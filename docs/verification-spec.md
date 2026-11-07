@@ -459,7 +459,8 @@ TalkBack, rotation and font scaling still require device QA.
   startup migration and a concurrent link/rename never drop a row. The
   migration itself is best-effort: a storage failure is logged, the app starts.
 - Label uniqueness compares the displayed names (host fallback included) and
-  the rename field shows the suggested name as its placeholder. The saved-sync
+  the line under the rename field names the suggested name (the placeholder
+  is a generic example). The saved-sync
   list surfaces a read failure (`ErrLoadFailed`) instead of rendering the
   empty state.
 - Unlinking puts the engine straight into `NoCredentials` instead of waiting

@@ -99,7 +99,7 @@ else
             {
                 <div class="mb-3">
                     <label class="form-label">@L.Get(Str.ConnSyncId)</label>
-                    <input disabled="@busy" class="form-control" @bind="syncId" @bind:after="ClearLinkError" placeholder="a1b2c3d4e5f6…" />
+                    <input disabled="@busy" class="form-control" @bind="syncId" @bind:after="ClearLinkError" placeholder="@L.Get(Str.ConnSyncIdPlaceholder)" autocomplete="off" spellcheck="false" autocapitalize="off" />
                     <label class="form-label mt-2">@L.Get(Str.CommonPassword)</label>
                     <input disabled="@busy" type="password" class="form-control" @bind="password" @bind:after="ClearLinkError" autocomplete="current-password" />
                     <InfoHint Text="@L.Get(Str.ConnPasswordShort)" Title="@L.Get(Str.ConnLinkExistingTitle)" Body="@L.Get(Str.ConnPasswordHint)" />

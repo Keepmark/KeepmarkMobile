@@ -316,6 +316,8 @@ internal static partial class Catalogs
         [Str.SyncsNameLabel] = "Name (optional)",
         [Str.SyncsNameTaken] = "Ein anderer Sync verwendet diesen Namen bereits: wähle einen anderen.",
         [Str.SyncsNameExample] = "z. B. Arbeit, Zuhause, Familie",
+        [Str.ConnSyncIdPlaceholder] = "Sync-ID hier einfügen",
+        [Str.ServiceHostExample] = "z. B. sync.ihredomain.de",
         [Str.SyncsNameEmptyHint] = "Leer lassen, um den Dienstnamen zu verwenden: {0}.",
         [Str.SyncsEmpty] = "Noch kein Sync gespeichert. Füge einen hinzu, indem du den QR-Code eines Syncs im Browser scannst.",
         [Str.SyncsUnlockTitle] = "Sync aktivieren",

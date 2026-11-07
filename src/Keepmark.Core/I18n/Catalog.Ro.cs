@@ -316,6 +316,8 @@ internal static partial class Catalogs
         [Str.SyncsNameLabel] = "Nume (opțional)",
         [Str.SyncsNameTaken] = "Altă sincronizare folosește deja acest nume: alege altul.",
         [Str.SyncsNameExample] = "ex. Serviciu, Acasă, Familie",
+        [Str.ConnSyncIdPlaceholder] = "Lipește aici ID-ul de sincronizare",
+        [Str.ServiceHostExample] = "ex. sync.domeniultau.ro",
         [Str.SyncsNameEmptyHint] = "Lasă gol pentru a folosi numele serviciului: {0}.",
         [Str.SyncsEmpty] = "Încă nicio sincronizare salvată. Adaugă una scanând codul QR al unei sincronizări din browser.",
         [Str.SyncsUnlockTitle] = "Activează sincronizarea",

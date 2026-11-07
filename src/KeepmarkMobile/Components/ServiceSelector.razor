@@ -37,7 +37,7 @@
                 <option value="https" selected="@(Scheme == "https")">https://</option>
                 <option value="http" selected="@(Scheme == "http")">http://</option>
             </select>
-            <input id="@(id + "-url")" class="form-control" value="@Host" @oninput="EditHost" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="sync.example.org" />
+            <input id="@(id + "-url")" class="form-control" value="@Host" @oninput="EditHost" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="@L.Get(Str.ServiceHostExample)" />
         </div>
         <div class="form-text">@L.Get(Str.ConnServiceUrlHintPlain)</div>
         @if (WorkflowRules.IsCleartextServiceUrl(Value))
