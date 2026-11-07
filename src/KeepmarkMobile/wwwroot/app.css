@@ -3170,3 +3170,6 @@ a.xbs-back { text-decoration: none; }
 .km-switch-info svg { width: 19px; height: 19px; }
 .km-switch-info::after { content: ""; position: absolute; inset: -6px; }
 .km-switch-info { position: relative; }
+/* Plain confirm (sync switch): no alert box inside the already-outlined row. */
+.km-confirm-plain .km-confirm-head > strong { color: var(--km-ink); }
+.km-confirm-plain .km-confirm-implication { color: var(--km-ink-2); font-size: .9rem; }

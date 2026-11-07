@@ -1,11 +1,12 @@
 @inject KeepmarkMobile.Services.XbsSettings Settings
 @* Activate-sync confirmation (Syncs page + switch sheet). The full explanation
    shows until the user ticks "Got it"; after that only "Activate X?" remains,
-   with the explanation behind a small info toggle on the right. *@
+   with the explanation behind a small info toggle on the right. Plain: the
+   armed row is already outlined, so no second (alert) box inside it. *@
 <ConfirmBlock Message="@L.Get(Str.SyncsActivateMessage, Name)"
               Implication="@(ShowFull ? L.Get(Str.SyncsActivateHint, Name) : null)"
               ConfirmLabel="@L.Get(Str.SyncsActivate)" Danger="false" Busy="Busy"
-              OnConfirm="ConfirmAsync" OnCancel="OnCancel" FillActions="true"
+              OnConfirm="ConfirmAsync" OnCancel="OnCancel" FillActions="true" Plain="true"
               HeadAside="@(seen ? InfoToggle : null)">
     @if (!seen)
     {

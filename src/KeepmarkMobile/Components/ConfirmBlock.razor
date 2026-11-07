@@ -2,8 +2,8 @@
    next to the action, the question in bold, one implication line (what is
    lost, where, who else is affected), then "Yes, <verb>" and Cancel.
    Destructive confirms are red. The page owns the armed flag. *@
-<div class="alert @(Danger ? "alert-danger" : "alert-warning") mt-2 mb-2" role="group" aria-label="@Message">
-    @if (HeadAside is null)
+<div class="@(Plain ? "km-confirm-plain" : Danger ? "alert alert-danger" : "alert alert-warning") mt-2 mb-2" role="group" aria-label="@Message">
+    @if (HeadAside is null && !Plain)
     {
         <strong>@Message</strong>
         @if (!string.IsNullOrEmpty(Implication))
@@ -41,4 +41,7 @@
     [Parameter] public RenderFragment? HeadAside { get; set; }
     /// <summary>Confirm and Cancel share the row in equal widths.</summary>
     [Parameter] public bool FillActions { get; set; }
+    /// <summary>No alert box: question and buttons sit in the host row (used
+    /// where the row is already outlined, e.g. the sync switch sheet).</summary>
+    [Parameter] public bool Plain { get; set; }
 }
