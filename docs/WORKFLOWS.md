@@ -72,9 +72,11 @@ Words come from `UI-TERMS.md`.
 
 ## Saved-sync list and settings layout
 
-The extension manager and Android Syncs page give every saved sync a prominent
-`Activate` button. It is disabled on the active sync, whose active badge stays
-visible. Secondary commands are in the row's accessible `⋮` menu: ordinary
+The extension manager gives every saved sync a prominent `Activate` button,
+disabled on the active sync, whose active badge stays visible. The Android
+Syncs page keeps each row on one line: the active sync shows only its badge,
+and every other sync shows `Activate` in that same slot, so the active sync
+never offers to activate itself. Secondary commands are in the row's accessible `⋮` menu: ordinary
 commands (rename, show QR or change password where supported) first, then a
 separate final group for forgetting, unlinking and server deletion where
 supported. A menu opens only that row's existing task; confirmations and stable

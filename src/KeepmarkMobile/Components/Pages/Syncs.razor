@@ -54,16 +54,39 @@ else
            rename editor is outlined, every other row is disabled below. *@
         <div class="card mb-2 @(OwnsTask(key) ? "border-primary" : "")" @key="key">
             <div class="card-body py-2">
-                <div class="d-flex justify-content-between align-items-start gap-2">
-                    <div>
+                @* One line per sync: the state slot holds the Active badge on the
+                   active row and the Activate button on the others, so the
+                   active sync never offers to activate itself. *@
+                <div class="xbs-sync-head">
+                    <div class="xbs-sync-name">
                         <div><strong>@name</strong></div>
                         <div class="form-text">
                             @SavedSyncs.ServiceHost(row.ServiceUrl) · ID <code>@SavedSyncs.ShortSyncId(row.SyncId)</code>
                         </div>
                     </div>
-                    <span class="badge @(isActive ? "text-bg-success" : "text-bg-secondary")">
-                        @L.Get(isActive ? Str.SyncsActive : Str.SyncsInactive)
-                    </span>
+                    @if (isActive)
+                    {
+                        <span class="badge text-bg-success">@L.Get(Str.SyncsActive)</span>
+                    }
+                    else if (!OwnsTask(key))
+                    {
+                        <button class="btn btn-outline-primary btn-sm xbs-sync-activate" @onclick="() => Arm(key, armActivate: true)"
+                                disabled="@RowBusy(key)" title="@L.Get(Str.SyncsActivateHint, name)">
+                            @L.Get(Str.SyncsActivate)
+                        </button>
+                    }
+                    @if (!OwnsTask(key))
+                    {
+                        <div class="xbs-sync-actions" @onclick:stopPropagation="true">
+                            <button type="button" class="btn btn-outline-secondary xbs-sync-more"
+                                    aria-label="@L.Get(Str.RowActionsFor, name)"
+                                    aria-expanded="@((menuKey == key).ToString().ToLowerInvariant())"
+                                    aria-controls="sync-actions-@i" disabled="@RowBusy(key)"
+                                    @onclick="() => ToggleMenu(key)">
+                                <span aria-hidden="true">⋮</span>
+                            </button>
+                        </div>
+                    }
                 </div>
 
                 @if (renamingKey == key)
@@ -144,41 +167,23 @@ else
                         }
                     </div>
                 }
-                else
+                else if (menuKey == key)
                 {
-                    <div class="mt-2 d-flex flex-wrap align-items-start gap-2">
-                        <button class="btn btn-primary xbs-sync-activate" @onclick="() => Arm(key, armActivate: true)"
-                                disabled="@(isActive || RowBusy(key))" title="@L.Get(Str.SyncsActivateHint, name)">
-                            @L.Get(Str.SyncsActivate)
-                        </button>
-                        <div class="xbs-sync-actions" @onclick:stopPropagation="true">
-                            <button type="button" class="btn btn-outline-secondary xbs-sync-more"
-                                    aria-label="@L.Get(Str.RowActionsFor, name)"
-                                    aria-expanded="@((menuKey == key).ToString().ToLowerInvariant())"
-                                    aria-controls="sync-actions-@i" disabled="@RowBusy(key)"
-                                    @onclick="() => ToggleMenu(key)">
-                                <span aria-hidden="true">⋮</span>
-                            </button>
-                        </div>
-                        @if (menuKey == key)
+                    <div id="sync-actions-@i" class="xbs-sync-action-list mt-2" role="group" @onclick:stopPropagation="true"
+                         aria-label="@L.Get(Str.RowActionsFor, name)">
+                        <button type="button" @onclick="() => StartRename(key, row)">@L.Get(Str.SyncsRename)</button>
+                        @if (isActive)
                         {
-                            <div id="sync-actions-@i" class="xbs-sync-action-list" role="group" @onclick:stopPropagation="true"
-                                 aria-label="@L.Get(Str.RowActionsFor, name)">
-                                <button type="button" @onclick="() => StartRename(key, row)">@L.Get(Str.SyncsRename)</button>
-                                @if (isActive)
-                                {
-                                    <button type="button" @onclick="() => StartPassword(key)">@L.Get(Str.SettingsChangePasswordBtn)</button>
-                                }
-                                <hr />
-                                @if (isActive)
-                                {
-                                    <button type="button" class="text-danger" @onclick="() => Arm(key, armUnlink: true)">@L.Get(Str.ConnUnlinkBtn)</button>
-                                }
-                                else
-                                {
-                                    <button type="button" class="text-danger" @onclick="() => Arm(key, armForget: true)">@L.Get(Str.SyncsForget)</button>
-                                }
-                            </div>
+                            <button type="button" @onclick="() => StartPassword(key)">@L.Get(Str.SettingsChangePasswordBtn)</button>
+                        }
+                        <hr />
+                        @if (isActive)
+                        {
+                            <button type="button" class="text-danger" @onclick="() => Arm(key, armUnlink: true)">@L.Get(Str.ConnUnlinkBtn)</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="text-danger" @onclick="() => Arm(key, armForget: true)">@L.Get(Str.SyncsForget)</button>
                         }
                     </div>
                 }

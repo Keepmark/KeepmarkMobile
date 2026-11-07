@@ -2950,12 +2950,16 @@ a.xbs-back { text-decoration: none; }
 /* “Cartella incisa”: closed pocket, fine outline and the original tinted tile. */
 .xbs-tree-ico .km-ico, .xbs-move-ico .km-ico { width: 20px; height: 20px; stroke-width: 1.7; }
 
-/* Saved syncs: activation stays visible; uncommon commands open in the row,
-   so long translated labels and the last row never escape the scroll area. */
-.xbs-sync-activate { flex: 1; min-height: 44px; }
+/* Saved syncs: one line per row, name on the left and a state slot (Active
+   badge or Activate button) plus ⋮ on the right; uncommon commands open in
+   the row, so long translated labels and the last row never escape the
+   scroll area. */
+.xbs-sync-head { display: flex; align-items: center; gap: .5rem; }
+.xbs-sync-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.xbs-sync-head .badge { flex: none; }
+.xbs-sync-activate { flex: none; min-height: 44px; padding-inline: .9rem; }
 .xbs-sync-more { min-width: 44px; min-height: 44px; font-size: 1.3rem; line-height: 1; }
 .xbs-sync-action-list {
-    flex-basis: 100%;
     border: 1px solid var(--bs-border-color, #dee2e6);
     border-radius: .5rem;
     background: var(--bs-body-bg, #fff);

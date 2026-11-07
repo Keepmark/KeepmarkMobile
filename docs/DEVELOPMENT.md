@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.231 (232)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.232 (233)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -1406,7 +1406,8 @@ domain), LibTomCrypt (public-domain option); Figtree (OFL). See
 [`native/sqlcipher/THIRD-PARTY-NOTICES.txt`](../native/sqlcipher/THIRD-PARTY-NOTICES.txt),
 also bundled in the app.
 
-Saved-sync rows use a prominent Activate button, disabled on the active row.
+Saved-sync rows are one line: the active row shows the Active badge and no
+Activate button; dormant rows show Activate in that same slot.
 Secondary actions open from an accessible ⋮ menu: Rename and active-row Change
 password first; Forget/Unlink in a separate final group. Settings places the
 complete log controls last; every setting applies on change (no Save). See WORKFLOWS.md for the
