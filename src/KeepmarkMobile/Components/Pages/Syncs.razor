@@ -106,6 +106,12 @@ else
                         </div>
                     </div>
                 }
+                else if (armedActivateKey == key && busy)
+                {
+                    @* Verify + save + download take a few seconds: say so,
+                       like the quick-switch sheet does. *@
+                    <p class="km-switch-busy mt-2" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.SwitchActivating)</p>
+                }
                 else if (armedActivateKey == key)
                 {
                     <ConfirmBlock Message="@L.Get(Str.SyncsActivateMessage, name)"
