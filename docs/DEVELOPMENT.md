@@ -208,6 +208,21 @@ Never ship R8 without that device run. Play's
 "native code without debug symbols" notice is expected: the native libraries
 are the .NET runtime and the pinned SQLCipher binaries.
 
+Start-up budget (v1.0.241, Release on the test phone, content visible): ~1.05 s
+cold, down from 2.7–3.6 s. MAUI's Android `SecureStorage` rebuilds
+EncryptedSharedPreferences (Tink + Keystore) on every call, 100–300 ms each,
+so `SecureCredentialStore` caches each key after its first read (write-through,
+one gate) and `XbsSession` starts from `App.CreateWindow`, prefetching the
+credentials and the saved-sync list while SQLCipher opens the database. Never
+add a SecureStorage read outside `SecureCredentialStore`. To measure: in a
+separate worktree add `Android.Util.Log.Info("KMPERF", …)` marks with
+`SystemClock.ElapsedRealtime() - Process.StartElapsedRealtime`, build the KM-R8
+side build (see "Release DEX"), then `am force-stop` + `am start -W` and read
+`logcat -s KMPERF:I`. Leak check: drive `Blazor.navigateTo` over all routes via
+CDP (needs `AddBlazorWebViewDeveloperTools`, otherwise BlazorWebView turns
+WebView debugging off) and compare `dumpsys meminfo` PSS per round of 100;
+v1.0.241 plateaus at ~195 MB with a ~2 MB JS heap.
+
 Device inspection:
 
 ```sh

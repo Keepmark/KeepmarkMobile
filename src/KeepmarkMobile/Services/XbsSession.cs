@@ -68,6 +68,10 @@ public sealed class XbsSession : IAsyncDisposable
     private async Task InitializeCoreAsync()
     {
         var dbKey = await _creds.GetOrCreateDbKeyAsync().ConfigureAwait(false);
+        // Each SecureStorage key costs a Keystore round-trip on first read:
+        // fetch the credentials and the saved-sync list while SQLCipher opens
+        // the database, so the migration below reads them from the cache.
+        var prefetch = PrefetchCredentialsAsync();
         var store = new BookmarkStore(
             Path.Combine(FileSystem.AppDataDirectory, "xbs.db"), dbKey, _log);
         await store.InitializeAsync().ConfigureAwait(false);
@@ -87,7 +91,7 @@ public sealed class XbsSession : IAsyncDisposable
         // storage failure here must never keep the app from starting.
         try
         {
-            await Registry.SyncActiveAsync(await _creds.GetAsync().ConfigureAwait(false)).ConfigureAwait(false);
+            await Registry.SyncActiveAsync(await prefetch.ConfigureAwait(false)).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -98,6 +102,13 @@ public sealed class XbsSession : IAsyncDisposable
         _log.Info("session", $"Log started (level {_log.MinLevel}, mode {_settings.Mode})");
         engine.AutoSyncEnabled = _foreground;
         await _poller.SetActiveAsync(ShouldPoll).ConfigureAwait(false);
+    }
+
+    private async Task<SyncCredentials?> PrefetchCredentialsAsync()
+    {
+        var creds = await _creds.GetAsync().ConfigureAwait(false);
+        await _creds.GetSavedSyncsAsync().ConfigureAwait(false);
+        return creds;
     }
 
     public void SetForeground(bool foreground)

@@ -16,6 +16,10 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
+        // Start the session (DB key, database, credentials) now, in parallel
+        // with the WebView and Blazor boot, instead of waiting for OnStart.
+        // InitAsync is idempotent: OnStart and the pages await the same task.
+        _ = _session.InitAsync();
         var window = new Window(new MainPage()) { Title = "Keepmark" };
         window.Activated += (_, _) => _session.SetForeground(true);
         window.Resumed += (_, _) => _session.SetForeground(true);
