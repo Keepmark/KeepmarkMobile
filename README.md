@@ -169,17 +169,10 @@ detection and cheap change checks; elsewhere it falls back automatically.
 
 ## Get it
 
-**Google Play (closed testing).** Keepmark is in closed testing on Google
-Play and testers are welcome:
+Install Keepmark from
+[Google Play](https://play.google.com/store/apps/details?id=com.keepmark.mobile).
 
-1. Join the [keepmark-testers](https://groups.google.com/g/keepmark-testers)
-   group with the Google account you use on Play Store.
-2. Opt in to the test:
-   <https://play.google.com/apps/testing/com.keepmark.mobile>
-3. Install from
-   [Google Play](https://play.google.com/store/apps/details?id=com.keepmark.mobile).
-
-Please keep the app installed for at least 14 days. Feedback is welcome in
+Feedback is welcome in
 [issues](https://github.com/Keepmark/KeepmarkMobile/issues) or at
 keepmark@proton.me.
 
