@@ -8,6 +8,7 @@
 @inject KeepmarkMobile.Services.AppLockState AppLock
 @inject KeepmarkMobile.Services.IAppLockService LockPrompt
 @inject KeepmarkMobile.Services.ToastState Toast
+@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>@L.Get(Str.SyncsTitle)</PageTitle>
@@ -93,9 +94,13 @@ else
                 {
                     <div class="mt-2">
                         <label class="form-label" for="sync-name-@i">@L.Get(Str.SyncsNameLabel)</label>
+                        @* The field starts with the current name, selected, so
+                           typing replaces it; the grey text is only an example,
+                           and the line below says what an empty name means. *@
                         <input id="sync-name-@i" class="form-control" @bind="renameText"
-                               placeholder="@RenameSuggestion(row)"
+                               placeholder="@L.Get(Str.SyncsNameExample)"
                                maxlength="@SavedSyncs.MaxLabelLength" disabled="@busy" />
+                        <div class="form-text">@L.Get(Str.SyncsNameEmptyHint, RenameSuggestion(row))</div>
                         @if (nameTaken)
                         {
                             <div class="form-text text-danger" role="alert">@L.Get(Str.SyncsNameTaken)</div>
@@ -587,8 +592,22 @@ else
         Disarm();
         ClearNotice();
         renamingKey = key;
-        renameText = row.Label ?? string.Empty;
+        renameText = SavedSyncs.Name(row);
         nameTaken = false;
+        selectRenameField = true;
+    }
+
+    /// <summary>Set when the rename editor opens: after that render the field
+    /// gets focus with its text selected.</summary>
+    private bool selectRenameField;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!selectRenameField || renamingKey is null) return;
+        selectRenameField = false;
+        var index = rows.FindIndex(r => SavedSyncs.Key(r.ServiceUrl, r.SyncId) == renamingKey);
+        if (index < 0) return;
+        try { await JS.InvokeVoidAsync("xbsGestures.focusSelect", $"#sync-name-{index}"); } catch { }
     }
 
     private void CancelRename()
@@ -602,6 +621,13 @@ else
         var key = renamingKey;
         var row = rows.FirstOrDefault(r => SavedSyncs.Key(r.ServiceUrl, r.SyncId) == key);
         if (busy || row is null) return;
+        // The field opens with the shown name: saving it unchanged must not
+        // turn the host fallback into a fixed label.
+        if (renameText.Trim() == SavedSyncs.Name(row))
+        {
+            renamingKey = null;
+            return;
+        }
         busy = true;
         nameTaken = false;
         try

@@ -315,6 +315,8 @@ internal static partial class Catalogs
         [Str.SyncsRename] = "Redenumește",
         [Str.SyncsNameLabel] = "Nume (opțional)",
         [Str.SyncsNameTaken] = "Altă sincronizare folosește deja acest nume: alege altul.",
+        [Str.SyncsNameExample] = "ex. Serviciu, Acasă, Familie",
+        [Str.SyncsNameEmptyHint] = "Lasă gol pentru a folosi numele serviciului: {0}.",
         [Str.SyncsEmpty] = "Încă nicio sincronizare salvată. Adaugă una scanând codul QR al unei sincronizări din browser.",
         [Str.SyncsUnlockTitle] = "Activează sincronizarea",
         [Str.SyncsUnlinked] = "{0} deconectată. Marcajele rămân pe acest dispozitiv; sincronizarea rămâne pe server.",

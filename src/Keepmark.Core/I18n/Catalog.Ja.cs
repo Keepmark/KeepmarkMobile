@@ -315,6 +315,8 @@ internal static partial class Catalogs
         [Str.SyncsRename] = "名前を変更",
         [Str.SyncsNameLabel] = "名前（任意）",
         [Str.SyncsNameTaken] = "別の同期がすでにこの名前を使っています。別の名前を選んでください。",
+        [Str.SyncsNameExample] = "例：仕事、自宅、家族",
+        [Str.SyncsNameEmptyHint] = "空欄にするとサービス名を使います：{0}",
         [Str.SyncsEmpty] = "保存された同期はまだありません。ブラウザの同期の QR コードをスキャンして追加してください。",
         [Str.SyncsUnlockTitle] = "同期を有効にする",
         [Str.SyncsUnlinked] = "{0} のリンクを解除しました。ブックマークはこのデバイスに残り、同期はサーバーに残ります。",

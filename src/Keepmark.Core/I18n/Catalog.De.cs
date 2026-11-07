@@ -315,6 +315,8 @@ internal static partial class Catalogs
         [Str.SyncsRename] = "Umbenennen",
         [Str.SyncsNameLabel] = "Name (optional)",
         [Str.SyncsNameTaken] = "Ein anderer Sync verwendet diesen Namen bereits: wähle einen anderen.",
+        [Str.SyncsNameExample] = "z. B. Arbeit, Zuhause, Familie",
+        [Str.SyncsNameEmptyHint] = "Leer lassen, um den Dienstnamen zu verwenden: {0}.",
         [Str.SyncsEmpty] = "Noch kein Sync gespeichert. Füge einen hinzu, indem du den QR-Code eines Syncs im Browser scannst.",
         [Str.SyncsUnlockTitle] = "Sync aktivieren",
         [Str.SyncsUnlinked] = "{0} getrennt. Die Lesezeichen bleiben auf diesem Gerät; der Sync bleibt auf dem Server.",

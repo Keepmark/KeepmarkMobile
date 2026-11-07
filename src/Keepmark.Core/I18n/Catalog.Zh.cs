@@ -316,6 +316,8 @@ internal static partial class Catalogs
         [Str.SyncsRename] = "重命名",
         [Str.SyncsNameLabel] = "名称（可选）",
         [Str.SyncsNameTaken] = "另一个同步已使用此名称：请选择其他名称。",
+        [Str.SyncsNameExample] = "例如：工作、家庭、家人",
+        [Str.SyncsNameEmptyHint] = "留空则使用服务名称：{0}。",
         [Str.SyncsEmpty] = "还没有已保存的同步。扫描浏览器上同步的二维码即可添加。",
         [Str.SyncsUnlockTitle] = "激活同步",
         [Str.SyncsUnlinked] = "已取消关联 {0}。书签保留在此设备上；同步仍保留在服务器上。",

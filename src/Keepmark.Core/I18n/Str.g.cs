@@ -314,6 +314,8 @@ public static partial class Str
     public const string SyncsRename = nameof(SyncsRename);
     public const string SyncsNameLabel = nameof(SyncsNameLabel);
     public const string SyncsNameTaken = nameof(SyncsNameTaken);
+    public const string SyncsNameExample = nameof(SyncsNameExample);
+    public const string SyncsNameEmptyHint = nameof(SyncsNameEmptyHint);
     public const string SyncsEmpty = nameof(SyncsEmpty);
     public const string SyncsUnlockTitle = nameof(SyncsUnlockTitle);
     public const string SyncsUnlinked = nameof(SyncsUnlinked);

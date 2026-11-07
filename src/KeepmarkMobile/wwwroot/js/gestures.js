@@ -609,6 +609,12 @@ window.xbsGestures = (() => {
             const el = document.querySelector(selector);
             if (el && el.focus) el.focus();
         },
+        focusSelect(selector) {
+            const el = document.querySelector(selector);
+            if (!el || !el.focus) return;
+            el.focus();
+            if (el.select) el.select();
+        },
         layoutBrowse() {
             if (layoutFrame) return;
             layoutFrame = requestAnimationFrame(() => {

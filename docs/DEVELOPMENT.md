@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.233 (234)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.234 (235)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -663,8 +663,9 @@ storage failure is logged and the app still starts.
   case.
 - **Label** ≤ 40 characters, optional, unique case-insensitively; empty clears
   it. The display name is the label, or the service host when absent.
-  `SuggestName` proposes the host, then "host 2", "host 3"… and is the rename
-  field's placeholder. Uniqueness is checked against the **displayed** names,
+  `SuggestName` proposes the host, then "host 2", "host 3"…; the rename field
+  opens with the current name selected, and its hint line names this fallback
+  for an empty field (saving the shown name unchanged stores nothing). Uniqueness is checked against the **displayed** names,
   host fallback included, so no two rows can look identical.
 - **Order**: last used first, then label, then sync ID (deterministic).
 - **Upsert** refreshes `LastUsedAt` and preserves a label/version/fingerprint
