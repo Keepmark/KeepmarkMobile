@@ -6,7 +6,7 @@ Edit that file, not this one. Repo-wide layout is in `../AGENTS.md` (loaded via
 `../CLAUDE.md`). Behavioral requirements for review: `docs/verification-spec.md`.
 
 `README.md` is the user-facing GitHub landing page (no build instructions and no
-APK: users install via Google Play closed testing, see "Get it").
+APK: users install from Google Play, see "Get it").
 
 Quick reminders (details in docs/DEVELOPMENT.md):
 

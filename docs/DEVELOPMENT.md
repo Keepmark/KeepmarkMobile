@@ -17,7 +17,6 @@ Distribution:
 
 - Google Play (public since 2026-11-07):
   <https://play.google.com/store/apps/details?id=com.keepmark.mobile>.
-  The former closed test used <https://groups.google.com/g/keepmark-testers>.
 - GitHub releases
   (<https://github.com/Keepmark/KeepmarkMobile/releases>, tag `v1.0.N`,
   `gh release create`): release notes only, **no APK or other assets** (since
@@ -1343,9 +1342,9 @@ See §16 and verification-spec.md §13.5.
    `wwwroot/index.html` when CSS/JS changed.
 5. Commit as `v1.0.N (M): …` (no AI attribution), then ask before pushing.
 6. Play: `scripts/build-play-aab.sh`, verify the AAB with
-   `keytool -printcert -jarfile`, upload to closed testing.
+   `keytool -printcert -jarfile`, upload to the production track.
 7. GitHub release: `gh release create v1.0.N` with notes only (no APK/assets),
-   explaining how to join the testers group.
+   linking to Google Play.
 
 Docs-only changes do not bump the version and do not need a device build.
 
