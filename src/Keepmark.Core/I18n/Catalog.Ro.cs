@@ -628,6 +628,8 @@ internal static partial class Catalogs
         [Str.SwitchBusy] = "Sincronizare în curs: schimbarea va fi posibilă la final.",
         [Str.SwitchNoKey] = "Cheia nu este salvată aici: reactiveaz-o din Gestionează sincronizările.",
         [Str.SwitchActivating] = "Se activează…",
+        [Str.SwitchGotIt] = "Am înțeles, nu mai repeta",
+        [Str.SwitchWhatHappens] = "Ce se întâmplă",
         [Str.WfBackupPasswordHint] = "Nu este parola sincronizării și nu poate fi recuperată: fără ea fișierul nu poate fi deschis.",
         [Str.WfExportDone_one] = "Copia de rezervă cu {0} element a fost exportată. Păstrează-i parola: nu este parola sincronizării și nu poate fi recuperată.",
         [Str.WfExportDone_other] = "Copia de rezervă cu {0} elemente a fost exportată. Păstrează-i parola: nu este parola sincronizării și nu poate fi recuperată.",

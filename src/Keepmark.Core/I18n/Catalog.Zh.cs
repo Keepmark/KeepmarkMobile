@@ -629,6 +629,8 @@ internal static partial class Catalogs
         [Str.SwitchBusy] = "正在同步：完成后即可切换。",
         [Str.SwitchNoKey] = "此设备未保存其密钥：请在“管理同步”中重新激活。",
         [Str.SwitchActivating] = "正在激活…",
+        [Str.SwitchGotIt] = "知道了，不再提示",
+        [Str.SwitchWhatHappens] = "会发生什么",
         [Str.WfBackupPasswordHint] = "这不是您的同步密码，且无法找回：没有它就无法打开文件。",
         [Str.WfExportDone_one] = "已导出 {0} 个项目的备份。请保存其密码：这不是您的同步密码，且无法找回。",
         [Str.WfExportDone_other] = "已导出 {0} 个项目的备份。请保存其密码：这不是您的同步密码，且无法找回。",

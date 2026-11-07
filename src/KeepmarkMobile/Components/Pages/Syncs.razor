@@ -119,10 +119,7 @@ else
                 }
                 else if (armedActivateKey == key)
                 {
-                    <ConfirmBlock Message="@L.Get(Str.SyncsActivateMessage, name)"
-                                  Implication="@L.Get(Str.SyncsActivateHint, name)"
-                                  ConfirmLabel="@L.Get(Str.SyncsActivate)" Danger="false" Busy="busy"
-                                  OnConfirm="ActivateAsync" OnCancel="Disarm" />
+                    <SwitchConfirm Name="@name" Busy="busy" OnConfirm="ActivateAsync" OnCancel="Disarm" />
                 }
                 else if (armedForgetKey == key)
                 {

@@ -628,6 +628,8 @@ internal static partial class Catalogs
         [Str.SwitchBusy] = "Synchronisation en cours : le changement sera possible à la fin.",
         [Str.SwitchNoKey] = "Sa clé n’est pas enregistrée ici : réactivez-la depuis Gérer les synchronisations.",
         [Str.SwitchActivating] = "Activation…",
+        [Str.SwitchGotIt] = "Compris, ne plus le répéter",
+        [Str.SwitchWhatHappens] = "Que se passe-t-il",
         [Str.WfBackupPasswordHint] = "Ce n'est pas votre mot de passe de synchronisation et il ne peut pas être récupéré : sans lui, le fichier ne peut pas être ouvert.",
         [Str.WfExportDone_one] = "Sauvegarde de {0} élément exportée. Conservez son mot de passe : ce n'est pas votre mot de passe de synchronisation et il ne peut pas être récupéré.",
         [Str.WfExportDone_other] = "Sauvegarde de {0} éléments exportée. Conservez son mot de passe : ce n'est pas votre mot de passe de synchronisation et il ne peut pas être récupéré.",

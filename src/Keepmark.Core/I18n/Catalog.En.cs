@@ -628,6 +628,8 @@ internal static partial class Catalogs
         [Str.SwitchBusy] = "Syncing now: switching is possible when it finishes.",
         [Str.SwitchNoKey] = "Its key is not saved here: reactivate it from Manage syncs.",
         [Str.SwitchActivating] = "Activating…",
+        [Str.SwitchGotIt] = "Got it, don't repeat this",
+        [Str.SwitchWhatHappens] = "What happens",
         [Str.WfBackupPasswordHint] = "It is not your sync password and cannot be recovered: without it the file cannot be opened.",
         [Str.WfExportDone_one] = "Backup of {0} item exported. Keep its password: it is not your sync password and cannot be recovered.",
         [Str.WfExportDone_other] = "Backup of {0} items exported. Keep its password: it is not your sync password and cannot be recovered.",

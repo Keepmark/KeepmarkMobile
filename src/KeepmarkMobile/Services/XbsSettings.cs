@@ -113,6 +113,14 @@ public sealed class XbsSettings
         set => Preferences.Set("home_show_recent", value);
     }
 
+    /// <summary>The user ticked "Got it" on the sync-switch confirmation: later
+    /// switches ask only "Activate X?" and keep the explanation behind a link.</summary>
+    public bool SwitchHintSeen
+    {
+        get => Preferences.Get("switch_hint_seen", false);
+        set => Preferences.Set("switch_hint_seen", value);
+    }
+
     /// <summary>Bookmarks in the Home "Recently added" section: 5, 10 or 20. Default 5.</summary>
     /// <summary>How many safety backups to keep (newest first). Default 10.</summary>
     public int SafetyKeep

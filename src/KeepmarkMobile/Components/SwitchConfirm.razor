@@ -1,0 +1,42 @@
+@inject KeepmarkMobile.Services.XbsSettings Settings
+@* Activate-sync confirmation (Syncs page + switch sheet). The full explanation
+   shows until the user ticks "Got it"; after that only "Activate X?" remains,
+   with the explanation one tap away. *@
+<ConfirmBlock Message="@L.Get(Str.SyncsActivateMessage, Name)"
+              Implication="@(ShowFull ? L.Get(Str.SyncsActivateHint, Name) : null)"
+              ConfirmLabel="@L.Get(Str.SyncsActivate)" Danger="false" Busy="Busy"
+              OnConfirm="ConfirmAsync" OnCancel="OnCancel">
+    @if (!seen)
+    {
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="@cbId" @bind="gotIt" disabled="@Busy" />
+            <label class="form-check-label" for="@cbId">@L.Get(Str.SwitchGotIt)</label>
+        </div>
+    }
+    else if (!expanded)
+    {
+        <div><button type="button" class="xbs-link-btn km-switch-what" @onclick="() => expanded = true" disabled="@Busy">@L.Get(Str.SwitchWhatHappens)</button></div>
+    }
+</ConfirmBlock>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private readonly string cbId = $"km-switch-gotit-{Guid.NewGuid():N}";
+    private bool seen;
+    private bool gotIt;
+    private bool expanded;
+
+    private bool ShowFull => !seen || expanded;
+
+    protected override void OnInitialized() => seen = Settings.SwitchHintSeen;
+
+    private async Task ConfirmAsync()
+    {
+        if (gotIt && !seen) Settings.SwitchHintSeen = true;
+        await OnConfirm.InvokeAsync();
+    }
+}

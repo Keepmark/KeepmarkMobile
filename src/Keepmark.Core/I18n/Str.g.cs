@@ -627,6 +627,8 @@ public static partial class Str
     public const string SwitchBusy = nameof(SwitchBusy);
     public const string SwitchNoKey = nameof(SwitchNoKey);
     public const string SwitchActivating = nameof(SwitchActivating);
+    public const string SwitchGotIt = nameof(SwitchGotIt);
+    public const string SwitchWhatHappens = nameof(SwitchWhatHappens);
     public const string WfBackupPasswordHint = nameof(WfBackupPasswordHint);
     public const string WfExportDone_one = nameof(WfExportDone_one);
     public const string WfExportDone_other = nameof(WfExportDone_other);

@@ -628,6 +628,8 @@ internal static partial class Catalogs
         [Str.SwitchBusy] = "同期中です。完了後に切り替えられます。",
         [Str.SwitchNoKey] = "この端末に鍵が保存されていません。「同期を管理」から再有効化してください。",
         [Str.SwitchActivating] = "有効化中…",
+        [Str.SwitchGotIt] = "わかりました。次回から表示しない",
+        [Str.SwitchWhatHappens] = "何が起きるか",
         [Str.WfBackupPasswordHint] = "同期のパスワードとは別で、復元できません。パスワードがないとファイルを開けません。",
         [Str.WfExportDone_one] = "{0} 件のバックアップをエクスポートしました。パスワードを保管してください。同期のパスワードとは別で、復元できません。",
         [Str.WfExportDone_other] = "{0} 件のバックアップをエクスポートしました。パスワードを保管してください。同期のパスワードとは別で、復元できません。",
