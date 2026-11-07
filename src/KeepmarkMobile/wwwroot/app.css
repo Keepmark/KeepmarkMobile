@@ -3159,4 +3159,14 @@ a.xbs-back { text-decoration: none; }
     opacity: 1;
 }
 .form-control:focus::placeholder { color: transparent; }
-.km-switch-what { height: 32px; padding-inline: 0; margin-top: .25rem; }
+/* Confirm question with a control pinned right (SwitchConfirm info toggle). */
+.km-confirm-head { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+.km-confirm-head > strong { flex: 1; min-width: 0; }
+.km-confirm-implication { margin-top: .25rem; }
+.km-confirm-actions > .btn { flex: 1 1 0; min-width: 0; }
+/* Compact info toggle: 32px visual inside the alert, 44px touch area kept
+   by negative margins so the question line does not grow. */
+.km-switch-info { width: 32px; height: 32px; margin: -6px -6px -6px 0; }
+.km-switch-info svg { width: 19px; height: 19px; }
+.km-switch-info::after { content: ""; position: absolute; inset: -6px; }
+.km-switch-info { position: relative; }

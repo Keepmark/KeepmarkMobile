@@ -3,13 +3,26 @@
    lost, where, who else is affected), then "Yes, <verb>" and Cancel.
    Destructive confirms are red. The page owns the armed flag. *@
 <div class="alert @(Danger ? "alert-danger" : "alert-warning") mt-2 mb-2" role="group" aria-label="@Message">
-    <strong>@Message</strong>
-    @if (!string.IsNullOrEmpty(Implication))
+    @if (HeadAside is null)
     {
-        @($" {Implication}")
+        <strong>@Message</strong>
+        @if (!string.IsNullOrEmpty(Implication))
+        {
+            @($" {Implication}")
+        }
+    }
+    else
+    {
+        @* Question with a control pinned to its right (e.g. an info toggle);
+           the implication then sits on its own line below. *@
+        <div class="km-confirm-head"><strong>@Message</strong>@HeadAside</div>
+        @if (!string.IsNullOrEmpty(Implication))
+        {
+            <div class="km-confirm-implication">@Implication</div>
+        }
     }
     @ChildContent
-    <div class="mt-2 d-flex gap-2">
+    <div class="mt-2 d-flex gap-2 @(FillActions ? "km-confirm-actions" : null)">
         <button class="btn @(Danger ? "btn-danger" : "btn-primary")" @onclick="OnConfirm" disabled="@Busy">@ConfirmLabel</button>
         <button class="btn btn-secondary" @onclick="OnCancel" disabled="@Busy">@L.Get(Str.CommonCancel)</button>
     </div>
@@ -24,4 +37,8 @@
     [Parameter] public EventCallback OnConfirm { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>Optional control shown right-aligned on the question line.</summary>
+    [Parameter] public RenderFragment? HeadAside { get; set; }
+    /// <summary>Confirm and Cancel share the row in equal widths.</summary>
+    [Parameter] public bool FillActions { get; set; }
 }

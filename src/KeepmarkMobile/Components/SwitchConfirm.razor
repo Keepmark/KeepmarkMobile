@@ -1,21 +1,18 @@
 @inject KeepmarkMobile.Services.XbsSettings Settings
 @* Activate-sync confirmation (Syncs page + switch sheet). The full explanation
    shows until the user ticks "Got it"; after that only "Activate X?" remains,
-   with the explanation one tap away. *@
+   with the explanation behind a small info toggle on the right. *@
 <ConfirmBlock Message="@L.Get(Str.SyncsActivateMessage, Name)"
               Implication="@(ShowFull ? L.Get(Str.SyncsActivateHint, Name) : null)"
               ConfirmLabel="@L.Get(Str.SyncsActivate)" Danger="false" Busy="Busy"
-              OnConfirm="ConfirmAsync" OnCancel="OnCancel">
+              OnConfirm="ConfirmAsync" OnCancel="OnCancel" FillActions="true"
+              HeadAside="@(seen ? InfoToggle : null)">
     @if (!seen)
     {
         <div class="form-check mt-2">
             <input class="form-check-input" type="checkbox" id="@cbId" @bind="gotIt" disabled="@Busy" />
             <label class="form-check-label" for="@cbId">@L.Get(Str.SwitchGotIt)</label>
         </div>
-    }
-    else if (!expanded)
-    {
-        <div><button type="button" class="xbs-link-btn km-switch-what" @onclick="() => expanded = true" disabled="@Busy">@L.Get(Str.SwitchWhatHappens)</button></div>
     }
 </ConfirmBlock>
 
@@ -31,6 +28,13 @@
     private bool expanded;
 
     private bool ShowFull => !seen || expanded;
+
+    private RenderFragment InfoToggle => @<button type="button" class="xbs-infobtn km-switch-info"
+            aria-label="@L.Get(Str.SwitchWhatHappens)" title="@L.Get(Str.SwitchWhatHappens)"
+            aria-expanded="@(expanded ? "true" : "false")" disabled="@Busy"
+            @onclick="() => expanded = !expanded">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" /><path d="M12 11v5.2M12 8.1h.01" /></svg>
+    </button>;
 
     protected override void OnInitialized() => seen = Settings.SwitchHintSeen;
 
