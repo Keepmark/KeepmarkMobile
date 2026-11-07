@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.238 (239)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.239 (240)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -184,14 +184,16 @@ scripts/build-play-aab.sh --dry-run
 # KEEPMARK_KEY_PASS or KEEPMARK_KEY_PASS_FILE (mode-600 file) skip the prompt.
 ```
 
-Release builds run R8 (`AndroidLinkTool=r8`,
-`AndroidR8ObfuscationMode=private-members`, since v1.0.232): DEX 18.1 MB →
-7.6 MB and Play's DEX-optimization check passes. The mapping is embedded in the
-AAB (`BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`), so no
-separate deobfuscation upload is needed. R8 can drop Java classes reached only
-by name (JNI, reflection): after any dependency change, walk QR scan
-(ZXing/CameraX), biometric unlock and database open on a Release build, and add
-`-keep` rules next to `Platforms/Android/sqlcipher.pro` if one breaks. Play's
+Release DEX: R8 is **off** (default D8, no shrinking). v1.0.232–238 ran R8
+(`AndroidLinkTool=r8`, `AndroidR8ObfuscationMode=private-members`; DEX 18.1 MB →
+7.6 MB, Play's DEX-optimization check passed), but the Play build 1.0.238 stopped
+at the blue start screen with Blazor's "An unhandled error has occurred", so
+v1.0.239 turned it off without a root cause (no logcat at the time; Tink's
+protobuf fields were checked and intact). To retry: re-add both properties for
+Release, install the signed APK on a device with `adb logcat` open, and walk
+start-up, database open, QR scan (ZXing/CameraX) and biometric unlock; add
+`-keep` rules next to `Platforms/Android/sqlcipher.pro` for whatever breaks.
+Never ship R8 without that device run. Play's
 "native code without debug symbols" notice is expected: the native libraries
 are the .NET runtime and the pinned SQLCipher binaries.
 

@@ -35,8 +35,8 @@
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.238</ApplicationDisplayVersion>
-        <ApplicationVersion>239</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.239</ApplicationDisplayVersion>
+        <ApplicationVersion>240</ApplicationVersion>
 
         <!-- monodroid mmaps lib/*.so straight from the APK: those entries MUST
              be STORED, never Deflated, or the app SIGABRTs on startup outside
@@ -47,13 +47,12 @@
         <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
         <WindowsPackageType>None</WindowsPackageType>
 
-        <!-- Release Java/DEX: R8 shrinks and obfuscates private members (Play
-             "DEX optimization" check; 18.1 MB -> 7.6 MB DEX). The SDK embeds
-             the mapping in the AAB (BUNDLE-METADATA/.../proguard.map), so Play
-             gets the deobfuscation file too. Classes found only by name from
-             native code need -keep rules (see sqlcipher.pro). -->
-        <AndroidLinkTool Condition="'$(Configuration)' == 'Release'">r8</AndroidLinkTool>
-        <AndroidR8ObfuscationMode Condition="'$(Configuration)' == 'Release'">private-members</AndroidR8ObfuscationMode>
+        <!-- R8 is OFF. v1.0.232-238 shrank/obfuscated the Release DEX with R8
+             (AndroidLinkTool=r8, AndroidR8ObfuscationMode=private-members);
+             the Play build 1.0.238 then stopped at the blue start screen with
+             Blazor's "An unhandled error has occurred". Re-enable only after a
+             signed Release build has been started on a device with logcat
+             open (see docs/DEVELOPMENT.md, "Release DEX"). -->
 
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
