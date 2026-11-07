@@ -35,8 +35,8 @@
 
         <!-- Versions: bump BOTH on every user-facing change (versionName 1.0.N, versionCode N).
              Visible in About, Status page, and the Explore status bar. -->
-        <ApplicationDisplayVersion>1.0.239</ApplicationDisplayVersion>
-        <ApplicationVersion>240</ApplicationVersion>
+        <ApplicationDisplayVersion>1.0.240</ApplicationDisplayVersion>
+        <ApplicationVersion>241</ApplicationVersion>
 
         <!-- monodroid mmaps lib/*.so straight from the APK: those entries MUST
              be STORED, never Deflated, or the app SIGABRTs on startup outside
@@ -47,12 +47,16 @@
         <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
         <WindowsPackageType>None</WindowsPackageType>
 
-        <!-- R8 is OFF. v1.0.232-238 shrank/obfuscated the Release DEX with R8
-             (AndroidLinkTool=r8, AndroidR8ObfuscationMode=private-members);
-             the Play build 1.0.238 then stopped at the blue start screen with
-             Blazor's "An unhandled error has occurred". Re-enable only after a
-             signed Release build has been started on a device with logcat
-             open (see docs/DEVELOPMENT.md, "Release DEX"). -->
+        <!-- Release Java/DEX: R8 shrinks and obfuscates private members (Play
+             "DEX optimization" check). The SDK embeds the mapping in the AAB
+             (BUNDLE-METADATA/.../proguard.map). Java members that .NET reaches
+             only by name through JNI need -keep rules (sqlcipher.pro,
+             jni-bindings.pro): v1.0.232-238 lacked jni-bindings.pro and the
+             Play build 1.0.238 stopped at the blue start screen. Any change to
+             these rules or to bound Java libraries needs a Release run on a
+             device (docs/DEVELOPMENT.md, "Release DEX"). -->
+        <AndroidLinkTool Condition="'$(Configuration)' == 'Release'">r8</AndroidLinkTool>
+        <AndroidR8ObfuscationMode Condition="'$(Configuration)' == 'Release'">private-members</AndroidR8ObfuscationMode>
 
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
@@ -107,6 +111,7 @@
         <!-- JNI_OnLoad registers Java classes even though .NET uses the C API. -->
         <AndroidLibrary Include="../../native/sqlcipher/android/sqlcipher-android.jar" Bind="false" />
         <ProguardConfiguration Include="Platforms/Android/sqlcipher.pro" />
+        <ProguardConfiguration Include="Platforms/Android/jni-bindings.pro" />
         <AndroidNativeLibrary Include="../../native/sqlcipher/android/arm64-v8a/libsqlcipher.so" Abi="arm64-v8a" />
         <AndroidNativeLibrary Include="../../native/sqlcipher/android/x86_64/libsqlcipher.so" Abi="x86_64" />
         <MauiAsset Include="../../native/sqlcipher/THIRD-PARTY-NOTICES.txt" LogicalName="sqlcipher-THIRD-PARTY-NOTICES.txt" />

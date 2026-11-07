@@ -184,15 +184,26 @@ scripts/build-play-aab.sh --dry-run
 # KEEPMARK_KEY_PASS or KEEPMARK_KEY_PASS_FILE (mode-600 file) skip the prompt.
 ```
 
-Release DEX: R8 is **off** (default D8, no shrinking). v1.0.232–238 ran R8
-(`AndroidLinkTool=r8`, `AndroidR8ObfuscationMode=private-members`; DEX 18.1 MB →
-7.6 MB, Play's DEX-optimization check passed), but the Play build 1.0.238 stopped
-at the blue start screen with Blazor's "An unhandled error has occurred", so
-v1.0.239 turned it off without a root cause (no logcat at the time; Tink's
-protobuf fields were checked and intact). To retry: re-add both properties for
-Release, install the signed APK on a device with `adb logcat` open, and walk
-start-up, database open, QR scan (ZXing/CameraX) and biometric unlock; add
-`-keep` rules next to `Platforms/Android/sqlcipher.pro` for whatever breaks.
+Release DEX: R8 is **on** for Release (`AndroidLinkTool=r8`,
+`AndroidR8ObfuscationMode=private-members`; DEX 18.1 MB → 7.6 MB, Play's
+DEX-optimization check). R8 only sees Java callers, so Java members that .NET
+bindings reach by name through JNI must be kept by hand:
+`Platforms/Android/sqlcipher.pro` (SQLCipher JNI_OnLoad) and
+`Platforms/Android/jni-bindings.pro` (androidx.security.crypto + Tink, used by
+MAUI `SecureStorage`). v1.0.232–238 lacked the second file: R8 stripped
+`EncryptedSharedPreferences$PrefKeyEncryptionScheme.AES256_SIV`, the Play
+build 1.0.238 stopped at the blue start screen ("An unhandled error has
+occurred"), and v1.0.239 shipped without R8 until v1.0.240 added the rules.
+To test a Release change without touching the Play install or the main tree:
+build in a separate worktree with `-c Release -p:AndroidKeyStore=false
+-p:ApplicationId=com.keepmark.mobile.r8test -p:ApplicationTitle=KM-R8
+-p:AndroidPackageFormats=apk`, temporarily call
+`Android.Webkit.WebView.SetWebContentsDebuggingEnabled(true)`, install it next
+to the Play app and read the WebView console over
+`adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>` (Blazor
+reports .NET exceptions there, not in logcat). Walk start-up, database open,
+add + sync, QR scan (ZXing/CameraX), biometric unlock and share intake; add
+`-keep` rules to `jni-bindings.pro` for whatever breaks.
 Never ship R8 without that device run. Play's
 "native code without debug symbols" notice is expected: the native libraries
 are the .NET runtime and the pinned SQLCipher binaries.
