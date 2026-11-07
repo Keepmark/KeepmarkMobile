@@ -47,6 +47,14 @@
         <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
         <WindowsPackageType>None</WindowsPackageType>
 
+        <!-- Release Java/DEX: R8 shrinks and obfuscates private members (Play
+             "DEX optimization" check; 18.1 MB -> 7.6 MB DEX). The SDK embeds
+             the mapping in the AAB (BUNDLE-METADATA/.../proguard.map), so Play
+             gets the deobfuscation file too. Classes found only by name from
+             native code need -keep rules (see sqlcipher.pro). -->
+        <AndroidLinkTool Condition="'$(Configuration)' == 'Release'">r8</AndroidLinkTool>
+        <AndroidR8ObfuscationMode Condition="'$(Configuration)' == 'Release'">private-members</AndroidR8ObfuscationMode>
+
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">29.0</SupportedOSPlatformVersion>

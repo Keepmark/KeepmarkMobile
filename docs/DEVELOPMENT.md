@@ -184,6 +184,17 @@ scripts/build-play-aab.sh --dry-run
 # KEEPMARK_KEY_PASS or KEEPMARK_KEY_PASS_FILE (mode-600 file) skip the prompt.
 ```
 
+Release builds run R8 (`AndroidLinkTool=r8`,
+`AndroidR8ObfuscationMode=private-members`, since v1.0.232): DEX 18.1 MB →
+7.6 MB and Play's DEX-optimization check passes. The mapping is embedded in the
+AAB (`BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`), so no
+separate deobfuscation upload is needed. R8 can drop Java classes reached only
+by name (JNI, reflection): after any dependency change, walk QR scan
+(ZXing/CameraX), biometric unlock and database open on a Release build, and add
+`-keep` rules next to `Platforms/Android/sqlcipher.pro` if one breaks. Play's
+"native code without debug symbols" notice is expected: the native libraries
+are the .NET runtime and the pinned SQLCipher binaries.
+
 Device inspection:
 
 ```sh
