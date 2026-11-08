@@ -3044,6 +3044,9 @@ a.xbs-back { text-decoration: none; }
 .km-bk-action-head { display: grid; gap: .25rem; margin-bottom: .5rem; }
 .km-bk-action-head h4 { margin: 0; font-size: 1.05rem; }
 .km-bk-hint { margin: .375rem 0 .5rem; font-size: .875rem; color: var(--km-ink-2); }
+/* Plain-text export warning (bookmarks.html): icon + sentence, gold like the cleartext service note. */
+.km-bk-warn { display: flex; gap: .5rem; margin: 0; font-size: .875rem; color: var(--km-gold, #9a6a0a); }
+.km-bk-warn .km-ico { width: 16px; height: 16px; flex: none; margin-top: 2px; }
 
 /* ---- Backup: safety list, grouped by day ---- */
 .km-sb-day {

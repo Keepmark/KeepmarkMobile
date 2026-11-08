@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.239 (240)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.242 (243)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -31,7 +31,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (420 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (439 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -311,7 +311,7 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
 |---|---|---|
 | `/` | `Home` | tree, search, pinned/recent, sheets, share intake, selection |
 | `/duplicates` | `Duplicates` | duplicate groups and bulk cleanup |
-| `/backup` | `Backup` | encrypted export/import, safety backups, removed copies |
+| `/backup` | `Backup` | encrypted export/import, bookmarks.html export/import, safety backups, removed copies |
 | `/syncs` | `Syncs` | saved syncs (activate, rename, forget, unlink, `Change password` on the active row) plus `+ Add a sync`, which opens the whole connect flow in place |
 | `/connect` | `Connect` | redirect to `/syncs` (old links only) |
 | `/settings` | `Settings` | theme, language, home sections, and the log panel folded behind one "Show logs" button (verbosity + current log inside) |
@@ -992,6 +992,7 @@ has.
 | Activate a saved sync (from unlinked) | local tree | local JSON | `switch-take-remote` |
 | Activate from another linked sync | — | none (that copy is on the server) | — |
 | Import encrypted backup | local tree | local JSON | `import-backup` |
+| Import bookmarks.html (additive) | — (nothing destroyed; the copy lets the import be taken back) | local JSON | `import-html` |
 | Change password | server copy | remote JSON | `change-password` |
 | Duplicates bulk delete | local tree | pre-delete JSON | `duplicates-cleanup` |
 | Selection → Delete | local tree | pre-delete JSON | `selection-delete` |
@@ -1153,6 +1154,42 @@ them, so `SafetyOperations.Describe` still names them; nothing writes them now.
   confirmation and its final button executes immediately.
 - A wrong password clears only the password; the chosen file stays.
 - File suffix is `.json` (export name `.xbs.json`); limits are in §6.
+
+### bookmarks.html (Netscape) export and import
+
+`Keepmark.Core/Html/NetscapeBookmarks` is the format code (pure, unit-tested
+against Chrome, Firefox, Safari and Pocket fixtures in
+`tests/.../TestData/html/`); Backup → "Bookmarks file (HTML)" is the UI.
+
+- **Export** (`ExportHtmlAsync`): **not encrypted**. The button first shows
+  the gold warning (`HtmlExportWarn`); only "Export anyway" writes
+  `backups/keepmark-[<sync>-]YYYYMMDD-HHmmss.html` (same slug and local time as
+  the encrypted export) and opens the share sheet. Mapping: folder =
+  `DT/H3` + `DL`, bookmark = `DT/A` (`HREF`, `ADD_DATE` in seconds, `TAGS`
+  comma-separated; a comma inside a tag becomes a space), description = `DD`
+  (one line), separator = `HR`. `[xbs] Menu` children are written at the top
+  level (Firefox layout), `[xbs] Toolbar` / `[xbs] Other` as H3 flagged
+  `PERSONAL_TOOLBAR_FOLDER` / `UNFILED_BOOKMARKS_FOLDER` with their display
+  names. Every text and attribute is HTML-escaped.
+- **Preview** (`PreviewHtmlAsync`, at pick time, no password): tolerant
+  tokenizer (not an HTML parser), entities decoded, control characters
+  dropped, descriptions cut at 300. Only absolute `http`/`https` links are
+  taken; `javascript:`, `place:`, `data:`, `file:` … are counted as skipped.
+  `ADD_DATE` accepts seconds, ms or µs. Icons, keywords, visit dates and
+  folder descriptions are ignored. Bounds: 50 MiB file, 200,000 nodes,
+  folder depth 1000. Text that has no structure and no Netscape doctype is
+  refused (`ErrHtmlNotBookmarks`). Shows bookmarks/folders/separators,
+  skipped links and duplicates (`BookmarkMerge.NormalizeUrl` against the local
+  tree and earlier in the file); "Skip bookmarks already saved" is on by
+  default and drops folders it empties.
+- **Import** (`ImportHtmlAsync`): **additive only**. Snapshots the local tree
+  (`import-html`, fail closed, change chip = nodes added), then
+  `SyncEngine.AddImportedFolderAsync` → `BookmarkStore.AddImportedFolderAsync`
+  appends one folder "Imported yyyy-MM-dd HH:mm" at the end of `[xbs] Other`
+  (created if missing) in one transaction, under the engine gate, with fresh
+  NodeIds and missing dates stamped. Works unlinked; while linked the
+  coalesced push uploads it (more than 10 nodes also triggers the
+  `sync-push` snapshot of the server copy).
 
 ---
 
@@ -1330,13 +1367,14 @@ lock 2000.
 
 ## 15. Tests and verification
 
-### Automated suites (420 tests, no device)
+### Automated suites (439 tests, no device)
 
 | Suite | Proves |
 |---|---|
 | `ApiClientTests` | routes, shapes, version headers, error mapping, timeouts, expiry capability |
 | `CryptoInteropTests` + `vectors.json` | sync envelope both directions |
 | `BackupGuardTests` | backup limits, tree validation, password rules |
+| `NetscapeBookmarksTests` + `TestData/html` | bookmarks.html read (Chrome/Firefox/Safari/Pocket), round trip, dates, bounds, duplicates plan, import under Other |
 | `RetryPolicyTests` | read retries/backoff, no blind create/PUT retry |
 | `StoreSyncTests` | mirror/meta/dirty, pull/push, stable RowIds, restore |
 | `BookmarkMergeTests` | union rules, ids, folder paths, empty sides, URL identity, flatten, `MoveResult` |

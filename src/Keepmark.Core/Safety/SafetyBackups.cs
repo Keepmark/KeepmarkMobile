@@ -13,6 +13,7 @@ public static class SafetyOperations
     public const string UploadLocal = "upload-local";
     public const string CreateEmpty = "create-empty";
     public const string ImportBackup = "import-backup";
+    public const string ImportHtml = "import-html";
     public const string ChangePassword = "change-password";
     // Legacy labels: the retired Move wizard and older sync switches. A
     // switch no longer snapshots the side it leaves (that tree is the sync's
@@ -49,6 +50,7 @@ public static class SafetyOperations
         UploadLocal => Loc.Get(Str.SafetyOpUploadLocal),
         CreateEmpty => Loc.Get(Str.SafetyOpCreateEmpty),
         ImportBackup => Loc.Get(Str.SafetyOpImportBackup),
+        ImportHtml => Loc.Get(Str.SafetyOpImportHtml),
         ChangePassword => Loc.Get(Str.SafetyOpChangePassword),
         SwitchTakeRemote => Loc.Get(Str.SafetyOpSwitchTakeRemote),
         SwitchUpload => Loc.Get(Str.SafetyOpSwitchUpload),

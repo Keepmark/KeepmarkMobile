@@ -637,6 +637,112 @@ public sealed class XbsSession : IAsyncDisposable
         return path;
     }
 
+    // ---- bookmarks.html (Netscape) export/import -----------------------------
+
+    /// <summary>Plain-text export (NOT encrypted, the UI warns first) of the
+    /// local tree as a bookmarks.html file. Returns the path and the number of
+    /// bookmarks written.</summary>
+    public async Task<(string Path, int Bookmarks)> ExportHtmlAsync(CancellationToken ct = default)
+    {
+        var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+        BackupGuard.ValidateTree(roots);
+        var html = Core.Html.NetscapeBookmarks.Write(roots);
+        var dir = Path.Combine(FileSystem.AppDataDirectory, "backups");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, Core.Html.NetscapeBookmarks.ExportFileName(
+            await ActiveSyncNameAsync().ConfigureAwait(false), DateTime.Now));
+        await File.WriteAllTextAsync(path, html, new System.Text.UTF8Encoding(false), ct).ConfigureAwait(false);
+        var bookmarks = CountBookmarks(roots);
+        _log.Info("session", $"HTML exported ({bookmarks} bookmarks)");
+        return (path, bookmarks);
+    }
+
+    /// <summary>Reads a bookmarks.html file and says what an import would add.
+    /// Nothing changes.</summary>
+    public async Task<(Core.Html.NetscapeImportPlan Plan, int Skipped)> PreviewHtmlAsync(
+        string path, bool skipDuplicates, CancellationToken ct = default)
+    {
+        var parsed = await ReadHtmlAsync(path, ct).ConfigureAwait(false);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+        return (Core.Html.NetscapeBookmarks.Plan(parsed, localRoots, skipDuplicates), parsed.Skipped);
+    }
+
+    /// <summary>Adds the file's bookmarks in a new folder under [xbs] Other.
+    /// Additive, never a replacement; the current local tree is still
+    /// snapshotted first (fail closed) so the import can be taken back from
+    /// Safety backups. Returns the bookmarks added and the folder title.</summary>
+    public async Task<(int Bookmarks, string Folder)> ImportHtmlAsync(
+        string path, bool skipDuplicates, string folderTitle, CancellationToken ct = default)
+    {
+        var title = folderTitle.Trim();
+        if (title.Length == 0)
+        {
+            throw new ArgumentException("An import folder needs a title.", nameof(folderTitle));
+        }
+
+        var parsed = await ReadHtmlAsync(path, ct).ConfigureAwait(false);
+        var (localRoots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+        var plan = Core.Html.NetscapeBookmarks.Plan(parsed, localRoots, skipDuplicates);
+        if (plan.Bookmarks == 0)
+        {
+            throw new InvalidOperationException(Loc.Get(Str.HtmlImportNothing));
+        }
+
+        var folder = new BookmarkNode { Title = title, Children = plan.Roots };
+        await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(localRoots),
+            SafetyOperations.ImportHtml, CountBackupNodes(localRoots),
+            changes: new SafetyChanges(plan.Folders + plan.Bookmarks + plan.Separators + 1, 0)).ConfigureAwait(false);
+        if (Engine is not null)
+        {
+            await Engine.AddImportedFolderAsync(folder, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            await Store.AddImportedFolderAsync(folder).ConfigureAwait(false);
+        }
+
+        _log.Info("session", $"HTML imported ({plan.Bookmarks} bookmarks, {plan.Duplicates} duplicates, skip={skipDuplicates})");
+        return (plan.Bookmarks, title);
+    }
+
+    private static async Task<Core.Html.NetscapeParseResult> ReadHtmlAsync(string path, CancellationToken ct)
+    {
+        BackupGuard.RequirePath(path);
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException(Loc.Get(Str.ErrBackupNotFoundPickAgain));
+        }
+
+        if (new FileInfo(path).Length > Core.Html.NetscapeBookmarks.MaxBytes)
+        {
+            throw new InvalidOperationException(
+                Loc.Get(Str.ErrBackupFileTooLarge, Core.Html.NetscapeBookmarks.MaxBytes / 1024 / 1024));
+        }
+
+        var html = await File.ReadAllTextAsync(path, System.Text.Encoding.UTF8, ct).ConfigureAwait(false);
+        return Core.Html.NetscapeBookmarks.Parse(html);
+    }
+
+    private static int CountBookmarks(List<BookmarkNode> roots)
+    {
+        int n = 0;
+        var queue = new Queue<BookmarkNode>(roots);
+        while (queue.Count > 0)
+        {
+            var node = queue.Dequeue();
+            if (node.Children is not null)
+            {
+                foreach (var c in node.Children) queue.Enqueue(c);
+            }
+            else if (!node.IsSeparator && !string.IsNullOrEmpty(node.Url))
+            {
+                n++;
+            }
+        }
+
+        return n;
+    }
+
     /// <summary>Name of the sync this device is linked to (label or service
     /// host), for the export file name. Null when nothing is linked.</summary>
     private async Task<string?> ActiveSyncNameAsync()

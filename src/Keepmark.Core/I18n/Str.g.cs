@@ -835,4 +835,32 @@ public static partial class Str
     public const string SafetyKeepPrune = nameof(SafetyKeepPrune);
     /// <summary>Base for Loc.Plural (SafetyNoneHere_one / SafetyNoneHere_other).</summary>
     public const string SafetyNoneHere = nameof(SafetyNoneHere);
+    public const string HtmlH = nameof(HtmlH);
+    public const string HtmlShort = nameof(HtmlShort);
+    public const string HtmlIntro = nameof(HtmlIntro);
+    public const string HtmlExportOpen = nameof(HtmlExportOpen);
+    public const string HtmlExportWarn = nameof(HtmlExportWarn);
+    public const string HtmlExportBtn = nameof(HtmlExportBtn);
+    public const string HtmlExportDone_one = nameof(HtmlExportDone_one);
+    public const string HtmlExportDone_other = nameof(HtmlExportDone_other);
+    public const string HtmlSaveTitle = nameof(HtmlSaveTitle);
+    public const string HtmlImportOpen = nameof(HtmlImportOpen);
+    public const string HtmlPickFile = nameof(HtmlPickFile);
+    public const string HtmlPreviewCounts = nameof(HtmlPreviewCounts);
+    public const string HtmlPreviewSkipped = nameof(HtmlPreviewSkipped);
+    public const string HtmlPreviewDuplicates = nameof(HtmlPreviewDuplicates);
+    public const string HtmlSkipDuplicates = nameof(HtmlSkipDuplicates);
+    public const string HtmlImportTarget = nameof(HtmlImportTarget);
+    public const string HtmlImportBtn = nameof(HtmlImportBtn);
+    public const string HtmlImportDone_one = nameof(HtmlImportDone_one);
+    public const string HtmlImportDone_other = nameof(HtmlImportDone_other);
+    public const string HtmlImportNothing = nameof(HtmlImportNothing);
+    public const string HtmlImportFolder = nameof(HtmlImportFolder);
+    public const string ErrHtmlNotBookmarks = nameof(ErrHtmlNotBookmarks);
+    public const string ErrHtmlTooDeep = nameof(ErrHtmlTooDeep);
+    public const string SafetyOpImportHtml = nameof(SafetyOpImportHtml);
+    /// <summary>Base for Loc.Plural (HtmlExportDone_one / HtmlExportDone_other).</summary>
+    public const string HtmlExportDone = nameof(HtmlExportDone);
+    /// <summary>Base for Loc.Plural (HtmlImportDone_one / HtmlImportDone_other).</summary>
+    public const string HtmlImportDone = nameof(HtmlImportDone);
 }

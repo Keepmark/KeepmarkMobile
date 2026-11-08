@@ -497,6 +497,48 @@ public sealed partial class BookmarkStore : IAsyncDisposable
         (await Db.QueryAsync<ItemRow>("SELECT * FROM Items WHERE NodeId = ? LIMIT 1", nodeId)
             .ConfigureAwait(false)).FirstOrDefault()?.RowId;
 
+    /// <summary>Appends an imported folder (with its subtree, no ids) at the end
+    /// of the top-level [xbs] Other container, creating that container when the
+    /// mirror lacks it. Container lookup, id assignment, insert and dirty happen
+    /// in one transaction. Returns the number of nodes inserted (folder included).</summary>
+    public async Task<int> AddImportedFolderAsync(BookmarkNode folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (folder.Children is null)
+        {
+            throw new ArgumentException("An imported folder needs children.", nameof(folder));
+        }
+
+        var db = Db;
+        await db.RunInTransactionAsync(tran =>
+        {
+            Interlocked.Increment(ref _contentVersion);
+            int nextId = (tran.ExecuteScalar<int?>("SELECT MAX(NodeId) FROM Items") ?? 0) + 1;
+            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            int? otherRowId = tran.Query<ItemRow>(
+                    "SELECT * FROM Items WHERE ParentRowId IS NULL AND IsFolder = 1 AND Title = ? ORDER BY SortOrder LIMIT 1",
+                    ContainerNames.Other)
+                .FirstOrDefault()?.RowId;
+            if (otherRowId is null)
+            {
+                var container = new BookmarkNode { Id = nextId++, Title = ContainerNames.Other, DateAdded = nowMs, Children = new() };
+                int top = (tran.ExecuteScalar<int?>("SELECT MAX(SortOrder) FROM Items WHERE ParentRowId IS NULL") ?? -1) + 1;
+                InsertNode(tran, container, null, ref top);
+                otherRowId = tran.ExecuteScalar<int>("SELECT RowId FROM Items WHERE NodeId = ? LIMIT 1", container.Id);
+            }
+
+            AssignMissingIds(folder, ref nextId);
+            StampMissingDates(folder, nowMs);
+            int order = (tran.ExecuteScalar<int?>(
+                "SELECT MAX(SortOrder) FROM Items WHERE ParentRowId = ?", otherRowId) ?? -1) + 1;
+            InsertNode(tran, folder, otherRowId, ref order);
+            tran.InsertOrReplace(new MetaRow { Key = MetaDirty, Value = "1" });
+        }).ConfigureAwait(false);
+        var count = CountNodes(new List<BookmarkNode> { folder });
+        _log.Info("store", $"Imported folder added under Other ({count} nodes)");
+        return count;
+    }
+
     /// <summary>Adds a node under the folder with the given stable NodeId
     /// (null = top level). Parent resolution + insert + dirty happen in one
     /// transaction, so a concurrent push/pull rekey cannot misplace the node.</summary>

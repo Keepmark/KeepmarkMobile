@@ -818,6 +818,30 @@ public sealed partial class SyncEngine(
         }
     }
 
+    /// <summary>HTML import: appends one folder (whole subtree) under [xbs]
+    /// Other, under the gate so no push/pull interleaves. Works unlinked too
+    /// (the tree is local until a link); while linked the coalesced push
+    /// uploads it. Returns the nodes inserted.</summary>
+    public async Task<int> AddImportedFolderAsync(BookmarkNode folder, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            int count = await store.AddImportedFolderAsync(folder).ConfigureAwait(false);
+            if (await creds.GetAsync().ConfigureAwait(false) is not null)
+            {
+                await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            }
+
+            log.Info("sync", $"Imported folder ({count} nodes)");
+            return count;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     /// <summary>Add under the folder with the given stable NodeId (null = top
     /// level). Prefer over <see cref="AddBookmarkAsync"/>.</summary>
     public async Task<int> AddBookmarkByNodeIdAsync(int? parentNodeId, BookmarkNode node, CancellationToken ct = default)

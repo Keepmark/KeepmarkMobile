@@ -78,6 +78,65 @@ else
             }
             <StepMessage Text="@impMessage" Error="impError" />
         </section>
+
+        @* bookmarks.html: plain text exchange with any browser. Export warns
+           first (not encrypted); import only adds, in a new folder. *@
+        <section class="km-bk-action @(htmlExportArmed || htmlPath is not null ? "is-open" : "")">
+            <div class="km-bk-action-head">
+                <h4>@L.Get(Str.HtmlH)</h4>
+                <InfoHint Text="@L.Get(Str.HtmlShort)" Title="@L.Get(Str.HtmlH)" Body="@L.Get(Str.HtmlIntro)" />
+            </div>
+            @if (htmlExportArmed)
+            {
+                <p class="km-bk-warn" role="status">
+                    <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v5M12 17h.01" /></svg>
+                    <span>@L.Get(Str.HtmlExportWarn)</span>
+                </p>
+                <div class="d-flex gap-2 mt-2">
+                    <button class="btn btn-primary" @onclick="ExportHtml" disabled="@busy">@L.Get(Str.HtmlExportBtn)</button>
+                    <button class="btn btn-outline-secondary" @onclick="CancelHtml" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                </div>
+            }
+            else if (htmlPath is not null)
+            {
+                <p class="mb-1">@L.Get(Str.BackupFileLabel) <strong>@htmlFileName</strong></p>
+                @if (htmlPlan is not null)
+                {
+                    <p class="text-muted mb-1" role="status">@L.Get(Str.HtmlPreviewCounts, htmlPlan.Bookmarks, htmlPlan.Folders, htmlPlan.Separators)</p>
+                    @if (htmlSkipped > 0)
+                    {
+                        <p class="text-muted mb-1">@L.Get(Str.HtmlPreviewSkipped, htmlSkipped)</p>
+                    }
+                    @if (htmlPlan.Duplicates > 0)
+                    {
+                        <p class="text-muted mb-1">@L.Get(Str.HtmlPreviewDuplicates, htmlPlan.Duplicates)</p>
+                        <div class="form-check mb-1">
+                            <input class="form-check-input" type="checkbox" id="km-html-skip" @bind="htmlSkipDuplicates" @bind:after="ReplanHtml" disabled="@busy" />
+                            <label class="form-check-label" for="km-html-skip">@L.Get(Str.HtmlSkipDuplicates)</label>
+                        </div>
+                    }
+                    <p class="text-muted">@L.Get(Str.HtmlImportTarget, htmlFolder, L.Get(Str.ContainerOther))</p>
+                    <div class="d-flex gap-2 mt-1">
+                        <button class="btn btn-primary" @onclick="ImportHtml" disabled="@(busy || htmlPlan.Bookmarks == 0)">@L.Get(Str.HtmlImportBtn)</button>
+                        <button class="btn btn-outline-secondary" @onclick="CancelHtml" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex gap-2 mt-1">
+                        <button class="btn btn-outline-secondary" @onclick="CancelHtml" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-outline-primary" @onclick="ArmHtmlExport" disabled="@busy">@L.Get(Str.HtmlExportOpen)</button>
+                    <button class="btn btn-outline-primary" @onclick="PickHtml" disabled="@busy">@L.Get(Str.HtmlImportOpen)</button>
+                </div>
+            }
+            <StepMessage Text="@htmlMessage" Error="htmlError" />
+        </section>
     </div>
 
     <div class="mb-3">
@@ -516,6 +575,135 @@ else
             await RefreshSafetyListAsync();
             return WorkflowTexts.ImportDone(restored, linked);
         }, (text, error) => (impMessage, impError) = (text, error));
+    }
+
+    // ---- bookmarks.html ------------------------------------------------------
+
+    private bool htmlExportArmed;
+    private string? htmlPath;
+    private string? htmlFileName;
+    private string htmlFolder = string.Empty;
+    private Keepmark.Core.Html.NetscapeImportPlan? htmlPlan;
+    private int htmlSkipped;
+    private bool htmlSkipDuplicates = true;
+    private string htmlMessage = string.Empty;
+    private bool htmlError;
+
+    private void ArmHtmlExport()
+    {
+        ForgetHtml();
+        (htmlMessage, htmlError) = (string.Empty, false);
+        htmlExportArmed = true;
+    }
+
+    private void CancelHtml()
+    {
+        ForgetHtml();
+        (htmlMessage, htmlError) = (string.Empty, false);
+    }
+
+    private void ForgetHtml()
+    {
+        htmlExportArmed = false;
+        if (htmlPath is not null)
+        {
+            try { File.Delete(htmlPath); } catch { }
+            htmlPath = null;
+        }
+
+        htmlFileName = null;
+        htmlPlan = null;
+        htmlSkipped = 0;
+        htmlSkipDuplicates = true;
+    }
+
+    /// <summary>Confirmed export: the warning was on screen, this click is
+    /// the consent. The file is offered to the share sheet like the
+    /// encrypted export.</summary>
+    private async Task ExportHtml()
+    {
+        await RunAsync(async () =>
+        {
+            var (path, count) = await Session.ExportHtmlAsync();
+            htmlExportArmed = false;
+            var done = Loc.Plural(Str.HtmlExportDone, count);
+            try
+            {
+                await Share.Default.RequestAsync(new ShareFileRequest(L.Get(Str.HtmlSaveTitle), new ShareFile(path)));
+                return done + " " + L.Get(Str.BackupChooseWhere);
+            }
+            catch
+            {
+                return done + " " + L.Get(Str.BackupSavedInApp);
+            }
+        }, (text, error) => (htmlMessage, htmlError) = (text, error));
+    }
+
+    /// <summary>Choose a file, copy it (capped) into the cache and preview it
+    /// at once: there is no password step.</summary>
+    private async Task PickHtml()
+    {
+        await RunAsync(async () =>
+        {
+            var picked = await FilePicker.Default.PickAsync();
+            if (picked is null)
+            {
+                return string.Empty;
+            }
+
+            var safeName = Path.GetFileName(picked.FileName);
+            if (string.IsNullOrWhiteSpace(safeName) || !Core.Html.NetscapeBookmarks.HasSupportedExtension(safeName))
+            {
+                throw new InvalidOperationException(L.Get(Str.HtmlPickFile));
+            }
+
+            ForgetHtml();
+            var tmp = Path.Combine(FileSystem.CacheDirectory, $"import-{Guid.NewGuid():N}.html");
+            await using (var src = await picked.OpenReadAsync())
+            await using (var dst = File.Create(tmp))
+            {
+                await CopyCappedAsync(src, dst, Core.Html.NetscapeBookmarks.MaxBytes);
+            }
+
+            htmlPath = tmp;
+            htmlFileName = safeName;
+            htmlFolder = L.Get(Str.HtmlImportFolder,
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture));
+            try
+            {
+                (htmlPlan, htmlSkipped) = await Session.PreviewHtmlAsync(tmp, htmlSkipDuplicates);
+            }
+            catch
+            {
+                ForgetHtml();
+                throw;
+            }
+
+            return htmlPlan.Bookmarks == 0 ? L.Get(Str.HtmlImportNothing) : string.Empty;
+        }, (text, error) => (htmlMessage, htmlError) = (text, error));
+    }
+
+    private async Task ReplanHtml()
+    {
+        if (htmlPath is null) return;
+        await RunAsync(async () =>
+        {
+            (htmlPlan, htmlSkipped) = await Session.PreviewHtmlAsync(htmlPath, htmlSkipDuplicates);
+            return htmlPlan.Bookmarks == 0 ? L.Get(Str.HtmlImportNothing) : string.Empty;
+        }, (text, error) => (htmlMessage, htmlError) = (text, error));
+    }
+
+    private async Task ImportHtml()
+    {
+        if (busy || htmlPath is null) return;
+        await RunAsync(async () =>
+        {
+            var (count, folder) = await Session.ImportHtmlAsync(htmlPath, htmlSkipDuplicates, htmlFolder);
+            ForgetHtml();
+            await RefreshCountsAsync();
+            await RefreshSafetyListAsync();
+            return Loc.Plural(Str.HtmlImportDone, count, folder);
+        }, (text, error) => (htmlMessage, htmlError) = (text, error));
     }
 
     private async Task RefreshSafety()
