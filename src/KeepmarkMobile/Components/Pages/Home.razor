@@ -1194,7 +1194,6 @@ else if (moved is not null)
         return false;
     }
 
-    /// <summary>Folder path as "Work › Dev"; top level when null.</summary>
     /// <summary>Tags in use, most used first (suggestions in the edit sheet).</summary>
     private async Task<List<string>> LoadTagNames()
     {
@@ -1218,6 +1217,7 @@ else if (moved is not null)
         catch (Exception ex) { Session.Log.Warn("ui", $"Open failed: {ex.GetType().Name}"); }
     }
 
+    /// <summary>Folder path as "Work › Dev"; top level when null.</summary>
     private string FolderPath(int? rowId)
     {
         var parts = new Stack<string>();

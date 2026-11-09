@@ -76,6 +76,7 @@ public sealed class XbsSession : IAsyncDisposable
             Path.Combine(FileSystem.AppDataDirectory, "xbs.db"), dbKey, _log);
         await store.InitializeAsync().ConfigureAwait(false);
         Store = store;
+        PurgeHtmlExports();
 
         var engine = new SyncEngine(ApiFor, _crypto, store, _creds, _str, _log,
             saveSafetyBackup: SaveSafetyBackupAsync,
@@ -641,13 +642,19 @@ public sealed class XbsSession : IAsyncDisposable
 
     /// <summary>Plain-text export (NOT encrypted, the UI warns first) of the
     /// local tree as a bookmarks.html file. Returns the path and the number of
-    /// bookmarks written.</summary>
+    /// bookmarks written. The file is a hand-over copy for the share sheet,
+    /// not a kept backup: it lives in the cache and
+    /// <see cref="PurgeHtmlExports"/> removes it at the next export and at
+    /// the next start (not sooner: the receiving app may still be reading
+    /// it), so no readable copy of the bookmarks stays for good next to the
+    /// encrypted database.</summary>
     public async Task<(string Path, int Bookmarks)> ExportHtmlAsync(CancellationToken ct = default)
     {
+        PurgeHtmlExports();
         var (roots, _, _, _) = await Store!.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
         BackupGuard.ValidateTree(roots);
         var html = Core.Html.NetscapeBookmarks.Write(roots);
-        var dir = Path.Combine(FileSystem.AppDataDirectory, "backups");
+        var dir = HtmlExportDir;
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, Core.Html.NetscapeBookmarks.ExportFileName(
             await ActiveSyncNameAsync().ConfigureAwait(false), DateTime.Now));
@@ -655,6 +662,35 @@ public sealed class XbsSession : IAsyncDisposable
         var bookmarks = CountBookmarks(roots);
         _log.Info("session", $"HTML exported ({bookmarks} bookmarks)");
         return (path, bookmarks);
+    }
+
+    private static string HtmlExportDir => Path.Combine(FileSystem.CacheDirectory, "html-export");
+
+    /// <summary>Deletes every plain-text bookmarks.html the app still holds:
+    /// the cache hand-over copies and the files v1.0.242-243 left in
+    /// backups/. Best effort, never throws.</summary>
+    public void PurgeHtmlExports()
+    {
+        try
+        {
+            if (Directory.Exists(HtmlExportDir))
+            {
+                Directory.Delete(HtmlExportDir, recursive: true);
+            }
+
+            var legacy = Path.Combine(FileSystem.AppDataDirectory, "backups");
+            if (Directory.Exists(legacy))
+            {
+                foreach (var file in Directory.EnumerateFiles(legacy, "keepmark-*" + Core.Html.NetscapeBookmarks.FileSuffix))
+                {
+                    File.Delete(file);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Warn("session", $"HTML export cleanup failed: {ex.GetType().Name}");
+        }
     }
 
     /// <summary>Reads a bookmarks.html file and says what an import would add.
@@ -1297,6 +1333,13 @@ public sealed class XbsSession : IAsyncDisposable
     public async Task<int> RenameTagAsync(string tag, string? newName, CancellationToken ct = default)
     {
         if (Store is null || Engine is null)
+        {
+            return 0;
+        }
+
+        // A no-op (same name, same spelling everywhere) must not cost a
+        // snapshot: each one can push an older backup out of the kept set.
+        if (await Store.CountTagRenameAsync(tag, newName).ConfigureAwait(false) == 0)
         {
             return 0;
         }

@@ -103,32 +103,7 @@ public sealed partial class BookmarkStore
             var rows = tran.Query<ItemRow>("SELECT * FROM Items WHERE Tags IS NOT NULL AND Tags != ''");
             foreach (var row in rows)
             {
-                var tags = SplitTags(row.Tags);
-                if (!tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var result = new List<string>(tags.Length);
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var t in tags)
-                {
-                    bool isOld = string.Equals(t, tag, StringComparison.OrdinalIgnoreCase);
-                    if (isOld && newName is null)
-                    {
-                        continue;
-                    }
-
-                    var value = newName is not null &&
-                        (isOld || string.Equals(t, newName, StringComparison.OrdinalIgnoreCase)) ? newName : t;
-                    if (seen.Add(value))
-                    {
-                        result.Add(value);
-                    }
-                }
-
-                var joined = result.Count > 0 ? string.Join(TagSep, result) : null;
-                if (joined == row.Tags)
+                if (!TryRewriteTags(row.Tags, tag, newName, out var joined))
                 {
                     continue;
                 }
@@ -147,5 +122,50 @@ public sealed partial class BookmarkStore
 
         _log.Debug("store", $"Tag {(newName is null ? "removed from" : "renamed on")} {changed} bookmark(s)");
         return changed;
+    }
+
+    /// <summary>How many bookmarks <see cref="RenameTagAsync"/> would change,
+    /// without changing any: lets the caller skip the safety backup when the
+    /// rename is a no-op (same name, every spelling already equal).</summary>
+    public async Task<int> CountTagRenameAsync(string tag, string? newName)
+    {
+        newName = newName?.Trim();
+        var rows = await Db.QueryAsync<ItemRow>("SELECT * FROM Items WHERE Tags IS NOT NULL AND Tags != ''")
+            .ConfigureAwait(false);
+        return rows.Count(row => TryRewriteTags(row.Tags, tag, newName, out _));
+    }
+
+    /// <summary>The Tags column after renaming <paramref name="tag"/> (null
+    /// name = remove). False when the row does not carry the tag or the
+    /// result equals what is stored.</summary>
+    private static bool TryRewriteTags(string? stored, string tag, string? newName, out string? joined)
+    {
+        joined = stored;
+        var tags = SplitTags(stored);
+        if (!tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var result = new List<string>(tags.Length);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in tags)
+        {
+            bool isOld = string.Equals(t, tag, StringComparison.OrdinalIgnoreCase);
+            if (isOld && newName is null)
+            {
+                continue;
+            }
+
+            var value = newName is not null &&
+                (isOld || string.Equals(t, newName, StringComparison.OrdinalIgnoreCase)) ? newName : t;
+            if (seen.Add(value))
+            {
+                result.Add(value);
+            }
+        }
+
+        joined = result.Count > 0 ? string.Join(TagSep, result) : null;
+        return joined != stored;
     }
 }

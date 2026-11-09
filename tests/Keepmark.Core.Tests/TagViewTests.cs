@@ -76,6 +76,23 @@ public sealed class TagViewTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task CountSaysWhatARenameWouldChangeWithoutChangingIt()
+    {
+        var version = store.ContentVersion;
+        Assert.Equal(3, await store.CountTagRenameAsync("work", " Job "));
+        Assert.Equal(3, await store.CountTagRenameAsync("work", null));
+        // "Work" is already the only spelling on node 3; nodes 2 and 5 still differ.
+        Assert.Equal(2, await store.CountTagRenameAsync("work", "Work"));
+        // A no-op: same name, one spelling, and a tag nobody carries.
+        Assert.Equal(0, await store.CountTagRenameAsync("dev", "dev"));
+        Assert.Equal(0, await store.CountTagRenameAsync("missing", "x"));
+        Assert.Equal(version, store.ContentVersion);
+        Assert.Equal(["work", "News"], await TagsOf(2));
+        // Count and rename agree.
+        Assert.Equal(2, await store.RenameTagAsync("work", "Work"));
+    }
+
+    [Fact]
     public async Task DeleteRemovesTheTagAndClearsEmptyLists()
     {
         Assert.Equal(1, await store.RenameTagAsync("NEWS", null));

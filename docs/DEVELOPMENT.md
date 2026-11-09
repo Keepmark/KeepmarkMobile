@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.243 (244)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.244 (245)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -31,7 +31,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (445 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (448 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -1165,8 +1165,14 @@ against Chrome, Firefox, Safari and Pocket fixtures in
 
 - **Export** (`ExportHtmlAsync`): **not encrypted**. The button first shows
   the gold warning (`HtmlExportWarn`); only "Export anyway" writes
-  `backups/keepmark-[<sync>-]YYYYMMDD-HHmmss.html` (same slug and local time as
-  the encrypted export) and opens the share sheet. Mapping: folder =
+  `keepmark-[<sync>-]YYYYMMDD-HHmmss.html` (same slug and local time as the
+  encrypted export) and opens the share sheet. The file is a hand-over copy,
+  never a kept backup: it goes to `CacheDirectory/html-export/` and
+  `XbsSession.PurgeHtmlExports` deletes it at the next export, at the next
+  start and at once when the share sheet fails (it also removes the
+  `backups/keepmark-*.html` files v1.0.242–243 left behind), so no readable
+  copy of the bookmarks stays next to the SQLCipher database. A node that is
+  neither folder nor link (no URL) is not written. Mapping: folder =
   `DT/H3` + `DL`, bookmark = `DT/A` (`HREF`, `ADD_DATE` in seconds, `TAGS`
   comma-separated; a comma inside a tag becomes a space), description = `DD`
   (one line), separator = `HR`. `[xbs] Menu` children are written at the top
@@ -1180,7 +1186,10 @@ against Chrome, Firefox, Safari and Pocket fixtures in
   `ADD_DATE` accepts seconds, ms or µs. Icons, keywords, visit dates and
   folder descriptions are ignored. Bounds: 50 MiB file, 200,000 nodes,
   folder depth 1000. Text that has no structure and no Netscape doctype is
-  refused (`ErrHtmlNotBookmarks`). Shows bookmarks/folders/separators,
+  refused (`ErrHtmlNotBookmarks`). A link or folder title without its closing
+  tag ends at the next structural tag (`DT`, `DL`, `DD`, `HR`, `H3`, `A`), and
+  a tag whose quotes do not balance ends at the next `>`: damaged markup loses
+  one item, not the rest of the file. Shows bookmarks/folders/separators,
   skipped links and duplicates (`BookmarkMerge.NormalizeUrl` against the local
   tree and earlier in the file); "Skip bookmarks already saved" is on by
   default and drops folders it empties.

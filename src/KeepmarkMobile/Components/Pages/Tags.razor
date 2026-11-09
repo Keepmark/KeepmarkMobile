@@ -172,6 +172,7 @@ else
     private Dictionary<int, string> paths = new();
     private string current = string.Empty;
     private string loadedKey = "\0";
+    private int reloadGeneration;
     private int page;
     private bool renaming;
     private bool deleting;
@@ -225,20 +226,34 @@ else
             return;
         }
 
+        // Two reloads can overlap (a sync event while the query string
+        // changes): each reads into locals for the view it started with and
+        // only the newest one is applied, so rows never belong to another view.
+        int generation = ++reloadGeneration;
         var key = ViewKey;
-        summary = await Session.Store.GetTagsAsync();
-        if (InDetail)
+        var (untagged, tag, inDetail) = (Untagged, Tag, InDetail);
+        var newSummary = await Session.Store.GetTagsAsync();
+        List<ItemRow> newRows = [];
+        Dictionary<int, string> newPaths = new();
+        if (inDetail)
         {
-            rows = await Session.Store.GetBookmarksByTagAsync(Untagged ? null : Tag);
-            paths = await Session.Store.GetFolderPathsAsync(rows.Select(r => r.RowId));
-            current = Untagged
-                ? string.Empty
-                : summary.Tags.FirstOrDefault(t => string.Equals(t.Name, Tag, StringComparison.OrdinalIgnoreCase))?.Name ?? Tag!;
+            newRows = await Session.Store.GetBookmarksByTagAsync(untagged ? null : tag);
+            newPaths = await Session.Store.GetFolderPathsAsync(newRows.Select(r => r.RowId));
         }
-        else
+
+        if (generation != reloadGeneration)
         {
-            rows = [];
-            paths = new();
+            return;
+        }
+
+        summary = newSummary;
+        rows = newRows;
+        paths = newPaths;
+        if (inDetail)
+        {
+            current = untagged
+                ? string.Empty
+                : summary.Tags.FirstOrDefault(t => string.Equals(t.Name, tag, StringComparison.OrdinalIgnoreCase))?.Name ?? tag!;
         }
 
         page = key == loadedKey ? Math.Clamp(page, 0, Math.Max(0, (rows.Count - 1) / PageSize)) : 0;

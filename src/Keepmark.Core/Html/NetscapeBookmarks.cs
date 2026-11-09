@@ -116,13 +116,19 @@ public static class NetscapeBookmarks
             return;
         }
 
-        Indent(sb, depth);
         if (node.IsSeparator)
         {
+            Indent(sb, depth);
             sb.Append("<HR>\n");
             return;
         }
 
+        if (string.IsNullOrEmpty(node.Url))
+        {
+            return; // neither folder nor link: nothing a browser could import
+        }
+
+        Indent(sb, depth);
         sb.Append("<DT><A HREF=\"").Append(Escape(node.Url ?? string.Empty)).Append('"');
         AppendDate(sb, node.DateAdded);
         var tags = node.Tags?
@@ -231,7 +237,13 @@ public static class NetscapeBookmarks
             int gt = TagEnd(html, lt + 1);
             if (gt < 0)
             {
-                break;
+                // An unbalanced quote hid the end of the tag: fall back to the
+                // next '>' so the rest of the file is still read.
+                gt = html.IndexOf('>', lt + 1);
+                if (gt < 0)
+                {
+                    break;
+                }
             }
 
             var (name, closing, attrs) = ReadTag(html, lt + 1, gt);
@@ -463,15 +475,28 @@ public static class NetscapeBookmarks
     }
 
     /// <summary>Text up to the closing tag (case-insensitive), decoded and with
-    /// any markup inside dropped; returns the index after the closing '>'.</summary>
+    /// any markup inside dropped; returns the index after the closing '>'.
+    /// A missing closing tag ends the text at the next structural tag (which
+    /// is left for the caller), so one unclosed link never swallows the items
+    /// after it and the scan stays linear.</summary>
     private static (string Text, int Next) InnerText(string html, int start, string closeTag)
     {
-        int end = html.IndexOf(closeTag, start, StringComparison.OrdinalIgnoreCase);
-        if (end < 0)
+        int end = html.Length;
+        var closed = false;
+        for (int p = html.IndexOf('<', start); p >= 0; p = html.IndexOf('<', p + 1))
         {
-            int lt = html.IndexOf('<', start);
-            end = lt < 0 ? html.Length : lt;
-            return (WebUtility.HtmlDecode(html[start..end]), end);
+            if (IsTagAt(html, p, closeTag))
+            {
+                end = p;
+                closed = true;
+                break;
+            }
+
+            if (IsStructuralTagAt(html, p))
+            {
+                end = p;
+                break;
+            }
         }
 
         var raw = html[start..end];
@@ -489,8 +514,35 @@ public static class NetscapeBookmarks
             raw = sb.ToString();
         }
 
+        if (!closed)
+        {
+            return (WebUtility.HtmlDecode(raw), end);
+        }
+
         int gt = html.IndexOf('>', end);
         return (WebUtility.HtmlDecode(raw), gt < 0 ? html.Length : gt + 1);
+    }
+
+    private static readonly string[] StructuralTags = ["<dt", "<dl", "</dl", "<dd", "<hr", "<h3", "<a"];
+
+    private static bool IsStructuralTagAt(string html, int index)
+    {
+        foreach (var tag in StructuralTags)
+        {
+            if (IsTagAt(html, index, tag)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>True when <paramref name="tag"/> (e.g. "&lt;a", "&lt;/h3") starts
+    /// at <paramref name="index"/> as a whole tag name, any case.</summary>
+    private static bool IsTagAt(string html, int index, string tag)
+    {
+        int after = index + tag.Length;
+        return after <= html.Length
+            && string.Compare(html, index, tag, 0, tag.Length, StringComparison.OrdinalIgnoreCase) == 0
+            && (after == html.Length || !char.IsAsciiLetterOrDigit(html[after]));
     }
 
     /// <summary>Index of the '&gt;' that ends a tag, skipping quoted values.</summary>

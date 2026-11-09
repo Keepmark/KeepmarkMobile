@@ -618,24 +618,26 @@ else
     }
 
     /// <summary>Confirmed export: the warning was on screen, this click is
-    /// the consent. The file is offered to the share sheet like the
-    /// encrypted export.</summary>
+    /// the consent. The file is offered to the share sheet; unlike the
+    /// encrypted export it is never kept in the app: if the share sheet
+    /// cannot open, the plain-text file is deleted and the error shown.</summary>
     private async Task ExportHtml()
     {
         await RunAsync(async () =>
         {
             var (path, count) = await Session.ExportHtmlAsync();
             htmlExportArmed = false;
-            var done = Loc.Plural(Str.HtmlExportDone, count);
             try
             {
                 await Share.Default.RequestAsync(new ShareFileRequest(L.Get(Str.HtmlSaveTitle), new ShareFile(path)));
-                return done + " " + L.Get(Str.BackupChooseWhere);
             }
             catch
             {
-                return done + " " + L.Get(Str.BackupSavedInApp);
+                Session.PurgeHtmlExports();
+                throw;
             }
+
+            return Loc.Plural(Str.HtmlExportDone, count) + " " + L.Get(Str.BackupChooseWhere);
         }, (text, error) => (htmlMessage, htmlError) = (text, error));
     }
 

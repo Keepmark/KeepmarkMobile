@@ -161,6 +161,45 @@ public class NetscapeBookmarksTests
     }
 
     [Fact]
+    public void DamagedMarkupLosesOneItemNotTheRestOfTheFile()
+    {
+        // An unclosed link stops at the next item instead of swallowing it.
+        var unclosed = NetscapeBookmarks.Parse(
+            "<DL><DT><A HREF=\"https://a.example/\">First <b>bold</b>\n" +
+            "<DT><A HREF=\"https://b.example/\">Second</A>\n" +
+            "<DT><H3>Folder\n<DL><DT><A HREF=\"https://c.example/\">Third</A></DL></DL>");
+        Assert.Equal(["First bold", "Second", "Folder"], unclosed.Roots.Select(r => r.Title));
+        Assert.Equal("Third", unclosed.Roots[2].Children!.Single().Title);
+
+        // An unbalanced quote in one tag does not drop what follows.
+        var quote = NetscapeBookmarks.Parse(
+            "<DL><DT><A HREF=\"https://a.example/\">One</A>\n" +
+            "<DT><A HREF=\"https://b.example/ ICON='x>Two</A>\n" +
+            "<DT><A HREF=https://c.example/>Three</A></DL>");
+        Assert.Contains(quote.Roots, r => r.Title == "One");
+        Assert.Contains(quote.Roots, r => r.Title == "Three");
+
+        // Many unclosed links stay linear (was quadratic: one scan to the end each).
+        var many = new StringBuilder("<DL>");
+        for (int i = 0; i < 50_000; i++) many.Append("<DT><A HREF=\"https://x.example/").Append(i).Append("\">t");
+        Assert.Equal(50_000, NetscapeBookmarks.Parse(many.ToString()).Bookmarks);
+    }
+
+    [Fact]
+    public void ExportSkipsNodesThatAreNeitherFolderNorLink()
+    {
+        var html = NetscapeBookmarks.Write([
+            new() { Title = ContainerNames.Other, Children = [
+                new() { Title = "No url" },
+                new() { Title = "Link", Url = "https://a.example/" },
+            ] },
+        ]);
+        Assert.DoesNotContain("No url", html);
+        Assert.DoesNotContain("HREF=\"\"", html);
+        Assert.Contains(">Link</A>", html);
+    }
+
+    [Fact]
     public void ControlCharactersNeverReachTitlesOrTags()
     {
         var r = NetscapeBookmarks.Parse("<DL><DT><A HREF=\"https://x.example/\" TAGS=\"a&#31;b,c\">t&#31;i\u0001tle</A></DL>");
