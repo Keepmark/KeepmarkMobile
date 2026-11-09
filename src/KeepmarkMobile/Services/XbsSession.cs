@@ -1291,6 +1291,26 @@ public sealed class XbsSession : IAsyncDisposable
         return await Engine.DeleteBookmarksByNodeIdsAsync(ids, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Renames a tag everywhere (null = delete it). The current
+    /// tree is saved as a safety backup first; a failed backup stops the
+    /// change (fail closed). Returns the number of changed bookmarks.</summary>
+    public async Task<int> RenameTagAsync(string tag, string? newName, CancellationToken ct = default)
+    {
+        if (Store is null || Engine is null)
+        {
+            return 0;
+        }
+
+        var (roots, _, _, _) = await Store.LoadMirrorAsync(includeBlob: false).ConfigureAwait(false);
+        await SaveSafetyBackupAsync("local", System.Text.Json.JsonSerializer.Serialize(roots),
+            SafetyOperations.TagsEdit, CountBackupNodes(roots)).ConfigureAwait(false);
+        return await Engine.RenameTagAsync(tag, newName, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Bookmark the Home page must reveal when it opens next (set by
+    /// the tag view's "go to location"). Consumed once.</summary>
+    public int? PendingLocateNodeId { get; set; }
+
     // ---- copies of removed syncs (service answered 401) -------------------
 
     /// <summary>Unlink after the service said the sync does not exist: the

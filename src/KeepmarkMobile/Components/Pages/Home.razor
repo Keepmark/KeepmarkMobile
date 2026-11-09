@@ -147,7 +147,7 @@ else
                 @foreach (var id in hitRows)
                 {
                     <BookmarkRow @key="@("s" + id)" Row="byRow[id]" Expanded="expandedRows.Contains(id)" Flash="flashRowId == id" Pinned="IsPinned(id)"
-                                 FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(byRow[id].NodeId)" SelectionCovered="selection.IsCovered(byRow[id].NodeId)" SelectionAvailable="selection.IsAvailable(byRow[id].NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
+                                 FolderPath="@hitPaths.GetValueOrDefault(id)" OnOpen="OpenRow" OnAction="OnRowAction" OnTag="OpenTag" SelectionMode="selection.Active" Selected="selection.IsSelected(byRow[id].NodeId)" SelectionCovered="selection.IsCovered(byRow[id].NodeId)" SelectionAvailable="selection.IsAvailable(byRow[id].NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                 }
             </div>
         }
@@ -159,7 +159,7 @@ else
             @foreach (var r in recentAll)
             {
                 <BookmarkRow @key="@("v" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)"
-                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
+                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" OnTag="OpenTag" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
             }
         </div>
     }
@@ -190,7 +190,7 @@ else
                         @foreach (var r in pinnedRows)
                         {
                             <BookmarkRow @key="@("p" + r.RowId)" Row="r" Pinned="true" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
-                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
+                                             FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" OnTag="OpenTag" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                         }
                     </div>
                 }
@@ -216,7 +216,7 @@ else
                         @foreach (var r in RecentShown)
                         {
                             <BookmarkRow @key="@("n" + r.RowId)" Row="r" Pinned="IsPinned(r.RowId)" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId"
-                                         FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
+                                         FolderPath="@pinPaths.GetValueOrDefault(r.RowId)" Added="@RelativeTime.Format(r.DateAdded)" OnOpen="OpenRow" OnAction="OnRowAction" OnTag="OpenTag" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                         }
                     </div>
                     @if (recentAll.Count > RecentShown.Count)
@@ -232,14 +232,14 @@ else
                 @if (rows.Count > 100 && !locationReveal && !hasSeparators && expandedRows.Count == 0)
                 {
                     <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize Items="rows" Context="r" ItemSize="64" OverscanCount="8">
-                        <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
+                        <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" OnTag="OpenTag" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                     </Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize>
                 }
                 else
                 {
                 @foreach (var r in rows)
                 {
-                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
+                    <BookmarkRow @key="@("r" + r.RowId)" Row="r" Expanded="expandedRows.Contains(r.RowId)" Flash="flashRowId == r.RowId" Pinned="IsPinned(r.RowId)" Count="@folderCounts.GetValueOrDefault(r.RowId)" OnOpen="OpenRow" OnAction="OnRowAction" OnTag="OpenTag" SelectionMode="selection.Active" Selected="selection.IsSelected(r.NodeId)" SelectionCovered="selection.IsCovered(r.NodeId)" SelectionAvailable="selection.IsAvailable(r.NodeId)" ContentVersion="renderedContentVersion" OnToggle="ToggleSelection" />
                 }
                 }
             </div>
@@ -340,7 +340,7 @@ else
     <BookmarkSheet @key="sharedSheetGeneration" Visible="true" Existing="sheetFor.Row" DefaultParent="sheetFor.Parent"
                    PresetUrl="@sheetFor.PresetUrl" PresetTitle="@sheetFor.PresetTitle"
                    Folders="allFolders" OnSave="SaveSheet" OnCancel="() => sheetFor = null"
-                   FindDuplicates="FindDuplicates" OnOpenExisting="OpenExisting"
+                   FindDuplicates="FindDuplicates" LoadTags="LoadTagNames" OnOpenExisting="OpenExisting"
                    OnEditExisting="r => sheetFor = new SheetTarget(r, null)" />
 }
 
@@ -375,7 +375,7 @@ else
                     <div class="xbs-sheet-tags">
                         @foreach (var tag in menuFor.Tags.Split('\u001F', StringSplitOptions.RemoveEmptyEntries))
                         {
-                            <span class="xbs-tag">#@tag</span>
+                            <button type="button" class="xbs-tag" aria-label="@L.Get(Str.TagsShowAria, tag)" @onclick="() => OpenTag(tag)">#@tag</button>
                         }
                     </div>
                 }
@@ -614,6 +614,7 @@ else if (moved is not null)
         OpenSharedIfPending();
         OnForegroundChanged();
         await RefreshAsync();
+        await LocatePendingAsync();
     }
 
     private void OnForegroundChanged() => _ = InvokeAsync(() =>
@@ -1194,6 +1195,14 @@ else if (moved is not null)
     }
 
     /// <summary>Folder path as "Work › Dev"; top level when null.</summary>
+    /// <summary>Tags in use, most used first (suggestions in the edit sheet).</summary>
+    private async Task<List<string>> LoadTagNames()
+    {
+        if (Session.Store is null) return [];
+        return (await Session.Store.GetTagsAsync()).Tags
+            .OrderByDescending(t => t.Count).Select(t => t.Name).ToList();
+    }
+
     private async Task<List<BookmarkSheet.DupHit>> FindDuplicates(string url)
     {
         if (Session.Store is null) return [];
@@ -1570,6 +1579,23 @@ else if (moved is not null)
         isSearch = false;
         searchOpen = false;
         await RefreshAsync();
+    }
+
+    private void OpenTag(string tag)
+    {
+        menuFor = null;
+        Nav.NavigateTo("tags?t=" + Uri.EscapeDataString(tag));
+    }
+
+    /// <summary>The tag view asked to reveal a bookmark ("go to location" there).</summary>
+    private async Task LocatePendingAsync()
+    {
+        if (Session.PendingLocateNodeId is not int nodeId || Session.Store is null) return;
+        Session.PendingLocateNodeId = null;
+        if (await Session.Store.GetRowIdByNodeIdAsync(nodeId) is int rowId)
+        {
+            await GoToLocation(await Session.Store.GetNodeAsync(rowId));
+        }
     }
 
     private async Task GoToLocation(ItemRow? row)

@@ -57,7 +57,18 @@
                 </div>
                 <div class="mb-2">
                     <label class="form-label" for="xbs-f-tags">@L.Get(Str.SheetTags)</label>
-                    <input id="xbs-f-tags" class="form-control" @bind="tags" />
+                    <input id="xbs-f-tags" class="form-control" @ref="tagsInput" @bind="tags" @bind:event="oninput" @bind:after="SuggestTags"
+                           autocapitalize="off" autocomplete="off" />
+                    @if (tagHints.Count > 0)
+                    {
+                        @* Existing tags starting with what is being typed: one tap completes it. *@
+                        <div class="xbs-tag-hints" role="group" aria-label="@L.Get(Str.SheetTagHints)">
+                            @foreach (var hint in tagHints)
+                            {
+                                <button type="button" class="xbs-tag" @key="hint" @onclick="() => PickTag(hint)">#@hint</button>
+                            }
+                        </div>
+                    }
                 </div>
             }
             <div class="mb-3">
@@ -122,7 +133,16 @@
     [Parameter] public EventCallback<ItemRow> OnOpenExisting { get; set; }
     [Parameter] public EventCallback<ItemRow> OnEditExisting { get; set; }
 
+    /// <summary>Tags already in use (most used first), for the suggestions
+    /// under the tags field. Loaded once per opened sheet, on first typing.</summary>
+    [Parameter] public Func<Task<List<string>>>? LoadTags { get; set; }
+
     public sealed record DupHit(ItemRow Row, string Path);
+
+    private const int MaxTagHints = 6;
+    private ElementReference tagsInput;
+    private List<string>? knownTags;
+    private List<string> tagHints = [];
 
     private List<DupHit> dups = [];
     private int dupCheck;
@@ -278,7 +298,50 @@
         initIsFolder = EffectiveIsFolder;
         initFolder = selectedFolder;
         dups = [];
+        knownTags = null;
+        tagHints = [];
         _ = CheckDuplicates();
+    }
+
+    /// <summary>Suggests existing tags for the entry being typed (the text
+    /// after the last comma). Only a hint: a failed load never blocks editing.</summary>
+    private async Task SuggestTags()
+    {
+        if (LoadTags is null)
+        {
+            return;
+        }
+
+        if (knownTags is null)
+        {
+            try { knownTags = await LoadTags(); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Tag suggestions failed: {ex.GetType().Name}");
+                knownTags = [];
+            }
+        }
+
+        var parts = tags.Split(',');
+        var typing = parts[^1].Trim();
+        if (typing.Length == 0)
+        {
+            tagHints = [];
+            return;
+        }
+
+        var used = parts[..^1].Select(p => p.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        tagHints = knownTags
+            .Where(k => k.StartsWith(typing, StringComparison.CurrentCultureIgnoreCase) && k != typing && !used.Contains(k))
+            .Take(MaxTagHints).ToList();
+    }
+
+    private async Task PickTag(string tag)
+    {
+        int cut = tags.LastIndexOf(',');
+        tags = (cut < 0 ? string.Empty : tags[..(cut + 1)].TrimEnd() + " ") + tag + ", ";
+        tagHints = [];
+        try { await tagsInput.FocusAsync(); } catch { }
     }
 
     /// <summary>Looks the URL up after each change; a newer check wins over a slower older one.</summary>

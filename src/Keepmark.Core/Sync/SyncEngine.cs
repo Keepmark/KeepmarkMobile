@@ -842,6 +842,29 @@ public sealed partial class SyncEngine(
         }
     }
 
+    /// <summary>Renames a tag on every bookmark (null = remove it) in one
+    /// transaction and one push. Works without a linked sync, like the
+    /// import: the change then stays local.</summary>
+    public async Task<int> RenameTagAsync(string tag, string? newName, CancellationToken ct = default)
+    {
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            int n = await store.RenameTagAsync(tag, newName).ConfigureAwait(false);
+            if (n > 0 && await creds.GetAsync().ConfigureAwait(false) is not null)
+            {
+                await NotifyLocalEditAsync(ct).ConfigureAwait(false);
+            }
+
+            log.Info("sync", $"Tag {(newName is null ? "deleted" : "renamed")} on {n} bookmark(s)");
+            return n;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     /// <summary>Add under the folder with the given stable NodeId (null = top
     /// level). Prefer over <see cref="AddBookmarkAsync"/>.</summary>
     public async Task<int> AddBookmarkByNodeIdAsync(int? parentNodeId, BookmarkNode node, CancellationToken ct = default)

@@ -1,0 +1,365 @@
+@inherits KeepmarkMobile.Components.SessionComponentBase
+@page "/tags"
+@using System.Linq
+@using Keepmark.Core.Data
+@inject KeepmarkMobile.Services.XbsSession Session
+@inject KeepmarkMobile.Services.ToastState Toast
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>@L.Get(Str.NavTags)</PageTitle>
+
+@* One page, two views: the tag list, and (with ?t=<tag> or ?u=1) the
+   bookmarks of one tag. The view is in the URL so Android back returns from
+   the bookmarks to the list, and from the list to where the user came from. *@
+@if (!ready)
+{
+    <h1>@L.Get(Str.NavTags)</h1>
+    <p role="status"><em>@L.Get(Str.CommonLoading)</em></p>
+}
+else if (!InDetail)
+{
+    <h1>@L.Get(Str.NavTags)</h1>
+    <InfoHint Text="@L.Get(Str.TagsShort)" Title="@L.Get(Str.NavTags)" Body="@L.Get(Str.TagsIntro)" />
+
+    @if (summary.Tags.Count == 0)
+    {
+        <div class="alert alert-info" role="status">@L.Get(Str.TagsEmpty)</div>
+    }
+    else
+    {
+        <div class="xbs-tagtools">
+            <input class="form-control" type="search" placeholder="@L.Get(Str.TagsSearchPlaceholder)" aria-label="@L.Get(Str.TagsSearchPlaceholder)"
+                   autocapitalize="off" autocorrect="off" spellcheck="false" @bind="filter" @bind:event="oninput" />
+            <div class="btn-group" role="group" aria-label="@L.Get(Str.TagsSortAria)">
+                <button type="button" class="btn @(sortByCount ? "btn-outline-secondary" : "btn-secondary")" aria-pressed="@((!sortByCount).ToString().ToLowerInvariant())" @onclick="() => sortByCount = false">@L.Get(Str.TagsSortName)</button>
+                <button type="button" class="btn @(sortByCount ? "btn-secondary" : "btn-outline-secondary")" aria-pressed="@sortByCount.ToString().ToLowerInvariant()" @onclick="() => sortByCount = true">@L.Get(Str.TagsSortCount)</button>
+            </div>
+        </div>
+
+        var shown = ShownTags();
+        @if (shown.Count == 0)
+        {
+            <p class="text-muted" role="status">@L.Get(Str.TagsNoMatch)</p>
+        }
+        else
+        {
+            <div class="xbs-taglist">
+                @foreach (var t in shown)
+                {
+                    <button type="button" class="xbs-tagitem" @key="t.Name" @onclick="() => OpenTag(t.Name)"
+                            aria-label="@($"{L.Get(Str.TagsShowAria, t.Name)}, {Loc.Plural(Str.HomeCountBookmarks, t.Count)}")">
+                        <span class="xbs-tagitem-name">#@t.Name</span>
+                        <span class="xbs-tagitem-count" aria-hidden="true">@t.Count</span>
+                    </button>
+                }
+            </div>
+        }
+    }
+
+    @if (summary.Untagged > 0 && filter.Trim().Length == 0)
+    {
+        <div class="xbs-taglist mt-2">
+            <button type="button" class="xbs-tagitem" @onclick="OpenUntagged"
+                    aria-label="@($"{L.Get(Str.TagsUntagged)}, {Loc.Plural(Str.HomeCountBookmarks, summary.Untagged)}")">
+                <span class="xbs-tagitem-name muted">@L.Get(Str.TagsUntagged)</span>
+                <span class="xbs-tagitem-count" aria-hidden="true">@summary.Untagged</span>
+            </button>
+        </div>
+    }
+}
+else
+{
+    <button type="button" class="xbs-tagback" @onclick="@(() => Nav.NavigateTo("tags"))">
+        <svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>@L.Get(Str.TagsAll)
+    </button>
+    <h1 class="text-break">@(Untagged ? L.Get(Str.TagsUntagged) : "#" + current)</h1>
+    <p class="text-muted" role="status"><small>@Loc.Plural(Str.HomeCountBookmarks, rows.Count)</small></p>
+
+    @if (!Untagged && rows.Count > 0)
+    {
+        @if (renaming)
+        {
+            <div class="alert alert-secondary mt-2 mb-2">
+                <label class="form-label" for="xbs-tag-name">@L.Get(Str.TagsNewName)</label>
+                <input id="xbs-tag-name" class="form-control" @bind="newName" @bind:event="oninput" maxlength="100"
+                       autocapitalize="off" autocorrect="off" spellcheck="false"
+                       aria-invalid="@(nameError.Length > 0 ? "true" : "false")" />
+                @if (MergeTarget() is { } target)
+                {
+                    <div class="form-text" role="status">@L.Get(Str.TagsMergeNote, target)</div>
+                }
+                @if (nameError.Length > 0)
+                {
+                    <div class="text-danger mt-1" role="alert">@nameError</div>
+                }
+                <div class="mt-2 d-flex gap-2">
+                    <button class="btn btn-primary" disabled="@busy" @onclick="Rename">@L.Get(Str.CommonSave)</button>
+                    <button class="btn btn-secondary" disabled="@busy" @onclick="() => renaming = false">@L.Get(Str.CommonCancel)</button>
+                </div>
+            </div>
+        }
+        else if (deleting)
+        {
+            <ConfirmBlock Danger="true" Message="@L.Get(Str.TagsDeleteQuestion, current)" Implication="@Loc.Plural(Str.TagsDeleteImplication, rows.Count)"
+                          ConfirmLabel="@L.Get(Str.CommonYesDelete)" Busy="busy" OnConfirm="Delete" OnCancel="() => deleting = false" />
+        }
+        else
+        {
+            <div class="d-flex gap-2 mb-2">
+                <button class="btn btn-outline-secondary" disabled="@busy" @onclick="StartRename">@L.Get(Str.SyncsRename)</button>
+                <button class="btn btn-outline-danger" disabled="@busy" @onclick="() => deleting = true">@L.Get(Str.CommonDelete)</button>
+            </div>
+        }
+    }
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+        <div class="alert alert-danger mt-2" role="alert">@error</div>
+    }
+
+    @if (rows.Count == 0)
+    {
+        <div class="alert alert-info" role="status">@L.Get(Str.TagsNoBookmarks)</div>
+    }
+    else
+    {
+        <section class="xbs-dupgroup">
+            @foreach (var r in rows.Skip(page * PageSize).Take(PageSize))
+            {
+                var title = string.IsNullOrWhiteSpace(r.Title) ? r.Url ?? string.Empty : r.Title;
+                <div class="xbs-tagrow" @key="r.RowId">
+                    <button type="button" class="xbs-duptext" aria-label="@L.Get(Str.RowOpenBookmark, title)" @onclick="() => Open(r)">
+                        <span class="xbs-duptext-title">@title</span>
+                        <span class="xbs-duptext-sub">@r.Url</span>
+                        @if (paths.GetValueOrDefault(r.RowId) is { Length: > 0 } path)
+                        {
+                            <span class="xbs-duptext-path">@path</span>
+                        }
+                    </button>
+                    <button type="button" class="xbs-tagrow-loc" aria-label="@($"{L.Get(Str.HomeGoToLocation)}: {title}")" @onclick="() => Locate(r)">
+                        <svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" /></svg>
+                    </button>
+                </div>
+            }
+        </section>
+        @if (rows.Count > PageSize)
+        {
+            <div class="d-flex gap-2 align-items-center my-2">
+                <button class="btn btn-outline-secondary" disabled="@(page == 0)" aria-label="@L.Get(Str.CommonPreviousPage)" @onclick="() => page--">←</button>
+                <span role="status">@($"{page * PageSize + 1}–{Math.Min((page + 1) * PageSize, rows.Count)} / {rows.Count}")</span>
+                <button class="btn btn-outline-secondary" disabled="@((page + 1) * PageSize >= rows.Count)" aria-label="@L.Get(Str.CommonNextPage)" @onclick="() => page++">→</button>
+            </div>
+        }
+    }
+}
+
+@code {
+    private const int PageSize = 100;
+
+    /// <summary>Tag to show (any case); empty or missing = the tag list.</summary>
+    [SupplyParameterFromQuery(Name = "t")] public string? Tag { get; set; }
+    /// <summary>"1" = bookmarks with no tag.</summary>
+    [SupplyParameterFromQuery(Name = "u")] public string? NoTag { get; set; }
+
+    // Kept across visits to the page (same app run): a list preference, not a setting.
+    private static bool sortByCount;
+
+    private bool ready;
+    private TagSummary summary = new([], 0);
+    private string filter = string.Empty;
+    private List<ItemRow> rows = [];
+    private Dictionary<int, string> paths = new();
+    private string current = string.Empty;
+    private string loadedKey = "\0";
+    private int page;
+    private bool renaming;
+    private bool deleting;
+    private bool busy;
+    private string newName = string.Empty;
+    private string nameError = string.Empty;
+    private string error = string.Empty;
+
+    private bool Untagged => NoTag == "1";
+    private bool InDetail => Untagged || !string.IsNullOrEmpty(Tag);
+    private string ViewKey => Untagged ? "\u0001" : Tag ?? string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await WaitForSessionAsync(Session)) return;
+
+        if (Session.Engine is not null)
+        {
+            Session.Engine.DataChanged += OnData;
+        }
+
+        await ReloadAsync();
+        if (IsDisposed) return;
+        ready = true;
+    }
+
+    /// <summary>Same page, another view: the query string changed.</summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        if (ready && ViewKey != loadedKey)
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private void OnData() => InvokeAsync(async () =>
+    {
+        // A push/pull rekeys every RowId: refresh unless a rename/delete is
+        // in flight (it reloads at the end).
+        if (!busy && !IsDisposed)
+        {
+            await ReloadAsync(keepForm: true);
+            StateHasChanged();
+        }
+    });
+
+    private async Task ReloadAsync(bool keepForm = false)
+    {
+        if (Session.Store is null)
+        {
+            return;
+        }
+
+        var key = ViewKey;
+        summary = await Session.Store.GetTagsAsync();
+        if (InDetail)
+        {
+            rows = await Session.Store.GetBookmarksByTagAsync(Untagged ? null : Tag);
+            paths = await Session.Store.GetFolderPathsAsync(rows.Select(r => r.RowId));
+            current = Untagged
+                ? string.Empty
+                : summary.Tags.FirstOrDefault(t => string.Equals(t.Name, Tag, StringComparison.OrdinalIgnoreCase))?.Name ?? Tag!;
+        }
+        else
+        {
+            rows = [];
+            paths = new();
+        }
+
+        page = key == loadedKey ? Math.Clamp(page, 0, Math.Max(0, (rows.Count - 1) / PageSize)) : 0;
+        if (!keepForm || key != loadedKey)
+        {
+            renaming = false;
+            deleting = false;
+            error = string.Empty;
+        }
+
+        loadedKey = key;
+    }
+
+    private List<TagInfo> ShownTags()
+    {
+        var f = filter.Trim().TrimStart('#');
+        IEnumerable<TagInfo> list = f.Length == 0
+            ? summary.Tags
+            : summary.Tags.Where(t => t.Name.Contains(f, StringComparison.CurrentCultureIgnoreCase));
+        // The store returns them by name; "most used" keeps that order on ties.
+        return sortByCount ? list.OrderByDescending(t => t.Count).ToList() : list.ToList();
+    }
+
+    private void OpenTag(string name) => Nav.NavigateTo("tags?t=" + Uri.EscapeDataString(name));
+
+    private void OpenUntagged() => Nav.NavigateTo("tags?u=1");
+
+    private async Task Open(ItemRow r)
+    {
+        if (!string.IsNullOrWhiteSpace(r.Url))
+        {
+            try { await Launcher.OpenAsync(r.Url); } catch { }
+        }
+    }
+
+    /// <summary>Shows the bookmark in its folder on the Home page, where it can be edited.</summary>
+    private void Locate(ItemRow r)
+    {
+        if (r.NodeId is null) return;
+        Session.PendingLocateNodeId = r.NodeId;
+        Nav.NavigateTo("/");
+    }
+
+    private void StartRename()
+    {
+        newName = current;
+        nameError = string.Empty;
+        error = string.Empty;
+        renaming = true;
+    }
+
+    /// <summary>Another tag the typed name would merge into (its display spelling), if any.</summary>
+    private string? MergeTarget()
+    {
+        var typed = newName.Trim();
+        return typed.Length == 0 || string.Equals(typed, current, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : summary.Tags.FirstOrDefault(t => string.Equals(t.Name, typed, StringComparison.OrdinalIgnoreCase))?.Name;
+    }
+
+    private async Task Rename()
+    {
+        var typed = newName.Trim();
+        if (!BookmarkStore.IsValidTagName(typed))
+        {
+            nameError = L.Get(Str.TagsNameInvalid);
+            return;
+        }
+
+        nameError = string.Empty;
+        var changed = await ApplyAsync(typed);
+        if (changed is null) return;
+
+        _ = Toast.ShowAsync(Loc.Plural(Str.TagsRenamed, changed.Value));
+        // replace: the old tag's view must not stay in the back history.
+        Nav.NavigateTo("tags?t=" + Uri.EscapeDataString(typed), replace: true);
+    }
+
+    private async Task Delete()
+    {
+        var changed = await ApplyAsync(null);
+        if (changed is null) return;
+
+        _ = Toast.ShowAsync(Loc.Plural(Str.TagsDeleted, changed.Value));
+        Nav.NavigateTo("tags", replace: true);
+    }
+
+    /// <summary>One rename / delete: safety backup, one transaction, one push.
+    /// Null when it failed (the error is shown, nothing changed).</summary>
+    private async Task<int?> ApplyAsync(string? name)
+    {
+        if (busy || Session.Engine is null) return null;
+
+        busy = true;
+        error = string.Empty;
+        try
+        {
+            var changed = await Session.RenameTagAsync(current, name);
+            Session.Log.Info("tags", $"Tag {(name is null ? "deleted" : "renamed")} on {changed} bookmark(s)");
+            busy = false;
+            await ReloadAsync();
+            return changed;
+        }
+        catch (Exception ex)
+        {
+            Session.Log.Warn("tags", $"Tag change failed: {ex.GetType().Name}");
+            error = L.Get(Str.TagsFailed, ex.Message);
+            return null;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        if (Session.Engine is not null)
+        {
+            Session.Engine.DataChanged -= OnData;
+        }
+    }
+}

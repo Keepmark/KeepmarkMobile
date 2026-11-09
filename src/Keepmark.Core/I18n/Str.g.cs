@@ -859,8 +859,40 @@ public static partial class Str
     public const string ErrHtmlNotBookmarks = nameof(ErrHtmlNotBookmarks);
     public const string ErrHtmlTooDeep = nameof(ErrHtmlTooDeep);
     public const string SafetyOpImportHtml = nameof(SafetyOpImportHtml);
+    public const string SafetyOpTagsEdit = nameof(SafetyOpTagsEdit);
     /// <summary>Base for Loc.Plural (HtmlExportDone_one / HtmlExportDone_other).</summary>
     public const string HtmlExportDone = nameof(HtmlExportDone);
     /// <summary>Base for Loc.Plural (HtmlImportDone_one / HtmlImportDone_other).</summary>
     public const string HtmlImportDone = nameof(HtmlImportDone);
+    public const string NavTags = nameof(NavTags);
+    public const string TagsShort = nameof(TagsShort);
+    public const string TagsIntro = nameof(TagsIntro);
+    public const string TagsEmpty = nameof(TagsEmpty);
+    public const string TagsSearchPlaceholder = nameof(TagsSearchPlaceholder);
+    public const string TagsSortAria = nameof(TagsSortAria);
+    public const string TagsSortName = nameof(TagsSortName);
+    public const string TagsSortCount = nameof(TagsSortCount);
+    public const string TagsNoMatch = nameof(TagsNoMatch);
+    public const string TagsShowAria = nameof(TagsShowAria);
+    public const string TagsUntagged = nameof(TagsUntagged);
+    public const string TagsAll = nameof(TagsAll);
+    public const string TagsNewName = nameof(TagsNewName);
+    public const string TagsMergeNote = nameof(TagsMergeNote);
+    public const string TagsDeleteQuestion = nameof(TagsDeleteQuestion);
+    public const string TagsDeleteImplication_one = nameof(TagsDeleteImplication_one);
+    public const string TagsDeleteImplication_other = nameof(TagsDeleteImplication_other);
+    public const string TagsNoBookmarks = nameof(TagsNoBookmarks);
+    public const string TagsNameInvalid = nameof(TagsNameInvalid);
+    public const string TagsRenamed_one = nameof(TagsRenamed_one);
+    public const string TagsRenamed_other = nameof(TagsRenamed_other);
+    public const string TagsDeleted_one = nameof(TagsDeleted_one);
+    public const string TagsDeleted_other = nameof(TagsDeleted_other);
+    public const string TagsFailed = nameof(TagsFailed);
+    public const string SheetTagHints = nameof(SheetTagHints);
+    /// <summary>Base for Loc.Plural (TagsDeleteImplication_one / TagsDeleteImplication_other).</summary>
+    public const string TagsDeleteImplication = nameof(TagsDeleteImplication);
+    /// <summary>Base for Loc.Plural (TagsRenamed_one / TagsRenamed_other).</summary>
+    public const string TagsRenamed = nameof(TagsRenamed);
+    /// <summary>Base for Loc.Plural (TagsDeleted_one / TagsDeleted_other).</summary>
+    public const string TagsDeleted = nameof(TagsDeleted);
 }

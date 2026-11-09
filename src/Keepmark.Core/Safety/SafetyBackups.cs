@@ -31,6 +31,8 @@ public static class SafetyOperations
     public const string ConflictPush = "conflict-push";
     public const string ConflictMerge = "conflict-merge";
     public const string SelectionDelete = "selection-delete";
+    // Tag rename / merge / delete from the tag view (touches many bookmarks).
+    public const string TagsEdit = "tags-edit";
     // A sync whose magnitude exceeded XbsConstants.MaxSilentSyncChanges: the
     // side being replaced was snapshotted first (a normal sync takes none).
     public const string SyncPull = "sync-pull";
@@ -57,6 +59,7 @@ public static class SafetyOperations
         ConnectMerge => Loc.Get(Str.SafetyOpConnectMerge),
         SwitchMerge => Loc.Get(Str.SafetyOpSwitchMerge),
         DuplicatesCleanup => Loc.Get(Str.SafetyOpDuplicatesCleanup),
+        TagsEdit => Loc.Get(Str.SafetyOpTagsEdit),
         PreRestore => Loc.Get(Str.SafetyOpPreRestore),
         ConflictPull => Loc.Get(Str.SafetyOpConflictPull),
         ConflictPush => Loc.Get(Str.SafetyOpConflictPush),

@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.242 (243)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.243 (244)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -31,7 +31,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (439 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (445 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -311,6 +311,7 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
 |---|---|---|
 | `/` | `Home` | tree, search, pinned/recent, sheets, share intake, selection |
 | `/duplicates` | `Duplicates` | duplicate groups and bulk cleanup |
+| `/tags` | `Tags` | tag list (counts, search, sort), per-tag bookmark list (`?t=` / `?u=1`), rename / merge / delete |
 | `/backup` | `Backup` | encrypted export/import, bookmarks.html export/import, safety backups, removed copies |
 | `/syncs` | `Syncs` | saved syncs (activate, rename, forget, unlink, `Change password` on the active row) plus `+ Add a sync`, which opens the whole connect flow in place |
 | `/connect` | `Connect` | redirect to `/syncs` (old links only) |
@@ -995,6 +996,7 @@ has.
 | Import bookmarks.html (additive) | — (nothing destroyed; the copy lets the import be taken back) | local JSON | `import-html` |
 | Change password | server copy | remote JSON | `change-password` |
 | Duplicates bulk delete | local tree | pre-delete JSON | `duplicates-cleanup` |
+| Tag rename / merge / delete | local tree | pre-edit JSON | `tags-edit` |
 | Selection → Delete | local tree | pre-delete JSON | `selection-delete` |
 | Safety restore | current state | local or server state | `pre-restore` |
 | Conflict → Download | local tree | local JSON | `conflict-pull` |
@@ -1401,7 +1403,7 @@ and PERFORMANCE.md.
 
 The per-view checklist is in
 [verification-spec.md](verification-spec.md) §11. No view may be skipped: Home,
-Duplicates, Backup, Syncs, Connect, MoveServiceLegacy, Settings, Status,
+Duplicates, Tags, Backup, Syncs, Connect, MoveServiceLegacy, Settings, Status,
 About, plus cross-view checks (live v1.2 conditional GET/CAS, restore against a
 real server, uninstall/reinstall data loss). QR hardware cases (permission
 denied/revoked, rotation, biometric lock, camera indicator off) and TalkBack,
