@@ -3304,4 +3304,10 @@ a.xbs-back { text-decoration: none; }
 .km-share-code-value { font-size: 1.6rem; letter-spacing: 0.15em; font-weight: 600; }
 .km-once-code { max-width: 10ch; letter-spacing: 0.15em; text-align: center; font-variant-numeric: tabular-nums; }
 .km-share-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.9rem; color: var(--km-ink-2); }
-.km-share-options { padding: 8px 12px; border: 1px solid var(--km-line, #d0d7de); border-radius: 8px; }
+.km-share-options { padding: 12px; border: 1px solid var(--km-line, #d0d7de); border-radius: 8px; }
+.km-share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.km-share-actions > .btn { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.km-share-actions > .btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.km-share-summary .xbs-link-btn { flex: none; height: 44px; }
+/* Hints inside the share box line up with the textarea and the warning. */
+.km-share .xbs-hint { padding: 0; }

@@ -223,10 +223,10 @@ else
                                         <input id="sync-share-code-@i" class="form-check-input" type="checkbox" @bind="shareWithCode" />
                                         <label class="form-check-label" for="sync-share-code-@i">@L.Get(Str.SyncsShareCodeLabel)</label>
                                     </div>
-                                    <div class="form-text mb-2">@L.Get(Str.SyncsShareCodeHint)</div>
-                                    <div class="d-flex flex-wrap gap-2">
-                                        <button class="btn btn-primary btn-sm" @onclick="() => RemakeOneTimeAsync(key, row)">@L.Get(Str.SyncsShareCreateOnce)</button>
-                                        <button class="btn btn-secondary btn-sm" @onclick="() => shareEditing = false">@L.Get(Str.CommonCancel)</button>
+                                    <div class="form-text mb-3">@L.Get(Str.SyncsShareCodeHint)</div>
+                                    <div class="km-share-actions">
+                                        <button class="btn btn-primary" @onclick="() => RemakeOneTimeAsync(key, row)">@L.Get(Str.SyncsShareCreateOnce)</button>
+                                        <button class="btn btn-secondary" @onclick="() => shareEditing = false">@L.Get(Str.CommonCancel)</button>
                                     </div>
                                 </div>
                             }
@@ -238,17 +238,17 @@ else
                         @if (!shareEditing)
                         {
                             <p class="xbs-hint mt-2 mb-2">@L.Get(Str.SyncsShareHowTo)</p>
-                            <div class="alert alert-warning mb-2" role="note">@L.Get(shareOnce is null ? Str.SyncsShareWarn : Str.SyncsShareWarnOnce)</div>
-                            <div class="d-flex flex-wrap gap-2 mb-2">
+                            <div class="alert alert-warning mb-0" role="note">@L.Get(shareOnce is null ? Str.SyncsShareWarn : Str.SyncsShareWarnOnce)</div>
+                            @* Two equal columns: send/copy first, then revoke/done;
+                               a lone last button takes the whole row. *@
+                            <div class="km-share-actions mt-3">
                                 <button class="btn btn-primary" @onclick="SendShareLinkAsync">@L.Get(Str.SyncsShareSend)</button>
                                 <button class="btn btn-outline-primary" @onclick="CopyShareLinkAsync">@L.Get(Str.SyncsShareCopy)</button>
-                            </div>
-                            <div class="d-flex flex-wrap gap-2">
                                 @if (shareOnce is not null)
                                 {
-                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => RevokeOneTimeAsync(key)">@L.Get(Str.SyncsShareRevoke)</button>
+                                    <button class="btn btn-outline-danger" @onclick="() => RevokeOneTimeAsync(key)">@L.Get(Str.SyncsShareRevoke)</button>
                                 }
-                                <button class="btn btn-secondary btn-sm" @onclick="CloseShare">@L.Get(Str.CommonDone)</button>
+                                <button class="btn btn-secondary" @onclick="CloseShare">@L.Get(Str.CommonDone)</button>
                             </div>
                         }
                     </div>
@@ -574,15 +574,20 @@ else
         await Task.CompletedTask;
     }
 
+    /// <summary>The share sheet is open: going to the background keeps the box.</summary>
+    private bool sendingOut;
+
     private async Task SendShareLinkAsync()
     {
         if (shareLink is null) return;
         try
         {
+            sendingOut = true;
             await Share.Default.RequestAsync(new ShareTextRequest(shareLink, L.Get(Str.SyncsShareSubject)));
         }
         catch (Exception ex)
         {
+            sendingOut = false;
             Session.Log.Warn("syncs", $"Share sheet failed: {ex.GetType().Name}");
         }
     }
@@ -598,8 +603,12 @@ else
     private void OnLockChanged() => _ = InvokeAsync(() =>
     {
         // The link must not stay on screen behind the lock or in recents.
-        if (AppLock.Locked || !AppLock.Foreground) CloseShare();
-        else OpenForLink();
+        // One exception: our own share sheet ("Send…") sends the app to the
+        // background; the box (code, expiry, Revoke) must still be there when
+        // the sender comes back. The app lock still closes it.
+        if (AppLock.Locked) { sendingOut = false; CloseShare(); }
+        else if (!AppLock.Foreground) { if (!sendingOut) CloseShare(); }
+        else { sendingOut = false; OpenForLink(); }
         StateHasChanged();
     });
 
