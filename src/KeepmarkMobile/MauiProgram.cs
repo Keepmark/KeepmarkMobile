@@ -27,6 +27,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ToastState>();
         builder.Services.AddSingleton<ISelectionFeedback, SelectionFeedback>();
         builder.Services.AddSingleton<SharedImportService>();
+        builder.Services.AddSingleton<SyncLinkInbox>();
         builder.Services.AddSingleton<AppLockState>();
         builder.Services.AddSingleton<IQrScanner, QrScanner>();
         builder.Services.AddSingleton<XbsSession>();

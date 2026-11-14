@@ -8,6 +8,7 @@
 @inject KeepmarkMobile.Services.AppLockState AppLock
 @inject KeepmarkMobile.Services.IAppLockService LockPrompt
 @inject KeepmarkMobile.Services.ToastState Toast
+@inject KeepmarkMobile.Services.SyncLinkInbox LinkInbox
 @inject IJSRuntime JS
 @implements IDisposable
 
@@ -175,11 +176,35 @@ else
                         }
                     </div>
                 }
+                else if (shareKey == key && busy)
+                {
+                    <p class="km-switch-busy mt-2" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.SyncsShareChecking)</p>
+                }
+                else if (shareKey == key && shareLink is not null)
+                {
+                    @* The link is a lasting credential: shown only after the app
+                       lock, cleared on close, lock or background, never stored. *@
+                    <div class="mt-2">
+                        <label class="form-label" for="sync-share-@i">@L.Get(Str.SyncsShareLabel, name)</label>
+                        <textarea id="sync-share-@i" class="form-control font-monospace small" rows="4" readonly
+                                  autocomplete="off" spellcheck="false">@shareLink</textarea>
+                        <div class="alert alert-warning mt-2 mb-2" role="note">@L.Get(Str.SyncsShareWarn)</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-primary btn-sm" @onclick="CopyShareLinkAsync">@L.Get(Str.SyncsShareCopy)</button>
+                            <button class="btn btn-outline-primary btn-sm" @onclick="SendShareLinkAsync">@L.Get(Str.SyncsShareSend)</button>
+                            <button class="btn btn-secondary btn-sm" @onclick="CloseShare">@L.Get(Str.CommonDone)</button>
+                        </div>
+                    </div>
+                }
                 else if (menuKey == key)
                 {
                     <div id="sync-actions-@i" class="xbs-sync-action-list mt-2" role="group" @onclick:stopPropagation="true"
                          aria-label="@L.Get(Str.RowActionsFor, name)">
                         <button type="button" @onclick="() => StartRename(key, row)">@L.Get(Str.SyncsRename)</button>
+                        @if (row.CanActivate || isActive)
+                        {
+                            <button type="button" @onclick="() => StartShareAsync(key, row)">@L.Get(Str.SyncsShare)</button>
+                        }
                         @if (isActive)
                         {
                             <button type="button" @onclick="() => StartPassword(key)">@L.Get(Str.SettingsChangePasswordBtn)</button>
@@ -261,13 +286,13 @@ else
     private bool RowTaskOpen =>
         busy || renamingKey is not null || armedActivateKey is not null
         || armedForgetKey is not null || armedUnlinkKey is not null
-        || passwordKey is not null;
+        || passwordKey is not null || shareKey is not null;
 
     /// <summary>True for the row that owns the open task (it gets the
     /// outline; its action buttons are replaced by the confirmation).</summary>
     private bool OwnsTask(string key) =>
         renamingKey == key || armedActivateKey == key
-        || armedForgetKey == key || armedUnlinkKey == key || passwordKey == key;
+        || armedForgetKey == key || armedUnlinkKey == key || passwordKey == key || shareKey == key;
 
     /// <summary>Disabled state of a row action: running, or another row is
     /// in the middle of a task. The owner keeps its own controls live.</summary>
@@ -284,16 +309,108 @@ else
     {
         if (!await WaitForSessionAsync(Session)) return;
         AppLock.Changed += OnLockChanged;
+        LinkInbox.Arrived += OnSyncLinkArrived;
         await RefreshAsync();
+        OpenForLink();
+    }
+
+    // ---- shared link -------------------------------------------------------
+
+    /// <summary>Row whose share panel is open, and its link (memory only).</summary>
+    private string? shareKey;
+    private string? shareLink;
+
+    private void OnSyncLinkArrived() => _ = InvokeAsync(() => { OpenForLink(); StateHasChanged(); });
+
+    /// <summary>A sync link arrived from outside: open the add flow, which
+    /// consumes it into its review (after the app lock).</summary>
+    private void OpenForLink()
+    {
+        if (IsDisposed || !loaded || adding || busy || !LinkInbox.HasPending) return;
+        StartAdding();
+    }
+
+    /// <summary>Same proof as activation: the saved key alone is enough to
+    /// hand the sync to someone else, so the app lock gates it.</summary>
+    private async Task StartShareAsync(string key, SavedSync row)
+    {
+        if (busy) return;
+        Disarm();
+        renamingKey = null;
+        ClearNotice();
+        if (!await ConfirmWithAppLockAsync(Str.SyncsShareUnlockTitle)) return;
+        shareKey = key;
+        busy = true;
+        StateHasChanged();
+        try
+        {
+            var link = await Session.PrepareShareLinkAsync(row.Identity, Lifetime);
+            if (IsDisposed || shareKey != key || AppLock.Locked || !AppLock.Foreground) return;
+            shareLink = link;
+        }
+        catch (OperationCanceledException) when (Lifetime.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            shareKey = null;
+            ShowNotice(key, ex.Message, error: true);
+            Session.Log.Warn("syncs", $"Share link failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            busy = false;
+            if (shareLink is null && shareKey == key) shareKey = null;
+        }
+    }
+
+    private void CloseShare()
+    {
+        shareKey = null;
+        shareLink = null;
+    }
+
+    private async Task CopyShareLinkAsync()
+    {
+        if (shareLink is null) return;
+        try
+        {
+            Platforms.Android.SensitiveClipboard.SetText(L.Get(Str.SyncsShareSubject), shareLink);
+            _ = Toast.ShowAsync(L.Get(Str.SyncsShareCopied));
+        }
+        catch
+        {
+            _ = Toast.ShowAsync(L.Get(Str.ConnCopyFailed), isError: true);
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task SendShareLinkAsync()
+    {
+        if (shareLink is null) return;
+        try
+        {
+            await Share.Default.RequestAsync(new ShareTextRequest(shareLink, L.Get(Str.SyncsShareSubject)));
+        }
+        catch (Exception ex)
+        {
+            Session.Log.Warn("syncs", $"Share sheet failed: {ex.GetType().Name}");
+        }
     }
 
     public override void Dispose()
     {
         AppLock.Changed -= OnLockChanged;
+        LinkInbox.Arrived -= OnSyncLinkArrived;
+        CloseShare();
         base.Dispose();
     }
 
-    private void OnLockChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnLockChanged() => _ = InvokeAsync(() =>
+    {
+        // The link must not stay on screen behind the lock or in recents.
+        if (AppLock.Locked || !AppLock.Foreground) CloseShare();
+        else OpenForLink();
+        StateHasChanged();
+    });
 
     private async Task RefreshAsync()
     {
@@ -331,6 +448,7 @@ else
         armedForgetKey = null;
         armedUnlinkKey = null;
         ClosePassword();
+        CloseShare();
     }
 
     // ---- add / connect ---------------------------------------------------
@@ -382,7 +500,7 @@ else
     /// <summary>Activation asks for the device PIN/biometric when app lock is
     /// configured: the saved key is enough to switch, so the step itself must
     /// be the proof it is the owner.</summary>
-    private async Task<bool> ConfirmWithAppLockAsync()
+    private async Task<bool> ConfirmWithAppLockAsync(string titleKey = Str.SyncsUnlockTitle)
     {
         if (AppSettings.AppLock == "Off") return true;
         if (!AppLock.Foreground) return false;
@@ -390,7 +508,7 @@ else
         AppLock.BeginAuth();
         try
         {
-            ok = await LockPrompt.AuthenticateAsync(L.Get(Str.SyncsUnlockTitle), requireDeviceCredential: false);
+            ok = await LockPrompt.AuthenticateAsync(L.Get(titleKey), requireDeviceCredential: false);
         }
         catch
         {

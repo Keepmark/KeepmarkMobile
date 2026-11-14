@@ -897,4 +897,23 @@ public static partial class Str
     public const string TagsRenamed = nameof(TagsRenamed);
     /// <summary>Base for Loc.Plural (TagsDeleted_one / TagsDeleted_other).</summary>
     public const string TagsDeleted = nameof(TagsDeleted);
+
+    // Shared sync link (keepmark://sync)
+    public const string ConnLinkLabel = nameof(ConnLinkLabel);
+    public const string ConnLinkPlaceholder = nameof(ConnLinkPlaceholder);
+    public const string ConnLinkUse = nameof(ConnLinkUse);
+    public const string ConnLinkHint = nameof(ConnLinkHint);
+    public const string ConnLinkInvalid = nameof(ConnLinkInvalid);
+    public const string ConnLinkAcquired = nameof(ConnLinkAcquired);
+    public const string ConnLinkKeyStale = nameof(ConnLinkKeyStale);
+    public const string SyncsShare = nameof(SyncsShare);
+    public const string SyncsShareUnlockTitle = nameof(SyncsShareUnlockTitle);
+    public const string SyncsShareChecking = nameof(SyncsShareChecking);
+    public const string SyncsShareWarn = nameof(SyncsShareWarn);
+    public const string SyncsShareCopy = nameof(SyncsShareCopy);
+    public const string SyncsShareSend = nameof(SyncsShareSend);
+    public const string SyncsShareCopied = nameof(SyncsShareCopied);
+    public const string SyncsShareSubject = nameof(SyncsShareSubject);
+    public const string SyncsShareLabel = nameof(SyncsShareLabel);
+    public const string ErrShareStale = nameof(ErrShareStale);
 }

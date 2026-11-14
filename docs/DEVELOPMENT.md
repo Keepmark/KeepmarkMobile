@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.247 (248)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.248 (249)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -31,7 +31,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (448 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (477 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -298,7 +298,7 @@ Razor page ──► XbsSession ──► SyncEngine ──► XSyncApiClient (p
   and `RemovedSyncCopyStore` (validate → encrypt → write → verify → list/read →
   delete pipeline, path guard, dedupe with relabel).
 - `src/Keepmark.Core/Workflow/` — `ServiceCatalog`, `ServiceCheckState`,
-  `ConnectQrPayload`/`ConnectQrCandidateState`, `WorkflowRules`,
+  `ConnectQrPayload`/`ConnectQrCandidateState`, `SyncShareLink`, `WorkflowRules`,
   `WorkflowTexts`.
 - `src/Keepmark.Core/I18n/` — `Str.g.cs`, ten `Catalog.*.cs`, `Localizer`,
   `RelativeTime`.
@@ -963,6 +963,38 @@ QR icon and "Scan QR from browser" before the manual fields. `IQrScanner` /
 - **Known gap**: the cleartext warning is attached to the service editor, so a
   QR carrying `http://` shows the URL in the review but not the amber warning.
 
+### 10.5b Shared sync link
+
+`Workflow/SyncShareLink` builds and parses
+`keepmark://sync?v=1&s=<url-encoded service>&id=<sync ID>&k=<derived key base64url>`,
+the text form of a format-2 QR (same validation: `ConnectQrPayload.IsServiceUrl`
+/ `IsSyncId` / `IsDerivedKey`; exactly the four parameters once each; text
+around the link is ignored). The shared vector is pinned in
+`SyncShareLinkTests` and in the extension's `tests/share-link.test.ts`.
+Workflow and security notes (a lasting credential, revoked only by a password
+change) are in WORKFLOWS.md "Shared sync link".
+
+- **Share**: Syncs row `⋮` → `Share sync…` (any row with a key) →
+  `ConfirmWithAppLockAsync` (device unlock when app lock is on) →
+  `XbsSession.PrepareShareLinkAsync` (active credentials or the row's key;
+  read-only `CompareAsync` proves the key opens the server copy, a stale key
+  is `ErrShareStale`) → read-only box with Copy
+  (`Platforms/Android/SensitiveClipboard`, `EXTRA_IS_SENSITIVE`) and the system
+  share sheet. Memory only; cleared on close, Disarm, lock, background and
+  disposal. The row owns the task (other rows disabled).
+- **Import**: `ConnectPanel` adds a `Shared link` field under the QR button;
+  `OfferLink` turns a valid link into the QR candidate
+  (`ConnectQrPayload.FromShareLink`, no version), so review, 60-second expiry,
+  `ProbeLinkWithKeyAsync` (stale text `ConnLinkKeyStale`) and apply are the QR
+  path unchanged.
+- **Incoming**: `SyncLinkActivity` (VIEW, `keepmark://sync`, BROWSABLE) and
+  `ShareIntake` (VIEW + SEND text containing a link) publish to
+  `Services/SyncLinkInbox` (memory, 5 minutes, consumed once) instead of
+  `SharedImportService`, so a link is never offered as a bookmark.
+  `MainLayout` navigates to `/syncs`, `Syncs` opens the add panel, and the
+  panel consumes the link only while unlocked and in the foreground.
+- Many chat apps do not linkify custom schemes: paste is the reliable path.
+
 ### 10.6 Unlink
 
 `Unlink this device…` lives on the **active row** of `Syncs` (§9.5), not in the
@@ -1542,7 +1574,7 @@ also bundled in the app.
 
 Saved-sync rows are one line: the active row shows the Active badge and no
 Activate button; dormant rows show Activate in that same slot.
-Secondary actions open from an accessible ⋮ menu: Rename and active-row Change
-password first; Forget/Unlink in a separate final group. Settings places the
+Secondary actions open from an accessible ⋮ menu: Rename, Share sync… and
+active-row Change password first; Forget/Unlink in a separate final group. Settings places the
 complete log controls last; every setting applies on change (no Save). See WORKFLOWS.md for the
 shared presentation and confirmation contract.

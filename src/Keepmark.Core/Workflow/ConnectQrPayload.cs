@@ -65,19 +65,33 @@ public sealed class ConnectQrPayload
             if (id is null || !Regex.IsMatch(id, "\\A[A-Za-z0-9_-]{1,128}\\z") ||
                 version is null || !Regex.IsMatch(version, "\\A[0-9]+\\.[0-9]+\\.[0-9]+\\z") ||
                 !System.Version.TryParse(version, out var parsedVersion) || parsedVersion > System.Version.Parse(XbsConstants.SyncClientVersion)) return false;
-            if (string.IsNullOrEmpty(url) || url.Any(c => char.IsControl(c) || char.IsWhiteSpace(c) || c == '\\') ||
-                url.Contains('?') || url.Contains('#') ||
-                Regex.IsMatch(url, "%((0[0-9a-f])|(1[0-9a-f])|7f|5c)", RegexOptions.IgnoreCase) ||
-                url.Split('/').ElementAtOrDefault(2)?.Contains('@') == true || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-                string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)) return false;
-            if (uri.Scheme != "https" && uri.Scheme != WorkflowRules.HttpScheme) return false;
-            payload = new(WorkflowRules.NormalizeServiceUrl(url), id, version, password, derivedKey);
+            if (!IsServiceUrl(url)) return false;
+            payload = new(WorkflowRules.NormalizeServiceUrl(url!), id, version, password, derivedKey);
             return true;
         }
         catch (JsonException) { return false; }
     }
 
-    private static bool IsDerivedKey(string? value)
+    /// <summary>Shared-link candidate (<see cref="SyncShareLink"/>): already
+    /// validated there; the link carries no sync version (the probe reads it).</summary>
+    internal static ConnectQrPayload FromShareLink(string serviceUrl, string id, string derivedKey)
+        => new(WorkflowRules.NormalizeServiceUrl(serviceUrl), id, string.Empty, null, derivedKey);
+
+    /// <summary>Absolute https/http service URL without credentials, query,
+    /// fragment, backslash, whitespace or control characters.</summary>
+    internal static bool IsServiceUrl(string? url)
+    {
+        if (string.IsNullOrEmpty(url) || url.Length > 512 || url.Any(c => char.IsControl(c) || char.IsWhiteSpace(c) || c == '\\') ||
+            url.Contains('?') || url.Contains('#') ||
+            Regex.IsMatch(url, "%((0[0-9a-f])|(1[0-9a-f])|7f|5c)", RegexOptions.IgnoreCase) ||
+            url.Split('/').ElementAtOrDefault(2)?.Contains('@') == true || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)) return false;
+        return uri.Scheme == "https" || uri.Scheme == WorkflowRules.HttpScheme;
+    }
+
+    internal static bool IsSyncId(string? id) => id is not null && Regex.IsMatch(id, "\\A[A-Za-z0-9_-]{1,128}\\z");
+
+    internal static bool IsDerivedKey(string? value)
     {
         // Canonical base64 of exactly 32 bytes (44 chars, one '=' pad).
         if (value is null || value.Length != 44 || !Regex.IsMatch(value, "\\A[A-Za-z0-9+/]{43}=\\z")) return false;

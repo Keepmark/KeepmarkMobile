@@ -175,7 +175,7 @@ public sealed class XbsSession : IAsyncDisposable
 
     /// <summary>Same probe from an already derived key (QR format 2). The
     /// remote blob must decrypt with it, exactly as with a typed password.</summary>
-    public async Task<ReconcileInfo> ProbeLinkWithKeyAsync(string serviceUrl, string syncId, string derived, CancellationToken ct = default)
+    public async Task<ReconcileInfo> ProbeLinkWithKeyAsync(string serviceUrl, string syncId, string derived, CancellationToken ct = default, string staleKey = Str.ConnQrKeyStale)
     {
         try
         {
@@ -184,7 +184,7 @@ public sealed class XbsSession : IAsyncDisposable
         catch (Core.Errors.InvalidCredentialsException ex)
         {
             // Nothing was typed: "wrong password" would point at the wrong thing.
-            throw new Core.Errors.InvalidCredentialsException(Loc.Get(Str.ConnQrKeyStale), ex);
+            throw new Core.Errors.InvalidCredentialsException(Loc.Get(staleKey), ex);
         }
     }
 
@@ -489,6 +489,41 @@ public sealed class XbsSession : IAsyncDisposable
         _log.Info("session", $"Activation probe: local={local} remote={remote}");
         return new ReconcileInfo(candidate, local, remote, remoteLast, remoteVer, remoteBlob, localBlob,
             remoteRev, remoteHash);
+    }
+
+    /// <summary>Shared sync link for one saved sync (active or dormant), built
+    /// from its stored derived key; the password is never needed. Read-only:
+    /// the service check + GET + decrypt prove the key still opens the server
+    /// copy, so a stale key is reported instead of shared. The caller gates
+    /// this behind the app lock and never persists or logs the result.</summary>
+    public async Task<string> PrepareShareLinkAsync(SavedSyncIdentity identity, CancellationToken ct = default)
+    {
+        var registry = Registry ?? throw new InvalidOperationException("Session not ready");
+        SyncCredentials candidate;
+        if (await _creds.GetAsync().ConfigureAwait(false) is { } active &&
+            SavedSyncs.Same(new SavedSyncIdentity(active.ServiceUrl, active.Id), identity))
+        {
+            candidate = active;
+        }
+        else
+        {
+            var row = await registry.FindAsync(identity).ConfigureAwait(false);
+            if (row is null) throw new XbsException(_str.Get(Str.ErrSavedNotFound));
+            if (!row.CanActivate) throw new XbsException(_str.Get(Str.ErrSavedNoKey));
+            candidate = new SyncCredentials(row.SyncId, SavedSyncs.CanonicalServiceUrl(row.ServiceUrl), row.DerivedKey, row.SyncVersion);
+        }
+
+        try
+        {
+            await Engine!.CompareAsync(candidate, ct).ConfigureAwait(false);
+        }
+        catch (Core.Errors.InvalidCredentialsException ex)
+        {
+            throw new Core.Errors.InvalidCredentialsException(_str.Get(Str.ErrShareStale), ex);
+        }
+
+        _log.Info("session", $"Share link prepared for {Keepmark.Core.Workflow.WorkflowRules.ShortId(candidate.Id)}");
+        return Keepmark.Core.Workflow.SyncShareLink.Build(candidate.ServiceUrl, candidate.Id, candidate.DerivedKey);
     }
 
     /// <summary>Makes a verified dormant sync the active one. Fail-closed: the

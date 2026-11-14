@@ -77,7 +77,7 @@ disabled on the active sync, whose active badge stays visible. The Android
 Syncs page keeps each row on one line: the active sync shows only its badge,
 and every other sync shows `Activate` in that same slot, so the active sync
 never offers to activate itself. Secondary commands are in the row's accessible `⋮` menu: ordinary
-commands (rename, show QR or change password where supported) first, then a
+commands (rename, show QR, share sync or change password where supported) first, then a
 separate final group for forgetting, unlinking and server deletion where
 supported. A menu opens only that row's existing task; confirmations and stable
 sync identity checks still apply. Only one menu is open at a time; Escape and
@@ -108,7 +108,7 @@ the recent count are segmented controls.
 
 | Workflow | Needs link | Steps | Confirmation | Implication line (required) |
 |---|---|---|---|---|
-| Add a sync while linked (Syncs → `+ Add a sync`) | yes | Device unlock when app lock is set → existing sync only (manual or QR) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict, a missing connection, a sync that no longer exists on the server or a failed push cancels the switch and changes nothing, and the message names that exact cause. A brand-new sync requires unlinking first (bookmarks stay). |
+| Add a sync while linked (Syncs → `+ Add a sync`) | yes | Device unlock when app lock is set → existing sync only (manual, QR or shared link) → verification → direction with consequences → apply | apply executes | The sync just added becomes active; the previous one stays in the Syncs list with its server copy. Unsynced edits on this device are pushed first: a pending conflict, a missing connection, a sync that no longer exists on the server or a failed push cancels the switch and changes nothing, and the message names that exact cause. A brand-new sync requires unlinking first (bookmarks stay). |
 | Bookmarks file (HTML): export | no | Backup → Bookmarks file (HTML) → `Export HTML…` → warning → `Export anyway` → share sheet | the warning is the confirmation | The file is NOT encrypted. It is a hand-over copy: Keepmark deletes its own copy at the next export or start. |
 | Bookmarks file (HTML): import | no | Backup → Bookmarks file (HTML) → `Import HTML…` → choose a `.html` file → preview (bookmarks, folders, separators, skipped links, duplicates; `Skip bookmarks already saved` on by default) → `Import` | Review is the only confirmation; final button executes | Additive only: one new folder `Imported <date>` at the end of Other, nothing is replaced. A safety backup is saved first; while linked the import is uploaded. |
 | Tags: rename, merge, delete | no | Menu → `Tags` → tap a tag → rename (a name that already exists merges the two) or delete | delete: always; rename/merge: the note under the field | The change applies to every bookmark with that tag in one step; the bookmarks themselves stay. A safety backup is saved first; while linked the change is uploaded. |
@@ -357,6 +357,47 @@ accepts `https` and plain `http` only for `localhost` / `127.0.0.1` / `[::1]`.
   verification failure drops the QR credentials and requires rescanning;
   manual entry remains available. Already-linked devices scan within `+ Add a
   sync` and keep the same verification/review gates.
+
+## Shared sync link (both apps)
+
+The text form of the connection QR, for sharing a sync with another person or
+a device without a camera:
+
+```
+keepmark://sync?v=1&s=<service URL, percent-encoded>&id=<sync ID>&k=<derived key, base64url>
+```
+
+- `v` is the link format (1). `k` is the sync's derived key (32 bytes,
+  base64url, no padding): never the password. The sync data version is not
+  carried; the verification reads it from the service. Exactly these four
+  parameters, once each; anything else is refused. Text around the link (a
+  chat message) is ignored when pasting.
+- **It is a lasting credential.** The QR lives 60 seconds on a screen; a link
+  stays in chats, clipboards and their backups. Anyone holding it can read and
+  change the bookmarks until the sync password is changed, which is the only
+  revocation (every other device must then be linked again). Both apps say so
+  next to the link.
+- **Share** (extension: share icon beside the QR icon on every saved sync and
+  on the Android card; Android: `⋮` → `Share sync…` on every saved sync with a
+  key). Same gate as the QR / a switch: the extension asks the sync-lock
+  password when a lock is set (nothing otherwise); Android asks the device
+  unlock when app lock is on (nothing otherwise). A read-only GET + decrypt
+  proves the saved key still opens the server copy first; a stale key is
+  reported, never shared. The link is shown in a read-only box with Copy
+  (Android marks the clip sensitive) and, on Android, the system share sheet.
+  It is held in memory only, never stored or logged, and is cleared on close,
+  lock or leaving the view.
+- **Import** — one more entry of "existing sync", beside the QR and the manual
+  fields: a `Shared link` field (paste, then `Use link`). On Android a tapped
+  `keepmark://sync` link and text shared to Keepmark that contains one open
+  Syncs → `+ Add a sync` with the link already read (after the app lock);
+  such text is never offered as a bookmark. A valid link produces the same
+  reviewed candidate as a QR (service + short ID, Continue / Cancel, discarded
+  after 60 seconds, on lock or background), then the normal verification,
+  direction choice, merge preview and safety backups. A key that no longer
+  opens the sync reports "ask for a new link".
+- A device linked from a link (or a QR) never knew the password, so it cannot
+  run `Change password` (which asks the current one).
 
 ## Android: organize multiple items
 

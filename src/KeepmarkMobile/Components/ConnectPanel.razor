@@ -5,6 +5,7 @@
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.IQrScanner QrScanner
 @inject KeepmarkMobile.Services.AppLockState AppLock
+@inject KeepmarkMobile.Services.SyncLinkInbox LinkInbox
 @implements IDisposable
 
 @* One sync at a time, one clear step at a time: this is the add/connect flow
@@ -64,6 +65,7 @@ else
         @if (qrState.ShowReview)
         {
             <QrCredentialReview ServiceUrl="@qrServiceUrl" SyncId="@qrSyncId" Busy="@(busy || qrState.IsVerifying)"
+                                Title="@(candidateFromLink ? L.Get(Str.ConnLinkAcquired) : null)"
                                 OnVerify="LinkQr" OnCancel="CancelQr" />
         }
         else
@@ -76,6 +78,21 @@ else
                 @if (!string.IsNullOrEmpty(qrError))
                 {
                     <div class="alert alert-danger" role="alert">@qrError</div>
+                }
+                @* A link someone shared (keepmark://sync): pasted here, or
+                   tapped elsewhere and delivered through SyncLinkInbox. Both
+                   end in the same reviewed candidate as a QR scan. *@
+                <label class="form-label" for="conn-share-link">@L.Get(Str.ConnLinkLabel)</label>
+                <div class="input-group mb-1">
+                    <input id="conn-share-link" class="form-control" @bind="linkText" @bind:event="oninput" @bind:after="ClearLinkPasteError"
+                           placeholder="@L.Get(Str.ConnLinkPlaceholder)" disabled="@busy"
+                           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+                    <button class="btn btn-secondary" @onclick="UsePastedLink" disabled="@(busy || string.IsNullOrWhiteSpace(linkText))">@L.Get(Str.ConnLinkUse)</button>
+                </div>
+                <div class="form-text mb-3">@L.Get(Str.ConnLinkHint)</div>
+                @if (!string.IsNullOrEmpty(linkPasteError))
+                {
+                    <div class="alert alert-danger" role="alert">@linkPasteError</div>
                 }
             }
             @if (reconcile is null)
@@ -237,12 +254,75 @@ else
         serviceUrl = AppSettings.ServiceUrl;
         if (AddingWhileLinked) mode = "existing";
         AppLock.Changed += LockChanged;
+        LinkInbox.Arrived += InboxArrived;
     }
 
     protected override async Task OnInitializedAsync()
     {
         if (!await WaitForSessionAsync(Session)) return;
         await RefreshLocalCountAsync();
+        TakeInboxLink();
+    }
+
+    // ---- shared link -------------------------------------------------------
+
+    private string linkText = string.Empty;
+    private string linkPasteError = string.Empty;
+    /// <summary>The pending candidate came from a link, not a QR: other
+    /// heading, other stale-key text.</summary>
+    private bool candidateFromLink;
+
+    private void ClearLinkPasteError() => linkPasteError = string.Empty;
+
+    private void InboxArrived() => _ = InvokeAsync(() =>
+    {
+        TakeInboxLink();
+        if (!IsDisposed) StateHasChanged();
+    });
+
+    /// <summary>A link delivered from outside waits until the app is unlocked
+    /// and in front, and never replaces a step already in progress.</summary>
+    private void TakeInboxLink()
+    {
+        if (IsDisposed || !Session.Ready || busy || AppLock.Locked || !AppLock.Foreground || createdId is not null || reconcile is not null || qrState.ShowReview) return;
+        var text = LinkInbox.Consume();
+        if (text is null) return;
+        if (!OfferLink(text)) linkPasteError = L.Get(Str.ConnLinkInvalid);
+    }
+
+    private void UsePastedLink()
+    {
+        if (busy || AppLock.Locked || !AppLock.Foreground) return;
+        var text = linkText;
+        linkText = string.Empty;
+        if (!OfferLink(text)) linkPasteError = L.Get(Str.ConnLinkInvalid);
+    }
+
+    /// <summary>Parses a shared link into the QR candidate (same review, same
+    /// 60-second lifetime, same probe). False = not a valid link.</summary>
+    private bool OfferLink(string? text)
+    {
+        if (!SyncShareLink.TryParse(text, out var candidate)) { mode = "existing"; return false; }
+        ClearQr();
+        var generation = qrGeneration;
+        ResetForCandidate();
+        linkPasteError = qrError = string.Empty;
+        qrServiceUrl = candidate!.ServiceUrl; qrSyncId = candidate.Id;
+        if (!qrState.Offer(candidate, generation)) return true;
+        candidateFromLink = true;
+        qrExpiry = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
+        _ = ExpireQr(generation, qrExpiry.Token);
+        return true;
+    }
+
+    /// <summary>A fresh candidate (QR or link) replaces whatever was typed.</summary>
+    private void ResetForCandidate()
+    {
+        serviceInfo = null; linkError = applyError = message = string.Empty;
+        reconcile = null; mergeStats = null; mergeStatsFor = null;
+        armed = null;
+        password = newPassword = confirmPassword = string.Empty;
+        mode = "existing";
     }
 
     private async Task RefreshLocalCountAsync()
@@ -323,6 +403,11 @@ else
 
     private void LockChanged()
     {
+        if (!AppLock.Locked && AppLock.Foreground)
+        {
+            _ = InvokeAsync(() => { TakeInboxLink(); if (!IsDisposed) StateHasChanged(); });
+            return;
+        }
         if (AppLock.Locked || !AppLock.Foreground)
             _ = InvokeAsync(() =>
             {
@@ -330,6 +415,7 @@ else
                 // session exists. The scanner rechecks lock/foreground after it.
                 // Native active sessions cancel themselves on this event.
                 if (qrState.ShowReview) ClearQr();
+                linkText = string.Empty;
                 if (!IsDisposed) StateHasChanged();
             });
     }
@@ -346,6 +432,7 @@ else
     {
         qrState.Clear();
         qrServiceUrl = qrSyncId = string.Empty;
+        candidateFromLink = false;
         StopQrExpiry();
     }
 
@@ -375,11 +462,8 @@ else
             if (text is null) return;
             if (!ConnectQrPayload.TryParse(text, out var candidate))
             { qrError = L.Get(Str.ConnQrInvalid); return; }
-            serviceInfo = null; linkError = applyError = message = string.Empty;
-            reconcile = null; mergeStats = null; mergeStatsFor = null;
-            armed = null;
-            password = newPassword = confirmPassword = string.Empty;
-            mode = "existing";
+            ResetForCandidate();
+            linkPasteError = string.Empty;
             qrServiceUrl = candidate!.ServiceUrl; qrSyncId = candidate.Id;
             if (!qrState.Offer(candidate, generation)) return;
             qrExpiry = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
@@ -419,9 +503,10 @@ else
         var targetUrl = candidate.ServiceUrl;
         var targetId = candidate.Id;
         var isKey = candidate.DerivedKey is not null;
+        var staleKey = candidateFromLink ? Str.ConnLinkKeyStale : Str.ConnQrKeyStale;
         var secret = candidate.DerivedKey ?? candidate.Password ?? string.Empty;
         candidate = null;
-        var task = LinkExistingCredentials(targetUrl, targetId, secret, generation, isKey);
+        var task = LinkExistingCredentials(targetUrl, targetId, secret, generation, isKey, staleKey);
         secret = string.Empty;
         try { await task; }
         finally { if (generation == qrGeneration) ClearQr(); }
@@ -433,6 +518,8 @@ else
     public override void Dispose()
     {
         AppLock.Changed -= LockChanged;
+        LinkInbox.Arrived -= InboxArrived;
+        linkText = string.Empty;
         ClearQr();
         base.Dispose();
     }
@@ -459,7 +546,7 @@ else
 
     private Task LinkExisting() => serviceInfo is null ? Task.CompletedTask : LinkExistingCredentials(ServiceUrlClean, syncId.Trim(), password);
 
-    private async Task LinkExistingCredentials(string targetUrl, string targetId, string targetPassword, int? qrAttempt = null, bool secretIsKey = false)
+    private async Task LinkExistingCredentials(string targetUrl, string targetId, string targetPassword, int? qrAttempt = null, bool secretIsKey = false, string staleKey = Str.ConnQrKeyStale)
     {
         await RunStepAsync(async () =>
         {
@@ -469,7 +556,7 @@ else
             }
 
             var probe = secretIsKey
-                ? Session.ProbeLinkWithKeyAsync(targetUrl, targetId, targetPassword, Lifetime)
+                ? Session.ProbeLinkWithKeyAsync(targetUrl, targetId, targetPassword, Lifetime, staleKey)
                 : Session.ProbeLinkAsync(targetUrl, targetId, targetPassword, Lifetime);
             targetPassword = string.Empty;
             var result = await probe;

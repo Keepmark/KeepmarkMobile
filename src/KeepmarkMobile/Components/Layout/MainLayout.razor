@@ -5,6 +5,7 @@
 @inject KeepmarkMobile.Services.IAppLockService AppLock
 @inject KeepmarkMobile.Services.ToastState Toast
 @inject KeepmarkMobile.Services.SharedImportService SharedImport
+@inject KeepmarkMobile.Services.SyncLinkInbox LinkInbox
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject KeepmarkMobile.Services.IStatusBarService StatusBar
 @inject Microsoft.JSInterop.IJSRuntime JS
@@ -72,6 +73,7 @@
         LockState.PromptRequested += OnPromptRequested;
         Toast.Changed += OnToast;
         SharedImport.Arrived += OnShareArrived;
+        LinkInbox.Arrived += OnSyncLinkArrived;
         Lang.Changed += OnLanguageChanged;
         _ = WatchSessionAsync();
     }
@@ -82,6 +84,9 @@
         {
             await ApplyThemeAsync();
             await ApplyLanguageAsync();
+            // Cold start from a tapped sync link: it arrived before this
+            // layout subscribed.
+            if (LinkInbox.HasPending) OnSyncLinkArrived();
             // Cold start: the lock may have asked for the prompt before this
             // layout subscribed.
             if (LockState.ShouldPrompt)
@@ -191,6 +196,16 @@
         }
     });
 
+    /// <summary>A shared sync link arrived: Syncs opens the add flow, which
+    /// shows the link's review (only after the app lock, if any).</summary>
+    private void OnSyncLinkArrived() => InvokeAsync(() =>
+    {
+        if (Nav.ToBaseRelativePath(Nav.Uri).Split('?')[0] != "syncs")
+        {
+            Nav.NavigateTo("/syncs");
+        }
+    });
+
     /// <summary>Opens the system prompt (auto on resume, or the manual Unlock
     /// button after a cancel). Single-flight via AuthInProgress.</summary>
     private async Task Unlock()
@@ -234,6 +249,7 @@
         LockState.PromptRequested -= OnPromptRequested;
         Toast.Changed -= OnToast;
         SharedImport.Arrived -= OnShareArrived;
+        LinkInbox.Arrived -= OnSyncLinkArrived;
         Lang.Changed -= OnLanguageChanged;
         if (Session.Engine is not null)
         {

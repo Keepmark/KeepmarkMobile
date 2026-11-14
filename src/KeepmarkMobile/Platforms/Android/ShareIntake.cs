@@ -13,13 +13,23 @@ internal static class ShareIntake
     {
         try
         {
-            if (intent?.Action != Intent.ActionSend ||
-                !string.Equals(intent.Type, "text/plain", StringComparison.OrdinalIgnoreCase))
+            string? text;
+            if (intent?.Action == Intent.ActionView &&
+                string.Equals(intent.Data?.Scheme, Keepmark.Core.Workflow.SyncShareLink.Scheme, StringComparison.OrdinalIgnoreCase))
+            {
+                // A tapped keepmark://sync link: same route as shared text.
+                text = intent.DataString;
+            }
+            else if (intent?.Action == Intent.ActionSend &&
+                     string.Equals(intent.Type, "text/plain", StringComparison.OrdinalIgnoreCase))
+            {
+                text = intent.GetStringExtra(Intent.ExtraText);
+            }
+            else
             {
                 return;
             }
 
-            var text = intent.GetStringExtra(Intent.ExtraText);
             var subject = intent.GetStringExtra(Intent.ExtraSubject);
             if (!Publish(text, subject))
             {
@@ -54,6 +64,17 @@ internal static class ShareIntake
 
     private static bool Publish(string? text, string? subject)
     {
+        // A sync link carries a key: it goes to the connect flow, never to
+        // the add-bookmark sheet (it would be saved and synced as a bookmark).
+        if (Keepmark.Core.Workflow.SyncShareLink.LooksLikeLink(text))
+        {
+            var inbox = global::KeepmarkMobile.Services.SyncLinkInbox.Current
+                ?? IPlatformApplication.Current?.Services?.GetService(typeof(global::KeepmarkMobile.Services.SyncLinkInbox)) as global::KeepmarkMobile.Services.SyncLinkInbox;
+            if (inbox is null) return false;
+            inbox.Publish(text);
+            return true;
+        }
+
         var share = global::KeepmarkMobile.Services.SharedImportService.Current;
         if (share is null)
         {

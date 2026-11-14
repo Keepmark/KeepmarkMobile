@@ -136,6 +136,16 @@ app discards an unused scan after 60 seconds or when it goes to the background:
 nothing from the QR is written to storage or to the log, and no image is kept.
 The camera is used only while you are scanning. Manual linking stays available.
 
+## Share a sync with a link
+
+**Syncs → ⋮ → Share sync…** shows a `keepmark://sync` link for that sync (after
+the device unlock when app lock is on), to copy or send with the share sheet.
+The other person pastes it in **+ Add a sync → Shared link** (or taps it), in
+this app or in Keepmark for browsers, reviews the service and ID, and links.
+The link carries the sync's key, never the password, and **does not expire**:
+anyone holding it can read and change those bookmarks until the sync password
+is changed. Send it only to people you trust.
+
 ## Organize several items
 
 Hold an item to select it, then tap others or choose All. Move them together to an
