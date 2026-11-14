@@ -923,7 +923,6 @@ public static partial class Str
     public const string ErrHandoffLimit = nameof(ErrHandoffLimit);
     public const string ErrHandoffDamaged = nameof(ErrHandoffDamaged);
     public const string ErrHandoffRevokeFailed = nameof(ErrHandoffRevokeFailed);
-    public const string SyncsShareIntroOnce = nameof(SyncsShareIntroOnce);
     public const string SyncsShareWarnOnce = nameof(SyncsShareWarnOnce);
     public const string SyncsShareNoOneTime = nameof(SyncsShareNoOneTime);
     public const string SyncsShareTtlLabel = nameof(SyncsShareTtlLabel);
@@ -935,6 +934,9 @@ public static partial class Str
     public const string SyncsShareCodeCaption = nameof(SyncsShareCodeCaption);
     public const string SyncsShareCodeTell = nameof(SyncsShareCodeTell);
     public const string SyncsShareValidUntil = nameof(SyncsShareValidUntil);
+    public const string SyncsShareHowTo = nameof(SyncsShareHowTo);
+    public const string SyncsShareNoCode = nameof(SyncsShareNoCode);
+    public const string SyncsShareWithCode = nameof(SyncsShareWithCode);
     public const string SyncsShareRevoke = nameof(SyncsShareRevoke);
     public const string SyncsShareRevoked = nameof(SyncsShareRevoked);
     public const string SyncsShareAlreadyGone = nameof(SyncsShareAlreadyGone);

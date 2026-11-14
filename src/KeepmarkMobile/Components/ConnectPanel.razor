@@ -73,19 +73,14 @@ else
             <h2 class="xbs-step-title">@(mode == "existing" ? L.Get(Str.ConnLinkExistingTitle) : L.Get(Str.ConnCreateTitle))</h2>
             @if (mode == "existing" && reconcile is null)
             {
-                <button class="btn btn-secondary mb-2" @onclick="ScanQr" disabled="@busy"><svg class="km-ico sm me-2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM19 15h2v6h-2zM15 19h2v2h-2z" /></svg>@L.Get(Str.ConnQrScan)</button>
-                <div class="form-text mb-3">@L.Get(Str.ConnQrHint)</div>
-                @if (!string.IsNullOrEmpty(qrError))
-                {
-                    <div class="alert alert-danger" role="alert">@qrError</div>
-                }
                 @* A link someone shared (keepmark://sync): pasted here, or
                    tapped elsewhere and delivered through SyncLinkInbox. Both
                    end in the same reviewed candidate as a QR scan. *@
                 @if (pendingOnce is { } once)
                 {
                     @* One-time link: nothing is redeemed until "Open link",
-                       which uses it up. *@
+                       which uses it up. Like the QR review, the offer stands
+                       alone: QR, service and manual fields return on Cancel. *@
                     <div class="km-once-offer mb-3" role="group" aria-label="@L.Get(Str.ConnLinkLabel)">
                         <div class="alert alert-info mb-2" role="status">@L.Get(Str.ConnLinkOnceNote, once.ServiceUrl)</div>
                         @if (once.CodeRequired)
@@ -111,6 +106,12 @@ else
                 }
                 else
                 {
+                    <button class="btn btn-secondary mb-2" @onclick="ScanQr" disabled="@busy"><svg class="km-ico sm me-2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h2v2h-2zM19 15h2v6h-2zM15 19h2v2h-2z" /></svg>@L.Get(Str.ConnQrScan)</button>
+                    <div class="form-text mb-3">@L.Get(Str.ConnQrHint)</div>
+                    @if (!string.IsNullOrEmpty(qrError))
+                    {
+                        <div class="alert alert-danger" role="alert">@qrError</div>
+                    }
                 <label class="form-label" for="conn-share-link">@L.Get(Str.ConnLinkLabel)</label>
                 <div class="input-group mb-1">
                     <input id="conn-share-link" class="form-control" @bind="linkText" @bind:event="oninput" @bind:after="ClearLinkPasteError"
@@ -125,7 +126,7 @@ else
                 }
                 }
             }
-            @if (reconcile is null)
+            @if (reconcile is null && pendingOnce is null)
             {
                 <ServiceSelector Value="@serviceUrl" ValueChanged="ServiceChanged" Checked="ServiceChecked" Disabled="@busy" />
             }
@@ -144,6 +145,8 @@ else
             }
             else if (mode == "existing")
             {
+                @if (pendingOnce is null)
+                {
                 <div class="mb-3">
                     <label class="form-label">@L.Get(Str.ConnSyncId)</label>
                     <input disabled="@busy" class="form-control" @bind="syncId" @bind:after="ClearLinkError" placeholder="@L.Get(Str.ConnSyncIdPlaceholder)" autocomplete="off" spellcheck="false" autocapitalize="off" />
@@ -158,6 +161,7 @@ else
                         <div class="alert alert-danger mt-2" role="alert">@linkError</div>
                     }
                 </div>
+                }
             }
             else
             {

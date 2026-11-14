@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.250 (251)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.251 (252)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -1012,16 +1012,21 @@ The byte vector is pinned in `SyncHandoffTests`, the extension's
 `tests/handoff.test.ts` and the API's `HandoffTests`.
 
 - **Share**: `Share sync…` first probes `capabilities.handoff`
-  (`XbsSession.GetHandoffCapabilityAsync`, v1.2 `/info`). With it, the row
-  offers duration (10 min default, 1 hour when `maxTtlSeconds` allows) and an
-  unchecked "Ask for a code" option, then `CreateOneTimeShareAsync` verifies
-  the key (same read-only compare) and posts the voucher. The box shows the
-  link, the code (`123 456`, to be told on another channel), the expiry and
-  `Revoke` (`RevokeOneTimeShareAsync`). Closing the box does not revoke. A
+  (`XbsSession.GetHandoffCapabilityAsync`, v1.2 `/info`). With it, one tap
+  makes the link (v1.0.251): `CreateOneTimeShareAsync` verifies the key (same
+  read-only compare) and posts the voucher with the defaults (10 min, no
+  code). The box shows the link, the code (`123 456`, to be told on another
+  channel), "Works once, until <time> · no code" with `Change` (duration
+  10 min / 1 hour when `maxTtlSeconds` allows, "Protect with a code"; it
+  revokes the link on screen first, a failed revoke stops there), the
+  receiver hint `SyncsShareHowTo`, the warning, `Send…` (primary, share
+  sheet), `Copy link`, `Revoke link` (`RevokeOneTimeShareAsync`) and `Done`.
+  Closing the box does not revoke. A
   service without the capability falls back to the format-1 link with the
   `SyncsShareNoOneTime` notice.
 - **Import**: `ConnectPanel.OfferLink` tries `SyncHandoff.TryParse` first. A
-  one-time link shows `ConnLinkOnceNote` and, when `c=1`, a numeric code field;
+  one-time link shows `ConnLinkOnceNote` and, when `c=1`, a numeric code field
+  (alone, like the QR review: QR, service and manual fields return on Cancel);
   nothing is redeemed until `Open link`. `RedeemOneTimeLinkAsync` uses the link
   up, opens the payload and the key goes straight into the probe
   (`SyncHandoff.ToCandidate` → `LinkQr`, no 60-second review: the link is
