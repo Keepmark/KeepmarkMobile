@@ -68,6 +68,55 @@ public sealed class ConnectQrTests
         var local = Fixture().Replace("https://sync.example.test:8443/prefix", "http://192.168.1.50:8090/prefix");
         Assert.True(ConnectQrPayload.TryParse(local, out _));
     }
+
+    private static readonly string SampleKey = Convert.ToBase64String(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray());
+
+    private static string KeyFixture(object? key) => JsonSerializer.Serialize(new Dictionary<string, object?>
+    {
+        ["app"] = "Keepmark", ["format"] = 2, ["serviceType"] = "xbrowsersync",
+        ["serviceUrl"] = "https://sync.example.test", ["id"] = "0123456789abcdef0123456789abcdef",
+        ["version"] = "1.8.0", ["key"] = key
+    });
+
+    [Fact]
+    public void FormatTwoCarriesTheDerivedKeyInsteadOfThePassword()
+    {
+        Assert.True(ConnectQrPayload.TryParse(KeyFixture(SampleKey), out var payload));
+        Assert.Equal(SampleKey, payload!.DerivedKey);
+        Assert.Null(payload.Password);
+        Assert.DoesNotContain(SampleKey, payload.ToString());
+
+        Assert.True(ConnectQrPayload.TryParse(Fixture("x"), out var legacy));
+        Assert.Equal("x", legacy!.Password);
+        Assert.Null(legacy.DerivedKey);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("not base64 at all, not base64 at all, nope!!")]
+    [InlineData("AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHw==")] // 31 bytes
+    [InlineData("AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAh")] // 33 bytes
+    [InlineData("AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyB=")] // non-canonical padding bits
+    public void FormatTwoRejectsAKeyThatIsNotThirtyTwoBytes(string? key)
+        => Assert.False(ConnectQrPayload.TryParse(KeyFixture(key), out _));
+
+    [Fact]
+    public void FormatTwoRejectsAPasswordBesideTheKeyAndUnknownFormats()
+    {
+        var both = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(KeyFixture(SampleKey))!;
+        both["password"] = JsonSerializer.SerializeToElement("x");
+        Assert.False(ConnectQrPayload.TryParse(JsonSerializer.Serialize(both), out _));
+
+        var three = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(KeyFixture(SampleKey))!;
+        three["format"] = JsonSerializer.SerializeToElement(3);
+        Assert.False(ConnectQrPayload.TryParse(JsonSerializer.Serialize(three), out _));
+
+        // Format 1 still needs its password; a key alone is not enough.
+        var oneWithKey = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(KeyFixture(SampleKey))!;
+        oneWithKey["format"] = JsonSerializer.SerializeToElement(1);
+        Assert.False(ConnectQrPayload.TryParse(JsonSerializer.Serialize(oneWithKey), out _));
+    }
 }
 
 public sealed class ConnectQrCandidateStateTests

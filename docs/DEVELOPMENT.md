@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.246 (247)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.247 (248)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -903,7 +903,8 @@ read again later.
 
 ### 10.4 Link an existing sync
 
-1. Enter service, sync ID and password (or scan a QR, §10.5).
+1. Enter service, sync ID and password (or scan a QR, §10.5; a format-2 QR
+   brings the derived key instead of the password).
 2. `ProbeLinkAsync` derives the key and runs `CompareAsync`: service version
    gate, full GET, decrypt, count both sides. Wrong password → zero mutations;
    legacy version-less sync → explicit refusal.
@@ -934,8 +935,11 @@ QR icon and "Scan QR from browser" before the manual fields. `IQrScanner` /
   photo, gallery, clipboard or image import. The scanner decodes QR only (UTF-8)
   and releases CameraManager/CameraX in every exit (back, cancel, modal close,
   app lock/background, page disposal).
-- `ConnectQrPayload` validates before any network call: Keepmark JSON v1
-  allowlist, 1,800 UTF-8 bytes, strict markers/types/duplicate names/depth,
+- `ConnectQrPayload` (`Workflow/ConnectQrPayload.cs`) validates before any
+  network call: Keepmark JSON allowlist for format 1 (`password`) and format 2
+  (`key`, 1.0.247: canonical base64 of exactly 32 bytes, the derived key; a
+  `password` beside the key is rejected; any other format is rejected),
+  1,800 UTF-8 bytes, strict markers/types/duplicate names/depth,
   safe ID, supported sync version, absolute `https`/`http` URL without
   credentials, query, fragment, backslash or control chars.
 - A valid scan produces an **in-memory candidate** only. `ConnectQrCandidateState`
@@ -945,8 +949,15 @@ QR icon and "Scan QR from browser" before the manual fields. `IQrScanner` /
   later headings stay hidden while pending or verifying. `BeginVerification`
   keeps the review visible with "Verifying sync…" so no form flashes.
 - Success enters exactly the manual `ProbeLink` → reconcile → apply path,
-  including direction, preview lock and safety backups. Failure drops the QR
-  password and requires a rescan; manual entry remains available.
+  including direction, preview lock and safety backups. A format-2 candidate
+  uses `XbsSession.ProbeLinkWithKeyAsync` (same probe, no derivation: the remote
+  blob must decrypt with the key; a key that no longer opens it reports
+  `Str.ConnQrKeyStale`, not the wrong-password text). Failure drops the QR credentials and
+  requires a rescan; manual entry remains available.
+- The browser extension emits only format 2 from 0.1.64 (the password never
+  leaves the browser). Releases before 1.0.247 reject it as invalid, so the
+  Android app must be updated first. `Str.ConnQrHint` says the QR brings the
+  service, sync ID and key, nothing to type.
 - The candidate clears on consumption, failure, edits, cancel, background,
   lock or a 60-second local timeout. This is not credential expiry.
 - **Known gap**: the cleartext warning is attached to the service editor, so a

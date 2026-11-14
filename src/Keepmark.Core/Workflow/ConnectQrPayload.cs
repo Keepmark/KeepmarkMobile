@@ -4,16 +4,21 @@ using System.Text.RegularExpressions;
 
 namespace Keepmark.Core.Workflow;
 
-/// <summary>Temporary credentials. Never persist or log this instance.</summary>
+/// <summary>Temporary credentials. Never persist or log this instance.
+/// Format 1 carries the long sync password; format 2 (browser 0.1.64+) carries
+/// the derived key instead (base64 of 32 bytes), so the password never leaves
+/// the browser. Exactly one of <see cref="Password"/> and <see cref="DerivedKey"/> is set.</summary>
 public sealed class ConnectQrPayload
 {
     public const int MaxUtf8Bytes = 1800;
+    public const int DerivedKeyBytes = 32;
     public string ServiceUrl { get; }
     public string Id { get; }
     public string Version { get; }
-    public string Password { get; }
-    private ConnectQrPayload(string url, string id, string version, string password)
-        => (ServiceUrl, Id, Version, Password) = (url, id, version, password);
+    public string? Password { get; }
+    public string? DerivedKey { get; }
+    private ConnectQrPayload(string url, string id, string version, string? password, string? derivedKey)
+        => (ServiceUrl, Id, Version, Password, DerivedKey) = (url, id, version, password, derivedKey);
     public override string ToString() => "Keepmark QR credentials [redacted]";
 
     public static bool TryParse(string? text, out ConnectQrPayload? payload)
@@ -40,10 +45,24 @@ public sealed class ConnectQrPayload
             }
             string? Read(string key) => root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
             if (Read("app") != "Keepmark" || Read("serviceType") != "xbrowsersync" ||
-                !root.TryGetProperty("format", out var format) || format.ValueKind != JsonValueKind.Number ||
-                format.GetRawText() != "1") return false;
-            var id = Read("id"); var url = Read("serviceUrl"); var version = Read("version"); var password = Read("password");
-            if (string.IsNullOrEmpty(password) || id is null || !Regex.IsMatch(id, "\\A[A-Za-z0-9_-]{1,128}\\z") ||
+                !root.TryGetProperty("format", out var format) || format.ValueKind != JsonValueKind.Number) return false;
+            var keyFormat = format.GetRawText() switch { "1" => false, "2" => true, _ => (bool?)null };
+            if (keyFormat is null) return false;
+            var id = Read("id"); var url = Read("serviceUrl"); var version = Read("version");
+            string? password = null, derivedKey = null;
+            if (keyFormat == true)
+            {
+                // The key replaces the password: a payload with both is not ours.
+                if (root.TryGetProperty("password", out _)) return false;
+                derivedKey = Read("key");
+                if (!IsDerivedKey(derivedKey)) return false;
+            }
+            else
+            {
+                password = Read("password");
+                if (string.IsNullOrEmpty(password)) return false;
+            }
+            if (id is null || !Regex.IsMatch(id, "\\A[A-Za-z0-9_-]{1,128}\\z") ||
                 version is null || !Regex.IsMatch(version, "\\A[0-9]+\\.[0-9]+\\.[0-9]+\\z") ||
                 !System.Version.TryParse(version, out var parsedVersion) || parsedVersion > System.Version.Parse(XbsConstants.SyncClientVersion)) return false;
             if (string.IsNullOrEmpty(url) || url.Any(c => char.IsControl(c) || char.IsWhiteSpace(c) || c == '\\') ||
@@ -52,10 +71,19 @@ public sealed class ConnectQrPayload
                 url.Split('/').ElementAtOrDefault(2)?.Contains('@') == true || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
                 string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)) return false;
             if (uri.Scheme != "https" && uri.Scheme != WorkflowRules.HttpScheme) return false;
-            payload = new(WorkflowRules.NormalizeServiceUrl(url), id, version, password);
+            payload = new(WorkflowRules.NormalizeServiceUrl(url), id, version, password, derivedKey);
             return true;
         }
         catch (JsonException) { return false; }
+    }
+
+    private static bool IsDerivedKey(string? value)
+    {
+        // Canonical base64 of exactly 32 bytes (44 chars, one '=' pad).
+        if (value is null || value.Length != 44 || !Regex.IsMatch(value, "\\A[A-Za-z0-9+/]{43}=\\z")) return false;
+        var bytes = new byte[DerivedKeyBytes];
+        return Convert.TryFromBase64String(value, bytes, out var written) && written == DerivedKeyBytes
+            && Convert.ToBase64String(bytes) == value;
     }
 }
 

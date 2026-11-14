@@ -43,8 +43,9 @@ before it leaves, and every risky change leaves a way back.
   resolved behind your back, single deletes have Undo, and a sync that
   disappears from its server leaves you a verified local copy.
 - **One scan from your browser.** The Keepmark browser manager shows a
-  connection QR: scan it here and the service, sync ID and password arrive
-  together, ready to review. Nothing from the QR is saved.
+  connection QR: scan it here and the service, sync ID and the sync's key
+  arrive together, ready to review, with nothing to type. Nothing from the QR
+  is saved.
 
 ## Never lose a bookmark silently
 
@@ -118,15 +119,19 @@ sync ID and the password. If you have the Keepmark browser extension, one scan i
 enough:
 
 1. In the Keepmark browser manager, the Android card says **Connect Keepmark on
-   your phone**; choose **Show connection QR** and verify the sync password there.
+   your phone**; choose **Show connection QR** (if a sync lock is set there,
+   enter its password first).
 2. On Android, open **Connect → Link an existing sync → Scan QR from browser**
    (the same QR button is in **Syncs → + Add a sync** when a sync is already
    active).
 3. Check the service and abbreviated sync ID the review shows, tap **Continue**,
    wait for verification, then choose the direction.
 
-The QR contains your credentials, password included, so show it only to your own
-device. The browser erases it after 60 seconds or when it loses focus, and this
+The QR contains the service, the sync ID and the sync's encryption key, never
+the password. Anyone with a copy can still read and change that sync's
+bookmarks, so show it only to your own device. Browser QRs (format 2, from
+Keepmark for browsers 0.1.64) need this app at 1.0.247 or later; older QRs with
+the password still work. The browser erases it after 60 seconds or when it loses focus, and this
 app discards an unused scan after 60 seconds or when it goes to the background:
 nothing from the QR is written to storage or to the log, and no image is kept.
 The camera is used only while you are scanning. Manual linking stays available.

@@ -418,9 +418,10 @@ else
         var generation = qrGeneration;
         var targetUrl = candidate.ServiceUrl;
         var targetId = candidate.Id;
-        var secret = candidate.Password;
+        var isKey = candidate.DerivedKey is not null;
+        var secret = candidate.DerivedKey ?? candidate.Password ?? string.Empty;
         candidate = null;
-        var task = LinkExistingCredentials(targetUrl, targetId, secret, generation);
+        var task = LinkExistingCredentials(targetUrl, targetId, secret, generation, isKey);
         secret = string.Empty;
         try { await task; }
         finally { if (generation == qrGeneration) ClearQr(); }
@@ -458,7 +459,7 @@ else
 
     private Task LinkExisting() => serviceInfo is null ? Task.CompletedTask : LinkExistingCredentials(ServiceUrlClean, syncId.Trim(), password);
 
-    private async Task LinkExistingCredentials(string targetUrl, string targetId, string targetPassword, int? qrAttempt = null)
+    private async Task LinkExistingCredentials(string targetUrl, string targetId, string targetPassword, int? qrAttempt = null, bool secretIsKey = false)
     {
         await RunStepAsync(async () =>
         {
@@ -467,7 +468,9 @@ else
                 throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
             }
 
-            var probe = Session.ProbeLinkAsync(targetUrl, targetId, targetPassword, Lifetime);
+            var probe = secretIsKey
+                ? Session.ProbeLinkWithKeyAsync(targetUrl, targetId, targetPassword, Lifetime)
+                : Session.ProbeLinkAsync(targetUrl, targetId, targetPassword, Lifetime);
             targetPassword = string.Empty;
             var result = await probe;
             if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;

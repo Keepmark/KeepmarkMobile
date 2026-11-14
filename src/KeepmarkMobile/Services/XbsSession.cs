@@ -170,9 +170,26 @@ public sealed class XbsSession : IAsyncDisposable
     }
 
     /// <summary>Onboarding step: validate credentials + fetch both counts for the reconcile screen.</summary>
-    public async Task<ReconcileInfo> ProbeLinkAsync(string serviceUrl, string syncId, string password, CancellationToken ct = default)
+    public Task<ReconcileInfo> ProbeLinkAsync(string serviceUrl, string syncId, string password, CancellationToken ct = default)
+        => ProbeCandidateAsync(serviceUrl, syncId, _crypto.DeriveKey(password, syncId, Core.XbsConstants.SyncClientVersion), ct);
+
+    /// <summary>Same probe from an already derived key (QR format 2). The
+    /// remote blob must decrypt with it, exactly as with a typed password.</summary>
+    public async Task<ReconcileInfo> ProbeLinkWithKeyAsync(string serviceUrl, string syncId, string derived, CancellationToken ct = default)
     {
-        var derived = _crypto.DeriveKey(password, syncId, Core.XbsConstants.SyncClientVersion);
+        try
+        {
+            return await ProbeCandidateAsync(serviceUrl, syncId, derived, ct).ConfigureAwait(false);
+        }
+        catch (Core.Errors.InvalidCredentialsException ex)
+        {
+            // Nothing was typed: "wrong password" would point at the wrong thing.
+            throw new Core.Errors.InvalidCredentialsException(Loc.Get(Str.ConnQrKeyStale), ex);
+        }
+    }
+
+    private async Task<ReconcileInfo> ProbeCandidateAsync(string serviceUrl, string syncId, string derived, CancellationToken ct)
+    {
         var candidate = new SyncCredentials(syncId, serviceUrl, derived, Core.XbsConstants.SyncClientVersion);
         var (local, remote, remoteLast, remoteVer, remoteBlob, localBlob, remoteRev, remoteHash) =
             await Engine!.CompareAsync(candidate, ct).ConfigureAwait(false);

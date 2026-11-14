@@ -313,7 +313,8 @@ fails the review.
 
 ### QR connection regression (v1.0.200)
 
-- Pure parser: strict Keepmark JSON v1, Unicode and short existing passwords,
+- Pure parser: strict Keepmark JSON format 1 (and format 2 with `key` since
+  v1.0.247, see below), Unicode and short existing passwords,
   1,800-byte cap before parsing, duplicates/depth/type/ID/URL/version rejection,
   unknown fields ignored, absolute `https`/`http` URL without credentials,
   query, fragment, backslash or control characters, representation redacted
@@ -321,8 +322,8 @@ fails the review.
   59/60 seconds, duplicate/late generations, cancellation and
   consume-before-probe (including failed probe).
 - Connect (first link and `+ Add a sync` while linked → Existing sync) shows a
-  QR icon with scan action and translated helper before service/ID/password
-  entry. Adding while linked keeps the usual verification, direction and apply.
+  QR icon with scan action and translated helper (`Str.ConnQrHint`: service,
+  sync ID and key, nothing to type) before service/ID/password entry. Adding while linked keeps the usual verification, direction and apply.
 - QR review is exclusive in Connect: only service URL, abbreviated
   sync ID, acquired-credentials summary and spaced actions. Manual inputs,
   service controls and later Connect headings stay hidden while pending and
@@ -488,7 +489,7 @@ Settings layout: the complete log block is the final functionality; all other
 preference blocks precede it. No Save button: each setting applies on change.
 
 
-## bookmarks.html, tags, start-up and pull to refresh — v1.0.241–245
+## bookmarks.html, tags, start-up, pull to refresh and QR format 2 — v1.0.241–247
 
 - Start-up (v1.0.241): content visible in about 1 s cold on the test phone;
   no `SecureStorage` read outside `SecureCredentialStore`.
@@ -506,6 +507,12 @@ preference blocks precede it. No Save button: each setting applies on change.
   freed by the 90 s watchdog never frees the pull that followed it (v1.0.246).
 - `SyncEngine.ForceSyncAsync` returns what the run moved (`SyncTransfer`); the
   gate is still released in `finally` and every branch keeps its status.
+- QR format 2 (v1.0.247): `ConnectQrPayload` accepts format 1 (`password`) and
+  format 2 (`key`: canonical base64 of exactly 32 bytes); a `password` beside
+  the key and any other format are rejected. A key candidate links through
+  `XbsSession.ProbeLinkWithKeyAsync` (same probe; the remote blob must decrypt)
+  and stores only the key. Releases before v1.0.247 reject format 2, which the
+  browser extension emits from 0.1.64.
 
 Tests: `NetscapeBookmarksTests`, `TagViewTests`, `RemovedSyncNoticeTests`
 (`AManualSyncReportsWhatItMoved`, `ATimestampThatMovedOverTheSameContentReceivesNothing`),
