@@ -377,8 +377,8 @@ keepmark://sync?v=1&s=<service URL, percent-encoded>&id=<sync ID>&k=<derived key
   change the bookmarks until the sync password is changed, which is the only
   revocation (every other device must then be linked again). Both apps say so
   next to the link.
-- **Share** (extension: share icon beside the QR icon on every saved sync and
-  on the Android card; Android: `⋮` → `Share sync…` on every saved sync with a
+- **Share** (extension: share icon beside the QR icon on every saved sync in
+  Manager → Sync; Android: `⋮` → `Share sync…` on every saved sync with a
   key). Same gate as the QR / a switch: the extension asks the sync-lock
   password when a lock is set (nothing otherwise); Android asks the device
   unlock when app lock is on (nothing otherwise). A read-only GET + decrypt
@@ -391,11 +391,16 @@ keepmark://sync?v=1&s=<service URL, percent-encoded>&id=<sync ID>&k=<derived key
   fields: a `Shared link` field (paste, then `Use link`). On Android a tapped
   `keepmark://sync` link and text shared to Keepmark that contains one open
   Syncs → `+ Add a sync` with the link already read (after the app lock);
-  such text is never offered as a bookmark. A valid link produces the same
-  reviewed candidate as a QR (service + short ID, Continue / Cancel, discarded
-  after 60 seconds, on lock or background), then the normal verification,
+  such text is never offered as a bookmark. On Android a valid link produces
+  the same reviewed candidate as a QR (service + short ID, Continue / Cancel,
+  discarded after 60 seconds, on lock or background). In the extension (popup
+  `Existing sync` and Manager `+ Add a sync` → `An existing sync`) a pasted
+  link is read at once: it selects the service, fills the sync ID, hides the
+  password and says the key was read; editing the service or the ID drops the
+  key (the password is asked again). Both then run the normal verification,
   direction choice, merge preview and safety backups. A key that no longer
-  opens the sync reports "ask for a new link".
+  opens the sync reports "ask for a new link". The extension accepts a plain
+  `http` link only for loopback hosts, like any service URL.
 - A device linked from a link (or a QR) never knew the password, so it cannot
   run `Change password` (which asks the current one).
 
