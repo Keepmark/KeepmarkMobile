@@ -461,7 +461,13 @@ else
         try
         {
             var once = await Session.CreateOneTimeShareAsync(row.Identity, shareTtl, shareWithCode, Lifetime);
-            if (IsDisposed || shareKey != key || AppLock.Locked || !AppLock.Foreground) return;
+            if (IsDisposed || shareKey != key || AppLock.Locked || !AppLock.Foreground)
+            {
+                // Nobody saw this voucher: revoke it rather than leave a live
+                // link no one can cancel (best effort; it expires anyway).
+                _ = RevokeUnseenAsync(once);
+                return;
+            }
             shareOnce = once;
             shareLink = once.Link;
         }
@@ -476,6 +482,12 @@ else
         {
             busy = false;
         }
+    }
+
+    private async Task RevokeUnseenAsync(OneTimeShare once)
+    {
+        try { await Session.RevokeOneTimeShareAsync(once, CancellationToken.None); }
+        catch (Exception ex) { Session.Log.Warn("syncs", $"Unseen one-time link not revoked: {ex.GetType().Name}"); }
     }
 
     /// <summary>Deletes the voucher on the service at once. Closing the panel

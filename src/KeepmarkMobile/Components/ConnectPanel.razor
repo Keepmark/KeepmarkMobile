@@ -373,6 +373,9 @@ else
         {
             busy = false;
             code = string.Empty;
+            // A lock or background during the redeem skipped LockChanged's
+            // DropOnce (busy): a kept link must not outlive it.
+            if (content is null && (AppLock.Locked || !AppLock.Foreground)) DropOnce();
         }
         if (content is null || IsDisposed) return;
         DropOnce();
