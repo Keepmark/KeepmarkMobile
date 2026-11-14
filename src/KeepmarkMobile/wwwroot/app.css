@@ -479,6 +479,45 @@ html.xbs-locked, body.xbs-locked {
     outline: none;
 }
 
+/* Pull-to-refresh indicator (Home): round chip that slides out from under
+   the fixed bars; top/transform/opacity and the arc are set by gestures.js. */
+.xbs-pull {
+    position: fixed;
+    left: 50%;
+    top: 0;
+    z-index: 1052; /* under the app bar (1059) and the crumb bar (1053) */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--km-surface);
+    box-shadow: var(--km-shadow-float), 0 0 0 1px var(--km-line);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 0);
+    will-change: transform, opacity;
+}
+.xbs-pull.show { display: flex; }
+.xbs-pull.settle { transition: transform 0.2s ease-out, opacity 0.2s ease-out; }
+.xbs-pull svg { width: 24px; height: 24px; overflow: visible; }
+.xbs-pull-arc {
+    fill: none;
+    stroke: var(--km-ink-2);
+    stroke-width: 2.5;
+}
+.xbs-pull-head {
+    fill: var(--km-ink-2);
+    transform-origin: 12px 12px;
+}
+.xbs-pull.armed .xbs-pull-arc, .xbs-pull.spin .xbs-pull-arc { stroke: var(--km-accent); }
+.xbs-pull.armed .xbs-pull-head { fill: var(--km-accent); }
+.xbs-pull.spin .xbs-pull-head { display: none; }
+.xbs-pull.spin .xbs-pull-arc { stroke-dasharray: 36 50.3; stroke-linecap: round; }
+.xbs-pull.spin svg { animation: xbs-pull-spin 0.8s linear infinite; }
+@keyframes xbs-pull-spin { to { transform: rotate(360deg); } }
+
 /* Fast-scroll thumb (lists > 8 screens): 28px-wide hit strip on the
    right edge, 12px bar; vertical position set by gestures.js. */
 .xbs-thumb {
@@ -554,6 +593,9 @@ html.xbs-locked, body.xbs-locked {
     .xbs-go, .xbs-go-chip, .xbs-thumb, .xbs-go-fill, .xbs-thumb-bar { transition: none; }
     .xbs-go, .xbs-go-chip { transform: none; }
     .xbs-row-inner.xbs-flash-once { animation: none; }
+    /* The spinner is the only progress cue of a pull: slowed, not removed. */
+    .xbs-pull.settle { transition: none; }
+    .xbs-pull.spin svg { animation-duration: 2.4s; }
 }
 
 /* Logs viewer page. */

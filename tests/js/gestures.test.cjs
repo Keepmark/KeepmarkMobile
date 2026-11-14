@@ -5,7 +5,7 @@ const { join } = require('node:path');
 const vm = require('node:vm');
 
 function setup() {
-    const handlers = {}, frames = [], timers = new Map();
+    const handlers = {}, frames = [], timers = new Map(), present = new Set();
     let nextTimer = 0, now = 0;
     const windowHandlers = {};
     const element = () => ({
@@ -15,8 +15,9 @@ function setup() {
     });
     const document = {
         documentElement: element(), body: element(), activeElement: null,
-        addEventListener(name, callback) { (handlers[name] ??= []).push(callback); },
-        createElement: element, querySelector() { return null; }, querySelectorAll() { return []; }
+        addEventListener(name, callback) { if (!(handlers[name] ??= []).includes(callback)) handlers[name].push(callback); },
+        removeEventListener(name, callback) { handlers[name] = (handlers[name] ?? []).filter(fn => fn !== callback); },
+        createElement: element, querySelector(selector) { return present.has(selector) ? element() : null; }, querySelectorAll() { return []; }
     };
     const window = { addEventListener(name, callback) { (windowHandlers[name] ??= []).push(callback); }, matchMedia() { return { matches: false }; }, scrollY: 0 };
     vm.runInNewContext(readFileSync(join(__dirname, '../../src/KeepmarkMobile/wwwroot/js/gestures.js'), 'utf8'), {
@@ -34,7 +35,8 @@ function setup() {
     const event = x => ({ target: { closest(selector) { return selector === '.xbs-row' ? row : null; } },
         clientX: x, clientY: 0, pointerId: 1, cancelable: true, preventDefault() {} });
     const swipe = () => { emit('pointerdown', event(0)); emit('pointermove', event(90)); emit('pointerup', event(90)); };
-    return { api: window.xbsGestures, frames, timers, emit, event, swipe, row,
+    return { api: window.xbsGestures, window, frames, timers, emit, event, swipe, row, present,
+        listening: name => (handlers[name] ?? []).length,
         setNow(value) { now = value; },
         emitWindow(name) { windowHandlers[name]?.forEach(fn => fn()); },
         fireTimers() { const pending = [...timers.values()]; timers.clear(); pending.forEach(fn => fn()); }
@@ -76,6 +78,55 @@ function recording(ui) {
     ui.api.init({ invokeMethodAsync(...args) { calls.push(args); return Promise.resolve(); } }, 'page');
     return calls;
 }
+
+// One-finger drag from (0,0) to (dx,dy); returns how many moves were claimed.
+function drag(ui, dx, dy, { cancelable = true, end = 'touchend' } = {}) {
+    let prevented = 0;
+    const touch = (x, y) => ({ identifier: 5, clientX: x, clientY: y });
+    const target = { closest() { return null; } };
+    ui.emit('touchstart', { target, touches: [touch(0, 0)] });
+    for (const f of [0.25, 1]) {
+        ui.emit('touchmove', { target, touches: [touch(dx * f, dy * f)], cancelable, preventDefault() { prevented++; } });
+    }
+    ui.emit(end, { target, touches: [], changedTouches: [touch(dx, dy)] });
+    return prevented;
+}
+
+test('pull past the threshold syncs once; a second pull waits for the first to finish', async () => {
+    const ui = setup(), calls = [];
+    let finish;
+    ui.api.init({ invokeMethodAsync(...args) { calls.push(args); return new Promise(resolve => { finish = resolve; }); } }, 'page');
+    assert.equal(drag(ui, 0, 200), 2);
+    assert.deepEqual(calls, [['OnPullRefresh']]);
+    assert.equal(drag(ui, 0, 200), 0);
+    assert.equal(calls.length, 1);
+    finish();
+    await new Promise(resolve => setImmediate(resolve));
+    drag(ui, 0, 200);
+    assert.equal(calls.length, 2);
+});
+
+test('short, upward, sideways, cancelled and non-cancelable drags never sync', () => {
+    const ui = setup(), calls = recording(ui);
+    assert.equal(drag(ui, 0, 100), 2); // claimed, but released before 64px of travel
+    assert.equal(drag(ui, 0, -200), 0);
+    assert.equal(drag(ui, 200, 120), 0);
+    assert.equal(drag(ui, 0, 200, { cancelable: false }), 0);
+    drag(ui, 0, 200, { end: 'touchcancel' });
+    assert.deepEqual(calls, []);
+});
+
+test('pull needs a live Home and the page at the very top', () => {
+    const ui = setup();
+    assert.equal(drag(ui, 0, 200), 0);
+    const calls = recording(ui);
+    ui.window.scrollY = 30;
+    assert.equal(drag(ui, 0, 200), 0);
+    ui.api.release('page');
+    ui.window.scrollY = 0;
+    assert.equal(drag(ui, 0, 200), 0);
+    assert.deepEqual(calls, []);
+});
 
 test('long press captures stable identity and content version and removes press highlight', () => {
     const ui = setup(), calls = recording(ui);
@@ -132,4 +183,66 @@ test('pointer cancellation and scroll clear pending presses; cancelled swipes ne
     ui.emit('pointerdown', ui.event(0)); ui.emit('pointermove', ui.event(90));
     ui.emit('pointercancel', ui.event(90)); ui.emit('pointerup', ui.event(90));
     assert.deepEqual(calls, []);
+});
+
+test('a failed sync frees the gesture; a sync that never answers is released by the watchdog', async () => {
+    const ui = setup(), calls = [];
+    ui.api.init({ invokeMethodAsync(...args) { calls.push(args); return calls.length === 1 ? Promise.reject(new Error('boom')) : new Promise(() => {}); } }, 'page');
+    drag(ui, 0, 200);
+    await new Promise(resolve => setImmediate(resolve));
+    drag(ui, 0, 200); // the rejection cleared the busy flag
+    assert.equal(calls.length, 2);
+    assert.equal(drag(ui, 0, 200), 0); // second sync still pending
+    ui.fireTimers(); // watchdog
+    drag(ui, 0, 200);
+    assert.equal(calls.length, 3);
+});
+
+test('selection or a modal that starts after touchstart blocks the pull', () => {
+    const ui = setup(), calls = recording(ui);
+    ui.present.add('.xbs-selection-actions');
+    assert.equal(drag(ui, 0, 200), 0);
+    ui.present.clear();
+    assert.equal(drag(ui, 0, 200), 2);
+    assert.equal(calls.length, 1);
+});
+
+test('only a live Home keeps the non-passive touchmove listener', () => {
+    const ui = setup();
+    assert.equal(ui.listening('touchmove'), 0);
+    ui.api.init({ invokeMethodAsync() { return Promise.resolve(); } }, 'a');
+    ui.api.init({ invokeMethodAsync() { return Promise.resolve(); } }, 'b');
+    assert.equal(ui.listening('touchmove'), 1);
+    ui.api.release('a'); // stale owner: the live Home keeps it
+    assert.equal(ui.listening('touchmove'), 1);
+    ui.api.release('b');
+    assert.equal(ui.listening('touchmove'), 0);
+});
+
+test('a wobble under the decision distance does not discard the pull', () => {
+    const ui = setup(), calls = recording(ui);
+    const touch = (x, y) => ({ identifier: 5, clientX: x, clientY: y });
+    const target = { closest() { return null; } };
+    const move = (x, y) => ui.emit('touchmove', { target, touches: [touch(x, y)], cancelable: true, preventDefault() {} });
+    ui.emit('touchstart', { target, touches: [touch(0, 0)] });
+    move(1, -2); move(0, 60); move(0, 200);
+    ui.emit('touchend', { target, touches: [], changedTouches: [touch(0, 200)] });
+    assert.deepEqual(calls, [['OnPullRefresh']]);
+});
+
+test('a sync that outlives the watchdog cannot free the pull that followed it', async () => {
+    const ui = setup(), calls = [], finish = [];
+    ui.api.init({ invokeMethodAsync(...args) { calls.push(args); return new Promise(resolve => finish.push(resolve)); } }, 'page');
+    drag(ui, 0, 200);
+    ui.fireTimers(); // watchdog frees the first pull
+    drag(ui, 0, 200); // second pull starts
+    assert.equal(calls.length, 2);
+    finish[0](); // the late first run answers
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(drag(ui, 0, 200), 0); // the second pull is still busy
+    assert.equal(calls.length, 2);
+    finish[1]();
+    await new Promise(resolve => setImmediate(resolve));
+    drag(ui, 0, 200);
+    assert.equal(calls.length, 3);
 });

@@ -446,6 +446,7 @@ public static partial class Str
     public const string NavSynced = nameof(NavSynced);
     public const string NavNotSyncedYet = nameof(NavNotSyncedYet);
     public const string NavSyncComplete = nameof(NavSyncComplete);
+    public const string NavSyncDone = nameof(NavSyncDone);
     public const string NavSyncFinished = nameof(NavSyncFinished);
     public const string StatusIdle = nameof(StatusIdle);
     public const string StatusSyncing = nameof(StatusSyncing);

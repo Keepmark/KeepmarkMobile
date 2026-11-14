@@ -180,7 +180,167 @@ window.xbsGestures = (() => {
         });
         window.addEventListener('scroll', cancelGesture, { passive: true });
         window.addEventListener('scroll', onScroll, { passive: true });
+        // The non-passive touchmove of the pull is added by init() and removed
+        // by release(): only Home pays for it, other pages keep passive scrolling.
+        document.addEventListener('touchstart', onPullStart, { passive: true });
+        document.addEventListener('touchend', onPullEnd, { passive: true });
+        document.addEventListener('touchcancel', onPullCancel, { passive: true });
         ensureGoButtons();
+    }
+
+    // ---- Pull to refresh (Home only, Gmail-style) ----
+    // With the page at the very top, dragging down slides a round indicator
+    // out from under the bars (half the finger travel). Releasing past
+    // PULL_TRIGGER_PX runs a sync (Home.OnPullRefresh) and the indicator
+    // spins until it returns; releasing earlier retracts it. Touch events,
+    // not pointer events: rows are touch-action: pan-y, so the browser would
+    // claim the drag and send pointercancel. The drag must be claimed on its
+    // first touchmove, later ones are no longer cancelable.
+    const PULL_TRIGGER_PX = 64;
+    const PULL_MAX_PX = 112;
+    const PULL_RESIST = 0.5;
+    const PULL_SIZE_PX = 40;
+    // Below this travel the direction is not decided yet (a wobble must not
+    // discard the pull); above it the first move claims or drops the drag.
+    const PULL_DECIDE_PX = 4;
+    // A sync that never answers must not disable the gesture for good.
+    const PULL_WATCHDOG_MS = 90000;
+    const PULL_ARC_C = 2 * Math.PI * 8;
+
+    let pull = null, pullBusy = false, pullEl = null, pullSvg = null, pullArc = null, pullHead = null, pullHideTimer = 0;
+    let pullWatchdog = 0, pullRun = 0;
+    const PULL_MOVE_OPTS = { passive: false };
+
+    // Selection or a modal can start after touchstart (long-press, a sheet).
+    function pullBlocked() {
+        return !dotNet || modalOpen() || !!document.querySelector('.xbs-selection-actions');
+    }
+
+    function ensurePullEl() {
+        if (pullEl) return;
+        pullEl = document.createElement('div');
+        pullEl.className = 'xbs-pull';
+        pullEl.setAttribute('aria-hidden', 'true');
+        pullEl.innerHTML =
+            `<svg viewBox="0 0 24 24"><circle class="xbs-pull-arc" cx="12" cy="12" r="8"/>` +
+            `<path class="xbs-pull-head" d="M16.6 12h6.8L20 16z"/></svg>`;
+        pullSvg = pullEl.querySelector('svg');
+        pullArc = pullEl.querySelector('.xbs-pull-arc');
+        pullHead = pullEl.querySelector('.xbs-pull-head');
+        document.body.appendChild(pullEl);
+    }
+
+    // Rest position: fully hidden just above the lower edge of the fixed bars.
+    function pullRestTop() {
+        let bottom = 0;
+        document.querySelectorAll('.top-row, .xbs-crumbbar').forEach((el) => {
+            const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+            if (r && r.height > 0 && r.bottom > bottom) bottom = r.bottom;
+        });
+        return bottom - PULL_SIZE_PX - 4;
+    }
+
+    function renderPull(dist) {
+        const p = Math.min(1, dist / PULL_TRIGGER_PX);
+        const arc = 0.8 * p;
+        pullEl.style.transform = `translate(-50%, ${dist.toFixed(1)}px)`;
+        pullEl.style.opacity = Math.min(1, p * 2).toFixed(2);
+        pullEl.classList.toggle('armed', p >= 1);
+        pullArc.setAttribute('stroke-dasharray', `${(PULL_ARC_C * arc).toFixed(1)} ${PULL_ARC_C.toFixed(1)}`);
+        pullHead.style.transform = `rotate(${(arc * 360).toFixed(1)}deg)`;
+        // Keeps turning past the threshold, so the extra travel still reads.
+        pullSvg.style.transform = `rotate(${(-90 + dist * 2.5).toFixed(1)}deg)`;
+    }
+
+    function hidePull() {
+        if (!pullEl) return;
+        pullEl.classList.add('settle');
+        pullEl.style.transform = 'translate(-50%, 0) scale(0.4)';
+        pullEl.style.opacity = '0';
+        clearTimeout(pullHideTimer);
+        pullHideTimer = setTimeout(() => pullEl.classList.remove('spin', 'armed', 'settle', 'show'), 220);
+    }
+
+    function pullAllowed(e) {
+        if (pullBusy || !dotNet || window.scrollY > 0 || modalOpen()) return false;
+        if (!e.touches || e.touches.length !== 1) return false;
+        if (document.querySelector('.xbs-selection-actions')) return false;
+        const t = e.target;
+        if (t && t.closest && t.closest('input, textarea, select, [contenteditable], .xbs-thumb, .xbs-go, .xbs-go-menu')) return false;
+        // A scrolled inner scroller keeps its own drag.
+        for (let n = t; n && n !== document.body; n = n.parentElement) {
+            if (n.scrollTop > 0) return false;
+        }
+        return true;
+    }
+
+    function pullTouch(e, list) {
+        const all = list || [];
+        for (let i = 0; i < all.length; i++) if (all[i].identifier === pull.id) return all[i];
+        return null;
+    }
+
+    function onPullStart(e) {
+        if (pull && pull.active) { onPullCancel(); return; } // second finger
+        pull = null;
+        if (!pullAllowed(e)) return;
+        const t = e.touches[0];
+        pull = { id: t.identifier, x0: t.clientX, y0: t.clientY, active: false, dist: 0 };
+    }
+
+    function onPullMove(e) {
+        if (!pull) return;
+        const t = pullTouch(e, e.touches);
+        if (!t) return;
+        const dx = t.clientX - pull.x0, dy = t.clientY - pull.y0;
+        if (!pull.active) {
+            if (Math.abs(dx) < PULL_DECIDE_PX && Math.abs(dy) < PULL_DECIDE_PX) return;
+            if (dy <= 0 || dy < Math.abs(dx) || !e.cancelable || window.scrollY > 0 || pullBlocked()) { pull = null; return; }
+            pull.active = true;
+            cancelGesture();
+            ensurePullEl();
+            clearTimeout(pullHideTimer);
+            pullEl.classList.remove('spin', 'settle');
+            pullEl.style.top = pullRestTop() + 'px';
+            pullEl.classList.add('show');
+        }
+        if (e.cancelable) e.preventDefault();
+        pull.dist = Math.max(0, Math.min(PULL_MAX_PX, dy * PULL_RESIST));
+        renderPull(pull.dist);
+    }
+
+    function onPullEnd(e) {
+        if (!pull || !pullTouch(e, e.changedTouches)) return;
+        const p = pull;
+        pull = null;
+        if (!p.active) return;
+        suppressUntil = Date.now() + 400; // the lifted finger must not tap a row
+        if (p.dist < PULL_TRIGGER_PX || pullBlocked()) { hidePull(); return; }
+        pullBusy = true;
+        const run = ++pullRun;
+        pullEl.classList.add('settle', 'spin');
+        pullEl.style.transform = `translate(-50%, ${PULL_TRIGGER_PX}px)`;
+        pullEl.style.opacity = '1';
+        pullSvg.style.transform = '';
+        // Only the newest pull may finish: a run that outlived the watchdog
+        // must not free the busy flag of the pull that followed it.
+        const done = () => {
+            if (!pullBusy || run !== pullRun) return;
+            clearTimeout(pullWatchdog);
+            pullBusy = false;
+            // A new drag may already own the indicator (after the watchdog).
+            if (!pull || !pull.active) hidePull();
+        };
+        pullWatchdog = setTimeout(done, PULL_WATCHDOG_MS);
+        let sync;
+        try { sync = dotNet.invokeMethodAsync('OnPullRefresh'); } catch { sync = null; }
+        Promise.resolve(sync).then(done, done);
+    }
+
+    function onPullCancel() {
+        const active = pull && pull.active;
+        pull = null;
+        if (active) hidePull();
     }
 
     // ---- Scroll jump (single button above the FAB + fast-scroll thumb) ----
@@ -565,6 +725,7 @@ window.xbsGestures = (() => {
             // disposes its reference): always point at the live instance.
             dotNet = ref;
             attach();
+            document.addEventListener('touchmove', onPullMove, PULL_MOVE_OPTS);
         },
         initDup(ref, owner) {
             dupOwner = owner;
@@ -577,7 +738,15 @@ window.xbsGestures = (() => {
             if ((home && state && state.kind !== 'dup') || (dup && state && state.kind === 'dup')) {
                 cancelGesture();
             }
-            if (home) { dotNet = null; homeOwner = null; }
+            if (home) {
+                dotNet = null;
+                homeOwner = null;
+                // Leaving Home: drop a drag in progress and take the spinner
+                // off the next page (the sync itself still finishes).
+                document.removeEventListener('touchmove', onPullMove, PULL_MOVE_OPTS);
+                pull = null;
+                hidePull();
+            }
             if (dup) { dupRef = null; dupOwner = null; }
         },
         closeAll() { /* kept for Blazor callers; no snapped rows anymore */ },

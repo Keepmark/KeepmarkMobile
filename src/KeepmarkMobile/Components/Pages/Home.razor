@@ -1527,7 +1527,16 @@ else if (moved is not null)
         await RefreshAsync();
     }
 
-    private async Task SyncNow()
+    private Task SyncNow() => SyncNowAsync(quietSuccess: false);
+
+    // Pull-to-refresh (gestures.js): the spinner is the feedback. A clean run
+    // that moved nothing stays silent; one that received or sent bookmarks
+    // shows a one-word, 2 s toast (the time is in the status bar). Anything
+    // else still reports like the button.
+    [JSInvokable]
+    public Task OnPullRefresh() => IsDisposed || selection.Active ? Task.CompletedTask : SyncNowAsync(quietSuccess: true);
+
+    private async Task SyncNowAsync(bool quietSuccess)
     {
         if (Session.Engine is null)
         {
@@ -1536,7 +1545,10 @@ else if (moved is not null)
 
         try
         {
-            await Session.Engine.ForceSyncAsync();
+            var transfer = await Session.Engine.ForceSyncAsync();
+            // Left the page meanwhile (pull, then the drawer): the sync is done,
+            // there is nothing to paint and no toast to raise from here.
+            if (IsDisposed) return;
             await RefreshAsync();
             // Paint first: the toast must never gate the list update.
             StateHasChanged();
@@ -1544,8 +1556,13 @@ else if (moved is not null)
             Session.Log.Info("ui", idle
                 ? $"Sync complete {DateTime.Now:HH:mm:ss}"
                 : $"Sync finished: {Session.Engine.Status}");
+            if (idle && quietSuccess)
+            {
+                if (transfer != Core.Sync.SyncTransfer.None) _ = Toast.ShowAsync(L.Get(Str.NavSyncDone), ms: 2000);
+                return;
+            }
             _ = Toast.ShowAsync(idle
-                ? L.Get(Str.NavSyncComplete, $"{DateTime.Now:HH:mm:ss}")
+                ? L.Get(Str.NavSyncComplete)
                 : L.Get(Str.NavSyncFinished, Core.Sync.SyncStatusText.Label(Session.Engine.Status)),
                 isError: Session.Engine.Status is not (Core.Sync.SyncStatus.Idle or Core.Sync.SyncStatus.Offline));
         }

@@ -96,6 +96,41 @@ public sealed class RemovedSyncNoticeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AManualSyncReportsWhatItMoved()
+    {
+        await AlignMirrorAsync();
+        Assert.Equal(SyncTransfer.None, await _engine.ForceSyncAsync());
+
+        _api.LastUpdated = "2024-02-02T00:00:00.000Z"; // another device pushed
+        Assert.Equal(SyncTransfer.Received, await _engine.ForceSyncAsync());
+        Assert.Equal(SyncTransfer.None, await _engine.ForceSyncAsync());
+
+        await _store.SetMetaAsync(BookmarkStore.MetaDirty, "1"); // unsent local edit
+        Assert.Equal(SyncTransfer.Sent, await _engine.ForceSyncAsync());
+        Assert.Equal(1, _api.PushCount);
+        Assert.Equal(SyncStatus.Idle, _engine.Status);
+
+        _api.OfflineOnRead = true;
+        Assert.Equal(SyncTransfer.None, await _engine.ForceSyncAsync());
+    }
+
+    [Fact]
+    public async Task ATimestampThatMovedOverTheSameContentReceivesNothing()
+    {
+        // v1.2: another client pushed an identical tree. The pull answers
+        // "unchanged" by hash, so the UI must not announce received bookmarks.
+        _api.V12 = true;
+        var blob = _crypto.Encrypt(System.Text.Json.JsonSerializer.Serialize(Sample()), Key);
+        _api.Blob = blob;
+        await _store.ReplaceAllAsync(Sample(), blob, _api.LastUpdated, "1.8.0", revision: 7, hash: _api.Hash);
+
+        _api.LastUpdated = "2024-03-03T00:00:00.000Z";
+        Assert.Equal(SyncTransfer.None, await _engine.ForceSyncAsync());
+        Assert.Equal(SyncStatus.Idle, _engine.Status);
+        Assert.Equal(0, _api.GetCount);
+    }
+
+    [Fact]
     public void CopiesAreContentAddressedByTreeHash()
     {
         var a = RemovedSyncCopies.Hash("[{\"id\":1}]");

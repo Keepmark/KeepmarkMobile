@@ -26,6 +26,16 @@ public enum SyncStatus
     NoCredentials
 }
 
+/// <summary>What a manual sync run moved: nothing (already aligned, or it
+/// stopped early), the remote tree down, or local edits up. Callers still
+/// read <see cref="SyncEngine.Status"/> for how the run ended.</summary>
+public enum SyncTransfer
+{
+    None,
+    Received,
+    Sent
+}
+
 /// <summary>Direction for resolving a sync conflict.</summary>
 public enum ConflictResolutionDirection
 {
@@ -568,13 +578,14 @@ public sealed partial class SyncEngine(
         }
     }
 
-    /// <summary>Manual "Sync now": same as the auto tick but runs in any mode.</summary>
-    public async Task ForceSyncAsync(CancellationToken ct = default)
+    /// <summary>Manual "Sync now": same as the auto tick but runs in any mode.
+    /// Returns what this run moved, so the UI can stay quiet on a plain check.</summary>
+    public async Task<SyncTransfer> ForceSyncAsync(CancellationToken ct = default)
     {
         await AcquireGateAsync("Sync now", TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
         try
         {
-            await ForceSyncInternalAsync(ct, isAutoSync: false).ConfigureAwait(false);
+            return await ForceSyncInternalAsync(ct, isAutoSync: false).ConfigureAwait(false);
         }
         finally
         {
@@ -644,7 +655,7 @@ public sealed partial class SyncEngine(
 
     /// <summary>Internal sync logic shared by auto and manual sync. The caller
     /// holds <c>_gate</c> and releases it; this method never does.</summary>
-    private async Task ForceSyncInternalAsync(CancellationToken ct, bool isAutoSync)
+    private async Task<SyncTransfer> ForceSyncInternalAsync(CancellationToken ct, bool isAutoSync)
     {
         log.Debug("sync", isAutoSync ? "Auto-sync: start" : "Manual sync: start");
 
@@ -652,7 +663,7 @@ public sealed partial class SyncEngine(
         if (_resolvingConflict)
         {
             log.Warn("sync", "ForceSync aborted: conflict resolution in progress");
-            if (isAutoSync) return;
+            if (isAutoSync) return SyncTransfer.None;
             throw new InvalidOperationException(Loc.Get(Str.ErrConflictInProgress));
         }
 
@@ -660,7 +671,7 @@ public sealed partial class SyncEngine(
         if (c is null)
         {
             SetStatus(SyncStatus.NoCredentials);
-            return;
+            return SyncTransfer.None;
         }
 
         var api = apiFor(c.ServiceUrl);
@@ -672,7 +683,7 @@ public sealed partial class SyncEngine(
         catch (ServiceOfflineException)
         {
             SetStatus(SyncStatus.Offline);
-            return;
+            return SyncTransfer.None;
         }
         catch (SyncNotFoundException)
         {
@@ -693,24 +704,27 @@ public sealed partial class SyncEngine(
                 // Both sides moved: never auto-merge, surface the conflict.
                 SetStatus(SyncStatus.Conflict);
                 log.Warn("sync", "Auto: remote and local both changed -> conflict");
-                return;
+                return SyncTransfer.None;
             }
 
             log.Debug("sync", "ForceSync: pulling remote");
-            await PullCoreAsync(ct, remote).ConfigureAwait(false);
+            // False = the timestamp moved but the content did not (v1.2 hash
+            // match): nothing was received.
+            return await PullCoreAsync(ct, remote).ConfigureAwait(false) ? SyncTransfer.Received : SyncTransfer.None;
         }
-        else if (dirty)
+
+        if (dirty)
         {
             log.Debug("sync", "ForceSync: pushing local");
             await PushCoreAsync(updateVersion: false, ct: ct).ConfigureAwait(false);
+            return SyncTransfer.Sent;
         }
-        else
-        {
-            // Successful check, nothing to do: still stamp the check time.
-            log.Debug("sync", "ForceSync: already in sync");
-            LastSyncAt = DateTimeOffset.UtcNow;
-            SetStatus(SyncStatus.Idle);
-        }
+
+        // Successful check, nothing to do: still stamp the check time.
+        log.Debug("sync", "ForceSync: already in sync");
+        LastSyncAt = DateTimeOffset.UtcNow;
+        SetStatus(SyncStatus.Idle);
+        return SyncTransfer.None;
     }
 
     /// <summary>Marks the mirror dirty after a local edit. In Auto mode the push

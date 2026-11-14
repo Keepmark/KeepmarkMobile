@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.244 (245)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.246 (247)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -1157,6 +1157,21 @@ them, so `SafetyOperations.Describe` still names them; nothing writes them now.
 - A wrong password clears only the password; the chosen file stays.
 - File suffix is `.json` (export name `.xbs.json`); limits are in §6.
 
+### Tags (v1.0.243)
+
+`/tags` (`Tags.razor`, side menu) and `BookmarkStore.Tags.cs`.
+
+- The list shows every tag with its count, a search box, sort by name or by
+  use, and an `Untagged` group. Tags that differ only by case are one tag.
+- Tapping a tag (in the list, on a row, in the action sheet) opens its
+  bookmarks: whole-tag match, case-insensitive (`?t=`; `?u=1` for untagged).
+- Rename, merge (renaming to a name that exists) and delete run in one
+  transaction under the engine gate, after a fail-closed `tags-edit` safety
+  backup, with one push. A no-op rename takes no backup. A tag cannot be
+  empty or contain commas or semicolons.
+- The bookmark sheet suggests existing tags while typing.
+- Tags are synced and exported by the browser extension, which has no tag UI.
+
 ### bookmarks.html (Netscape) export and import
 
 `Keepmark.Core/Html/NetscapeBookmarks` is the format code (pure, unit-tested
@@ -1262,6 +1277,22 @@ disposal. Shared components are presentation-only: data in through
 - Swipe thresholds: 12 px with a 1.5× ratio to start, 60 px to confirm; a
   swipe/long press suppresses the following tap (400 ms). Separators and inner
   buttons are ignored.
+- Pull to refresh (Home only, Gmail-style, v1.0.245): with the page at the
+  top, a downward drag slides a round indicator out from under the bars at
+  half the finger travel; release past 64 px calls `Home.OnPullRefresh` (same
+  path as the sync button) and the indicator spins until it returns. A clean
+  run that moved nothing is silent; one that received or sent bookmarks
+  (`SyncEngine.ForceSyncAsync` returns `SyncTransfer`; a v1.2 hash match is
+  `None`) shows the one-word `NavSyncDone` toast for 2 s, without the time
+  (the status bar has it). Uses `touch*` listeners (rows are
+  `touch-action: pan-y`): the non-passive `touchmove` is added by
+  `xbsGestures.init` and removed by `release`, so only Home pays for it. The
+  drag is claimed on the first move past 4 px and re-checked there and at
+  release. Disabled while a modal or the drawer is open, during selection,
+  inside text fields and while a sync started by a pull is still running (a
+  90 s watchdog frees it; each pull has a run id, so a late answer from a run
+  the watchdog already freed cannot free the pull that followed). Leaving Home
+  hides the indicator; the sync still finishes.
 - `Home.Selection.cs` coordinates `SelectionController`, the store
   `SelectionBatch` and gated engine batch APIs. IDs are resolved and validated
   inside the same transaction as the mutation; one engine notification follows

@@ -486,3 +486,34 @@ require device QA.
 
 Settings layout: the complete log block is the final functionality; all other
 preference blocks precede it. No Save button: each setting applies on change.
+
+
+## bookmarks.html, tags, start-up and pull to refresh — v1.0.241–245
+
+- Start-up (v1.0.241): content visible in about 1 s cold on the test phone;
+  no `SecureStorage` read outside `SecureCredentialStore`.
+- `bookmarks.html` export (v1.0.242, v1.0.244): never encrypted and never kept;
+  the warning precedes the write, the file lives in `CacheDirectory/html-export/`
+  and is purged at the next export, at the next start and when sharing fails.
+- `bookmarks.html` import: additive only, into one new folder at the end of
+  Other, behind a preview and an `import-html` safety backup; only absolute
+  `http`/`https` links; damaged markup loses one item, not the file.
+- Tags (v1.0.243): whole-tag, case-insensitive; rename / merge / delete are one
+  transaction, one push, one `tags-edit` safety backup (none for a no-op).
+- Pull to refresh (v1.0.245): Home only, page at the top; never during
+  selection, with a modal open or inside a text field; one sync per pull; the
+  indicator never survives leaving Home; no toast when nothing moved; a run
+  freed by the 90 s watchdog never frees the pull that followed it (v1.0.246).
+- `SyncEngine.ForceSyncAsync` returns what the run moved (`SyncTransfer`); the
+  gate is still released in `finally` and every branch keeps its status.
+
+Tests: `NetscapeBookmarksTests`, `TagViewTests`, `RemovedSyncNoticeTests`
+(`AManualSyncReportsWhatItMoved`, `ATimestampThatMovedOverTheSameContentReceivesNothing`),
+`tests/js/gestures.test.cjs` (pull cases).
+
+Regression check on a device: pull on Home with nothing to sync (spinner, no
+toast); edit a bookmark in the browser, pull (short `Synced`); pull, then open
+the drawer while it spins (indicator gone, list correct on return); long-press
+a row then drag down (no pull); scroll long lists on Home and on Tags (no
+stutter); pull in airplane mode (offline message). TalkBack and rotation
+still require device QA.

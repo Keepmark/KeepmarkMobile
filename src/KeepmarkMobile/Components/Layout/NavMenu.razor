@@ -205,7 +205,7 @@
             // Paint first: the toast must never gate the status update.
             StateHasChanged();
             _ = Toast.ShowAsync(Session.Engine.Status == Core.Sync.SyncStatus.Idle
-                ? L.Get(Str.NavSyncComplete, $"{DateTime.Now:HH:mm:ss}")
+                ? L.Get(Str.NavSyncComplete)
                 : L.Get(Str.NavSyncFinished, Core.Sync.SyncStatusText.Label(Session.Engine.Status)));
         }
         catch (Exception ex)
