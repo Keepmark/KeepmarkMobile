@@ -89,6 +89,43 @@ public sealed class ApiCapabilities
     [JsonIgnore]
     public int? SyncExpiryDays =>
         SyncExpiryDaysRaw is { ValueKind: JsonValueKind.Number } e && e.TryGetInt32(out var d) && d >= 0 ? d : null;
+
+    /// <summary>Raw <c>handoff</c> object (one-time links); untyped for the same reason.</summary>
+    [JsonPropertyName("handoff")]
+    public JsonElement? HandoffRaw { get; set; }
+
+    /// <summary>One-time link limits, or null when the service keeps none (or
+    /// advertises them malformed: then the lasting link is used).</summary>
+    [JsonIgnore]
+    public HandoffCapability? Handoff
+    {
+        get
+        {
+            if (HandoffRaw is not { ValueKind: JsonValueKind.Object } h) return null;
+            int? Int(string name) => h.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) && n >= 0 ? n : null;
+            var max = Int("maxTtlSeconds");
+            if (max is null || max < 60) return null;
+            return new HandoffCapability(Int("defaultTtlSeconds") ?? Math.Min(600, max.Value), max.Value,
+                Int("maxActivePerSync") ?? 0, Int("maxAttempts") ?? 0, Int("maxPayloadBytes") ?? 0);
+        }
+    }
+}
+
+public sealed record HandoffCapability(int DefaultTtlSeconds, int MaxTtlSeconds, int MaxActivePerSync, int MaxAttempts, int MaxPayloadBytes);
+
+public sealed class CreateHandoffResponse
+{
+    [JsonPropertyName("expiresAt")]
+    public string? ExpiresAt { get; set; }
+    [JsonPropertyName("codeRequired")]
+    public bool? CodeRequired { get; set; }
+}
+
+public sealed class RedeemHandoffResponse
+{
+    [JsonPropertyName("payload")]
+    public string? Payload { get; set; }
+    public override string ToString() => "Keepmark handoff payload [redacted]";
 }
 
 public sealed class ServiceInfoResponse
@@ -350,6 +387,118 @@ public sealed class XSyncApiClient : IXSyncApiClient, IDisposable
             }
 
             return dto;
+        }
+        catch (XbsException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            sw.Stop();
+            _log.Warn("net", $"← TIMEOUT {label} after {sw.ElapsedMilliseconds}ms");
+            throw new ServiceOfflineException(_str.Get(Str.ErrServiceOffline), ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            _log.Warn("net", $"← FAIL {label} after {sw.ElapsedMilliseconds}ms: {ex.GetType().Name}");
+            throw new ServiceOfflineException(_str.Get(Str.ErrServiceOffline), ex);
+        }
+    }
+
+    // ---- One-time links (v1.2 handoff vouchers) ----
+
+    /// <summary>Stores a sealed voucher for this sync. Runs once (not idempotent).</summary>
+    public async Task<CreateHandoffResponse> CreateHandoffAsync(
+        string syncId, string handoffId, string payload, int ttlSeconds, string? authHash, CancellationToken ct = default)
+    {
+        object body = authHash is null
+            ? new { handoffId, payload, ttlSeconds }
+            : new { handoffId, payload, ttlSeconds, authHash };
+        var res = await HandoffRequestAsync<CreateHandoffResponse>(HttpMethod.Post, $"bookmarks/{syncId}/handoffs",
+            LogSanitizer.PathFor("POST bookmarks/{id}/handoffs", syncId), body, ct).ConfigureAwait(false);
+        if (res is null || string.IsNullOrEmpty(res.ExpiresAt) || res.CodeRequired is null)
+            throw new UnexpectedResponseException(_str.Get(Str.ErrUnexpectedResponse));
+        return res;
+    }
+
+    /// <summary>Redeems a voucher and returns its sealed payload. A 200
+    /// consumes it: never retried.</summary>
+    public async Task<string> RedeemHandoffAsync(string handoffId, string? auth, CancellationToken ct = default)
+    {
+        object body = auth is null ? new { } : new { auth };
+        var res = await HandoffRequestAsync<RedeemHandoffResponse>(HttpMethod.Post, $"handoffs/{handoffId}/redeem",
+            "POST handoffs/{handoff}/redeem", body, ct).ConfigureAwait(false);
+        if (string.IsNullOrEmpty(res?.Payload)) throw new UnexpectedResponseException(_str.Get(Str.ErrUnexpectedResponse));
+        return res.Payload;
+    }
+
+    /// <summary>Deletes one voucher of this sync; false when it was already gone.</summary>
+    public async Task<bool> RevokeHandoffAsync(string syncId, string handoffId, CancellationToken ct = default)
+    {
+        try
+        {
+            await HandoffRequestAsync<JsonElement?>(HttpMethod.Delete, $"bookmarks/{syncId}/handoffs/{handoffId}",
+                LogSanitizer.PathFor("DELETE bookmarks/{id}/handoffs/{handoff}", syncId), null, ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (HandoffNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Handoff routes: exactly one attempt, their own log label (the
+    /// voucher ID is a secret too) and their own error codes.</summary>
+    private async Task<T?> HandoffRequestAsync<T>(HttpMethod method, string path, string label, object? body, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        _log.Info("net", $"→ START {label}");
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            if (_http.Timeout != Timeout.InfiniteTimeSpan) timeout.CancelAfter(_http.Timeout);
+            var requestToken = timeout.Token;
+            using var req = new HttpRequestMessage(method, path);
+            req.Headers.TryAddWithoutValidation("Accept-Version", XbsConstants.ApiVersion12);
+            if (body is not null) req.Content = JsonContent.Create(body);
+            using var res = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, requestToken).ConfigureAwait(false);
+            sw.Stop();
+            _log.Info("net", $"← END {label} {(int)res.StatusCode} in {sw.ElapsedMilliseconds}ms");
+            if (res.IsSuccessStatusCode)
+            {
+                if (res.StatusCode == HttpStatusCode.NoContent) return default;
+                return await ReadResponseAsync<T>(res, requestToken).ConfigureAwait(false);
+            }
+
+            var code = string.Empty;
+            try
+            {
+                using var doc = await ReadErrorDocumentAsync(res, requestToken).ConfigureAwait(false);
+                if (doc is not null && doc.RootElement.ValueKind == JsonValueKind.Object &&
+                    doc.RootElement.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String)
+                    code = c.GetString() ?? string.Empty;
+            }
+            catch (Exception ex) when (ex is JsonException or SyncTooLargeException) { }
+
+            if (res.StatusCode == HttpStatusCode.Forbidden && code == "HandoffAuthFailedException")
+            {
+                var left = res.Headers.TryGetValues("X-Handoff-Attempts-Left", out var values) &&
+                    int.TryParse(values.FirstOrDefault(), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n) ? n : 0;
+                if (left <= 0) throw new HandoffNotFoundException(Loc.Get(Str.ErrHandoffNotFound));
+                throw new HandoffAuthFailedException(Loc.Get(Str.ErrHandoffWrongCode, left)) { AttemptsLeft = left };
+            }
+            if (res.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw code == "HandoffNotFoundException"
+                    ? new HandoffNotFoundException(Loc.Get(Str.ErrHandoffNotFound))
+                    : new HandoffUnavailableException(Loc.Get(Str.ErrHandoffUnavailable));
+            }
+            if (res.StatusCode == HttpStatusCode.NotAcceptable && code == "HandoffLimitExceededException")
+                throw new HandoffLimitException(Loc.Get(Str.ErrHandoffLimit));
+            if (res.StatusCode == HttpStatusCode.PreconditionFailed)
+                throw new HandoffUnavailableException(Loc.Get(Str.ErrHandoffUnavailable));
+            throw MapError(res.StatusCode, string.Empty, res);
         }
         catch (XbsException)
         {

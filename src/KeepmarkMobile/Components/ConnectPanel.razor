@@ -82,6 +82,35 @@ else
                 @* A link someone shared (keepmark://sync): pasted here, or
                    tapped elsewhere and delivered through SyncLinkInbox. Both
                    end in the same reviewed candidate as a QR scan. *@
+                @if (pendingOnce is { } once)
+                {
+                    @* One-time link: nothing is redeemed until "Open link",
+                       which uses it up. *@
+                    <div class="km-once-offer mb-3" role="group" aria-label="@L.Get(Str.ConnLinkLabel)">
+                        <div class="alert alert-info mb-2" role="status">@L.Get(Str.ConnLinkOnceNote, once.ServiceUrl)</div>
+                        @if (once.CodeRequired)
+                        {
+                            <label class="form-label" for="conn-once-code">@L.Get(Str.ConnLinkCodeLabel)</label>
+                            <input id="conn-once-code" class="form-control km-once-code mb-2" @bind="onceCode" @bind:event="oninput" @bind:after="ClearOnceError"
+                                   inputmode="numeric" autocomplete="one-time-code" maxlength="7" disabled="@busy"
+                                   aria-invalid="@(string.IsNullOrEmpty(onceError) ? "false" : "true")" aria-describedby="conn-once-error"
+                                   autocorrect="off" autocapitalize="off" spellcheck="false" />
+                        }
+                        @if (!string.IsNullOrEmpty(onceError))
+                        {
+                            <div id="conn-once-error" class="alert alert-danger mb-2" role="alert">@onceError</div>
+                        }
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-primary" @onclick="OpenOnceAsync" disabled="@busy">
+                                @if (busy) { <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span> }
+                                @L.Get(Str.ConnLinkOpen)
+                            </button>
+                            <button class="btn btn-secondary" @onclick="DropOnce" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
                 <label class="form-label" for="conn-share-link">@L.Get(Str.ConnLinkLabel)</label>
                 <div class="input-group mb-1">
                     <input id="conn-share-link" class="form-control" @bind="linkText" @bind:event="oninput" @bind:after="ClearLinkPasteError"
@@ -93,6 +122,7 @@ else
                 @if (!string.IsNullOrEmpty(linkPasteError))
                 {
                     <div class="alert alert-danger" role="alert">@linkPasteError</div>
+                }
                 }
             }
             @if (reconcile is null)
@@ -284,7 +314,7 @@ else
     /// and in front, and never replaces a step already in progress.</summary>
     private void TakeInboxLink()
     {
-        if (IsDisposed || !Session.Ready || busy || AppLock.Locked || !AppLock.Foreground || createdId is not null || reconcile is not null || qrState.ShowReview) return;
+        if (IsDisposed || !Session.Ready || busy || AppLock.Locked || !AppLock.Foreground || createdId is not null || reconcile is not null || qrState.ShowReview || pendingOnce is not null) return;
         var text = LinkInbox.Consume();
         if (text is null) return;
         if (!OfferLink(text)) linkPasteError = L.Get(Str.ConnLinkInvalid);
@@ -298,17 +328,91 @@ else
         if (!OfferLink(text)) linkPasteError = L.Get(Str.ConnLinkInvalid);
     }
 
+    /// <summary>A parsed one-time link waiting for "Open link" (nothing redeemed yet).</summary>
+    private HandoffSecret? pendingOnce;
+    private string onceCode = string.Empty;
+    private string onceError = string.Empty;
+    /// <summary>Sender's sync name from the redeemed voucher, proposed for the new row.</summary>
+    private string? proposedLabel;
+
+    private void ClearOnceError() => onceError = string.Empty;
+
+    private void DropOnce()
+    {
+        pendingOnce = null;
+        onceCode = onceError = string.Empty;
+    }
+
+    /// <summary>Uses the one-time link up, then verifies the key it returned
+    /// at once: "Open link" was the confirmation, and the key must not sit
+    /// in a review that can expire after the link is spent. A wrong code
+    /// keeps the link (the service counts attempts); offline keeps it too;
+    /// anything else drops it.</summary>
+    private async Task OpenOnceAsync()
+    {
+        if (busy || pendingOnce is not { } once || AppLock.Locked || !AppLock.Foreground) return;
+        var code = new string(onceCode.Where(c => !char.IsWhiteSpace(c)).ToArray());
+        if (once.CodeRequired && !SyncHandoff.IsCode(code)) { onceError = L.Get(Str.ErrHandoffCodeRequired); return; }
+        busy = true;
+        onceError = string.Empty;
+        HandoffContent? content = null;
+        try
+        {
+            content = await Session.RedeemOneTimeLinkAsync(once, once.CodeRequired ? code : null, Lifetime);
+        }
+        catch (OperationCanceledException) when (Lifetime.IsCancellationRequested) { return; }
+        catch (Keepmark.Core.Errors.HandoffAuthFailedException ex) { onceCode = string.Empty; onceError = ex.Message; }
+        catch (Keepmark.Core.Errors.ServiceOfflineException ex) { onceError = ex.Message; }
+        catch (Exception ex)
+        {
+            Session.Log.Warn("connect", $"One-time link failed: {ex.GetType().Name}");
+            DropOnce();
+            linkPasteError = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+            code = string.Empty;
+        }
+        if (content is null || IsDisposed) return;
+        DropOnce();
+        var label = content.Label;
+        if (!OfferCandidate(SyncHandoff.ToCandidate(content))) return;
+        proposedLabel = label;
+        content = null;
+        await LinkQr();
+    }
+
     /// <summary>Parses a shared link into the QR candidate (same review, same
-    /// 60-second lifetime, same probe). False = not a valid link.</summary>
+    /// 60-second lifetime, same probe), or a one-time link into its offer.
+    /// False = not a valid link.</summary>
     private bool OfferLink(string? text)
     {
+        if (SyncHandoff.TryParse(text, out var once))
+        {
+            ClearQr();
+            ResetForCandidate();
+            linkPasteError = qrError = string.Empty;
+            DropOnce();
+            pendingOnce = once;
+            return true;
+        }
         if (!SyncShareLink.TryParse(text, out var candidate)) { mode = "existing"; return false; }
+        DropOnce();
+        OfferCandidate(candidate!);
+        return true;
+    }
+
+    /// <summary>Puts a link's key up as the reviewed candidate. False when a
+    /// newer candidate already replaced it.</summary>
+    private bool OfferCandidate(ConnectQrPayload candidate)
+    {
         ClearQr();
         var generation = qrGeneration;
         ResetForCandidate();
         linkPasteError = qrError = string.Empty;
-        qrServiceUrl = candidate!.ServiceUrl; qrSyncId = candidate.Id;
-        if (!qrState.Offer(candidate, generation)) return true;
+        qrServiceUrl = candidate.ServiceUrl; qrSyncId = candidate.Id;
+        if (!qrState.Offer(candidate, generation)) return false;
         candidateFromLink = true;
         qrExpiry = CancellationTokenSource.CreateLinkedTokenSource(Lifetime);
         _ = ExpireQr(generation, qrExpiry.Token);
@@ -322,6 +426,7 @@ else
         reconcile = null; mergeStats = null; mergeStatsFor = null;
         armed = null;
         password = newPassword = confirmPassword = string.Empty;
+        proposedLabel = null;
         mode = "existing";
     }
 
@@ -346,6 +451,7 @@ else
     private void UseDifferentSync()
     {
         reconcile = null;
+        proposedLabel = null;
         mergeStats = null;
         mergeStatsFor = null;
         applyError = string.Empty;
@@ -355,6 +461,7 @@ else
     private void Back()
     {
         if (qrState.ShowReview) { CancelQr(); return; }
+        if (pendingOnce is not null) { DropOnce(); return; }
         if (AddingWhileLinked)
         {
             _ = CancelAsync();
@@ -415,6 +522,7 @@ else
                 // session exists. The scanner rechecks lock/foreground after it.
                 // Native active sessions cancel themselves on this event.
                 if (qrState.ShowReview) ClearQr();
+                if (!busy) DropOnce();
                 linkText = string.Empty;
                 if (!IsDisposed) StateHasChanged();
             });
@@ -520,6 +628,8 @@ else
         AppLock.Changed -= LockChanged;
         LinkInbox.Arrived -= InboxArrived;
         linkText = string.Empty;
+        DropOnce();
+        proposedLabel = null;
         ClearQr();
         base.Dispose();
     }
@@ -562,7 +672,7 @@ else
             var result = await probe;
             if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;
             serviceUrl = targetUrl; syncId = targetId;
-            reconcile = result;
+            reconcile = qrAttempt.HasValue && proposedLabel is not null ? result with { ProposedLabel = proposedLabel } : result;
             // Consumed: the candidate carries the key; a failed check keeps it for a retry.
             password = string.Empty;
 

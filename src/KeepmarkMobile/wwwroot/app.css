@@ -3297,3 +3297,9 @@ a.xbs-back { text-decoration: none; }
 /* Plain confirm (sync switch): no alert box inside the already-outlined row. */
 .km-confirm-plain .km-confirm-head > strong { color: var(--km-ink); }
 .km-confirm-plain .km-confirm-implication { color: var(--km-ink-2); font-size: .9rem; }
+
+/* One-time shared link (Syncs share panel, ConnectPanel offer). */
+.km-share-code { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; border: 1px solid var(--km-line, #d0d7de); border-radius: 8px; }
+.km-share-code-caption { font-size: 0.8rem; color: var(--km-ink-2); }
+.km-share-code-value { font-size: 1.6rem; letter-spacing: 0.15em; font-weight: 600; }
+.km-once-code { max-width: 10ch; letter-spacing: 0.15em; text-align: center; font-variant-numeric: tabular-nums; }

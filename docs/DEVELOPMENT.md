@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.248 (249)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.249 (250)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -31,7 +31,7 @@ not a git repo). Solution `KeepmarkMobile.slnx`:
 |---|---|---|
 | `src/KeepmarkMobile` | `net10.0-android` | MAUI Blazor Hybrid host, Razor pages, platform services |
 | `src/Keepmark.Core` | `net10.0` | UI-free logic: API, crypto, store, sync, safety, i18n, workflow |
-| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (477 tests) |
+| `tests/Keepmark.Core.Tests` | `net10.0` | xUnit suite (505 tests) |
 | `tools/Keepmark.Benchmarks` | `net10.0` | store/sync performance + crypto interop probes |
 
 ## Contents
@@ -529,6 +529,13 @@ and calls:
 | `GetLastUpdatedAsync` | `GET /bookmarks/{id}/lastUpdated` | cheap poll |
 | `UpdateBookmarksAsync` | `PUT /bookmarks/{id}` | timestamp base |
 | `UpdateBookmarksV12Async` | same, v1.2 | `baseRevision` CAS |
+| `CreateHandoffAsync` | `POST /bookmarks/{id}/handoffs`, v1.2 | one-time link voucher (§10.5b) |
+| `RedeemHandoffAsync` | `POST /handoffs/{handoffId}/redeem`, v1.2 | single use, never retried |
+| `RevokeHandoffAsync` | `DELETE /bookmarks/{id}/handoffs/{handoffId}`, v1.2 | `204`; already gone → not found |
+
+Handoff errors map separately: 404 `HandoffNotFound` (code `HandoffNotFoundException`, also a 403
+with `X-Handoff-Attempts-Left: 0`), 403 `HandoffAuthFailed` (attempts left),
+406 `HandoffLimit`, 412 or any other 404 `HandoffUnavailable`.
 
 There is **no server-side sync DELETE** in this client (no `HttpMethod.Delete`).
 The app cannot erase a server copy; `Unlink` only removes local credentials.
@@ -995,6 +1002,35 @@ change) are in WORKFLOWS.md "Shared sync link".
   panel consumes the link only while unlocked and in the foreground.
 - Many chat apps do not linkify custom schemes: paste is the reliable path.
 
+**One-time link (format 2, v1.0.249).** `Workflow/SyncHandoff` builds and
+parses `keepmark://sync?v=2&s=<service>&t=<32-byte secret base64url>[&c=1]`.
+The secret never reaches the service: HKDF-SHA256 derives `handoffId`, the
+AES-256-GCM key and, with the optional 6-digit code (`ikm = secret‖code`), the
+redeem `auth` (the service stores only `SHA-256(auth)`). The payload
+`{v:1,s,id,k,l?}` is sealed with AAD `keepmark-handoff-v1|<handoffId>|<service>`.
+The byte vector is pinned in `SyncHandoffTests`, the extension's
+`tests/handoff.test.ts` and the API's `HandoffTests`.
+
+- **Share**: `Share sync…` first probes `capabilities.handoff`
+  (`XbsSession.GetHandoffCapabilityAsync`, v1.2 `/info`). With it, the row
+  offers duration (10 min default, 1 hour when `maxTtlSeconds` allows) and an
+  unchecked "Ask for a code" option, then `CreateOneTimeShareAsync` verifies
+  the key (same read-only compare) and posts the voucher. The box shows the
+  link, the code (`123 456`, to be told on another channel), the expiry and
+  `Revoke` (`RevokeOneTimeShareAsync`). Closing the box does not revoke. A
+  service without the capability falls back to the format-1 link with the
+  `SyncsShareNoOneTime` notice.
+- **Import**: `ConnectPanel.OfferLink` tries `SyncHandoff.TryParse` first. A
+  one-time link shows `ConnLinkOnceNote` and, when `c=1`, a numeric code field;
+  nothing is redeemed until `Open link`. `RedeemOneTimeLinkAsync` uses the link
+  up, opens the payload and the key goes straight into the probe
+  (`SyncHandoff.ToCandidate` → `LinkQr`, no 60-second review: the link is
+  spent). A wrong code keeps the link and clears the field (the service counts
+  attempts); offline keeps it; anything else drops it. The sender's label `l`
+  becomes `ReconcileInfo.ProposedLabel`, used for a new row whose name is free.
+  The pending link is dropped on Back, Cancel, lock/background and disposal;
+  an inbox link waits while one is pending.
+
 ### 10.6 Unlink
 
 `Unlink this device…` lives on the **active row** of `Syncs` (§9.5), not in the
@@ -1452,7 +1488,7 @@ lock 2000.
 
 ## 15. Tests and verification
 
-### Automated suites (439 tests, no device)
+### Automated suites (505 tests, no device)
 
 | Suite | Proves |
 |---|---|

@@ -2,6 +2,8 @@
 @page "/syncs"
 @using Keepmark.Core.Sync
 @using Keepmark.Core.Workflow
+@using Keepmark.Core.Api
+@using KeepmarkMobile.Services
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.SecureCredentialStore Creds
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
@@ -180,18 +182,67 @@ else
                 {
                     <p class="km-switch-busy mt-2" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> @L.Get(Str.SyncsShareChecking)</p>
                 }
+                else if (shareKey == key && shareCaps is not null && shareLink is null)
+                {
+                    @* One-time link: the sender chooses first, nothing is created
+                       until "Create link". *@
+                    <div class="mt-2 km-share-options">
+                        <p class="xbs-hint mb-2">@L.Get(Str.SyncsShareIntroOnce)</p>
+                        <label class="form-label" for="sync-share-ttl-@i">@L.Get(Str.SyncsShareTtlLabel)</label>
+                        <select id="sync-share-ttl-@i" class="form-select mb-2" @bind="shareTtl">
+                            @foreach (var (seconds, text) in ShareTtlChoices)
+                            {
+                                <option value="@seconds">@text</option>
+                            }
+                        </select>
+                        <div class="form-check mb-1">
+                            <input id="sync-share-code-@i" class="form-check-input" type="checkbox" @bind="shareWithCode" />
+                            <label class="form-check-label" for="sync-share-code-@i">@L.Get(Str.SyncsShareCodeLabel)</label>
+                        </div>
+                        <div class="form-text mb-2">@L.Get(Str.SyncsShareCodeHint)</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-primary btn-sm" @onclick="() => CreateOneTimeAsync(key, row)">@L.Get(Str.SyncsShareCreateOnce)</button>
+                            <button class="btn btn-secondary btn-sm" @onclick="CloseShare">@L.Get(Str.CommonCancel)</button>
+                        </div>
+                    </div>
+                }
                 else if (shareKey == key && shareLink is not null)
                 {
-                    @* The link is a lasting credential: shown only after the app
-                       lock, cleared on close, lock or background, never stored. *@
+                    @* The link is shown only after the app lock, cleared on close,
+                       lock or background, never stored. A lasting link is a
+                       credential; a one-time link works once and expires. *@
                     <div class="mt-2">
                         <label class="form-label" for="sync-share-@i">@L.Get(Str.SyncsShareLabel, name)</label>
                         <textarea id="sync-share-@i" class="form-control font-monospace small" rows="4" readonly
                                   autocomplete="off" spellcheck="false">@shareLink</textarea>
-                        <div class="alert alert-warning mt-2 mb-2" role="note">@L.Get(Str.SyncsShareWarn)</div>
+                        @if (shareOnce is { } once)
+                        {
+                            @if (once.Code is { } code)
+                            {
+                                <div class="km-share-code mt-2" role="group" aria-label="@L.Get(Str.SyncsShareCodeCaption)">
+                                    <span class="km-share-code-caption">@L.Get(Str.SyncsShareCodeCaption)</span>
+                                    <span class="km-share-code-value font-monospace">@($"{code[..3]} {code[3..]}")</span>
+                                    <span class="form-text">@L.Get(Str.SyncsShareCodeTell)</span>
+                                </div>
+                            }
+                            <p class="xbs-hint mt-2 mb-1" role="status">@L.Get(Str.SyncsShareValidUntil, ValidUntil(once))</p>
+                            <div class="alert alert-warning mt-2 mb-2" role="note">@L.Get(Str.SyncsShareWarnOnce)</div>
+                        }
+                        else
+                        {
+                            @if (shareNoOneTime)
+                            {
+                                <p class="xbs-hint mt-2 mb-1" role="note">@L.Get(Str.SyncsShareNoOneTime)</p>
+                            }
+                            <div class="alert alert-warning mt-2 mb-2" role="note">@L.Get(Str.SyncsShareWarn)</div>
+                        }
                         <div class="d-flex flex-wrap gap-2">
                             <button class="btn btn-primary btn-sm" @onclick="CopyShareLinkAsync">@L.Get(Str.SyncsShareCopy)</button>
                             <button class="btn btn-outline-primary btn-sm" @onclick="SendShareLinkAsync">@L.Get(Str.SyncsShareSend)</button>
+                            @if (shareOnce is not null)
+                            {
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => RevokeOneTimeAsync(key)">@L.Get(Str.SyncsShareRevoke)</button>
+                            }
                             <button class="btn btn-secondary btn-sm" @onclick="CloseShare">@L.Get(Str.CommonDone)</button>
                         </div>
                     </div>
@@ -319,6 +370,33 @@ else
     /// <summary>Row whose share panel is open, and its link (memory only).</summary>
     private string? shareKey;
     private string? shareLink;
+    /// <summary>The service keeps one-time links: the options step is shown.</summary>
+    private HandoffCapability? shareCaps;
+    private int shareTtl = 600;
+    private bool shareWithCode;
+    /// <summary>The link on screen is a one-time link (code, validity, revoke).</summary>
+    private OneTimeShare? shareOnce;
+    /// <summary>The lasting link was used because the service has no one-time links.</summary>
+    private bool shareNoOneTime;
+
+    private IEnumerable<(int Seconds, string Text)> ShareTtlChoices
+    {
+        get
+        {
+            var max = shareCaps?.MaxTtlSeconds ?? 600;
+            var any = false;
+            foreach (var (seconds, text) in new[] { (600, L.Get(Str.SyncsShareTtl10)), (3600, L.Get(Str.SyncsShareTtl60)) })
+            {
+                if (seconds > max) continue;
+                any = true;
+                yield return (seconds, text);
+            }
+            if (!any) yield return (max, L.Get(Str.SyncsShareTtl10));
+        }
+    }
+
+    private static string ValidUntil(OneTimeShare share)
+        => share.ExpiresAt is { } at ? at.ToLocalTime().ToString("t", System.Globalization.CultureInfo.CurrentCulture) : "—";
 
     private void OnSyncLinkArrived() => _ = InvokeAsync(() => { OpenForLink(); StateHasChanged(); });
 
@@ -339,14 +417,26 @@ else
         renamingKey = null;
         ClearNotice();
         if (!await ConfirmWithAppLockAsync(Str.SyncsShareUnlockTitle)) return;
+        CloseShare();
         shareKey = key;
         busy = true;
         StateHasChanged();
         try
         {
+            var caps = await Session.GetHandoffCapabilityAsync(SavedSyncs.CanonicalServiceUrl(row.ServiceUrl), Lifetime);
+            if (IsDisposed || shareKey != key || AppLock.Locked || !AppLock.Foreground) return;
+            if (caps is not null)
+            {
+                // Options first; the voucher is made on "Create link".
+                shareCaps = caps;
+                shareTtl = ShareTtlChoices.First().Seconds;
+                shareWithCode = false;
+                return;
+            }
             var link = await Session.PrepareShareLinkAsync(row.Identity, Lifetime);
             if (IsDisposed || shareKey != key || AppLock.Locked || !AppLock.Foreground) return;
             shareLink = link;
+            shareNoOneTime = true;
         }
         catch (OperationCanceledException) when (Lifetime.IsCancellationRequested) { }
         catch (Exception ex)
@@ -358,7 +448,59 @@ else
         finally
         {
             busy = false;
-            if (shareLink is null && shareKey == key) shareKey = null;
+            if (shareLink is null && shareCaps is null && shareKey == key) shareKey = null;
+        }
+    }
+
+    private async Task CreateOneTimeAsync(string key, SavedSync row)
+    {
+        if (busy || shareKey != key || shareCaps is null) return;
+        if (!ShareTtlChoices.Any(c => c.Seconds == shareTtl)) shareTtl = ShareTtlChoices.First().Seconds;
+        busy = true;
+        StateHasChanged();
+        try
+        {
+            var once = await Session.CreateOneTimeShareAsync(row.Identity, shareTtl, shareWithCode, Lifetime);
+            if (IsDisposed || shareKey != key || AppLock.Locked || !AppLock.Foreground) return;
+            shareOnce = once;
+            shareLink = once.Link;
+        }
+        catch (OperationCanceledException) when (Lifetime.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            CloseShare();
+            ShowNotice(key, ex.Message, error: true);
+            Session.Log.Warn("syncs", $"One-time link failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    /// <summary>Deletes the voucher on the service at once. Closing the panel
+    /// does not: the link stays valid until used or expired.</summary>
+    private async Task RevokeOneTimeAsync(string key)
+    {
+        if (busy || shareOnce is not { } once) return;
+        busy = true;
+        StateHasChanged();
+        try
+        {
+            var revoked = await Session.RevokeOneTimeShareAsync(once, Lifetime);
+            if (IsDisposed) return;
+            CloseShare();
+            ShowNotice(key, L.Get(revoked ? Str.SyncsShareRevoked : Str.SyncsShareAlreadyGone));
+        }
+        catch (OperationCanceledException) when (Lifetime.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            ShowNotice(key, L.Get(Str.ErrHandoffRevokeFailed), error: true);
+            Session.Log.Warn("syncs", $"Revoke failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            busy = false;
         }
     }
 
@@ -366,6 +508,10 @@ else
     {
         shareKey = null;
         shareLink = null;
+        shareCaps = null;
+        shareOnce = null;
+        shareNoOneTime = false;
+        shareWithCode = false;
     }
 
     private async Task CopyShareLinkAsync()

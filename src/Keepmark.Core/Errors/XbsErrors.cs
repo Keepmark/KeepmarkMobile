@@ -52,3 +52,19 @@ public sealed class IncompleteSyncInfoException(string message, Exception? inner
 
 /// <summary>Response shape is not what the API contract promises.</summary>
 public sealed class UnexpectedResponseException(string message, Exception? inner = null) : XbsException(message, inner);
+
+/// <summary>One-time link: the voucher is gone (used, expired, revoked, or
+/// too many wrong codes). Ask the sender for a new link.</summary>
+public sealed class HandoffNotFoundException(string message, Exception? inner = null) : XbsException(message, inner);
+
+/// <summary>One-time link: wrong code; the voucher stays, the service counts attempts.</summary>
+public sealed class HandoffAuthFailedException(string message, Exception? inner = null) : XbsException(message, inner)
+{
+    public int AttemptsLeft { get; init; }
+}
+
+/// <summary>The service keeps no one-time links (no v1.2 handoff routes).</summary>
+public sealed class HandoffUnavailableException(string message, Exception? inner = null) : XbsException(message, inner);
+
+/// <summary>Too many active one-time links for this sync.</summary>
+public sealed class HandoffLimitException(string message, Exception? inner = null) : XbsException(message, inner);

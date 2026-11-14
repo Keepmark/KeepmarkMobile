@@ -8,6 +8,7 @@ using Keepmark.Core.Logging;
 using Keepmark.Core.Models;
 using Keepmark.Core.Safety;
 using Keepmark.Core.Sync;
+using Keepmark.Core.Workflow;
 
 namespace KeepmarkMobile.Services;
 
@@ -230,15 +231,26 @@ public sealed class XbsSession : IAsyncDisposable
     }
 
     /// <summary>The sync just activated becomes the active registry row.</summary>
-    private async Task RememberActiveAsync(SyncCredentials candidate)
+    /// <param name="proposedLabel">Sender's name from a one-time link: used
+    /// only for a row this device does not know yet, and only when no other
+    /// row already shows that name.</param>
+    private async Task RememberActiveAsync(SyncCredentials candidate, string? proposedLabel = null)
     {
         if (Registry is null) return;
+        string? label = null;
+        if (SavedSyncs.NormalizeLabel(proposedLabel) is { } wanted)
+        {
+            var rows = await Registry.ListAsync().ConfigureAwait(false);
+            var identity = new SavedSyncIdentity(candidate.ServiceUrl, candidate.Id);
+            if (SavedSyncs.Find(rows, identity) is null && !SavedSyncs.LabelTaken(rows, identity, wanted)) label = wanted;
+        }
         await Registry.RememberAsync(new SavedSync
         {
             ServiceUrl = candidate.ServiceUrl,
             SyncId = candidate.Id,
             DerivedKey = candidate.DerivedKey,
-            SyncVersion = candidate.Version
+            SyncVersion = candidate.Version,
+            Label = label
         }).ConfigureAwait(false);
     }
 
@@ -359,7 +371,7 @@ public sealed class XbsSession : IAsyncDisposable
             }).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
-        await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
+        await RememberActiveAsync(info.Candidate, info.ProposedLabel).ConfigureAwait(false);
         return !switching;
     }
 
@@ -394,7 +406,7 @@ public sealed class XbsSession : IAsyncDisposable
             }).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
-        await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
+        await RememberActiveAsync(info.Candidate, info.ProposedLabel).ConfigureAwait(false);
     }
 
     /// <summary>Merge preview (dry-run): union counts without mutating
@@ -441,7 +453,7 @@ public sealed class XbsSession : IAsyncDisposable
             }).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, info.Candidate.DerivedKey).ConfigureAwait(false);
         RememberService(info.Candidate.ServiceUrl);
-        await RememberActiveAsync(info.Candidate).ConfigureAwait(false);
+        await RememberActiveAsync(info.Candidate, info.ProposedLabel).ConfigureAwait(false);
         return !switching;
     }
 
@@ -498,8 +510,18 @@ public sealed class XbsSession : IAsyncDisposable
     /// this behind the app lock and never persists or logs the result.</summary>
     public async Task<string> PrepareShareLinkAsync(SavedSyncIdentity identity, CancellationToken ct = default)
     {
+        var (candidate, _) = await VerifiedShareCandidateAsync(identity, ct).ConfigureAwait(false);
+        _log.Info("session", $"Share link prepared for {Keepmark.Core.Workflow.WorkflowRules.ShortId(candidate.Id)}");
+        return Keepmark.Core.Workflow.SyncShareLink.Build(candidate.ServiceUrl, candidate.Id, candidate.DerivedKey);
+    }
+
+    /// <summary>Credentials of a saved sync (active or dormant) and its label,
+    /// after the read-only proof that the key still opens the server copy.</summary>
+    private async Task<(SyncCredentials Candidate, string? Label)> VerifiedShareCandidateAsync(SavedSyncIdentity identity, CancellationToken ct)
+    {
         var registry = Registry ?? throw new InvalidOperationException("Session not ready");
         SyncCredentials candidate;
+        var row = await registry.FindAsync(identity).ConfigureAwait(false);
         if (await _creds.GetAsync().ConfigureAwait(false) is { } active &&
             SavedSyncs.Same(new SavedSyncIdentity(active.ServiceUrl, active.Id), identity))
         {
@@ -507,7 +529,6 @@ public sealed class XbsSession : IAsyncDisposable
         }
         else
         {
-            var row = await registry.FindAsync(identity).ConfigureAwait(false);
             if (row is null) throw new XbsException(_str.Get(Str.ErrSavedNotFound));
             if (!row.CanActivate) throw new XbsException(_str.Get(Str.ErrSavedNoKey));
             candidate = new SyncCredentials(row.SyncId, SavedSyncs.CanonicalServiceUrl(row.ServiceUrl), row.DerivedKey, row.SyncVersion);
@@ -521,9 +542,64 @@ public sealed class XbsSession : IAsyncDisposable
         {
             throw new Core.Errors.InvalidCredentialsException(_str.Get(Str.ErrShareStale), ex);
         }
+        return (candidate, row?.Label);
+    }
 
-        _log.Info("session", $"Share link prepared for {Keepmark.Core.Workflow.WorkflowRules.ShortId(candidate.Id)}");
-        return Keepmark.Core.Workflow.SyncShareLink.Build(candidate.ServiceUrl, candidate.Id, candidate.DerivedKey);
+    /// <summary>One-time links this sync's service keeps (KeepmarkApi v1.2
+    /// <c>capabilities.handoff</c>); null on any other service or on a failed
+    /// probe, which means the lasting link.</summary>
+    public async Task<HandoffCapability?> GetHandoffCapabilityAsync(string serviceUrl, CancellationToken ct = default)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(Core.XbsConstants.ServiceProbeTimeout);
+            var info = await ApiFor(serviceUrl).GetInfoV12Async(cts.Token).ConfigureAwait(false);
+            return info.Capabilities?.Revision == true ? info.Capabilities.Handoff : null;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            _log.Warn("session", $"Handoff probe failed: {ex.GetType().Name}");
+            return null;
+        }
+    }
+
+    /// <summary>Makes a one-time link for a saved sync: same proof as the
+    /// lasting link, then the key is sealed into a voucher the service keeps
+    /// and cannot read. The link carries only the voucher secret.</summary>
+    public async Task<OneTimeShare> CreateOneTimeShareAsync(SavedSyncIdentity identity, int ttlSeconds, bool withCode, CancellationToken ct = default)
+    {
+        var (candidate, label) = await VerifiedShareCandidateAsync(identity, ct).ConfigureAwait(false);
+        var code = withCode ? SyncHandoff.GenerateCode() : null;
+        var made = SyncHandoff.Create(new HandoffContent(candidate.ServiceUrl, candidate.Id, candidate.DerivedKey, label), code);
+        var created = await ApiFor(candidate.ServiceUrl).CreateHandoffAsync(candidate.Id, made.HandoffId, made.Payload, ttlSeconds, made.AuthHash, ct).ConfigureAwait(false);
+        _log.Info("session", $"One-time link created for {Keepmark.Core.Workflow.WorkflowRules.ShortId(candidate.Id)} ({ttlSeconds}s{(code is null ? "" : ", code")})");
+        DateTimeOffset? expires = DateTimeOffset.TryParse(created.ExpiresAt, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal, out var at) ? at : null;
+        return new OneTimeShare(made.Link, code, expires, made.HandoffId, candidate.ServiceUrl, candidate.Id);
+    }
+
+    /// <summary>Deletes a one-time link at once; false when it was already used or expired.</summary>
+    public async Task<bool> RevokeOneTimeShareAsync(OneTimeShare share, CancellationToken ct = default)
+    {
+        var revoked = await ApiFor(share.ServiceUrl).RevokeHandoffAsync(share.SyncId, share.HandoffId, ct).ConfigureAwait(false);
+        _log.Info("session", $"One-time link {(revoked ? "revoked" : "already gone")} for {Keepmark.Core.Workflow.WorkflowRules.ShortId(share.SyncId)}");
+        return revoked;
+    }
+
+    /// <summary>Uses a one-time link up (one redeem, never retried: a 200
+    /// consumes it) and opens its payload. Links nothing: the caller probes
+    /// and applies the key like a format-1 link.</summary>
+    public async Task<HandoffContent> RedeemOneTimeLinkAsync(HandoffSecret link, string? code, CancellationToken ct = default)
+    {
+        if (link.CodeRequired && !SyncHandoff.IsCode(code)) throw new HandoffAuthFailedException(_str.Get(Str.ErrHandoffCodeRequired));
+        var (handoffId, auth) = SyncHandoff.RedeemRequest(link, link.CodeRequired ? code : null);
+        var payload = await ApiFor(link.ServiceUrl).RedeemHandoffAsync(handoffId, auth, ct).ConfigureAwait(false);
+        var content = SyncHandoff.Open(link, payload, link.CodeRequired ? code : null)
+            ?? throw new Core.Errors.InvalidCredentialsException(_str.Get(Str.ErrHandoffDamaged));
+        _log.Info("session", $"One-time link used for {Keepmark.Core.Workflow.WorkflowRules.ShortId(content.Id)}");
+        return content;
     }
 
     /// <summary>Makes a verified dormant sync the active one. Fail-closed: the
@@ -1619,10 +1695,20 @@ public sealed class XbsSession : IAsyncDisposable
     }
 }
 
+/// <summary>A one-time link just created: shown once, held in memory only.</summary>
+public sealed record OneTimeShare(string Link, string? Code, DateTimeOffset? ExpiresAt, string HandoffId, string ServiceUrl, string SyncId)
+{
+    public override string ToString() => "Keepmark one-time share [redacted]";
+}
+
 public sealed record ReconcileInfo(
     SyncCredentials Candidate, int LocalCount, int RemoteCount,
     string? RemoteLastUpdated, string? RemoteVersion,
     string RemoteBlob, string LocalBlob,
-    long? RemoteRevision = null, string? RemoteHash = null);
+    long? RemoteRevision = null, string? RemoteHash = null)
+{
+    /// <summary>Sync name proposed by a one-time link's sender (see RememberActiveAsync).</summary>
+    public string? ProposedLabel { get; init; }
+}
 
 public sealed record BackupEnvelope(string App, int Format, string Salt, string Blob);
