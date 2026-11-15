@@ -20,7 +20,20 @@ public sealed class QrScanner(AppLockState appLock) : IQrScanner
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (appLock.Locked || !appLock.Foreground || (!BarcodeScanning.IsSupported || Android.App.Application.Context.PackageManager?.HasSystemFeature(Android.Content.PM.PackageManager.FeatureCameraAny) != true)) throw Unavailable();
-            var permission = await MainThread.InvokeOnMainThreadAsync(() => Permissions.RequestAsync<Permissions.Camera>());
+            var permission = await MainThread.InvokeOnMainThreadAsync(() => Permissions.CheckStatusAsync<Permissions.Camera>());
+            if (permission != PermissionStatus.Granted)
+            {
+                // First use: the system permission dialog pauses the activity
+                // and its result arrives before onResume. Without the bracket
+                // and the wait, Foreground is still false here and the scan
+                // silently ended, so the user had to tap Scan a second time.
+                appLock.BeginSystemDialog();
+                try { permission = await MainThread.InvokeOnMainThreadAsync(() => Permissions.RequestAsync<Permissions.Camera>()); }
+                finally { appLock.EndSystemDialog(); }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (permission == PermissionStatus.Granted)
+                    await appLock.WaitForegroundAsync(TimeSpan.FromSeconds(3), cancellationToken);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             if (permission != PermissionStatus.Granted) throw new QrScanException(Str.ConnQrPermission);
             if (appLock.Locked || !appLock.Foreground) return null;

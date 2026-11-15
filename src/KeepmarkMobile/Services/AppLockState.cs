@@ -137,6 +137,35 @@ public sealed class AppLockState
         }
     }
 
+    /// <summary>A system dialog the app itself opened (runtime permission)
+    /// pauses the activity like the lock prompt does: same bracket, so it
+    /// neither locks the app nor re-prompts when the dialog closes.</summary>
+    public void BeginSystemDialog() => AuthInProgress = true;
+
+    public void EndSystemDialog()
+    {
+        AuthInProgress = false;
+        _authEndedMs = Android.OS.SystemClock.ElapsedRealtime();
+    }
+
+    /// <summary>Completes once the activity is resumed again (or at once if it
+    /// is); false on timeout. The permission result arrives before onResume.</summary>
+    public async Task<bool> WaitForegroundAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        if (Foreground) return true;
+        var resumed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnChanged() { if (Foreground) resumed.TrySetResult(); }
+        Changed += OnChanged;
+        try
+        {
+            if (Foreground) return true;
+            var done = await Task.WhenAny(resumed.Task, Task.Delay(timeout, cancellationToken)).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            return done == resumed.Task;
+        }
+        finally { Changed -= OnChanged; }
+    }
+
     private void RequestPromptIfNeeded()
     {
         if (ShouldPrompt)
