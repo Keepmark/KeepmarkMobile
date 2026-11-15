@@ -47,7 +47,9 @@ else
            a sync that already exists (nothing to type). *@
         <div class="xbs-choices">
             <button class="xbs-choice" @onclick='() => Choose("link")'>
-                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
+                @* QR first (scanning is the quick path), the link as its own badge:
+                       the tile-colored disc cuts it free of the QR finders. *@
+                    <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="6" height="6" rx="1.3" /><rect x="11.5" y="2.5" width="6" height="6" rx="1.3" /><rect x="2.5" y="11.5" width="6" height="6" rx="1.3" /><path d="M5.5 5.5h0M14.5 5.5h0M5.5 14.5h0" /><circle class="xbs-ico-knock" cx="17.5" cy="17.5" r="6.2" /><path transform="translate(17.5 17.5) scale(.5) translate(-12 -12)" style="stroke-width:3.5" d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
                 <span class="xbs-choice-text"><strong>@L.Get(Str.ConnMethodLinkTitle)</strong><span>@L.Get(Str.ConnMethodLinkText)</span></span>
                 <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </button>
@@ -128,9 +130,12 @@ else
                     }
                 <label class="form-label" for="conn-share-link">@L.Get(Str.ConnLinkLabel)</label>
                 <div class="input-group mb-1">
-                    <input id="conn-share-link" class="form-control" @bind="linkText" @bind:event="oninput" @bind:after="ClearLinkPasteError"
+                    <input id="conn-share-link" class="form-control xbs-field-has-ico" @bind="linkText" @bind:event="oninput" @bind:after="ClearLinkPasteError"
                            placeholder="@L.Get(Str.ConnLinkPlaceholder)" disabled="@busy"
                            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+                    @* Between input and button, not first: Bootstrap's input-group
+                       corner rules key off :first-child / :last-child. *@
+                    <svg class="km-ico sm xbs-field-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>
                     <button class="btn btn-secondary" @onclick="UsePastedLink" disabled="@(busy || string.IsNullOrWhiteSpace(linkText))">@L.Get(Str.ConnLinkUse)</button>
                 </div>
                 <div class="mb-3"></div>

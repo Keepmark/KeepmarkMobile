@@ -2598,6 +2598,21 @@ button.xbs-tag:active { opacity: 0.6; }
 .xbs-back:active { filter: brightness(0.94); }
 .xbs-back:disabled { opacity: 0.5; }
 
+/* Leading icon inside a form field (link paste), like the QR button's. */
+.input-group > .xbs-field-ico {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 6;
+    color: var(--km-ink-2);
+    pointer-events: none;
+}
+.form-control.xbs-field-has-ico { padding-left: 2.5rem; }
+
+/* Disc in the tile color that separates a badge from the glyph under it. */
+.xbs-ico-knock { fill: var(--km-tint); stroke: none; }
+
 .xbs-step-title { font-size: 1.35rem; font-weight: 700; margin: 0 0 0.75rem; }
 
 .xbs-service-row {
