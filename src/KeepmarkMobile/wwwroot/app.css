@@ -2704,8 +2704,11 @@ button.xbs-tag:active { opacity: 0.6; }
 /* ---- Wizards: Back + step count on top, one question per screen. ---- */
 .xbs-wizard-head { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-bottom: 0.25rem; }
 .xbs-stepcount { font-size: 0.8125rem; font-weight: 600; color: var(--km-ink-2); }
-.xbs-verified-text { flex: 1; }
-.xbs-verified .xbs-link-btn { flex: none; }
+.xbs-verified { flex-wrap: wrap; }
+/* The text keeps a readable width: a long action label ("Use another link")
+   drops to its own row, right-aligned, instead of squeezing the text. */
+.xbs-verified-text { flex: 1 1 12rem; }
+.xbs-verified .xbs-link-btn { flex: none; margin-left: auto; }
 
 /* DirectionPicker: three radio cards, the chosen one tinted. */
 .xbs-options { border: 0; padding: 0; margin: 0 0 1rem; min-width: 0; display: flex; flex-direction: column; gap: 0.625rem; }

@@ -118,10 +118,10 @@ Bringing a browser onto this phone's sync normally means typing the service, the
 sync ID and the password. If you have the Keepmark browser extension, one scan is
 enough:
 
-1. In the Keepmark browser manager, the Android card says **Connect Keepmark on
-   your phone**; choose **Show connection QR** (if a sync lock is set there,
-   enter its password first).
-2. On Android, open **Connect → Link an existing sync → Scan QR from browser**
+1. In the Keepmark browser manager, open **Status → Connect another device**
+   and choose **Show connection QR** (if a sync lock is set there, enter its
+   password first).
+2. On Android, open **Connect → I have a shared link → Scan QR from browser**
    (the same QR button is in **Syncs → + Add a sync** when a sync is already
    active).
 3. Check the service and abbreviated sync ID the review shows, tap **Continue**,
@@ -140,11 +140,24 @@ The camera is used only while you are scanning. Manual linking stays available.
 
 **Syncs → ⋮ → Share sync…** shows a `keepmark://sync` link for that sync (after
 the device unlock when app lock is on), to copy or send with the share sheet.
-The other person pastes it in **+ Add a sync → Shared link** (or taps it), in
-this app or in Keepmark for browsers, reviews the service and ID, and links.
-The link carries the sync's key, never the password, and **does not expire**:
-anyone holding it can read and change those bookmarks until the sync password
-is changed. Send it only to people you trust.
+The other person pastes it in **+ Add a sync → I have a shared link** (or taps
+it), in this app or in Keepmark for browsers, reviews the service and ID, and
+links. The service and ID come from the link and cannot be edited: **Use
+another link** goes back to the paste field.
+
+**One-time links.** When the sync's service supports them (Keepmark sync
+service 1.2.1 or later), the shared link works once and expires (10 minutes by
+default, or 1 hour), optionally with a 6-digit code to pass on separately;
+**Change** remakes it with other options and **Revoke link** cancels it. The
+receiver sees the service first and only **Open link** uses it up; after that,
+**Use another link** asks before dropping the key, because the link cannot be
+opened again.
+
+A lasting link carries the sync's key, never the password, and **does not
+expire**: anyone holding it can read and change those bookmarks until the sync
+password is changed. Send it only to people you trust. A one-time link carries
+only a random secret: the key travels encrypted on the service, which cannot
+read it.
 
 ## Organize several items
 
