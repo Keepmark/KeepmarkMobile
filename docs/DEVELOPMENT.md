@@ -1048,7 +1048,10 @@ The byte vector is pinned in `SyncHandoffTests`, the extension's
   attempts); offline keeps it; anything else drops it. The sender's label `l`
   becomes `ReconcileInfo.ProposedLabel`, used for a new row whose name is free.
   The pending link is dropped on Back, Cancel, lock/background and disposal;
-  an inbox link waits while one is pending.
+  an inbox link waits while one is pending. Once verified, the summary's
+  `Use another link` (`Edit` for ID and password) drops the candidate; for a
+  redeemed one-time key it first asks `ConnOnceDiscard` (`Discard` / Cancel,
+  the back key presses Cancel, focus moves to Cancel and back).
 
 ### 10.6 Unlink
 

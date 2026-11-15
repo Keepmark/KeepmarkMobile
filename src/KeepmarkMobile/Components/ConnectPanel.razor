@@ -159,7 +159,7 @@ else
                         <strong>@L.Get(Str.ConnSyncOpenedA) <code>@WorkflowRules.ShortId(reconcile.Candidate.Id)</code> @L.Get(Str.ConnSyncOpenedB)</strong>
                         <span>@L.Get(Str.ConnItemsCounts, reconcile.RemoteCount, reconcile.LocalCount)</span>
                     </div>
-                    <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@(busy || confirmDiscard)">@L.Get(mode == "link" ? Str.ConnUseAnotherLink : Str.ConnEditCreds)</button>
+                    <button class="xbs-link-btn" @ref="useAnotherButton" @onclick="UseDifferentSync" disabled="@(busy || confirmDiscard)">@L.Get(mode == "link" ? Str.ConnUseAnotherLink : Str.ConnEditCreds)</button>
                 </div>
                 @if (confirmDiscard)
                 {
@@ -169,7 +169,7 @@ else
                         <p class="mb-2">@L.Get(Str.ConnOnceDiscard)</p>
                         <div class="d-flex flex-wrap gap-2">
                             <button class="btn btn-danger" @onclick="DiscardOnceKey" disabled="@busy">@L.Get(Str.ConnOnceDiscardYes)</button>
-                            <button class="btn btn-secondary" data-back="20" @onclick="() => confirmDiscard = false" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                            <button class="btn btn-secondary" data-back="20" @ref="discardCancelButton" @onclick="KeepOnceKey" disabled="@busy">@L.Get(Str.CommonCancel)</button>
                         </div>
                     </div>
                 }
@@ -379,6 +379,27 @@ else
     /// that link is used up, so "Use another link" asks first.</summary>
     private bool reconcileFromOnce;
     private bool confirmDiscard;
+    /// <summary>The button that opened the question is disabled while it is
+    /// open (focus would drop to the page): focus moves to Cancel, and back
+    /// to that button on Cancel.</summary>
+    private ElementReference useAnotherButton, discardCancelButton;
+    /// <summary>Read after render: the Cancel reference exists only once
+    /// the question was rendered.</summary>
+    private bool focusDiscardCancel, focusUseAnother;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!focusDiscardCancel && !focusUseAnother) return;
+        var target = focusDiscardCancel ? discardCancelButton : useAnotherButton;
+        focusDiscardCancel = focusUseAnother = false;
+        try { await target.FocusAsync(); } catch { }
+    }
+
+    private void KeepOnceKey()
+    {
+        confirmDiscard = false;
+        focusUseAnother = true;
+    }
 
     private void ClearOnceError() => onceError = string.Empty;
 
@@ -503,7 +524,7 @@ else
     /// the ID/password form. A key from a one-time link asks first.</summary>
     private void UseDifferentSync()
     {
-        if (reconcileFromOnce && reconcile is not null) { confirmDiscard = true; return; }
+        if (reconcileFromOnce && reconcile is not null) { confirmDiscard = true; focusDiscardCancel = true; return; }
         DiscardOnceKey();
     }
 
