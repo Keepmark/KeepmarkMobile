@@ -67,12 +67,15 @@ else
         </div>
         <p class="xbs-hint mt-3">@L.Get(Str.ConnBackupHintA) <a href="backup">@L.Get(Str.ConnBackupHintLink)</a> @L.Get(Str.ConnBackupHintB)</p>
         <div class="d-grid mt-3">
-            <button class="btn btn-secondary" @onclick="CancelAsync" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+            <button class="btn btn-secondary" data-back="15" @onclick="CancelAsync" disabled="@busy">@L.Get(Str.CommonCancel)</button>
         </div>
     }
     else
     {
-        <button class="xbs-back" @onclick="Back" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>@L.Get(Str.CommonBack)</button>
+        @* data-back: the Android back key presses this button (gestures.js
+           xbsGestures.back), so the key steps back inside the flow instead
+           of leaving the page. Sheets (30+) still win over it. *@
+        <button class="xbs-back" data-back="15" @onclick="Back" disabled="@busy"><svg class="km-ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>@L.Get(Str.CommonBack)</button>
         @if (qrState.ShowReview)
         {
             <QrCredentialReview ServiceUrl="@qrServiceUrl" SyncId="@qrSyncId" Busy="@(busy || qrState.IsVerifying)"
