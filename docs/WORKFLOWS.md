@@ -96,9 +96,9 @@ the recent count are segmented controls.
 | Connect: new sync | no | `Create a new sync` → service URL, password + confirm, name (prefilled with the service host) → `Create sync` | none | The password cannot be recovered. After success the full sync ID is shown with `Copy sync ID`. |
 | Connect: existing sync | no | `I have a shared link` (paste, or QR on Android) or `I have the sync ID and password` (service URL, sync ID, password) → verification → direction with consequences, name → apply | Android: apply executes; extension popup: one inline confirmation | Download: unsynced edits on this device are lost. Upload: changes from other devices are lost. Merge: items deleted on one side come back. |
 | Change password | yes | Syncs → `Change password` on the active sync's row → Current, New, Confirm new → `Change password` | one inline confirmation | Other devices stop syncing until they are unlinked and linked again with the new password. Unsynced local edits are uploaded now. Older backup files keep their own password. The long password belongs to the sync, so this is a row action in Syncs, never a Settings section, and the sync lock is not asked again: the saved key is re-wrapped under the previous one. |
-| Backup: export | no | Backup password + confirm → `Export encrypted backup` | none | The backup password is not the sync password and cannot be recovered. |
+| Backup: export | no | Backup password + confirm → `Export encrypted backup` (extension: Backup → `Export…` opens a task dialog first) | none | The backup password is not the sync password and cannot be recovered. |
 | Backup: import | yes (extension) / no (Android) | `Choose backup file…` → password of that backup → `Check backup` (dry run: item count, nothing changes) → consequences → `Restore backup` | Review is the only confirmation; final button executes | Replaces local bookmarks and, while linked, the server copy; the other devices receive it at their next sync. A wrong password clears only the password; the file stays chosen. |
-| Safety backup: restore | no | `Restore` | always | What is replaced (local bookmarks or server copy) and that a pre-restore backup is taken. Backups of another sync (or needing a link while unlinked) cannot be restored here: they are hidden behind the `Restorable here / All` filter, shown dimmed with the reason, with no `Restore` and, when their sync is saved, `Activate <name>…` (opens Syncs) instead. |
+| Safety backup: restore | no | `Restore` | always | What is replaced (local bookmarks or server copy) and that a pre-restore backup is taken. Backups of another sync (or needing a link while unlinked) cannot be restored here: they are hidden behind the `Restorable here / All` filter, shown dimmed with the reason, with no `Restore` and, when their sync is saved, `Activate <name>…` (Android: opens Syncs) instead. |
 | Safety backup: delete | no | `Delete` | always | There is no undo. |
 | Unlink this device | yes | `Unlink this device…` | always | Local bookmarks stay. Linking again needs the sync ID and password. Edits not yet synced stay only on this device. Undo is cleared. |
 | Sync conflict | conflict | direction with consequences → apply | Android: apply executes; extension: one inline confirmation | Same direction text as Connect. |
@@ -158,8 +158,11 @@ the recent count are segmented controls.
   the password, and the service check and merge preview run again. Android has
   no resumable wizard.
 - Recovery (extension): there is no "last action / undo" banner. What a
-  destructive step replaced is listed in Backup → Safety backups, with the
-  operation named in words and its date. The popup carries no backup or restore
+  destructive step replaced is listed in Backup → Safety backups, grouped by
+  day, each entry with the operation named in words, its time, the sync it
+  belongs to (saved name + short ID), how many items it added/removed when the
+  writer knew the before/after trees (large syncs, conflicts, duplicates
+  cleanup), side, size and encryption. The popup carries no backup or restore
   panel: it shows status and `Sync now`, and `Manage` opens the place where
   those live.
 
@@ -378,7 +381,8 @@ keepmark://sync?v=1&s=<service URL, percent-encoded>&id=<sync ID>&k=<derived key
   revocation (every other device must then be linked again). Both apps say so
   next to the link.
 - **Share** (extension: share icon beside the QR icon on every saved sync in
-  Manager → Sync; Android: `⋮` → `Share sync…` on every saved sync with a
+  Manager → Sync, plus “Share link” beside “Show connection QR” on the Status
+  card for the active sync; Android: `⋮` → `Share sync…` on every saved sync with a
   key). Same gate as the QR / a switch: the extension asks the sync-lock
   password when a lock is set (nothing otherwise); Android asks the device
   unlock when app lock is on (nothing otherwise). A read-only GET + decrypt
