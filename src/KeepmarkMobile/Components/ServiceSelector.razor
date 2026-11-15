@@ -101,9 +101,13 @@
     private string? observed;
     private string selection = string.Empty;
     /// <summary>What the scheme picker shows: the scheme of the URL the parent
-    /// holds, "https" for a host on its own. Derived, never stored separately —
-    /// the composed URL stays the single source of truth.</summary>
-    private string Scheme => WorkflowRules.SplitServiceUrl(Value).Scheme;
+    /// holds, "https" for a host on its own. Derived from the composed URL,
+    /// except while the host box is empty: an empty URL cannot carry a scheme,
+    /// so a scheme picked before typing the host waits in
+    /// <see cref="pendingScheme"/> (else typing the host fell back to https
+    /// while the picker still showed http).</summary>
+    private string Scheme => string.IsNullOrWhiteSpace(Value) && pendingScheme is { } p ? p : WorkflowRules.SplitServiceUrl(Value).Scheme;
+    private string? pendingScheme;
     /// <summary>What the host box shows: the URL without its scheme.</summary>
     private string Host => WorkflowRules.SplitServiceUrl(Value).Host;
     private bool checking;
@@ -181,6 +185,7 @@
     {
         expanded = false;
         selection = value;
+        pendingScheme = null;
         Value = selection == "custom" ? string.Empty : selection;
         observed = Value;
         await Invalidate();
@@ -190,7 +195,8 @@
     private async Task EditScheme(ChangeEventArgs e)
     {
         if (Disabled) return;
-        await Compose(e.Value?.ToString(), Host);
+        pendingScheme = e.Value?.ToString();
+        await Compose(pendingScheme, Host);
     }
     private async Task EditHost(ChangeEventArgs e)
     {
