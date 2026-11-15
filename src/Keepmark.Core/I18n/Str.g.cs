@@ -941,6 +941,10 @@ public static partial class Str
     public const string SyncsShareRevoked = nameof(SyncsShareRevoked);
     public const string SyncsShareAlreadyGone = nameof(SyncsShareAlreadyGone);
     public const string ConnLinkOnceNote = nameof(ConnLinkOnceNote);
+    public const string ConnUseAnotherLink = nameof(ConnUseAnotherLink);
+    public const string ConnEditCreds = nameof(ConnEditCreds);
+    public const string ConnOnceDiscard = nameof(ConnOnceDiscard);
+    public const string ConnOnceDiscardYes = nameof(ConnOnceDiscardYes);
     public const string ConnLinkCodeLabel = nameof(ConnLinkCodeLabel);
     public const string ConnLinkOpen = nameof(ConnLinkOpen);
     public const string ConnLinkAcquiredOnce = nameof(ConnLinkAcquiredOnce);

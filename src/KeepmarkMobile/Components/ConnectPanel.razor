@@ -159,8 +159,20 @@ else
                         <strong>@L.Get(Str.ConnSyncOpenedA) <code>@WorkflowRules.ShortId(reconcile.Candidate.Id)</code> @L.Get(Str.ConnSyncOpenedB)</strong>
                         <span>@L.Get(Str.ConnItemsCounts, reconcile.RemoteCount, reconcile.LocalCount)</span>
                     </div>
-                    <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@busy">@L.Get(Str.CommonChange)</button>
+                    <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@(busy || confirmDiscard)">@L.Get(mode == "link" ? Str.ConnUseAnotherLink : Str.ConnEditCreds)</button>
                 </div>
+                @if (confirmDiscard)
+                {
+                    @* The key came from a one-time link: it is used up and
+                       cannot bring the key back, so dropping it asks first. *@
+                    <div class="alert alert-warning mb-3" role="group" aria-label="@L.Get(Str.ConnOnceDiscard)">
+                        <p class="mb-2">@L.Get(Str.ConnOnceDiscard)</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-danger" @onclick="DiscardOnceKey" disabled="@busy">@L.Get(Str.ConnOnceDiscardYes)</button>
+                            <button class="btn btn-secondary" data-back="20" @onclick="() => confirmDiscard = false" disabled="@busy">@L.Get(Str.CommonCancel)</button>
+                        </div>
+                    </div>
+                }
             }
             else if (mode == "creds")
             {
@@ -363,6 +375,10 @@ else
     private string onceError = string.Empty;
     /// <summary>Sender's sync name from the redeemed voucher, proposed for the new row.</summary>
     private string? proposedLabel;
+    /// <summary>The verified candidate came from a redeemed one-time link:
+    /// that link is used up, so "Use another link" asks first.</summary>
+    private bool reconcileFromOnce;
+    private bool confirmDiscard;
 
     private void ClearOnceError() => onceError = string.Empty;
 
@@ -411,6 +427,7 @@ else
         var label = content.Label;
         if (!OfferCandidate(SyncHandoff.ToCandidate(content))) return;
         proposedLabel = label;
+        reconcileFromOnce = true;
         content = null;
         await LinkQr();
     }
@@ -459,6 +476,7 @@ else
         armed = null;
         password = newPassword = confirmPassword = string.Empty;
         proposedLabel = null;
+        reconcileFromOnce = confirmDiscard = false;
         mode = "link";
     }
 
@@ -474,15 +492,24 @@ else
     private void Choose(string value)
     {
         mode = value;
+        reconcileFromOnce = confirmDiscard = false;
         if (value == "new") _ = SuggestNameAsync(null);
         isError = false;
         linkError = string.Empty;
         message = string.Empty;
     }
 
-    /// <summary>Drop the verified candidate and go back to the ID/password form.</summary>
+    /// <summary>Drop the verified candidate and go back to the link step or
+    /// the ID/password form. A key from a one-time link asks first.</summary>
     private void UseDifferentSync()
     {
+        if (reconcileFromOnce && reconcile is not null) { confirmDiscard = true; return; }
+        DiscardOnceKey();
+    }
+
+    private void DiscardOnceKey()
+    {
+        reconcileFromOnce = confirmDiscard = false;
         reconcile = null;
         proposedLabel = null;
         mergeStats = null;
@@ -498,6 +525,7 @@ else
         ClearQr();
         mode = null;
         reconcile = null;
+        reconcileFromOnce = confirmDiscard = false;
         armed = null;
         linkError = string.Empty;
         applyError = string.Empty;
