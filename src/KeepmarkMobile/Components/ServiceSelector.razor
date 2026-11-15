@@ -40,7 +40,7 @@
             <input id="@(id + "-url")" class="form-control" value="@Host" @oninput="EditHost" disabled="@Disabled" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="@L.Get(Str.ServiceHostExample)" />
         </div>
         <div class="form-text">@L.Get(Str.ConnServiceUrlHintPlain)</div>
-        @if (WorkflowRules.IsCleartextServiceUrl(Value))
+        @if (WorkflowRules.IsCleartextServiceUrl(Value) || Scheme == WorkflowRules.HttpScheme)
         {
             @* Cleartext warning sits where the choice is made, not in a dialog:
                it must be readable before "Check service", and colour alone never
@@ -201,7 +201,11 @@
     private async Task EditHost(ChangeEventArgs e)
     {
         if (Disabled) return;
-        await Compose(Scheme, e.Value?.ToString());
+        // The scheme on screen survives an emptied host box: one that came
+        // with the URL (pasted, or from the parent) is not in pendingScheme
+        // yet, and clearing the host to retype it must not turn it into https.
+        pendingScheme = Scheme;
+        await Compose(pendingScheme, e.Value?.ToString());
     }
     /// <summary>Publishes the URL the two controls describe. An emptied host box
     /// clears the parent value too, so "Check service" goes back to disabled
