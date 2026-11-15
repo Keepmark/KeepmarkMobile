@@ -1,5 +1,6 @@
 @inherits KeepmarkMobile.Components.SessionComponentBase
 @using Keepmark.Core.Workflow
+@using Keepmark.Core.Sync
 @inject KeepmarkMobile.Services.XbsSession Session
 @inject KeepmarkMobile.Services.XbsSettings AppSettings
 @inject KeepmarkMobile.Services.ToastState Toast
@@ -38,11 +39,21 @@ else
         {
             <div class="alert @(isError ? "alert-danger" : "alert-success")" role="@(isError ? "alert" : "status")">@message</div>
         }
-        <p class="xbs-connect-lead">@L.Get(Str.ConnLead)</p>
+        @if (!AddingWhileLinked)
+        {
+            <p class="xbs-connect-lead">@L.Get(Str.ConnLead)</p>
+        }
+        @* Three flat choices, the shared link first: it is the usual way to add
+           a sync that already exists (nothing to type). *@
         <div class="xbs-choices">
-            <button class="xbs-choice" @onclick='() => Choose("existing")'>
+            <button class="xbs-choice" @onclick='() => Choose("link")'>
                 <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg></span>
-                <span class="xbs-choice-text"><strong>@L.Get(Str.ConnLinkExistingTitle)</strong><span>@L.Get(Str.ConnLinkExistingText)</span></span>
+                <span class="xbs-choice-text"><strong>@L.Get(Str.ConnMethodLinkTitle)</strong><span>@L.Get(Str.ConnMethodLinkText)</span></span>
+                <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+            </button>
+            <button class="xbs-choice" @onclick='() => Choose("creds")'>
+                <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7a4 4 0 1 1-3.9 4.9L4 19v2h3v-2h2v-2h2l1.1-1.1A4 4 0 0 1 15 7zM16 10h.01" /></svg></span>
+                <span class="xbs-choice-text"><strong>@L.Get(Str.ConnMethodCredsTitle)</strong><span>@L.Get(Str.ConnMethodCredsText)</span></span>
                 <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </button>
             @if (AllowCreate)
@@ -70,8 +81,8 @@ else
         }
         else
         {
-            <h2 class="xbs-step-title">@(mode == "existing" ? L.Get(Str.ConnLinkExistingTitle) : L.Get(Str.ConnCreateTitle))</h2>
-            @if (mode == "existing" && reconcile is null)
+            <h2 class="xbs-step-title">@StepTitle</h2>
+            @if (mode == "link" && reconcile is null)
             {
                 @* A link someone shared (keepmark://sync): pasted here, or
                    tapped elsewhere and delivered through SyncLinkInbox. Both
@@ -119,18 +130,18 @@ else
                            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
                     <button class="btn btn-secondary" @onclick="UsePastedLink" disabled="@(busy || string.IsNullOrWhiteSpace(linkText))">@L.Get(Str.ConnLinkUse)</button>
                 </div>
-                <div class="form-text mb-3">@L.Get(Str.ConnLinkHint)</div>
+                <div class="mb-3"></div>
                 @if (!string.IsNullOrEmpty(linkPasteError))
                 {
                     <div class="alert alert-danger" role="alert">@linkPasteError</div>
                 }
                 }
             }
-            @if (reconcile is null && pendingOnce is null)
+            @if (reconcile is null && pendingOnce is null && mode != "link")
             {
                 <ServiceSelector Value="@serviceUrl" ValueChanged="ServiceChanged" Checked="ServiceChecked" Disabled="@busy" />
             }
-            @if (mode == "existing" && reconcile is not null)
+            @if (mode is "link" or "creds" && reconcile is not null)
             {
                 @* Verified: the apply step uses exactly these credentials, so the
                    inputs are gone (editing them would not change the target). *@
@@ -143,7 +154,7 @@ else
                     <button class="xbs-link-btn" @onclick="UseDifferentSync" disabled="@busy">@L.Get(Str.CommonChange)</button>
                 </div>
             }
-            else if (mode == "existing")
+            else if (mode == "creds")
             {
                 @if (pendingOnce is null)
                 {
@@ -152,7 +163,7 @@ else
                     <input disabled="@busy" class="form-control" @bind="syncId" @bind:after="ClearLinkError" placeholder="@L.Get(Str.ConnSyncIdPlaceholder)" autocomplete="off" spellcheck="false" autocapitalize="off" />
                     <label class="form-label mt-2">@L.Get(Str.CommonPassword)</label>
                     <input disabled="@busy" type="password" class="form-control" @bind="password" @bind:after="ClearLinkError" autocomplete="current-password" />
-                    <InfoHint Text="@L.Get(Str.ConnPasswordShort)" Title="@L.Get(Str.ConnLinkExistingTitle)" Body="@L.Get(Str.ConnPasswordHint)" />
+                    <InfoHint Text="@L.Get(Str.ConnPasswordShort)" Title="@L.Get(Str.ConnMethodCredsTitle)" Body="@L.Get(Str.ConnPasswordHint)" />
                     <div class="mt-3 d-grid">
                         <button class="btn btn-primary" @onclick="LinkExisting" disabled="@(busy || serviceInfo is null)">@L.Get(Str.ConnOpenSync)</button>
                     </div>
@@ -163,7 +174,7 @@ else
                 </div>
                 }
             }
-            else
+            else if (mode == "new")
             {
                 <div class="mb-3">
                     <label class="form-label">@L.Get(Str.CommonNewPassword)</label>
@@ -171,14 +182,15 @@ else
                     <label class="form-label mt-2">@L.Get(Str.ConnConfirmPassword)</label>
                     <input disabled="@busy" type="password" class="form-control" @bind="confirmPassword" @bind:after="ClearLinkError" autocomplete="new-password" />
                     <InfoHint Text="@L.Get(Str.ConnPwNewShort)" Title="@L.Get(Str.ConnCreateTitle)" Body="@L.Get(Str.ConnPwNewHint)" />
+                    @NameField()
                     <div class="mt-2 d-grid gap-2">
                         @if (localCount > 0)
                         {
-                            <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@(busy || !CanCreate)">@Loc.Plural(Str.ConnCreateUpload, localCount)</button>
+                            <button class="btn btn-primary" @onclick="CreateWithUpload" disabled="@(busy || !CanCreate || NameTaken)">@Loc.Plural(Str.ConnCreateUpload, localCount)</button>
                             <InfoHint Text="@L.Get(Str.ConnCreateUploadShort)" Title="@Loc.Plural(Str.ConnCreateUpload, localCount)" Body="@L.Get(Str.ConnCreateUploadHint)" />
                             @if (armed != "createEmpty")
                             {
-                                <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@(busy || !CanCreate)">@L.Get(Str.ConnCreateEmptyInstead)</button>
+                                <button class="btn btn-outline-danger" @onclick='() => armed = "createEmpty"' disabled="@(busy || !CanCreate || NameTaken)">@L.Get(Str.ConnCreateEmptyInstead)</button>
                             }
                             else
                             {
@@ -190,7 +202,7 @@ else
                         }
                         else
                         {
-                            <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@(busy || !CanCreate)">@L.Get(Str.ConnCreateNew)</button>
+                            <button class="btn btn-outline-primary" @onclick="CreateNew" disabled="@(busy || !CanCreate || NameTaken)">@L.Get(Str.ConnCreateNew)</button>
                             <div class="form-text">@L.Get(Str.ConnCreateEmptyHint)</div>
                         }
                     </div>
@@ -224,8 +236,9 @@ else
         {
             <button class="btn btn-secondary mb-2" @onclick="PreviewMerge">@L.Get(Str.StatusCompareAgain)</button>
         }
+        @NameField()
         <div class="d-grid">
-            <button class="btn btn-primary" @onclick="ApplyChosen" disabled="@(busy || (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, reconcile))))">@ApplyLabel</button>
+            <button class="btn btn-primary" @onclick="ApplyChosen" disabled="@(busy || NameTaken || (direction == "merge" && (mergeStats is null || !ReferenceEquals(mergeStatsFor, reconcile))))">@ApplyLabel</button>
         </div>
         @if (!string.IsNullOrEmpty(applyError))
         {
@@ -274,8 +287,9 @@ else
     /// empty. Changing direction invalidates the merge preview.</summary>
     private string direction = "download";
 
-    /// <summary>First-run choice: null = pick, "existing" = link, "new" = create.
-    /// Adding while linked starts on "existing": a new sync needs an unlink.</summary>
+    /// <summary>The choice: null = pick, "link" = shared link or QR, "creds" =
+    /// sync ID and password, "new" = create (first link only: adding while
+    /// linked offers the first two).</summary>
     private string? mode;
 
     private string ServiceUrlClean => WorkflowRules.NormalizeServiceUrl(serviceUrl);
@@ -286,7 +300,6 @@ else
     protected override void OnInitialized()
     {
         serviceUrl = AppSettings.ServiceUrl;
-        if (AddingWhileLinked) mode = "existing";
         AppLock.Changed += LockChanged;
         LinkInbox.Arrived += InboxArrived;
     }
@@ -404,7 +417,7 @@ else
             pendingOnce = once;
             return true;
         }
-        if (!SyncShareLink.TryParse(text, out var candidate)) { mode = "existing"; return false; }
+        if (!SyncShareLink.TryParse(text, out var candidate)) { mode = "link"; return false; }
         DropOnce();
         OfferCandidate(candidate!);
         return true;
@@ -434,7 +447,7 @@ else
         armed = null;
         password = newPassword = confirmPassword = string.Empty;
         proposedLabel = null;
-        mode = "existing";
+        mode = "link";
     }
 
     private async Task RefreshLocalCountAsync()
@@ -449,6 +462,7 @@ else
     private void Choose(string value)
     {
         mode = value;
+        if (value == "new") _ = SuggestNameAsync(null);
         isError = false;
         linkError = string.Empty;
         message = string.Empty;
@@ -469,11 +483,6 @@ else
     {
         if (qrState.ShowReview) { CancelQr(); return; }
         if (pendingOnce is not null) { DropOnce(); return; }
-        if (AddingWhileLinked)
-        {
-            _ = CancelAsync();
-            return;
-        }
         ClearQr();
         mode = null;
         reconcile = null;
@@ -484,6 +493,8 @@ else
         password = string.Empty;
         newPassword = string.Empty;
         confirmPassword = string.Empty;
+        linkText = linkPasteError = qrError = string.Empty;
+        nameDraft = string.Empty;
     }
 
     private async Task CancelAsync() => await OnCancel.InvokeAsync();
@@ -659,7 +670,12 @@ else
 
     private bool CanCreate => serviceInfo?.Status == Core.Models.ServiceStatus.Online;
     private Task ServiceChecked(Core.Api.ServiceInfoResponse? info) { serviceInfo = info; return Task.CompletedTask; }
-    private Task ServiceChanged(string url) { serviceUrl = url; ClearQr(); reconcile = null; linkError = string.Empty; armed = null; return Task.CompletedTask; }
+    private async Task ServiceChanged(string url)
+    {
+        serviceUrl = url; ClearQr(); reconcile = null; linkError = string.Empty; armed = null;
+        // A new sync is named after its service until the user types a name.
+        if (mode == "new" && !nameTouched) await SuggestNameAsync(null);
+    }
 
     private Task LinkExisting() => serviceInfo is null ? Task.CompletedTask : LinkExistingCredentials(ServiceUrlClean, syncId.Trim(), password);
 
@@ -679,7 +695,9 @@ else
             var result = await probe;
             if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;
             serviceUrl = targetUrl; syncId = targetId;
-            reconcile = qrAttempt.HasValue && proposedLabel is not null ? result with { ProposedLabel = proposedLabel } : result;
+            await SuggestNameAsync(new SavedSyncIdentity(targetUrl, targetId), qrAttempt.HasValue ? proposedLabel : null);
+            if (IsDisposed || Lifetime.IsCancellationRequested || (qrAttempt.HasValue && !CurrentQrAttempt(qrAttempt.Value))) return;
+            reconcile = result;
             // Consumed: the candidate carries the key; a failed check keeps it for a retry.
             password = string.Empty;
 
@@ -688,7 +706,7 @@ else
             applyError = string.Empty;
             if (reconcile is { LocalCount: 0, RemoteCount: 0 })
             {
-                await Session.ApplyRemoteAsync(reconcile);
+                await Session.ApplyRemoteAsync(Named(reconcile));
                 reconcile = null;
                 await RefreshLocalCountAsync();
                 await FinishAsync(L.Get(Str.ConnLinkedEmpty));
@@ -711,7 +729,7 @@ else
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
-            createdId = await Session.CreateNewSyncAsync(ServiceUrlClean, newPassword);
+            createdId = await Session.CreateNewSyncAsync(ServiceUrlClean, newPassword, label: NameForSave);
 
             reconcile = null;
             armed = null;
@@ -729,7 +747,7 @@ else
         await RunStepAsync(async () =>
         {
             WorkflowRules.RequireNewPassword(newPassword, confirmPassword);
-            createdId = await Session.CreateNewSyncWithUploadAsync(ServiceUrlClean, newPassword);
+            createdId = await Session.CreateNewSyncWithUploadAsync(ServiceUrlClean, newPassword, label: NameForSave);
 
             reconcile = null;
             mode = null;
@@ -759,7 +777,7 @@ else
         await RunStepAsync(async () =>
         {
             var target = reconcile!;
-            var backedUp = await Session.ApplyRemoteAsync(target);
+            var backedUp = await Session.ApplyRemoteAsync(Named(target));
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
@@ -774,7 +792,7 @@ else
         await RunStepAsync(async () =>
         {
             var target = reconcile!;
-            await Session.ApplyLocalAsync(target);
+            await Session.ApplyLocalAsync(Named(target));
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
@@ -808,7 +826,7 @@ else
                 throw new InvalidOperationException(L.Get(Str.ConnPreviewFirst));
             }
 
-            var backedUp = await Session.ApplyMergeAsync(target, Core.Safety.SafetyOperations.ConnectMerge);
+            var backedUp = await Session.ApplyMergeAsync(Named(target), Core.Safety.SafetyOperations.ConnectMerge);
             reconcile = null;
             mergeStats = null;
             mergeStatsFor = null;
@@ -848,6 +866,77 @@ else
             busy = false;
         }
     }
+
+    // ---- name (last field, always editable) --------------------------------
+
+    private string StepTitle => mode switch
+    {
+        "link" => L.Get(Str.ConnMethodLinkTitle),
+        "creds" => L.Get(Str.ConnMethodCredsTitle),
+        _ => L.Get(Str.ConnCreateTitle),
+    };
+
+    /// <summary>Name the row will get. Prefilled once the target is known: the
+    /// name this device already shows for it, else the sender's name from a
+    /// one-time link (when free), else the host suggestion.</summary>
+    private string nameDraft = string.Empty;
+    private IReadOnlyList<SavedSync> savedRows = [];
+    private SavedSyncIdentity? nameTarget;
+    /// <summary>The target is already a saved row (its name is kept when empty).</summary>
+    private bool nameKnown;
+
+    private string? NameForSave => SavedSyncs.NormalizeLabel(nameDraft);
+    private bool NameTaken => NameForSave is { } n && SavedSyncs.LabelTaken(savedRows, nameTarget, n);
+    private string NameFallback => SavedSyncs.Name(new SavedSync { ServiceUrl = nameTarget?.ServiceUrl ?? ServiceUrlClean, SyncId = nameTarget?.SyncId ?? string.Empty });
+
+    private Services.ReconcileInfo Named(Services.ReconcileInfo info) => info with { ProposedLabel = NameForSave };
+
+    /// <summary>The user typed a name: a later service change keeps it.</summary>
+    private bool nameTouched;
+    private void NameEdited() => nameTouched = true;
+
+    private async Task SuggestNameAsync(SavedSyncIdentity? target, string? sender = null)
+    {
+        nameTouched = false;
+        nameTarget = target;
+        // Awaited from ServiceChanged (an event callback): a registry read
+        // failure must only lose the suggestion, never surface as an
+        // unhandled error. RememberActiveAsync re-checks the name anyway.
+        try { savedRows = Session.Registry is { } registry ? await registry.ListAsync() : []; }
+        catch (Exception ex)
+        {
+            Session.Log.Warn("connect", $"Saved syncs unreadable for the name suggestion: {ex.GetType().Name}");
+            savedRows = [];
+        }
+        if (IsDisposed) return;
+        var url = target?.ServiceUrl ?? ServiceUrlClean;
+        var known = target is null ? null : SavedSyncs.Find(savedRows, target);
+        nameKnown = known is not null;
+        nameDraft = known is not null ? SavedSyncs.Name(known)
+            : SavedSyncs.NormalizeLabel(sender) is { } s && !SavedSyncs.LabelTaken(savedRows, target, s) ? s
+            : SavedSyncs.SuggestName(url, savedRows);
+        if (!IsDisposed) StateHasChanged();
+    }
+
+    private RenderFragment NameField() => __builder =>
+    {
+        <div class="mb-3">
+            <label class="form-label" for="conn-sync-name">@L.Get(Str.SyncsNameLabel)</label>
+            <input id="conn-sync-name" class="form-control" @bind="nameDraft" @bind:event="oninput" @bind:after="NameEdited" disabled="@busy"
+                   maxlength="@SavedSyncs.MaxLabelLength" autocomplete="off" spellcheck="false"
+                   aria-invalid="@(NameTaken ? "true" : "false")" aria-describedby="conn-sync-name-hint" />
+            @if (NameTaken)
+            {
+                <div id="conn-sync-name-hint" class="alert alert-danger mt-2 mb-0" role="alert">@L.Get(Str.SyncsNameTaken)</div>
+            }
+            else if (!nameKnown)
+            {
+                @* A saved sync keeps its name when the field is emptied, so the
+                   host-fallback hint would be wrong there. *@
+                <div id="conn-sync-name-hint" class="form-text">@L.Get(Str.SyncsNameEmptyHint, NameFallback)</div>
+            }
+        </div>
+    };
 
     private void Ok(string text)
     {

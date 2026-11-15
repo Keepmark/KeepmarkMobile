@@ -869,5 +869,9 @@ internal static partial class Catalogs
         [Str.ConnLinkCodeLabel] = "Codice",
         [Str.ConnLinkOpen] = "Apri link",
         [Str.ConnLinkAcquiredOnce] = "Chiave ricevuta dal link monouso per il sync {0}: nessuna password richiesta. Il link ora è consumato.",
+        [Str.ConnMethodLinkTitle] = "Ho un link condiviso",
+        [Str.ConnMethodLinkText] = "Inquadra il QR del browser o incolla il link: porta servizio, ID sync e chiave.",
+        [Str.ConnMethodCredsTitle] = "Ho ID sync e password",
+        [Str.ConnMethodCredsText] = "Li trovi sul dispositivo che usa già il sync.",
     };
 }

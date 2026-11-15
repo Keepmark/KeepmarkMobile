@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.252 (253)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.253 (254)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -755,7 +755,7 @@ The list is refreshed in place.
 ### 9.4 Add a sync while linked
 
 `Syncs → + Add a sync` is available only while linked and offers **only the
-existing-sync path** (manual credentials or QR). Creating a brand-new sync is a
+existing-sync methods** (shared link / QR, or sync ID and password). Creating a brand-new sync is a
 first-time flow: unlink first (bookmarks stay).
 
 The flow reuses `ProbeLinkAsync` and the normal direction review:
@@ -846,11 +846,22 @@ list of its own and reports back with `OnFinished` (refresh the list) and
 2. **Panel closed** — the Syncs list (rows, active badge, actions) with
    `+ Add a sync` below it; while unlinked with no rows, the empty state with
    the same button.
-3. **Mode choice** — only while unlinked: `Link an existing sync` and
-   `Create a new sync`. While linked the panel opens directly on the
-   existing-sync editor (the row that is active already has its own Unlink).
-4. **Editor** — service selector, credentials, QR, verification, direction
-   review and apply.
+3. **Method choice** (v1.0.253) — three cards, shared link first:
+   `I have a shared link` (`mode = "link"`: QR scan + paste field only),
+   `I have the sync ID and password` (`"creds"`: service selector, ID,
+   password) and, only while unlinked, `Create a new sync` (`"new"`). Back
+   returns here; a link from the inbox or a scan jumps to `"link"`. Same
+   choices and order as the extension (WORKFLOWS.md "Connect methods").
+4. **Editor** — only the chosen method's fields, verification, direction
+   review, the name and apply. The name (`SyncsNameLabel`, last field above the
+   final button; for a new sync after the passwords) is prefilled by
+   `SuggestNameAsync`: the row's current name when this device knows the
+   sync, else the one-time link's sender label when free, else
+   `SavedSyncs.SuggestName`. A taken name (`SyncsNameTaken`) disables the
+   final button; empty means host fallback. It travels as
+   `ReconcileInfo.ProposedLabel` (or the `label` argument of the create
+   methods) to `RememberActiveAsync`, which applies it unless another row
+   shows it.
 5. **Created** — the new sync ID in full, `Copia sync ID` and `Done`; the panel
    waits for that acknowledgement instead of dropping the only readable copy of
    the credential.
@@ -934,8 +945,8 @@ cluster keeps its own adjacent error surface (`check` / `verify-link` /
 
 ### 10.5 Browser QR
 
-Syncs → `+ Add a sync` → Existing sync (first link, and while linked) places a
-QR icon and "Scan QR from browser" before the manual fields. `IQrScanner` /
+Syncs → `+ Add a sync` → `I have a shared link` (first link, and while linked)
+shows a QR icon and "Scan QR from browser" above the paste field. `IQrScanner` /
 `QrScanner` use pinned `ZXing.Net.Maui.Controls` 0.10.4.
 
 - CAMERA is requested only on the scan action; camera hardware is optional; no
@@ -989,7 +1000,8 @@ change) are in WORKFLOWS.md "Shared sync link".
   (`Platforms/Android/SensitiveClipboard`, `EXTRA_IS_SENSITIVE`) and the system
   share sheet. Memory only; cleared on close, Disarm, lock, background and
   disposal. The row owns the task (other rows disabled).
-- **Import**: `ConnectPanel` adds a `Shared link` field under the QR button;
+- **Import**: `ConnectPanel`'s `I have a shared link` method holds the QR
+  button and the `Shared link` field;
   `OfferLink` turns a valid link into the QR candidate
   (`ConnectQrPayload.FromShareLink`, no version), so review, 60-second expiry,
   `ProbeLinkWithKeyAsync` (stale text `ConnLinkKeyStale`) and apply are the QR

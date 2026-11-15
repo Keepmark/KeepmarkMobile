@@ -231,9 +231,10 @@ public sealed class XbsSession : IAsyncDisposable
     }
 
     /// <summary>The sync just activated becomes the active registry row.</summary>
-    /// <param name="proposedLabel">Sender's name from a one-time link: used
-    /// only for a row this device does not know yet, and only when no other
-    /// row already shows that name.</param>
+    /// <param name="proposedLabel">The name confirmed in the connect form
+    /// (prefilled with the row's current name, the one-time link's sender
+    /// name or the host suggestion). Used whenever no other row already shows
+    /// that name; null or empty keeps the row's current name.</param>
     private async Task RememberActiveAsync(SyncCredentials candidate, string? proposedLabel = null)
     {
         if (Registry is null) return;
@@ -242,7 +243,7 @@ public sealed class XbsSession : IAsyncDisposable
         {
             var rows = await Registry.ListAsync().ConfigureAwait(false);
             var identity = new SavedSyncIdentity(candidate.ServiceUrl, candidate.Id);
-            if (SavedSyncs.Find(rows, identity) is null && !SavedSyncs.LabelTaken(rows, identity, wanted)) label = wanted;
+            if (!SavedSyncs.LabelTaken(rows, identity, wanted)) label = wanted;
         }
         await Registry.RememberAsync(new SavedSync
         {
@@ -638,7 +639,7 @@ public sealed class XbsSession : IAsyncDisposable
 
     /// <summary>Creates an empty sync and adopts it. Returns the new sync ID (the
     /// caller must show it: it is the credential's only readable form).</summary>
-    public async Task<string> CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default)
+    public async Task<string> CreateNewSyncAsync(string serviceUrl, string password, CancellationToken ct = default, string? label = null)
     {
         // Creating replaces the local tree: save the sync in use first (no-op
         // when unlinked), then snapshot what is about to be destroyed.
@@ -655,14 +656,14 @@ public sealed class XbsSession : IAsyncDisposable
         await Store.ReplaceAllAsync([], string.Empty, created.LastUpdated!, created.Version).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
         RememberService(serviceUrl);
-        await RememberActiveAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version)).ConfigureAwait(false);
+        await RememberActiveAsync(new SyncCredentials(created.Id!, serviceUrl, derived, created.Version), label).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
         return created.Id!;
     }
 
     /// <summary>Creates the sync on the service, then uploads the current local tree into it.
     /// Returns the new sync ID (the caller must show it: it is not derivable later).</summary>
-    public async Task<string> CreateNewSyncWithUploadAsync(string serviceUrl, string password, CancellationToken ct = default)
+    public async Task<string> CreateNewSyncWithUploadAsync(string serviceUrl, string password, CancellationToken ct = default, string? label = null)
     {
         // The local tree becomes a new sync: save the sync in use first (no-op
         // when unlinked), so a failed push cannot silently lose its edits.
@@ -683,7 +684,7 @@ public sealed class XbsSession : IAsyncDisposable
             }).ConfigureAwait(false);
         await RotateSafetyMasterBestEffortAsync(oldKek, derived).ConfigureAwait(false);
         RememberService(serviceUrl);
-        await RememberActiveAsync(candidate).ConfigureAwait(false);
+        await RememberActiveAsync(candidate, label).ConfigureAwait(false);
         Engine!.Mode = _settings.Mode;
         _log.Info("session", "Created new sync and uploaded local tree");
         return created.Id!;
@@ -1707,7 +1708,7 @@ public sealed record ReconcileInfo(
     string RemoteBlob, string LocalBlob,
     long? RemoteRevision = null, string? RemoteHash = null)
 {
-    /// <summary>Sync name proposed by a one-time link's sender (see RememberActiveAsync).</summary>
+    /// <summary>Sync name confirmed in the connect form (see RememberActiveAsync).</summary>
     public string? ProposedLabel { get; init; }
 }
 

@@ -869,5 +869,9 @@ internal static partial class Catalogs
         [Str.ConnLinkCodeLabel] = "コード",
         [Str.ConnLinkOpen] = "リンクを開く",
         [Str.ConnLinkAcquiredOnce] = "同期 {0} のキーを1回限りのリンクから受け取りました。パスワードは不要です。リンクは使用済みになりました。",
+        [Str.ConnMethodLinkTitle] = "共有リンクがある",
+        [Str.ConnMethodLinkText] = "ブラウザーの QR を読み取るかリンクを貼り付けるだけで、サービス・同期 ID・キーが入ります。",
+        [Str.ConnMethodCredsTitle] = "同期 ID とパスワードがある",
+        [Str.ConnMethodCredsText] = "同期を使っている端末で確認できます。",
     };
 }

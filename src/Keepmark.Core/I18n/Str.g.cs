@@ -944,4 +944,8 @@ public static partial class Str
     public const string ConnLinkCodeLabel = nameof(ConnLinkCodeLabel);
     public const string ConnLinkOpen = nameof(ConnLinkOpen);
     public const string ConnLinkAcquiredOnce = nameof(ConnLinkAcquiredOnce);
+    public const string ConnMethodLinkTitle = nameof(ConnMethodLinkTitle);
+    public const string ConnMethodLinkText = nameof(ConnMethodLinkText);
+    public const string ConnMethodCredsTitle = nameof(ConnMethodCredsTitle);
+    public const string ConnMethodCredsText = nameof(ConnMethodCredsText);
 }

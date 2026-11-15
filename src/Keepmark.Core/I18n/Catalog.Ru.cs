@@ -871,5 +871,9 @@ internal static partial class Catalogs
         [Str.ConnLinkCodeLabel] = "Код",
         [Str.ConnLinkOpen] = "Открыть ссылку",
         [Str.ConnLinkAcquiredOnce] = "Ключ для синхронизации {0} получен из одноразовой ссылки: пароль не нужен. Ссылка теперь использована.",
+        [Str.ConnMethodLinkTitle] = "У меня есть ссылка",
+        [Str.ConnMethodLinkText] = "Отсканируйте QR-код из браузера или вставьте ссылку: в ней есть сервис, ID синхронизации и ключ.",
+        [Str.ConnMethodCredsTitle] = "У меня есть ID и пароль",
+        [Str.ConnMethodCredsText] = "Их можно найти на устройстве, где синхронизация уже работает.",
     };
 }

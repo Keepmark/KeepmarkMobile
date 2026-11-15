@@ -869,5 +869,9 @@ internal static partial class Catalogs
         [Str.ConnLinkCodeLabel] = "Cod",
         [Str.ConnLinkOpen] = "Deschide linkul",
         [Str.ConnLinkAcquiredOnce] = "Cheie primită din linkul de unică folosință pentru sync-ul {0}: nu este nevoie de parolă. Linkul a fost folosit.",
+        [Str.ConnMethodLinkTitle] = "Am un link partajat",
+        [Str.ConnMethodLinkText] = "Scanează codul QR din browser sau lipește linkul: aduce serviciul, ID-ul sync și cheia.",
+        [Str.ConnMethodCredsTitle] = "Am ID-ul sync și parola",
+        [Str.ConnMethodCredsText] = "Le găsești pe dispozitivul care folosește deja sync-ul.",
     };
 }

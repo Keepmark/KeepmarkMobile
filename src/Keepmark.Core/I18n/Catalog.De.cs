@@ -869,5 +869,9 @@ internal static partial class Catalogs
         [Str.ConnLinkCodeLabel] = "Code",
         [Str.ConnLinkOpen] = "Link öffnen",
         [Str.ConnLinkAcquiredOnce] = "Schlüssel aus dem Einmal-Link für Sync {0} erhalten: kein Passwort nötig. Der Link ist jetzt verbraucht.",
+        [Str.ConnMethodLinkTitle] = "Ich habe einen geteilten Link",
+        [Str.ConnMethodLinkText] = "Scanne den QR-Code aus dem Browser oder füge den Link ein: Er bringt Dienst, Sync-ID und Schlüssel mit.",
+        [Str.ConnMethodCredsTitle] = "Ich habe Sync-ID und Passwort",
+        [Str.ConnMethodCredsText] = "Du findest sie auf dem Gerät, das den Sync schon nutzt.",
     };
 }

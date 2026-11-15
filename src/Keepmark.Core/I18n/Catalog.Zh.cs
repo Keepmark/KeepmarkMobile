@@ -870,5 +870,9 @@ internal static partial class Catalogs
         [Str.ConnLinkCodeLabel] = "代码",
         [Str.ConnLinkOpen] = "打开链接",
         [Str.ConnLinkAcquiredOnce] = "已从一次性链接收到同步 {0} 的密钥：无需密码。该链接现已用掉。",
+        [Str.ConnMethodLinkTitle] = "我有共享链接",
+        [Str.ConnMethodLinkText] = "扫描浏览器中的二维码或粘贴链接：它带有服务、同步 ID 和密钥。",
+        [Str.ConnMethodCredsTitle] = "我有同步 ID 和密码",
+        [Str.ConnMethodCredsText] = "可在已使用该同步的设备上找到。",
     };
 }

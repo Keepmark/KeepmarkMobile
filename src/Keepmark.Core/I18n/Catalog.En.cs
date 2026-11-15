@@ -869,5 +869,9 @@ internal static partial class Catalogs
         [Str.ConnLinkCodeLabel] = "Code",
         [Str.ConnLinkOpen] = "Open link",
         [Str.ConnLinkAcquiredOnce] = "Key received from the one-time link for sync {0}: no password needed. The link is now used up.",
+        [Str.ConnMethodLinkTitle] = "I have a shared link",
+        [Str.ConnMethodLinkText] = "Scan the QR from the browser or paste the link: it brings the service, sync ID and key.",
+        [Str.ConnMethodCredsTitle] = "I have the sync ID and password",
+        [Str.ConnMethodCredsText] = "Find them on the device that already uses the sync.",
     };
 }
