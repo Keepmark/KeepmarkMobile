@@ -10,7 +10,7 @@ workflows and wording: [WORKFLOWS.md](WORKFLOWS.md) and
 [UI-TERMS.md](UI-TERMS.md). Visual language: [DESIGN.md](DESIGN.md).
 Measurements and limits: [PERFORMANCE.md](PERFORMANCE.md).
 
-Current version: **v1.0.253 (254)** · app id `com.keepmark.mobile` · display
+Current version: **v1.0.254 (255)** · app id `com.keepmark.mobile` · display
 name `Keepmark` · Android 10 (API 29) or later.
 
 Distribution:
@@ -861,7 +861,9 @@ list of its own and reports back with `OnFinished` (refresh the list) and
    final button; empty means host fallback. It travels as
    `ReconcileInfo.ProposedLabel` (or the `label` argument of the create
    methods) to `RememberActiveAsync`, which applies it unless another row
-   shows it.
+   shows it. While linked, `Syncs.razor` passes `ActiveSync`: a link or ID
+   naming it is refused before the probe with `ErrSavedAlreadyActive`
+   (v1.0.254), so the review never offers to "leave" the sync it would open.
 5. **Created** — the new sync ID in full, `Copia sync ID` and `Done`; the panel
    waits for that acknowledgement instead of dropping the only readable copy of
    the credential.

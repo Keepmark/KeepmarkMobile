@@ -252,6 +252,10 @@ else
     /// one" applies, and the new target becomes active (the old row stays).</summary>
     [Parameter] public bool AddingWhileLinked { get; set; }
 
+    /// <summary>The sync this device uses now, if any: adding it again is
+    /// refused before the server check (nothing to add, nothing to leave).</summary>
+    [Parameter] public SavedSyncIdentity? ActiveSync { get; set; }
+
     /// <summary>Creating a brand-new sync stays a first-time flow.</summary>
     [Parameter] public bool AllowCreate { get; set; } = true;
 
@@ -686,6 +690,11 @@ else
             if (string.IsNullOrWhiteSpace(targetId) || string.IsNullOrEmpty(targetPassword))
             {
                 throw new InvalidOperationException(L.Get(Str.ConnEnterBoth));
+            }
+
+            if (ActiveSync is { } current && SavedSyncs.Same(current, new SavedSyncIdentity(targetUrl, targetId)))
+            {
+                throw new InvalidOperationException(L.Get(Str.ErrSavedAlreadyActive));
             }
 
             var probe = secretIsKey
