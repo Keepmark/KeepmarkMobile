@@ -321,7 +321,7 @@ internal static partial class Catalogs
         [Str.ConnSyncIdPlaceholder] = "在此粘贴同步 ID",
         [Str.ServiceHostExample] = "例如：sync.yourdomain.com",
         [Str.SyncsNameEmptyHint] = "留空则使用服务名称：{0}。",
-        [Str.SyncsEmpty] = "还没有已保存的同步。扫描浏览器上同步的二维码即可添加。",
+        [Str.SyncsEmpty] = "还没有已保存的同步。新建一个，或通过共享链接或浏览器上的二维码添加已有的同步。",
         [Str.SyncsUnlockTitle] = "激活同步",
         [Str.SyncsUnlinked] = "已取消关联 {0}。书签保留在此设备上；同步仍保留在服务器上。",
         [Str.SyncsActivateMessage] = "激活 {0}？",

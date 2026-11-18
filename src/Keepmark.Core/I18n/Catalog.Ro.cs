@@ -320,7 +320,7 @@ internal static partial class Catalogs
         [Str.ConnSyncIdPlaceholder] = "Lipește aici ID-ul de sincronizare",
         [Str.ServiceHostExample] = "ex. sync.domeniultau.ro",
         [Str.SyncsNameEmptyHint] = "Lasă gol pentru a folosi numele serviciului: {0}.",
-        [Str.SyncsEmpty] = "Încă nicio sincronizare salvată. Adaugă una scanând codul QR al unei sincronizări din browser.",
+        [Str.SyncsEmpty] = "Încă nicio sincronizare salvată. Creează una nouă sau adaugă una existentă dintr-un link partajat ori din codul QR din browser.",
         [Str.SyncsUnlockTitle] = "Activează sincronizarea",
         [Str.SyncsUnlinked] = "{0} deconectată. Marcajele rămân pe acest dispozitiv; sincronizarea rămâne pe server.",
         [Str.SyncsActivateMessage] = "Activezi {0}?",

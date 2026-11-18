@@ -320,7 +320,7 @@ internal static partial class Catalogs
         [Str.ConnSyncIdPlaceholder] = "同期 ID をここに貼り付け",
         [Str.ServiceHostExample] = "例：sync.yourdomain.com",
         [Str.SyncsNameEmptyHint] = "空欄にするとサービス名を使います：{0}",
-        [Str.SyncsEmpty] = "保存された同期はまだありません。ブラウザの同期の QR コードをスキャンして追加してください。",
+        [Str.SyncsEmpty] = "保存された同期はまだありません。新しく作成するか、共有リンクまたはブラウザの QR コードから既存の同期を追加してください。",
         [Str.SyncsUnlockTitle] = "同期を有効にする",
         [Str.SyncsUnlinked] = "{0} のリンクを解除しました。ブックマークはこのデバイスに残り、同期はサーバーに残ります。",
         [Str.SyncsActivateMessage] = "{0} を有効にしますか？",

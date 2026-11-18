@@ -320,7 +320,7 @@ internal static partial class Catalogs
         [Str.ConnSyncIdPlaceholder] = "Paste the sync ID here",
         [Str.ServiceHostExample] = "e.g. sync.yourdomain.com",
         [Str.SyncsNameEmptyHint] = "Leave it empty to use the service name: {0}.",
-        [Str.SyncsEmpty] = "No saved sync yet. Add one by scanning the QR code of a sync in your browser.",
+        [Str.SyncsEmpty] = "No saved sync yet. Create a new one, or add an existing one from a shared link or a browser QR code.",
         [Str.SyncsUnlockTitle] = "Activate sync",
         [Str.SyncsUnlinked] = "{0} unlinked. The bookmarks stay on this device; the sync stays on the server.",
         [Str.SyncsActivateMessage] = "Activate {0}?",

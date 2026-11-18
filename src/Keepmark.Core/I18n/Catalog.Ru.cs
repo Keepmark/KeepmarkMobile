@@ -322,7 +322,7 @@ internal static partial class Catalogs
         [Str.ConnSyncIdPlaceholder] = "Вставьте сюда ID синхронизации",
         [Str.ServiceHostExample] = "напр. sync.yourdomain.com",
         [Str.SyncsNameEmptyHint] = "Оставьте пустым, чтобы использовать имя сервиса: {0}.",
-        [Str.SyncsEmpty] = "Сохранённых sync пока нет. Добавьте его, отсканировав QR-код sync в браузере.",
+        [Str.SyncsEmpty] = "Сохранённых sync пока нет. Создайте новый или добавьте существующий по общей ссылке или QR-коду из браузера.",
         [Str.SyncsUnlockTitle] = "Активировать sync",
         [Str.SyncsUnlinked] = "{0} отвязан. Закладки остаются на этом устройстве; sync остаётся на сервере.",
         [Str.SyncsActivateMessage] = "Активировать {0}?",
