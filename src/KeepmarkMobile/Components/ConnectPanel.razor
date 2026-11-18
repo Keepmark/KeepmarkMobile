@@ -44,8 +44,13 @@ else
             <p class="xbs-connect-lead">@L.Get(Str.ConnLead)</p>
         }
         @* Three flat choices, the shared link first: it is the usual way to add
-           a sync that already exists (nothing to type). *@
+           a sync that already exists (nothing to type). With no sync saved yet
+           (first link on this phone) "Create a new sync" comes first, highlighted. *@
         <div class="xbs-choices">
+            @if (AllowCreate && SuggestCreate)
+            {
+                @NewChoice
+            }
             <button class="xbs-choice" @onclick='() => Choose("link")'>
                 @* QR first (scanning is the quick path), the link as its own badge:
                        the tile-colored disc cuts it free of the QR finders. *@
@@ -58,13 +63,9 @@ else
                 <span class="xbs-choice-text"><strong>@L.Get(Str.ConnMethodCredsTitle)</strong><span>@L.Get(Str.ConnMethodCredsText)</span></span>
                 <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </button>
-            @if (AllowCreate)
+            @if (AllowCreate && !SuggestCreate)
             {
-                <button class="xbs-choice" @onclick='() => Choose("new")'>
-                    <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></span>
-                    <span class="xbs-choice-text"><strong>@L.Get(Str.ConnCreateTitle)</strong><span>@(localCount > 0 ? Loc.Plural(Str.ConnCreateTextUpload, localCount) : L.Get(Str.ConnCreateTextFresh))</span></span>
-                    <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-                </button>
+                @NewChoice
             }
         </div>
         <p class="xbs-hint mt-3">@L.Get(Str.ConnBackupHintA) <a href="backup">@L.Get(Str.ConnBackupHintLink)</a> @L.Get(Str.ConnBackupHintB)</p>
@@ -278,6 +279,16 @@ else
 
     /// <summary>Creating a brand-new sync stays a first-time flow.</summary>
     [Parameter] public bool AllowCreate { get; set; } = true;
+
+    /// <summary>No sync is saved on this phone yet: "Create a new sync" is
+    /// the likely first step, so its card comes first and is highlighted.</summary>
+    [Parameter] public bool SuggestCreate { get; set; }
+
+    private RenderFragment NewChoice => @<button class="xbs-choice@(SuggestCreate ? " xbs-choice-suggested" : "")" @onclick='() => Choose("new")'>
+        <span class="xbs-choice-ico"><svg class="km-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg></span>
+        <span class="xbs-choice-text"><strong>@L.Get(Str.ConnCreateTitle)</strong><span>@(localCount > 0 ? Loc.Plural(Str.ConnCreateTextUpload, localCount) : L.Get(Str.ConnCreateTextFresh))</span></span>
+        <svg class="km-ico sm xbs-choice-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+    </button>;
 
     /// <summary>A sync was added, created or applied: the page refreshes and
     /// closes the panel (the toast carries the outcome).</summary>

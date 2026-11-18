@@ -36,7 +36,7 @@ else if (adding)
 {
     @* The connect/add flow lives here, not on a page of its own: one section
        owns the syncs, and the list reappears when the panel is done. *@
-    <ConnectPanel AddingWhileLinked="@(active is not null)" AllowCreate="@(active is null)"
+    <ConnectPanel AddingWhileLinked="@(active is not null)" AllowCreate="@(active is null)" SuggestCreate="@(rows.Count == 0)"
                   ActiveSync="@(active is null ? null : new SavedSyncIdentity(active.ServiceUrl, active.Id))"
                   OnFinished="FinishAddingAsync" OnCancel="CancelAdding" />
 }

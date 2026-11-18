@@ -2529,6 +2529,10 @@ button.xbs-tag:active { opacity: 0.6; }
 }
 
 .xbs-choice:active { background: var(--km-surface-2); border-color: var(--km-accent); }
+/* First link on this phone (no saved sync): "Create a new sync" is proposed. */
+.xbs-choice-suggested { border-color: var(--km-accent); background: var(--km-tint); }
+.xbs-choice-suggested .xbs-choice-ico { background: var(--km-accent); color: #fff; }
+.xbs-choice-suggested .xbs-choice-chev { color: var(--km-accent); }
 
 .xbs-choice-ico {
     width: 48px;
